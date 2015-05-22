@@ -1,0 +1,33 @@
+<assembly
+	xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+	<id>fimtraplatform-api</id>
+	<formats>
+		<format>jar</format>
+	</formats>
+	<includeBaseDirectory>false</includeBaseDirectory>
+	<dependencySets>
+		<dependencySet>
+			<outputDirectory>/</outputDirectory>
+			<includes>
+				<include>
+                    *:platform-core:jar:sources:${project.version}
+                </include>
+				<include>
+                    *:datafission:jar:sources:${project.version}
+                </include>
+			</includes>
+			<useTransitiveFiltering>true</useTransitiveFiltering>
+			<unpack>true</unpack>
+			<unpackOptions>
+				<includes>
+					<include>com/fimtra/platform/*.java</include>
+					<include>com/fimtra/platform/event/*.java</include>
+					<include>com/fimtra/platform/config/*.java</include>
+					<include>com/fimtra/infra/datafission/*.java</include>
+				</includes>
+			</unpackOptions>
+		</dependencySet>
+	</dependencySets>
+</assembly>

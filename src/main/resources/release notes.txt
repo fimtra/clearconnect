@@ -1,0 +1,100 @@
+<--- Release 0.9.8 (Mozart)--->
+Code clean up
+- Rationalise access for ConfigService
+- Enusre construction of PlatformKernel and ConfigService is consistent.
+
+<--- Release 0.9.7 (Bulwalk)--->
+
+Enhancements
+- Add ability to remove all records for a context
+- Provide access to a utility executor
+- Use only logical connections for licence connection count
+- Log thread stall warning when executing RPC on a core/RPC thread
+- Improve performance of coalescing atomic changes with many submaps
+
+Platform statistics
+- Report memory available in agent JVM
+- Add service instance statistics UPTIME, SUBSCRIPTION_COUNT, MESSAGE_COUNT, KB_COUNT
+- Report messages for minute and Kb per minute per agent
+- Change default stats logging period from 30sec->10sec
+- Fix QStats logs printing blank line after each log cycle
+- Fix events-per-minute statistic going negative
+- Add GC duty cycle to replace SystemLoad
+
+Platform desktop
+- Ensure RegistryService is in the services meta-data
+- Add agent name to the service instance meta-data model
+- Show when a registry is connected/disconnected
+- Add ability to display submap data
+- Fix services being deleted after adding on a restart of a registry
+- Fix service instances not being removed from the instance count
+
+Solace channel
+- Allow solace reconnect as default
+- Improve broadcast support
+- Improve error handling
+
+Code clean up
+- Rationalise access to platform components
+- Ensure context removes are unique
+- Add java 6 compile compatibility
+
+Benchmark Results 1
+-------------------
+Network msgs/sec:30017
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,423,462,557,605
+1,2,481,626,689,738
+1,3,532,616,743,719
+1,4,623,596,752,801
+1,5,636,646,942,1011
+1,6,741,827,1007,1030
+1,7,800,919,1123,1289
+1,8,904,1027,1339,1384
+1,9,1053,1251,2567,1491
+1,10,1224,1402,1648,1556
+1,11,1142,1260,1635,1736
+1,12,1232,1354,1741,1775
+1,13,1268,1453,1855,2011
+1,14,1338,1551,2348,2449
+1,15,1906,1727,2288,2554
+totalTx=492946
+totalRx=492951
+totalTimeSecs=87
+txMsgsPerSec=5645
+rxMsgsPerSec=5645
+networkMsgsPerSec=11291
+kbPublished=133438
+msgsPublished=719404
+avgMsgSizeBytes=189
+Windows 8.1 (6.3), amd64, Java 1.7.0_72, cpus=4, Corei5 1.6Ghz
+
+Benchmark Results 2
+-------------------
+Network msgs/sec:86599
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,391,386,352,253
+1,2,304,309,341,375
+1,3,316,306,345,400
+1,4,301,330,400,375
+1,5,284,313,369,457
+1,6,299,327,410,431
+1,7,365,365,445,491
+1,8,369,401,485,539
+1,9,424,468,547,585
+1,10,454,509,597,641
+1,11,496,538,632,711
+1,12,558,606,693,746
+1,13,580,630,767,799
+1,14,637,685,824,1052
+1,15,748,804,900,1146
+totalTx=492703
+totalRx=492659
+totalTimeSecs=40
+txMsgsPerSec=12225
+rxMsgsPerSec=12224
+networkMsgsPerSec=24450
+kbPublished=136443
+msgsPublished=732091
+avgMsgSizeBytes=190
+Linux (3.13.0-39-generic), amd64, Java 1.7.0_25, cpus=4, Corei7 2.0Ghz
