@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.fimtra</groupId>
-	<artifactId>platform</artifactId>
+	<artifactId>clearconnect</artifactId>
 	<packaging>jar</packaging>
 	<version>0.9.8-SNAPSHOT</version>
 
@@ -25,7 +25,7 @@
 		<dependency>
 			<groupId>com.fimtra</groupId>
 			<artifactId>datafission</artifactId>
-			<version>0.9.9-SNAPSHOT</version>
+			<version>0.9.9</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
