@@ -4,8 +4,45 @@
 
 	<groupId>com.fimtra</groupId>
 	<artifactId>clearconnect</artifactId>
-	<packaging>jar</packaging>
 	<version>0.9.8-SNAPSHOT</version>
+	<name>${project.groupId}:${project.artifactId}</name>
+	<description>A real-time multi-process application framework</description>
+	<packaging>jar</packaging>
+	<url>https://github.com/fimtra/clearconnect</url>
+
+	<licenses>
+		<license>
+			<name>The Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Ramon Servadei</name>
+			<email>ramon.servadei@fimtra.com</email>
+			<organization>Fimtra</organization>
+			<organizationUrl>http://www.fimtra.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>Paul Mackinlay</name>
+			<email>paul.mackinlay@fimtra.com</email>
+			<organization>Fimtra</organization>
+			<organizationUrl>http://www.fimtra.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>James Lupton</name>
+			<email>james.lupton@fimtra.com</email>
+			<organization>Fimtra</organization>
+			<organizationUrl>http://www.fimtra.com</organizationUrl>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>scm:git:git@github.com:fimtra/clearconnect.git</connection>
+		<developerConnection>scm:git:git@github.com:fimtra/clearconnect.git</developerConnection>
+		<url>git@github.com:fimtra/clearconnect.git</url>
+	</scm>
 
 	<properties>
 		<plugins.compiler.version>3.1</plugins.compiler.version>
@@ -18,6 +55,7 @@
 		<plugins.progard.version>2.0.6</plugins.progard.version>
 		<plugins.source.version>2.2.1</plugins.source.version>
 		<plugins.javadoc.version>2.9.1</plugins.javadoc.version>
+		<plugins.gpg.version>1.6</plugins.gpg.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
@@ -40,13 +78,6 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-
-	<scm>
-		<connection>scm:git:ssh://git@bitbucket.org/fimtra/fimtra.git</connection>
-		<developerConnection>scm:git:ssh://git@bitbucket.org/fimtra/fimtra.git</developerConnection>
-		<url>https://bitbucket.org/fimtra/fimtra.git</url>
-		<tag>0.9.4</tag>
-	</scm>
 
 	<build>
 		<plugins>
@@ -82,11 +113,6 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-release-plugin</artifactId>
-				<version>${plugins.release.version}</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${plugins.surefire.version}</version>
 				<configuration>
@@ -98,6 +124,14 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
 				<version>${plugins.source.version}</version>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<Version>${project.version}</Version>
+							<Built-By>fimtra.com</Built-By>
+						</manifestEntries>
+					</archive>
+				</configuration>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
@@ -107,10 +141,88 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>${plugins.javadoc.version}</version>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<Version>${project.version}</Version>
+							<Built-By>fimtra.com</Built-By>
+						</manifestEntries>
+					</archive>
+				</configuration>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
+	<distributionManagement>
+		<repository>
+			<id>sonatype-releases</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+		</repository>
+		<snapshotRepository>
+			<id>sonatype-snapshots</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+
 	<profiles>
+		<profile>
+			<!-- This profile exists to set socket linger times to 0 as unit tests 
+				open and close the same socket. -->
+			<id>Unix OS</id>
+			<activation>
+				<os>
+					<family>unix</family>
+				</os>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>${plugins.surefire.version}</version>
+						<configuration>
+							<argLine></argLine>
+							<forkCount>1</forkCount>
+							<reuseForks>false</reuseForks>
+							<argLine>-Dtcpchannel.SO_LINGER=0</argLine>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>central</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>${plugins.gpg.version}</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
 		<profile>
 			<id>java6</id>
 			<build>
@@ -122,166 +234,6 @@
 							<source>1.6</source>
 							<target>1.6</target>
 						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>fimtraPlatformSources</id>
-			<dependencies>
-				<dependency>
-					<groupId>com.fimtra</groupId>
-					<artifactId>datafission</artifactId>
-					<classifier>sources</classifier>
-				</dependency>
-			</dependencies>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<version>${plugins.assembly.version}</version>
-						<configuration>
-							<finalName>fimtra-platform-${project.version}-sources</finalName>
-							<appendAssemblyId>false</appendAssemblyId>
-							<attach>false</attach>
-							<archive>
-								<manifestEntries>
-									<Version>${project.version}</Version>
-									<Built-By>fimtra.com</Built-By>
-								</manifestEntries>
-							</archive>
-							<descriptors>
-								<descriptor>fimtraplatform_assembly.xml</descriptor>
-							</descriptors>
-						</configuration>
-						<executions>
-							<execution>
-								<id>assemble-api</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>fimtraPlatform</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<version>${plugins.assembly.version}</version>
-						<configuration>
-							<archive>
-								<manifestEntries>
-									<Version>${project.version}</Version>
-									<Built-By>fimtra.com</Built-By>
-								</manifestEntries>
-								<manifest>
-									<mainClass>com.fimtra.platform.impl.PlatformRegistry</mainClass>
-								</manifest>
-							</archive>
-							<descriptorRefs>
-								<descriptorRef>jar-with-dependencies</descriptorRef>
-							</descriptorRefs>
-							<finalName>fimtra-platform-${project.version}</finalName>
-							<appendAssemblyId>false</appendAssemblyId>
-						</configuration>
-						<executions>
-							<execution>
-								<id>standalone</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>api</id>
-			<dependencies>
-				<dependency>
-					<groupId>com.fimtra.infra</groupId>
-					<artifactId>datafission</artifactId>
-					<classifier>sources</classifier>
-				</dependency>
-			</dependencies>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<version>${plugins.assembly.version}</version>
-						<configuration>
-							<finalName>fimtra-platform-api-${project.version}-sources</finalName>
-							<appendAssemblyId>false</appendAssemblyId>
-							<attach>false</attach>
-							<archive>
-								<manifestEntries>
-									<Version>${project.version}</Version>
-									<Built-By>fimtra.com</Built-By>
-								</manifestEntries>
-							</archive>
-							<descriptors>
-								<descriptor>api_assembly.xml</descriptor>
-							</descriptors>
-						</configuration>
-						<executions>
-							<execution>
-								<id>assemble-api</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-javadoc-plugin</artifactId>
-						<version>${plugins.javadoc.version}</version>
-						<configuration>
-							<charset>UTF-8</charset>
-							<docencoding>UTF-8</docencoding>
-							<finalName>fimtra-platform-api-${project.version}</finalName>
-							<includeDependencySources>true</includeDependencySources>
-							<docfilessubdirs>true</docfilessubdirs>
-							<stylesheet>maven</stylesheet>
-							<stylesheetfile>stylesheet.css</stylesheetfile>
-							<top>
-							<![CDATA[
-							<div class="fimtratop"><a href="http://www.fimtra.com/" target="_top"><img src="http://www.fimtra.com/platformapi/resources/fimtralogo.png" width="124" height="30" alt="" border="0" /></a> <span class="fimtratitle">The Fimtra Platform API</span></div> 
-     						]]>
-							</top>
-							<archive>
-								<manifestEntries>
-									<Version>${project.version}</Version>
-									<Built-By>fimtra.com</Built-By>
-								</manifestEntries>
-							</archive>
-							<sourceFileIncludes>
-								<include>com/fimtra/platform/*.java</include>
-								<include>com/fimtra/platform/event/*.java</include>
-								<include>com/fimtra/platform/config/*.java</include>
-								<include>com/fimtra/infra/datafission/*.java</include>
-							</sourceFileIncludes>
-						</configuration>
-						<executions>
-							<execution>
-								<phase>package</phase>
-								<goals>
-									<goal>jar</goal>
-								</goals>
-							</execution>
-						</executions>
 					</plugin>
 				</plugins>
 			</build>
