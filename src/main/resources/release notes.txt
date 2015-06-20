@@ -1,9 +1,42 @@
-<--- Release 0.9.8 (Mozart)--->
+<--- Release 0.9.9 --->
+- Rename packages to com.fimtra.clearconnect
+
+Benchmark Results
+-----------------
+Network msgs/sec:42682
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,481,452,680,706
+1,2,274,297,382,565
+1,3,619,792,1537,990
+1,4,737,786,891,1024
+1,5,916,870,1039,993
+1,6,772,928,1143,1220
+1,7,983,969,1273,1376
+1,8,911,1071,1289,1385
+1,9,1040,1074,1430,1529
+1,10,1494,1241,2094,1805
+1,11,1193,1263,1655,1778
+1,12,1257,1368,1802,1905
+1,13,1390,1468,1947,2038
+1,14,1490,1588,2645,2283
+1,15,2097,1718,2291,2383
+totalTx=492921
+totalRx=492885
+totalTimeSecs=88
+txMsgsPerSec=5590
+rxMsgsPerSec=5589
+networkMsgsPerSec=11179
+kbPublished=141517
+msgsPublished=703475
+avgMsgSizeBytes=205
+Windows 8.1 (6.3), amd64, Java 1.7.0_79, cpus=4
+
+<--- Release 0.9.8 --->
 Code clean up
 - Rationalise access for ConfigService
-- Enusre construction of PlatformKernel and ConfigService is consistent.
+- Ensure construction of PlatformKernel and ConfigService is consistent.
 
-<--- Release 0.9.7 (Bulwalk)--->
+<--- Release 0.9.7 --->
 
 Enhancements
 - Add ability to remove all records for a context
