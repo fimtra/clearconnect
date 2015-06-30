@@ -74,8 +74,11 @@ import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.ContextUtils;
+import com.fimtra.datafission.core.IStatusAttribute;
+import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.ui.ColumnOrientedRecordTable;
 import com.fimtra.datafission.ui.ColumnOrientedRecordTableModel;
@@ -236,6 +239,29 @@ class PlatformDesktop
             return subscriptions;
         }
 
+        final IRecordListener statusObserver = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
+            {
+                final Connection status =
+                    IStatusAttribute.Utils.getStatus(Connection.class, imageValidInCallingThreadOnly);
+
+                switch(status)
+                {
+                    case CONNECTED:
+                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(null);
+                        break;
+                    case DISCONNECTED:
+                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.orange);
+                        break;
+                    case RECONNECTING:
+                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.yellow);
+                        break;
+                }
+            }
+        };
+        
         final String title;
         final ColumnOrientedRecordTable table;
         final ColumnOrientedRecordTableModel model;
@@ -272,6 +298,8 @@ class PlatformDesktop
             this.subscribedRecords = new CopyOnWriteArrayList<String>();
             this.model.addRecordRemovedListener(this.context);
 
+            this.context.addObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
+
             prepareTablePopupMenu();
 
             this.frame.add(new JScrollPane(this.table));
@@ -306,6 +334,7 @@ class PlatformDesktop
         protected void destroy()
         {
 
+            this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
             this.context.removeObserver(this.model,
                 this.subscribedRecords.toArray(new String[this.subscribedRecords.size()]));
             synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
