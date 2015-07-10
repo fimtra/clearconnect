@@ -40,6 +40,7 @@ import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInf
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
+import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -550,5 +551,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.stats.put(IServiceStatsRecordFields.KB_COUNT, LongValue.valueOf(this.publisher.getBytesPublished() / 1024));
 
         this.context.publishAtomicChange(this.stats);
+    }
+
+    @Override
+    public void setPermissionFilter(IPermissionFilter filter)
+    {
+        this.context.setPermissionFilter(filter);
     }
 }

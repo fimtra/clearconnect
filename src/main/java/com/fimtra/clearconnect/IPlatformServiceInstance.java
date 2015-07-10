@@ -23,7 +23,9 @@ import com.fimtra.channel.IEndPointService;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IFtStatusListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
+import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.thimble.ISequentialRunnable;
 
@@ -202,4 +204,15 @@ public interface IPlatformServiceInstance extends IPlatformServiceComponent
      *            the task to run
      */
     void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable);
+
+    /**
+     * Set the permission filter for this context. All subscriptions via
+     * {@link IPlatformServiceComponent#addRecordListener(String, IRecordListener, String...)} are
+     * passed through the filter to see if the permission token is valid for the record(s) being
+     * subscribed for.
+     * 
+     * @param filter
+     *            the filter to set, <code>null</code> to use the default "pass all" filter
+     */
+    void setPermissionFilter(IPermissionFilter filter);
 }
