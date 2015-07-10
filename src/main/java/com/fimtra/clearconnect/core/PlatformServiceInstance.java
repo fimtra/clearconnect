@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -244,11 +245,17 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
-
+    
     @Override
-    public CountDownLatch addRecordListener(IRecordListener listener, String... recordNames)
+    public Future<Map<String, Boolean>> addRecordListener(IRecordListener listener, String... recordNames)
     {
         return this.context.addObserver(listener, recordNames);
+    }
+
+    @Override
+    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener, String... recordNames)
+    {
+        return this.context.addObserver(permissionToken, listener, recordNames);
     }
 
     @Override

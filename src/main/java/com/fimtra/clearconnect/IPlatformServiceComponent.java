@@ -18,12 +18,14 @@ package com.fimtra.clearconnect;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
+import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
@@ -70,15 +72,45 @@ public interface IPlatformServiceComponent
      * names is the same as just calling it once
      * <p>
      * <b>The listener will receive all updates asynchronously</b>
+     * <p>
+     * This operation uses a permission token of {@link IPermissionFilter#DEFAULT_PERMISSION_TOKEN}.
      * 
      * @param listener
      *            the listener to add
      * @param recordNames
      *            the record name(s) to subscribe the listener to
-     * @return a latch that is triggered when the listener is added to all records; this allows
-     *         synchronous operation of this method
+     * @return a future triggered when all records have been processed. The map contains a boolean
+     *         result for each record name to indicate if the record is being observed or not. A
+     *         false result for a record name means it is not being observed and this is due to the
+     *         service having determined that the permission token is not valid for the record name.
+     * @see #addRecordListener(String, IRecordListener, String...)
      */
-    CountDownLatch addRecordListener(IRecordListener listener, String... recordNames);
+    Future<Map<String, Boolean>> addRecordListener(IRecordListener listener, String... recordNames);
+
+    /**
+     * Add a listener to receive changes to the specified records. Invoking this method will cause a
+     * subscription to be issued for any records not already subscribed for by the component. This
+     * method can be called to register multiple listeners.
+     * <p>
+     * This method is idempotent; calling this multiple times with the same listener and record
+     * names is the same as just calling it once
+     * <p>
+     * <b>The listener will receive all updates asynchronously</b>
+     * 
+     * @see #addRecordListener(IRecordListener, String...)
+     * @param permissionToken
+     *            a token representing the permission to use for the operation
+     * @param listener
+     *            the listener to add
+     * @param recordNames
+     *            the record name(s) to subscribe the listener to
+     * @return a future triggered when all records have been processed. The map contains a boolean
+     *         result for each record name to indicate if the record is being observed or not. A
+     *         false result for a record name means it is not being observed and this is due to the
+     *         service having determined that the permission token is not valid for the record name.
+     */
+    Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener,
+        String... recordNames);
 
     /**
      * Remove the listener from receiving changes for the specified records. If no more listeners

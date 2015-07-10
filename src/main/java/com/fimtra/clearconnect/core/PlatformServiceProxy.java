@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.channel.EndPointAddress;
@@ -118,10 +119,17 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
+    
     @Override
-    public CountDownLatch addRecordListener(IRecordListener listener, String... recordNames)
+    public Future<Map<String, Boolean>> addRecordListener(IRecordListener listener, String... recordNames)
     {
         return this.proxyContext.addObserver(listener, recordNames);
+    }
+
+    @Override
+    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener, String... recordNames)
+    {
+        return this.proxyContext.addObserver(permissionToken, listener, recordNames);
     }
 
     @Override
