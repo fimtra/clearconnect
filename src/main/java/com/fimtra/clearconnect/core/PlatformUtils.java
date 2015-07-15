@@ -15,9 +15,7 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.lang.management.RuntimeMXBean;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,8 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarFile;
 
-import javax.management.MXBean;
-
 import com.fimtra.clearconnect.IPlatformServiceComponent;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.WireProtocolEnum;
@@ -37,11 +33,11 @@ import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
+import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
