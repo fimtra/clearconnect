@@ -134,4 +134,11 @@ public interface IPlatformServiceProxy extends IPlatformServiceComponent
      *         this proxy
      */
     String getShortSocketDescription();
+
+    /**
+     * @return <code>true</code> if the proxy has an active connection to its service,
+     *         <code>false</code> otherwise. The connection status can change over time.
+     * @see IPlatformServiceProxy#addServiceConnectionStatusListener(IServiceConnectionStatusListener)
+     */
+    boolean isConnected();
 }

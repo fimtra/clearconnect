@@ -295,4 +295,11 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         return this.serviceConnectionStatusNotifyingCache.removeListener(listener);
     }
+
+
+    @Override
+    public boolean isConnected()
+    {
+        return this.proxyContext.isConnected();
+    }
 }
