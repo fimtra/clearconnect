@@ -1147,6 +1147,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 gcMillisPerMin -= time;
                                 final double perMin = 60d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                                 gcMillisPerMin *= perMin;
+                                // this is now the "% GC duty cycle per minute"
+                                gcMillisPerMin = (long) ((double)gcMillisPerMin / 600d);
 
                                 final long qTotalExecuted = stats[2];
                                 final long eventsPerMin =
