@@ -15,6 +15,7 @@
  */
 package com.fimtra.clearconnect;
 
+import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -59,6 +60,21 @@ import com.fimtra.thimble.ThimbleExecutor;
  */
 public interface IPlatformRegistryAgent
 {
+    /**
+     * Represents when the registry is not available during agent construction.
+     * 
+     * @author Ramon Servadei
+     */
+    class RegistryNotAvailableException extends IOException
+    {
+        private static final long serialVersionUID = 1L;
+
+        public RegistryNotAvailableException(String message)
+        {
+            super(message);
+        }
+    }
+
     /**
      * @return the name of the agent
      */

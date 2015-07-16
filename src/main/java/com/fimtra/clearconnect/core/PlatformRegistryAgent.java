@@ -48,10 +48,10 @@ import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
 import com.fimtra.clearconnect.event.IDataRadarListener;
+import com.fimtra.clearconnect.event.IDataRadarListener.SignatureMatch;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.clearconnect.event.IDataRadarListener.SignatureMatch;
 import com.fimtra.clearconnect.expression.IExpression;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
@@ -241,8 +241,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
      * @param registryAddresses
      *            the addresses of registry servers to use - this provides redundancy for registry
      *            connections
+     * @throws RegistryNotAvailableException
+     *             if the registry is not available
      */
-    public PlatformRegistryAgent(String agentName, EndPointAddress... registryAddresses) throws IOException
+    public PlatformRegistryAgent(String agentName, EndPointAddress... registryAddresses)
+        throws RegistryNotAvailableException
     {
         this(agentName, DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, registryAddresses);
     }
@@ -258,10 +261,12 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
      * @param registryAddresses
      *            the addresses of registry servers to use - this provides redundancy for registry
      *            connections
+     * @throws RegistryNotAvailableException
+     *             if the registry is not available
      */
     @SuppressWarnings({ "unused" })
     public PlatformRegistryAgent(final String agentName, int registryReconnectPeriodMillis,
-        EndPointAddress... registryAddresses) throws IOException
+        EndPointAddress... registryAddresses) throws RegistryNotAvailableException
     {
         this.startTime = System.currentTimeMillis();
         this.agentName = agentName + "-" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
@@ -377,7 +382,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
         if (this.platformName == null)
         {
-            throw new IOException("Registry name has not been received from " + registryAddresses[0]);
+            throw new RegistryNotAvailableException("Registry name has not been received from " + registryAddresses[0]);
         }
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
@@ -1148,7 +1153,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 final double perMin = 60d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                                 gcMillisPerMin *= perMin;
                                 // this is now the "% GC duty cycle per minute"
-                                gcMillisPerMin = (long) ((double)gcMillisPerMin / 600d);
+                                gcMillisPerMin = (long) ((double) gcMillisPerMin / 600d);
 
                                 final long qTotalExecuted = stats[2];
                                 final long eventsPerMin =
