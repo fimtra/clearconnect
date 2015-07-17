@@ -56,7 +56,6 @@ import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -285,21 +284,6 @@ public final class PlatformRegistry
     final ThimbleExecutor coalescingExecutor;
 
     /**
-     * Construct the platform registry using the localhost's name and the default platform registry
-     * port.
-     * 
-     * @see #PlatformRegistry(String, String, int)
-     * @see PlatformCoreProperties#REGISTRY_PORT
-     * @see TcpChannelUtils#LOCALHOST_IP
-     * @param platformName
-     *            the platform name
-     */
-    public PlatformRegistry(String platformName)
-    {
-        this(platformName, TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
-    }
-
-    /**
      * Construct the platform registry using the default platform registry port.
      * 
      * @see #PlatformRegistry(String, String, int)
@@ -310,9 +294,9 @@ public final class PlatformRegistry
      *            the hostname or IP address to use when creating the end-point for the channel
      *            server
      */
-    public PlatformRegistry(String platformName, String host)
+    public PlatformRegistry(String platformName, String node)
     {
-        this(platformName, host, PlatformCoreProperties.Values.REGISTRY_PORT);
+        this(platformName, node, PlatformCoreProperties.Values.REGISTRY_PORT);
     }
 
     /**

@@ -18,7 +18,6 @@ package com.fimtra.clearconnect;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.config.impl.ConfigService;
 import com.fimtra.clearconnect.core.PlatformRegistry;
-import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.SystemUtils;
 
@@ -36,19 +35,6 @@ public class PlatformKernel {
 	private final ConfigService configService;
 
 	/**
-	 * Construct the kernel using the default host and port
-	 *
-	 * @see PlatformCoreProperties#REGISTRY_PORT
-	 * @see TcpChannelUtils#LOCALHOST_IP
-	 * @see #PlatformKernel(String, String, int)
-	 * @param platformName
-	 *            the platform name
-	 */
-	public PlatformKernel(String platformName) {
-		this(platformName, TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
-	}
-
-	/**
 	 * Construct the kernel using the default port
 	 *
 	 * @see PlatformCoreProperties#REGISTRY_PORT
@@ -59,19 +45,6 @@ public class PlatformKernel {
 	 */
 	public PlatformKernel(String platformName, String host) {
 		this(platformName, host, PlatformCoreProperties.Values.REGISTRY_PORT);
-	}
-
-	/**
-	 * Construct the kernel using the default host
-	 *
-	 * @see TcpChannelUtils#LOCALHOST_IP
-	 * @param platformName
-	 *            the platform name
-	 * @param registryPort
-	 *            the registry port
-	 */
-	public PlatformKernel(String platformName, int registryPort) {
-		this(platformName, TcpChannelUtils.LOCALHOST_IP, registryPort);
 	}
 
 	/**
@@ -99,7 +72,7 @@ public class PlatformKernel {
 	public PlatformKernel(String platformName, String host, int registryPort) {
 		this.platformRegistry = new PlatformRegistry(platformName, host, registryPort);
 		this.configService = new KernelConfigService(host, registryPort);
-		Log.banner(this, "PLATFORM '" + platformName + "' STARTED ON " + host + ":" + registryPort);
+		Log.banner(this, "CLEARCONNECT PLATFORM '" + platformName + "' STARTED ON " + host + ":" + registryPort);
 	}
 
 	/**
@@ -108,16 +81,13 @@ public class PlatformKernel {
 	 * @param args - the parameters used to start the {@link PlatformKernel}.
 	 * <pre>
 	 *  arg[0] is the platform name (mandatory)
-	 *  arg[1] is the host (optional)
+	 *  arg[1] is the host (mandatory)
 	 *  arg[2] is the port (optional)
 	 * </pre>
 	 */
 	public static void main(String[] args) throws InterruptedException {
 		try {
 			switch (args.length) {
-				case 1:
-					new PlatformKernel(args[0]);
-					break;
 				case 2:
 					new PlatformKernel(args[0], args[1]);
 					break;
@@ -129,8 +99,8 @@ public class PlatformKernel {
 			}
 		} catch (RuntimeException e) {
 			throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + PlatformKernel.class.getSimpleName()
-					+ " platformName [hostname [tcpPort]]" + SystemUtils.lineSeparator() + "    platformName is mandatory"
-					+ SystemUtils.lineSeparator() + "    hostName is optional but must be specified if tcpPort is specified"
+					+ " platformName hostname [tcpPort]" + SystemUtils.lineSeparator() + "    platformName is mandatory"
+					+ SystemUtils.lineSeparator() + "    hostName is mandatory"
 					+ SystemUtils.lineSeparator() + "    tcpPort is optional and only applicable if hostName has been specified", e);
 		}
 		synchronized (args) {
