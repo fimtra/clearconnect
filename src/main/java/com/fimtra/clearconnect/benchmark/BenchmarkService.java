@@ -58,7 +58,7 @@ public class BenchmarkService {
 
 		NetworkTest.main(args);
 
-		new BenchmarkService(TcpChannelUtils.LOOPBACK);
+		new BenchmarkService(TcpChannelUtils.LOCALHOST_IP);
 	}
 
 	static final String PING_RECORD = "benchmarkRecord";

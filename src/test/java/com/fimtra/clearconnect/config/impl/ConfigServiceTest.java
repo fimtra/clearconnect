@@ -40,6 +40,7 @@ import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.tcpchannel.TcpChannelUtils;
 
 import static org.mockito.Matchers.eq;
 
@@ -59,7 +60,7 @@ import static org.junit.Assert.assertTrue;
  * @author Paul Mackinlay
  */
 public class ConfigServiceTest {
-	private final static String LOOPBACK = "127.0.0.1";
+	private final static String LOCALHOST_IP = TcpChannelUtils.LOCALHOST_IP;
 	private static final String MEMBER = "firing";
 	private static final String SERVICE = "lasers";
 	private static final int TIMEOUT = 6000;
@@ -70,15 +71,15 @@ public class ConfigServiceTest {
 	IPlatformRegistryAgent agent;
 
 	static ConfigService createConfigService() {
-		return new ConfigService(LOOPBACK, PlatformCoreProperties.Values.REGISTRY_PORT);
+		return new ConfigService(LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
 	}
 
 	@Before
 	public void setUp() throws IOException {
 		deleteConfigDir();
-		this.registry = new PlatformRegistry(getClass().getSimpleName(), LOOPBACK);
+		this.registry = new PlatformRegistry(getClass().getSimpleName(), LOCALHOST_IP);
 		this.candidate = createConfigService();
-		this.agent = new PlatformRegistryAgent(getClass().getSimpleName(), LOOPBACK);
+		this.agent = new PlatformRegistryAgent(getClass().getSimpleName(), LOCALHOST_IP);
 		this.agent.setRegistryReconnectPeriodMillis(RECONNECT_TIMEOUT);
 
 		this.agent.waitForPlatformService(IConfigServiceProxy.CONFIG_SERVICE);
@@ -164,7 +165,7 @@ public class ConfigServiceTest {
 		// changes
 		this.candidate.destroy();
 		this.registry.destroy();
-		this.registry = new PlatformRegistry(getClass().getSimpleName(), LOOPBACK);
+		this.registry = new PlatformRegistry(getClass().getSimpleName(), LOCALHOST_IP);
 
 		assertTrue(unavailableLatch.get().await(10, TimeUnit.SECONDS));
 		this.candidate = createConfigService();

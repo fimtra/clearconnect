@@ -43,7 +43,7 @@ public class MatrixClient
 
     public MatrixClient() throws Exception
     {
-        final String host = TcpChannelUtils.LOOPBACK; 
+        final String host = TcpChannelUtils.LOCALHOST_IP; 
         this.matrixClientAccess = new PlatformServiceAccess("MATRIX-client", "lasers", host);
         final IPlatformServiceProxy matrixEngineProxy =
             this.matrixClientAccess.getPlatformRegistryAgent().getPlatformServiceProxy(MatrixServer.SERVICE_NAME);

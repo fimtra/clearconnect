@@ -52,7 +52,7 @@ public class MatrixServer
 
     public MatrixServer() throws Exception
     {
-        final String host = TcpChannelUtils.LOOPBACK;
+        final String host = TcpChannelUtils.LOCALHOST_IP;
         this.matrixServerAccess = new PlatformServiceAccess(SERVICE_NAME, "01", host);
         this.matrixEngine = this.matrixServerAccess.getPlatformServiceInstance();
         start();

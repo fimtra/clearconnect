@@ -240,8 +240,8 @@ public class PlatformTest
     private static final int RECONNECT_PERIOD = 1000;
     private static final String TEST_PLATFORM = "PlatformTestJUnit";
 
-    String registryHost = TcpChannelUtils.LOOPBACK;
-    String agentHost = TcpChannelUtils.LOOPBACK;
+    String registryHost = TcpChannelUtils.LOCALHOST_IP;
+    String agentHost = TcpChannelUtils.LOCALHOST_IP;
     String primary = "PRIMARY";
     String secondary = "SECONDARY";
 
@@ -286,7 +286,6 @@ public class PlatformTest
     public void teardown() throws InterruptedException
     {
         Log.log(this, "============== START TEAR DOWN =============================");
-        ChannelUtils.WATCHDOG.configure(5000);
 
         PlatformTest.this.registry.destroy();
         ThreadUtils.newThread(new Runnable()
@@ -307,6 +306,8 @@ public class PlatformTest
         Log.log(this, "============== END TEAR DOWN =============================");
         // IO sensitive tests
         Thread.sleep(100);
+        
+        ChannelUtils.WATCHDOG.configure(5000);
     }
 
     @Test(timeout = 30000l)

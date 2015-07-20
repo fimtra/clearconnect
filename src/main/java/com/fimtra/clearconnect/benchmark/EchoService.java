@@ -39,7 +39,7 @@ import com.fimtra.util.is;
 public class EchoService {
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException {
-		new EchoService(TcpChannelUtils.LOOPBACK);
+		new EchoService(TcpChannelUtils.LOCALHOST_IP);
 		System.in.read();
 	}
 

@@ -1298,7 +1298,7 @@ class PlatformDesktop
         final String port = "platform port";
 
         ParametersPanel parameters = new ParametersPanel();
-        parameters.addParameter(node, TcpChannelUtils.LOOPBACK);
+        parameters.addParameter(node, TcpChannelUtils.LOCALHOST_IP);
         parameters.addParameter(port, "" + PlatformCoreProperties.Values.REGISTRY_PORT);
 
         final JFrame frame = new JFrame("ClearConnect | fimtra.com");

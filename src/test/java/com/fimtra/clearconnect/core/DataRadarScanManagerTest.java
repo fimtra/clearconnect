@@ -91,11 +91,11 @@ public class DataRadarScanManagerTest
     {
         PORT += TIMEOUT_SECS;
         this.executor = ThreadUtils.newScheduledExecutorService(getClass().getSimpleName(), TIMEOUT_SECS);
-        this.registry = new PlatformRegistry(PLATFORM_NAME, TcpChannelUtils.LOOPBACK, PORT);
+        this.registry = new PlatformRegistry(PLATFORM_NAME, TcpChannelUtils.LOCALHOST_IP, PORT);
         PORT += TIMEOUT_SECS;
         this.service =
             new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING,
-                TcpChannelUtils.LOOPBACK, PORT);
+                TcpChannelUtils.LOCALHOST_IP, PORT);
         this.candidate = this.service.dataRadarScanManager;
 
         // setup records with constantly changing data:

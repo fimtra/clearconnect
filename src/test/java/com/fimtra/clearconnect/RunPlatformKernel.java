@@ -28,7 +28,7 @@ public class RunPlatformKernel
     @SuppressWarnings("unused")
     public static void main(String[] args) throws Exception
     {
-        new PlatformKernel("TestPlatform", TcpChannelUtils.LOOPBACK);
+        new PlatformKernel("TestPlatform", TcpChannelUtils.LOCALHOST_IP);
         System.in.read();
     }
 }

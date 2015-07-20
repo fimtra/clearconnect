@@ -81,8 +81,8 @@ public class PlatformServiceProxyTest
     private static final String RPC1 = "rpc1";
     static int PORT = 31000;
     static int registryPort = 31500;
-    static String registryHost = TcpChannelUtils.LOOPBACK;
-    static String agentHost = TcpChannelUtils.LOOPBACK;
+    static String registryHost = TcpChannelUtils.LOCALHOST_IP;
+    static String agentHost = TcpChannelUtils.LOCALHOST_IP;
     final static String hostName = "localhost";
     final static String record1 = "record1";
     final static String record2 = "record2";
