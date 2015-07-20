@@ -99,9 +99,9 @@ public class PlatformKernel {
 			}
 		} catch (RuntimeException e) {
 			throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + PlatformKernel.class.getSimpleName()
-					+ " platformName hostname [tcpPort]" + SystemUtils.lineSeparator() + "    platformName is mandatory"
-					+ SystemUtils.lineSeparator() + "    hostName is mandatory"
-					+ SystemUtils.lineSeparator() + "    tcpPort is optional and only applicable if hostName has been specified", e);
+					+ " platformName hostName [tcpPort]" + SystemUtils.lineSeparator() + "    platformName is mandatory"
+					+ SystemUtils.lineSeparator() + "    hostName is mandatory and is either the hostname or IP address"
+					+ SystemUtils.lineSeparator() + "    tcpPort is optional", e);
 		}
 		synchronized (args) {
 			args.wait();
