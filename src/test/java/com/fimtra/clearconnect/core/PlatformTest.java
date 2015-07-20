@@ -57,6 +57,7 @@ import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
@@ -758,8 +759,23 @@ public class PlatformTest
         }
         assertEquals(0, proxy.getAllRpcs().size());
 
+
         // give time for IO to settle
         Thread.sleep(1000);
+        
+        // verify the socket is gone for us to proceed
+        try
+        {
+            Socket socket = null;
+            while(true)
+            {
+                socket = new Socket(this.agentHost, servicePort);
+                socket.close();
+            }
+        }
+        catch (IOException e)
+        {
+        }
 
         // re-create service instance 1 - SAME port
         assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,

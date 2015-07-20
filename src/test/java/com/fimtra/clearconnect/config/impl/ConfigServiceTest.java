@@ -15,8 +15,18 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,10 +39,8 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.config.IConfig;
-import com.fimtra.clearconnect.config.IConfigServiceProxy;
 import com.fimtra.clearconnect.config.IConfig.IConfigChangeListener;
-import com.fimtra.clearconnect.config.impl.ConfigService;
-import com.fimtra.clearconnect.config.impl.ConfigServiceProxy;
+import com.fimtra.clearconnect.config.IConfigServiceProxy;
 import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformUtils;
@@ -41,17 +49,6 @@ import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-
-import static org.mockito.Matchers.eq;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the {@link ConfigService}
@@ -165,6 +162,24 @@ public class ConfigServiceTest {
 		// changes
 		this.candidate.destroy();
 		this.registry.destroy();
+		
+        // give time for IO to settle
+        Thread.sleep(1000);
+        
+        // verify the socket is gone for us to proceed
+        try
+        {
+            Socket socket = null;
+            while(true)
+            {
+                socket = new Socket(LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
+                socket.close();
+            }
+        }
+        catch (IOException e)
+        {
+        }
+
 		this.registry = new PlatformRegistry(getClass().getSimpleName(), LOCALHOST_IP);
 
 		assertTrue(unavailableLatch.get().await(10, TimeUnit.SECONDS));

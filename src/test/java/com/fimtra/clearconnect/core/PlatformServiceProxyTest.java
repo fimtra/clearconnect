@@ -101,6 +101,7 @@ public class PlatformServiceProxyTest
     @Before
     public void setUp() throws IOException, InterruptedException
     {
+        System.err.println(this.name.getMethodName());
         registryPort++;
         ChannelUtils.WATCHDOG.configure(200, 10);
         this.registry = new PlatformRegistry(this.name.getMethodName(), registryHost, registryPort);
@@ -120,13 +121,13 @@ public class PlatformServiceProxyTest
     @After
     public void tearDown() throws InterruptedException
     {
-        ChannelUtils.WATCHDOG.configure(5000);
         this.registry.destroy();
         this.agent.destroy();
         this.service.destroy();
         this.candidate.destroy();
         // IO sensitive
         Thread.sleep(100);
+        ChannelUtils.WATCHDOG.configure(5000);
     }
 
     @Test
