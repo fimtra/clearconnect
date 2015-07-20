@@ -15,6 +15,28 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PLATFORM_CONNECTIONS;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_INSTANCE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_INSTANCE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RUNTIME_STATUS;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICES;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
+import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MESSAGE_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROTOCOL;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ENDPOINT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_ID;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_NODE;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_PORT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.SUBSCRIPTION_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,7 +56,6 @@ import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
-import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
@@ -58,28 +79,6 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.is;
-
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PLATFORM_CONNECTIONS;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_INSTANCE;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_INSTANCE;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RUNTIME_STATUS;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICES;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
-import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MESSAGE_COUNT;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROTOCOL;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ENDPOINT;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_ID;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_NODE;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_PORT;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.SUBSCRIPTION_COUNT;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
 /**
  * The PlatformMetaDataModel exposes all platform connections and meta-data required by tooling
@@ -349,8 +348,6 @@ public final class PlatformMetaDataModel
     final ConcurrentMap<String, Context> serviceInstanceRpcsContext;
     final ConcurrentMap<String, Context> serviceInstanceRecordsContext;
     final ConcurrentMap<String, ProxyContext> serviceInstanceProxyContexts;
-    final Map<String, Long> serviceUpdateTime;
-    final Map<String, Long> serviceInstanceUpdateTime;
 
     final Set<String> pendingRemoves;
     final ThimbleExecutor coalescingExecutor;
@@ -360,16 +357,6 @@ public final class PlatformMetaDataModel
     public PlatformMetaDataModel(String registryNode, int registryPort) throws IOException
     {
         this.agent = new PlatformRegistryAgent(PlatformMetaDataModel.class.getSimpleName(), registryNode, registryPort);
-
-        final int deadServicePeriodMillis = Values.STATS_LOGGING_PERIOD_SECS * 2 * 1000;
-        this.agent.getUtilityExecutor().scheduleWithFixedDelay(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                removeServicesNotUpdated(deadServicePeriodMillis);
-            }
-        }, deadServicePeriodMillis, deadServicePeriodMillis, TimeUnit.MILLISECONDS);
 
         this.pendingRemoves = Collections.synchronizedSet(new HashSet<String>());
         this.coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
@@ -381,8 +368,6 @@ public final class PlatformMetaDataModel
         this.serviceProxiesContext = new Context("serviceProxies");
         this.serviceInstancesContext = new Context("serviceInstances");
 
-        this.serviceUpdateTime = new ConcurrentHashMap<String, Long>();
-        this.serviceInstanceUpdateTime = new ConcurrentHashMap<String, Long>();
         this.serviceRpcsContext = new ConcurrentHashMap<String, Context>();
         this.serviceRecordsContext = new ConcurrentHashMap<String, Context>();
         this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
@@ -512,35 +497,6 @@ public final class PlatformMetaDataModel
                     handleRuntimeStatusUpdate(imageCopy);
                 }
             }, RUNTIME_STATUS), RUNTIME_STATUS);
-    }
-
-    void removeServicesNotUpdated(int deadServicePeriod)
-    {
-        Map.Entry<String, Long> entry = null;
-        String name = null;
-        Long lastUpdateTime = null;
-        for (Iterator<Map.Entry<String, Long>> it = this.serviceUpdateTime.entrySet().iterator(); it.hasNext();)
-        {
-            entry = it.next();
-            name = entry.getKey();
-            lastUpdateTime = entry.getValue();
-            if (System.currentTimeMillis() - lastUpdateTime.longValue() > deadServicePeriod)
-            {
-                it.remove();
-                removeService(name);
-            }
-        }
-        for (Iterator<Map.Entry<String, Long>> it = this.serviceInstanceUpdateTime.entrySet().iterator(); it.hasNext();)
-        {
-            entry = it.next();
-            name = entry.getKey();
-            lastUpdateTime = entry.getValue();
-            if (System.currentTimeMillis() - lastUpdateTime.longValue() > deadServicePeriod)
-            {
-                it.remove();
-                removeServiceInstance(name);
-            }
-        }
     }
 
     void checkReset()
@@ -1094,10 +1050,6 @@ public final class PlatformMetaDataModel
                 {
                     serviceFamily = decomposeServiceInstanceID[0];
                 }
-
-                final Long updateTime = Long.valueOf(System.currentTimeMillis());
-                this.serviceUpdateTime.put(serviceFamily, updateTime);
-                this.serviceInstanceUpdateTime.put(platformServiceInstanceID, updateTime);
 
                 // get the client part
                 proxyEndPoint = connectionRecord.get(PROXY_ENDPOINT);
