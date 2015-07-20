@@ -133,7 +133,7 @@ public final class PlatformMetaDataModel
     /** The fields for each record in the agents context */
     public static enum AgentMetaDataRecordDefinition
     {
-        Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyPerMin,
+        Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
             Runtime, User, EPM
     }
 
@@ -981,7 +981,7 @@ public final class PlatformMetaDataModel
                     subMap.get(IRuntimeStatusRecordFields.MEM_AVAILABLE_MB));
                 agentRecord.put(AgentMetaDataRecordDefinition.ThreadCount.toString(),
                     subMap.get(IRuntimeStatusRecordFields.THREAD_COUNT));
-                agentRecord.put(AgentMetaDataRecordDefinition.GcDutyPerMin.toString(),
+                agentRecord.put(AgentMetaDataRecordDefinition.GcDutyCycle.toString(),
                     subMap.get(IRuntimeStatusRecordFields.SYSTEM_LOAD));
                 agentRecord.put(AgentMetaDataRecordDefinition.Runtime.toString(),
                     subMap.get(IRuntimeStatusRecordFields.RUNTIME));
