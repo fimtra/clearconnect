@@ -15,6 +15,10 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS;
+import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
+import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,11 +63,8 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.is;
-
-import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS;
-import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
-import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
 
 /**
  * A service that maintains a registry of all other services in the platform. This should only be
@@ -79,6 +80,51 @@ import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.
  */
 public final class PlatformRegistry
 {
+
+    /**
+     * Access for starting a {@link PlatformRegistry} using command line.
+     * 
+     * @param args
+     *            - the parameters used to start the {@link PlatformRegistry}.
+     * 
+     *            <pre>
+     *  arg[0] is the platform name (mandatory)
+     *  arg[1] is the host (mandatory)
+     *  arg[2] is the port (optional)
+     * </pre>
+     * @throws InterruptedException 
+     */
+    @SuppressWarnings("unused")
+    public static void main(String[] args) throws InterruptedException
+    {
+        try
+        {
+            switch(args.length)
+            {
+                case 2:
+                    new PlatformRegistry(args[0], args[1]);
+                    break;
+                case 3:
+                    new PlatformRegistry(args[0], args[1], Integer.parseInt(args[2]));
+                    break;
+                default :
+                    throw new IllegalArgumentException("Incorrect number of arguments.");
+            }
+        }
+        catch (RuntimeException e)
+        {
+            throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + PlatformRegistry.class.getSimpleName()
+                + " platformName hostName [tcpPort]" 
+                + SystemUtils.lineSeparator() + "    platformName is mandatory"
+                + SystemUtils.lineSeparator() + "    hostName is mandatory and is either the hostname or IP address"
+                + SystemUtils.lineSeparator() + "    tcpPort is optional", e);
+        }
+        synchronized (args)
+        {
+            args.wait();
+        }
+    }
+
     static final IValue BLANK_VALUE = new TextValue("");
     static final StringProtocolCodec CODEC = new StringProtocolCodec();
 
