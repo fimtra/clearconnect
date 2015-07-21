@@ -114,6 +114,7 @@ public class PlatformUtils
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
             new NotifyingCache<IServiceAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -158,8 +159,14 @@ public class PlatformUtils
                         Log.log(logContext, "Service unavailable (lost): '", serviceFamily, "'");
                     }
                 }
+				updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return serviceAvailableListeners;
     }
 
@@ -169,6 +176,7 @@ public class PlatformUtils
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
             new NotifyingCache<IServiceInstanceAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -223,8 +231,14 @@ public class PlatformUtils
                         }
                     }
                 }
+				updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return serviceInstanceAvailableListeners;
     }
 
@@ -285,6 +299,7 @@ public class PlatformUtils
     static NotifyingCache<IRpcAvailableListener, IRpcInstance> createRpcAvailableNotifyingCache(
         final IObserverContext context, String contextRpcRecordName, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
             new NotifyingCache<IRpcAvailableListener, IRpcInstance>(context.getUtilityExecutor())
             {
@@ -337,8 +352,14 @@ public class PlatformUtils
                             ObjectUtils.safeToString(logContext));
                     }
                 }
+				updateWaitLatch.countDown();
             }
         }, contextRpcRecordName);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return rpcAvailableNotifyingCache;
     }
 
@@ -349,6 +370,7 @@ public class PlatformUtils
     static NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> createSubscriptionNotifyingCache(
         final IObserverContext context, String contextSubscriptionsRecordName, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
             new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(context.getUtilityExecutor())
             {
@@ -401,8 +423,14 @@ public class PlatformUtils
                         subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName(), info);
                     }
                 }
+				updateWaitLatch.countDown();
             }
         }, contextSubscriptionsRecordName);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return subscriptionNotifyingCache;
     }
 
@@ -413,6 +441,7 @@ public class PlatformUtils
     static NotifyingCache<IRecordConnectionStatusListener, IValue> createRecordConnectionStatusNotifyingCache(
         final ProxyContext proxyContext, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
             new NotifyingCache<IRecordConnectionStatusListener, IValue>(proxyContext.getUtilityExecutor())
             {
@@ -457,8 +486,14 @@ public class PlatformUtils
                     value = entry.getValue();
                     recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
                 }
+				updateWaitLatch.countDown();
             }
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return recordStatusNotifyingCache;
     }
 
@@ -469,6 +504,7 @@ public class PlatformUtils
     static NotifyingCache<IServiceConnectionStatusListener, Connection> createServiceConnectionStatusNotifyingCache(
         final ProxyContext proxyContext, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
             new NotifyingCache<IServiceConnectionStatusListener, Connection>(proxyContext.getUtilityExecutor())
             {
@@ -506,8 +542,14 @@ public class PlatformUtils
             {
                 Connection status = IStatusAttribute.Utils.getStatus(Connection.class, imageCopy);
                 serviceStatusNotifyingCache.notifyListenersDataAdded(Connection.class.getSimpleName(), status);
+				updateWaitLatch.countDown();
             }
         }, ISystemRecordNames.CONTEXT_STATUS);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return serviceStatusNotifyingCache;
     }
 
