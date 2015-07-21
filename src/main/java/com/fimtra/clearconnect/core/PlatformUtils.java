@@ -236,6 +236,7 @@ public class PlatformUtils
     static NotifyingCache<IRecordAvailableListener, String> createRecordAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
+		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
             new NotifyingCache<IRecordAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -266,8 +267,14 @@ public class PlatformUtils
                 {
                     recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName, recordName);
                 }
+				updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
+		try {
+			updateWaitLatch.await();
+		} catch (InterruptedException e) {
+			// ignore
+		}
         return recordAvailableNotifyingCache;
     }
 
