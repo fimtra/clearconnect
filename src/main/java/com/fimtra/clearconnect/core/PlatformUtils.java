@@ -163,7 +163,12 @@ public class PlatformUtils
             }
         }, contextRecordsRecordName);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -235,7 +240,12 @@ public class PlatformUtils
             }
         }, contextRecordsRecordName);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -285,7 +295,12 @@ public class PlatformUtils
             }
         }, contextRecordsRecordName);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -356,7 +371,12 @@ public class PlatformUtils
             }
         }, contextRpcRecordName);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -427,7 +447,12 @@ public class PlatformUtils
             }
         }, contextSubscriptionsRecordName);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -490,7 +515,12 @@ public class PlatformUtils
             }
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
@@ -546,7 +576,12 @@ public class PlatformUtils
             }
         }, ISystemRecordNames.CONTEXT_STATUS);
 		try {
-			updateWaitLatch.await();
+			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+					TimeUnit.MILLISECONDS);
+			if (!isCountedDown) {
+				Log.log(logContext, "Initial image was not processed in [",
+						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+			}
 		} catch (InterruptedException e) {
 			// ignore
 		}
