@@ -28,31 +28,31 @@ public interface IServiceConnectionStatusListener
     /**
      * Called when a platform service proxy is connected to its service.
      * 
-     * @param platformServiceName
+     * @param serviceFamily
      *            the name of the service that is now connected
      * @param identityHash
      *            an identity hash to uniquely identify this platform service proxy instance
      */
-    void onConnected(String platformServiceName, int identityHash);
+    void onConnected(String serviceFamily, int identityHash);
 
     /**
      * Called when a platform service proxy is being re-connected to its service.
      * 
-     * @param platformServiceName
+     * @param serviceFamily
      *            the name of the service that is being re-connected
      * @param identityHash
      *            an identity hash to uniquely identify this platform service proxy instance
      */
-    void onReconnecting(String platformServiceName, int identityHash);
+    void onReconnecting(String serviceFamily, int identityHash);
 
     /**
      * Called when a platform service proxy is disconnected from its service. Generally, the
      * {@link #onReconnecting(IPlatformServiceProxy, int)} will be called some-time after this.
      * 
-     * @param platformServiceName
+     * @param serviceFamily
      *            the name of the service that is now disconnected
      * @param identityHash
      *            an identity hash to uniquely identify this platform service proxy instance
      */
-    void onDisconnected(String platformServiceName, int identityHash);
+    void onDisconnected(String serviceFamily, int identityHash);
 }
