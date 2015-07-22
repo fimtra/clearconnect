@@ -57,7 +57,9 @@ public interface IPlatformServiceProxy extends IPlatformServiceComponent
 {
     /**
      * Add a listener to receive notifications about the connection status of the proxy to the
-     * platform service
+     * platform service.
+     * <p>
+     * This is an idempotent operation.
      * 
      * @param listener
      *            the listener to add
@@ -81,6 +83,8 @@ public interface IPlatformServiceProxy extends IPlatformServiceComponent
      * viewed as having stale data.
      * <p>
      * Once added the listener receives the existing record statuses asynchronously.
+     * <p>
+     * This is an idempotent operation.
      * 
      * @param listener
      *            the listener to add
