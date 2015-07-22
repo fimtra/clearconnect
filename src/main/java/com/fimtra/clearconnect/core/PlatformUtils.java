@@ -96,8 +96,7 @@ public class PlatformUtils
         sb.append(version); // already has a line separator
         sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(SystemUtils.lineSeparator());
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(SystemUtils.lineSeparator());
-        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(
-            SystemUtils.lineSeparator());
+        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(SystemUtils.lineSeparator());
         sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(SystemUtils.lineSeparator());
         sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
@@ -109,12 +108,51 @@ public class PlatformUtils
     static final String SERVICE_CLIENT_DELIMITER = "->";
 
     /**
+     * Used to provide an efficient "one-shot" latch
+     * 
+     * @author Ramon Servadei
+     */
+    private static final class OneShotLatch
+    {
+        CountDownLatch latch;
+
+        OneShotLatch()
+        {
+            this.latch = new CountDownLatch(1);
+        }
+
+        void countDown()
+        {
+            if (this.latch != null)
+            {
+                this.latch.countDown();
+            }
+        }
+
+        boolean await(long timeout, TimeUnit unit) throws InterruptedException
+        {
+            if (this.latch != null)
+            {
+                try
+                {
+                    return this.latch.await(timeout, unit);
+                }
+                finally
+                {
+                    this.latch = null;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
      * Construct a {@link NotifyingCache} that handles when services are discovered.
      */
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
             new NotifyingCache<IServiceAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -159,19 +197,10 @@ public class PlatformUtils
                         Log.log(logContext, "Service unavailable (lost): '", serviceFamily, "'");
                     }
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return serviceAvailableListeners;
     }
 
@@ -181,7 +210,7 @@ public class PlatformUtils
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
             new NotifyingCache<IServiceInstanceAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -236,19 +265,10 @@ public class PlatformUtils
                         }
                     }
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
 
@@ -256,11 +276,10 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when records are added or removed from the
      * context.
      */
-    @SuppressWarnings("unused")
     static NotifyingCache<IRecordAvailableListener, String> createRecordAvailableNotifyingCache(
         final IObserverContext context, String contextRecordsRecordName, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
             new NotifyingCache<IRecordAvailableListener, String>(context.getUtilityExecutor())
             {
@@ -291,19 +310,10 @@ public class PlatformUtils
                 {
                     recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName, recordName);
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return recordAvailableNotifyingCache;
     }
 
@@ -314,7 +324,7 @@ public class PlatformUtils
     static NotifyingCache<IRpcAvailableListener, IRpcInstance> createRpcAvailableNotifyingCache(
         final IObserverContext context, String contextRpcRecordName, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
             new NotifyingCache<IRpcAvailableListener, IRpcInstance>(context.getUtilityExecutor())
             {
@@ -367,19 +377,10 @@ public class PlatformUtils
                             ObjectUtils.safeToString(logContext));
                     }
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, contextRpcRecordName);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return rpcAvailableNotifyingCache;
     }
 
@@ -390,7 +391,7 @@ public class PlatformUtils
     static NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> createSubscriptionNotifyingCache(
         final IObserverContext context, String contextSubscriptionsRecordName, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
             new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(context.getUtilityExecutor())
             {
@@ -443,30 +444,20 @@ public class PlatformUtils
                         subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName(), info);
                     }
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, contextSubscriptionsRecordName);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return subscriptionNotifyingCache;
     }
 
     /**
      * Construct the {@link NotifyingCache} that handles record connection status changes
      */
-    @SuppressWarnings("unused")
     static NotifyingCache<IRecordConnectionStatusListener, IValue> createRecordConnectionStatusNotifyingCache(
         final ProxyContext proxyContext, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
             new NotifyingCache<IRecordConnectionStatusListener, IValue>(proxyContext.getUtilityExecutor())
             {
@@ -511,30 +502,20 @@ public class PlatformUtils
                     value = entry.getValue();
                     recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
                 }
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return recordStatusNotifyingCache;
     }
 
     /**
      * Construct the {@link NotifyingCache} that handles service connection status changes
      */
-    @SuppressWarnings("unused")
     static NotifyingCache<IServiceConnectionStatusListener, Connection> createServiceConnectionStatusNotifyingCache(
         final ProxyContext proxyContext, final Object logContext)
     {
-		final CountDownLatch updateWaitLatch = new CountDownLatch(1);
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
             new NotifyingCache<IServiceConnectionStatusListener, Connection>(proxyContext.getUtilityExecutor())
             {
@@ -572,19 +553,10 @@ public class PlatformUtils
             {
                 Connection status = IStatusAttribute.Utils.getStatus(Connection.class, imageCopy);
                 serviceStatusNotifyingCache.notifyListenersDataAdded(Connection.class.getSimpleName(), status);
-				updateWaitLatch.countDown();
+                updateWaitLatch.countDown();
             }
         }, ISystemRecordNames.CONTEXT_STATUS);
-		try {
-			boolean isCountedDown = updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-					TimeUnit.MILLISECONDS);
-			if (!isCountedDown) {
-				Log.log(logContext, "Initial image was not processed in [",
-						String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
-			}
-		} catch (InterruptedException e) {
-			// ignore
-		}
+        awaitUpdateLatch(logContext, updateWaitLatch);
         return serviceStatusNotifyingCache;
     }
 
@@ -812,5 +784,24 @@ public class PlatformUtils
         return TcpChannelUtils.getNextFreeTcpServerPort(host,
             PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_START,
             PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_END);
+    }
+
+    private static void awaitUpdateLatch(final Object logContext, final OneShotLatch updateWaitLatch)
+    {
+        try
+        {
+            boolean isCountedDown =
+                updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
+                    TimeUnit.MILLISECONDS);
+            if (!isCountedDown)
+            {
+                Log.log(logContext, "Initial image was not processed in [",
+                    String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
+            }
+        }
+        catch (InterruptedException e)
+        {
+            // ignore
+        }
     }
 }
