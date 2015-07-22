@@ -748,11 +748,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     }
 
     @Override
-    public IPlatformServiceProxy getPlatformServiceInstanceProxy(final String serviceInstanceId)
+    public IPlatformServiceProxy getPlatformServiceInstanceProxy(String serviceFamily, String serviceMember)
     {
         this.createLock.lock();
         try
         {
+            final String serviceInstanceId =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+            
             PlatformServiceProxy proxy = this.serviceInstanceProxies.get(serviceInstanceId);
             if (proxy == null || !proxy.isActive())
             {
@@ -1153,7 +1156,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 final double perMin = 60d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                                 gcMillisPerMin *= perMin;
                                 // this is now the "% GC duty cycle per minute"
-                                gcMillisPerMin = (long) ((double) gcMillisPerMin / 600d);
+                                gcMillisPerMin = (long) ((double) gcMillisPerMin / 600);
 
                                 final long qTotalExecuted = stats[2];
                                 final long eventsPerMin =

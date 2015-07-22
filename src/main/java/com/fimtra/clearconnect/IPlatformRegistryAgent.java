@@ -298,12 +298,14 @@ public interface IPlatformRegistryAgent
      * <p>
      * <b>This returns the SAME proxy instance for the same service instance.</b>
      * 
-     * @param serviceInstanceId
-     *            the ID of the platform service instance to get the proxy for
+     * @param serviceFamily
+     *            the name of the platform service
+     * @param serviceMember
+     *            the name of the service member
      * @return a proxy to the platform service <b>instance</b> or <code>null</code> if the platform
      *         service instance does not exist
      */
-    IPlatformServiceProxy getPlatformServiceInstanceProxy(String serviceInstanceId);
+    IPlatformServiceProxy getPlatformServiceInstanceProxy(String serviceFamily, String serviceMember);
 
     /**
      * Destroy the proxy that was created for the service family. Any references to the proxy will

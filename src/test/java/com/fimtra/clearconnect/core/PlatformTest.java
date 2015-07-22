@@ -307,7 +307,7 @@ public class PlatformTest
         Log.log(this, "============== END TEAR DOWN =============================");
         // IO sensitive tests
         Thread.sleep(100);
-        
+
         ChannelUtils.WATCHDOG.configure(5000);
     }
 
@@ -732,7 +732,9 @@ public class PlatformTest
         listener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1, serviceInstance2);
         listener2.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1, serviceInstance2);
 
-        IPlatformServiceProxy proxy = this.agent.getPlatformServiceInstanceProxy(serviceInstance1);
+        final String[] familyAndMember = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstance1);
+        IPlatformServiceProxy proxy =
+            this.agent.getPlatformServiceInstanceProxy(familyAndMember[0], familyAndMember[1]);
 
         assertNotNull(proxy);
 
@@ -759,15 +761,14 @@ public class PlatformTest
         }
         assertEquals(0, proxy.getAllRpcs().size());
 
-
         // give time for IO to settle
         Thread.sleep(1000);
-        
+
         // verify the socket is gone for us to proceed
         try
         {
             Socket socket = null;
-            while(true)
+            while (true)
             {
                 socket = new Socket(this.agentHost, servicePort);
                 socket.close();
