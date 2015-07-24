@@ -135,6 +135,7 @@ class PlatformDesktop
             this.frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             this.desktop.getViews().add(this);
             this.desktop.getDesktopPane().add(getFrame());
+            getFrame().toFront();
         }
 
         JInternalFrame getFrame()
