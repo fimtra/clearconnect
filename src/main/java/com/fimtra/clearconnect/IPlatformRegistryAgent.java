@@ -16,6 +16,7 @@
 package com.fimtra.clearconnect;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -358,4 +359,11 @@ public interface IPlatformRegistryAgent
      * @return a {@link ScheduledExecutorService} for utility tasks
      */
     ScheduledExecutorService getUtilityExecutor();
+
+    /**
+     * @return a detached copy of the map of all the service names to active
+     *         {@link IPlatformServiceProxy} instances created via calls to
+     *         {@link #getPlatformServiceProxy(String)}
+     */
+    Map<String, IPlatformServiceProxy> getActiveProxies();
 }

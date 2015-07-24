@@ -555,13 +555,17 @@ public class PlatformTest
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
+        assertEquals(0, this.agent.getActiveProxies().size());
         IPlatformServiceProxy platformServiceProxy = this.agent.getPlatformServiceProxy(SERVICE1);
         assertNotNull(platformServiceProxy);
+        assertEquals(1, this.agent.getActiveProxies().size());
+        assertEquals(platformServiceProxy, this.agent.getActiveProxies().get(SERVICE1));
 
         assertFalse(this.agent.destroyPlatformServiceProxy("no service"));
         assertTrue(this.agent.destroyPlatformServiceProxy(SERVICE1));
         assertFalse(this.agent.destroyPlatformServiceProxy(SERVICE1));
         assertFalse(platformServiceProxy.isActive());
+        assertEquals(0, this.agent.getActiveProxies().size());
 
         IPlatformServiceProxy platformServiceProxy2 = this.agent.getPlatformServiceProxy(SERVICE1);
         assertTrue(platformServiceProxy2.isActive());

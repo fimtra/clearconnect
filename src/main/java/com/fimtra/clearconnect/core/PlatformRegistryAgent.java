@@ -20,6 +20,7 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -1193,5 +1194,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     public ScheduledExecutorService getUtilityExecutor()
     {
         return this.registryProxy.getUtilityExecutor();
+    }
+
+    @Override
+    public Map<String, IPlatformServiceProxy> getActiveProxies()
+    {
+        return new HashMap<String, IPlatformServiceProxy>(this.serviceProxies);
     }
 }
