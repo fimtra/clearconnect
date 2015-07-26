@@ -110,7 +110,13 @@ public class ShadowKernel
             @Override
             public void onRegistryConnected()
             {
-                stopShadowKernel();
+                // if a shadow is running as a warm-standby on the same host, the agent will
+                // re-connect to the shadow and cause it to stop - leads to an infinite start/stop
+                // loop, so don't do anything when connected
+                if (!ShadowKernel.this.primaryRegistryEndPoint.equals(ShadowKernel.this.shadowRegistryEndPoint))
+                {
+                    stopShadowKernel();
+                }
             }
         });
     }

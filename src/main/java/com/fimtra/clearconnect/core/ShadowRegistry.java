@@ -45,8 +45,8 @@ public final class ShadowRegistry
      *  arg[2] is the shadow registry host (mandatory)
      *  arg[2] is the shadow registry port (mandatory)
      * </pre>
-     * @throws InterruptedException 
-     * @throws RegistryNotAvailableException 
+     * @throws InterruptedException
+     * @throws RegistryNotAvailableException
      */
     @SuppressWarnings("unused")
     public static void main(String[] args) throws InterruptedException, RegistryNotAvailableException
@@ -113,7 +113,13 @@ public final class ShadowRegistry
             @Override
             public void onRegistryConnected()
             {
-                stopShadowRegistry();
+                // if a shadow is running as a warm-standby on the same host, the agent will
+                // re-connect to the shadow and cause it to stop - leads to an infinite start/stop
+                // loop, so don't do anything when connected
+                if (!ShadowRegistry.this.primaryRegistryEndPoint.equals(ShadowRegistry.this.shadowRegistryEndPoint))
+                {
+                    stopShadowRegistry();
+                }
             }
         });
     }
