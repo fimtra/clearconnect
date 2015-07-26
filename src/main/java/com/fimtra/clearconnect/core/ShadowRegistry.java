@@ -20,6 +20,7 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.util.Log;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -31,6 +32,50 @@ import com.fimtra.util.ThreadUtils;
  */
 public final class ShadowRegistry
 {
+    /**
+     * Access for starting a {@link PlatformRegistry} using command line.
+     * 
+     * @param args
+     *            - the parameters used to start the {@link PlatformRegistry}.
+     * 
+     *            <pre>
+     *  arg[0] is the platform name (mandatory)
+     *  arg[1] is the primary registry host (mandatory)
+     *  arg[2] is the primary registry port (mandatory)
+     *  arg[2] is the shadow registry host (mandatory)
+     *  arg[2] is the shadow registry port (mandatory)
+     * </pre>
+     * @throws InterruptedException 
+     * @throws RegistryNotAvailableException 
+     */
+    @SuppressWarnings("unused")
+    public static void main(String[] args) throws InterruptedException, RegistryNotAvailableException
+    {
+        try
+        {
+            switch(args.length)
+            {
+                case 5:
+                    new ShadowRegistry(args[0], new EndPointAddress(args[1], Integer.parseInt(args[2])),
+                        new EndPointAddress(args[3], Integer.parseInt(args[4])));
+                    break;
+                default :
+                    throw new IllegalArgumentException("Incorrect number of arguments.");
+            }
+        }
+        catch (RuntimeException e)
+        {
+            throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + ShadowRegistry.class.getSimpleName()
+                + " platformName primaryRegistryHostName primaryRegistryTcpPort shadowRegistryHostName shadowRegistryTcpPort " 
+                + SystemUtils.lineSeparator() + "    platformName is mandatory"
+                + SystemUtils.lineSeparator() + "    the hostName arguments are either a hostname or IP address", e);
+        }
+        synchronized (args)
+        {
+            args.wait();
+        }
+    }
+
     PlatformRegistry registry;
     final String platformName;
     final EndPointAddress primaryRegistryEndPoint;
