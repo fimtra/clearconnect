@@ -1,3 +1,44 @@
+<--- Release 1.0.0 --->
+- Add permission mechanics into record subscription API
+- Add shadow registry and kernel
+- NotifyingCaches changed to block (5 secs) until first image is received
+- Platform desktop updates;
+	- internal windows open on top
+	- added icon
+	- subscribed records background goes orange when disconnected
+	- GC duty cycle
+	- removed dead service reaper thread
+
+Benchmark Results
+-----------------	
+Network msgs/sec:42596
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,521,476,607,591
+1,2,330,395,449,533
+1,3,575,587,760,844
+1,4,610,728,930,874
+1,5,837,798,1072,1020
+1,6,826,862,1066,1111
+1,7,977,839,1094,1307
+1,8,1172,1235,1443,1352
+1,9,1083,1053,1297,1456
+1,10,1500,1512,1463,1525
+1,11,1112,1274,1588,1622
+1,12,1163,1282,1638,1756
+1,13,1330,1357,1733,1861
+1,14,1351,1524,2075,2085
+1,15,1435,1528,2309,2175
+totalTx=492862
+totalRx=492854
+totalTimeSecs=82
+txMsgsPerSec=5955
+rxMsgsPerSec=5955
+networkMsgsPerSec=11911
+kbPublished=142147
+msgsPublished=706651
+avgMsgSizeBytes=205
+Windows 8.1 (6.3), amd64, Java 1.7.0_79, cpus=4, Corei5 1.6Ghz
+
 <--- Release 0.9.9 --->
 - Rename packages to com.fimtra.clearconnect
 
