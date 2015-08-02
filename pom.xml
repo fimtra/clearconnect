@@ -103,7 +103,7 @@
 					<archive>
 						<manifestEntries>
 							<Version>${project.version}</Version>
-							<Built-By>fimtra.com</Built-By>
+							<Built-By>clearconnect@fimtra.com</Built-By>
 						</manifestEntries>
 					</archive>
 				</configuration>
@@ -146,7 +146,7 @@
 					<archive>
 						<manifestEntries>
 							<Version>${project.version}</Version>
-							<Built-By>fimtra.com</Built-By>
+							<Built-By>clearconnect@fimtra.com</Built-By>
 						</manifestEntries>
 					</archive>
 				</configuration>
@@ -167,7 +167,7 @@
 					<archive>
 						<manifestEntries>
 							<Version>${project.version}</Version>
-							<Built-By>fimtra.com</Built-By>
+							<Built-By>clearconnect@fimtra.com</Built-By>
 						</manifestEntries>
 					</archive>
 				</configuration>

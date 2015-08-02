@@ -80,8 +80,17 @@ public class PlatformUtils
             while (manifests.hasMoreElements())
             {
                 version = ClassUtils.getManifestEntriesAsString(manifests.nextElement(), ClassUtils.fimtraVersionKeys);
-                if (version.toLowerCase().contains("fimtra.com"))
+                if (version.toLowerCase().contains("clearconnect@fimtra.com"))
                 {
+                    final String[] tokens = version.split(SystemUtils.lineSeparator());
+                    for (String token : tokens)
+                    {
+                        if(token.toLowerCase().startsWith("version"))
+                        {
+                            version = token;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
@@ -93,7 +102,7 @@ public class PlatformUtils
 
         final StringBuilder sb = new StringBuilder();
         sb.append("ClearConnect").append(SystemUtils.lineSeparator());
-        sb.append(version); // already has a line separator
+        sb.append(version).append(SystemUtils.lineSeparator()); 
         sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(SystemUtils.lineSeparator());
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(SystemUtils.lineSeparator());
         sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(SystemUtils.lineSeparator());
