@@ -15,7 +15,17 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -30,10 +40,6 @@ import org.junit.rules.TestName;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.clearconnect.WireProtocolEnum;
-import com.fimtra.clearconnect.core.PlatformRegistry;
-import com.fimtra.clearconnect.core.PlatformRegistryAgent;
-import com.fimtra.clearconnect.core.PlatformServiceInstance;
-import com.fimtra.clearconnect.core.PlatformServiceProxy;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -53,19 +59,6 @@ import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
-
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.eq;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the {@link PlatformServiceProxy}
@@ -99,7 +92,7 @@ public class PlatformServiceProxyTest
     }
 
     @Before
-    public void setUp() throws IOException, InterruptedException
+    public void setUp() throws Exception
     {
         System.err.println(this.name.getMethodName());
         registryPort++;
@@ -111,11 +104,6 @@ public class PlatformServiceProxyTest
             new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING, hostName, PORT);
         this.candidate =
             new PlatformServiceProxy(this.agent, "TestPlatformService", new StringProtocolCodec(), hostName, PORT);
-        // wait for the data-radar register RPCs to be published
-        while (this.candidate.getAllRpcs().size() < 2)
-        {
-            Thread.sleep(50);
-        }
     }
 
     @After
@@ -404,15 +392,15 @@ public class PlatformServiceProxyTest
     @Test
     public void testGetAllRpcs()
     {
-        assertEquals(3, this.candidate.getAllRpcs().size());
+        assertEquals(1, this.candidate.getAllRpcs().size());
         IRpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         assertTrue(this.service.publishRPC(rpc1));
 
         IRpcAvailableListener rpcListener = mock(IRpcAvailableListener.class);
         this.candidate.addRpcAvailableListener(rpcListener);
-        verify(rpcListener, timeout(1000).times(4)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener, timeout(1000).times(2)).onRpcAvailable(any(IRpcInstance.class));
 
-        assertEquals(4, this.candidate.getAllRpcs().size());
+        assertEquals(2, this.candidate.getAllRpcs().size());
         assertEquals(rpc1, this.candidate.getAllRpcs().get(RPC1));
     }
 

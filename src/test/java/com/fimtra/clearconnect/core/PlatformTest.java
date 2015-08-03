@@ -1489,16 +1489,11 @@ public class PlatformTest
         IPlatformServiceInstance lb1 = this.agent.getPlatformServiceInstance(SERVICE2, this.primary);
         IPlatformServiceInstance lb2 = this.agent008.getPlatformServiceInstance(SERVICE2, this.secondary);
 
-        // ensure all the register radar RPCs are there
-        ensureRpcCount(2, ft1, ft2, lb1, lb2);
-
         final AtomicReference<IRecord> serviceInstanceRpcs = new AtomicReference<IRecord>();
         final AtomicReference<IRecord> serviceRpcs = new AtomicReference<IRecord>();
 
-        final int instanceCount = 4;
-        final int serviceCount = 2;
-        final int instanceDataRadarRpcCount = (instanceCount * 2) + 2;
-        final int serviceDataRadarRpcCount = (serviceCount * 2) + 1;
+        final int instanceCount = 6;
+        final int serviceCount = 3;
 
         IRecordListener platformListener = new IRecordListener()
         {
@@ -1510,8 +1505,6 @@ public class PlatformTest
         };
         this.agent.registryProxy.addObserver(platformListener,
             PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_INSTANCE);
-        // we expect just the radar RPCs
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceDataRadarRpcCount);
 
         IRecordListener platformServiceListener = new IRecordListener()
         {
@@ -1524,8 +1517,6 @@ public class PlatformTest
         };
         this.agent.registryProxy.addObserver(platformServiceListener,
             PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY);
-        // we expect just the radar RPCs
-        checkRecordSubmapSize(serviceRpcs, serviceDataRadarRpcCount);
 
         Log.log(this, ">>>> start publish");
 
@@ -1537,8 +1528,8 @@ public class PlatformTest
 
         Log.log(this, ">>>> end publish");
 
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount + instanceDataRadarRpcCount);
-        checkRecordSubmapSize(serviceRpcs, serviceCount + serviceDataRadarRpcCount);
+        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount);
+        checkRecordSubmapSize(serviceRpcs, serviceCount );
 
         assertTrue(
             "Got: " + serviceInstanceRpcs,
@@ -1564,8 +1555,8 @@ public class PlatformTest
         // publish a second RPC
         lb2.publishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC2"));
 
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount + instanceDataRadarRpcCount + 1);
-        checkRecordSubmapSize(serviceRpcs, serviceCount + serviceDataRadarRpcCount + 1);
+        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount + 1);
+        checkRecordSubmapSize(serviceRpcs, serviceCount + 1);
 
         assertTrue(
             "Got: " + serviceInstanceRpcs,
@@ -1576,8 +1567,8 @@ public class PlatformTest
         // remove lb1.LB_RPC1 - only service instance change will occur
         lb1.unpublishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC1"));
 
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount + instanceDataRadarRpcCount);
-        checkRecordSubmapSize(serviceRpcs, serviceCount + serviceDataRadarRpcCount + 1);
+        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount);
+        checkRecordSubmapSize(serviceRpcs, serviceCount + 1);
 
         assertFalse(
             "Got: " + serviceInstanceRpcs,
@@ -1594,8 +1585,8 @@ public class PlatformTest
         // service2.LB_RPC1=SLB_RPC1
         this.agent008.destroyPlatformServiceInstance(SERVICE2, this.secondary);
 
-        checkRecordSubmapSize(serviceInstanceRpcs, 10);
-        checkRecordSubmapSize(serviceRpcs, 6);
+        checkRecordSubmapSize(serviceInstanceRpcs, 4);
+        checkRecordSubmapSize(serviceRpcs, 2);
     }
 
     @Test

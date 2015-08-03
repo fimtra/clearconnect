@@ -15,6 +15,19 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,7 +37,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.WireProtocolEnum;
-import com.fimtra.clearconnect.core.PlatformServiceInstance;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
@@ -36,21 +48,6 @@ import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.ThreadUtils;
-
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the {@link PlatformServiceInstance}
@@ -75,16 +72,11 @@ public class PlatformServiceTest
     }
 
     @Before
-    public void setUp() throws InterruptedException
+    public void setUp()
     {
         PORT += 1;
         this.candidate =
             new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING, hostName, PORT);
-        // wait for the data-radar register RPCs to be published
-        while (this.candidate.getAllRpcs().size() < 2)
-        {
-            Thread.sleep(50);
-        }
     }
 
     @After
@@ -222,10 +214,10 @@ public class PlatformServiceTest
     @Test
     public void testGetAllRpcs()
     {
-        assertEquals(3, this.candidate.getAllRpcs().size());
+        assertEquals(1, this.candidate.getAllRpcs().size());
         IRpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         assertTrue(this.candidate.publishRPC(rpc1));
-        assertEquals(4, this.candidate.getAllRpcs().size());
+        assertEquals(2, this.candidate.getAllRpcs().size());
         assertEquals(rpc1, this.candidate.getAllRpcs().get(RPC1));
     }
 
@@ -239,7 +231,7 @@ public class PlatformServiceTest
         IRpcAvailableListener rpcListener1 = mock(IRpcAvailableListener.class);
         assertTrue(this.candidate.addRpcAvailableListener(rpcListener1));
         assertFalse(this.candidate.addRpcAvailableListener(rpcListener1));
-        verify(rpcListener1, timeout(500).times(4)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener1, timeout(500).times(2)).onRpcAvailable(any(IRpcInstance.class));
         verify(rpcListener1).onRpcAvailable(eq(rpc1));
         reset(rpcListener1);
 
@@ -254,7 +246,7 @@ public class PlatformServiceTest
 
         IRpcAvailableListener rpcListener2 = mock(IRpcAvailableListener.class);
         assertTrue(this.candidate.addRpcAvailableListener(rpcListener2));
-        verify(rpcListener2, timeout(500).times(4)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener2, timeout(500).times(2)).onRpcAvailable(any(IRpcInstance.class));
         verify(rpcListener2).onRpcAvailable(eq(rpc1));
         reset(rpcListener2);
 
