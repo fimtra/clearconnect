@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -39,7 +38,6 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
-import com.fimtra.clearconnect.IDataRadar;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
@@ -48,12 +46,9 @@ import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
-import com.fimtra.clearconnect.event.IDataRadarListener;
-import com.fimtra.clearconnect.event.IDataRadarListener.SignatureMatch;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.clearconnect.expression.IExpression;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecord;
@@ -92,98 +87,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             && rpcNames.contains(PlatformRegistry.GET_HEARTBEAT_CONFIG);
     }
 
-    /**
-     * A data radar.
-     * <p>
-     * Equal by object instance.
-     * 
-     * @author Ramon Servadei
-     */
-    private final class DataRadar implements IDataRadar, IRecordListener
-    {
-        final DataRadarSpecification dataRadarSpecification;
-        final IDataRadarListener listener;
-
-        DataRadar(DataRadarSpecification dataRadarSpec, IDataRadarListener listener)
-        {
-            this.dataRadarSpecification = dataRadarSpec;
-            this.listener = listener;
-        }
-
-        @Override
-        public IExpression getDataRadarSignatureExpression()
-        {
-            return this.dataRadarSpecification.getDataRadarSignatureExpression();
-        }
-
-        @Override
-        public void onChange(IRecord radarRecord, IRecordChange atomicChange)
-        {
-            final Set<SignatureMatch> found = new HashSet<SignatureMatch>();
-            final Set<SignatureMatch> lost = new HashSet<SignatureMatch>();
-
-            Map.Entry<String, IValue> entry = null;
-            String key = null;
-            IValue value = null;
-            SignatureMatch signatureMatch;
-            for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
-            {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                signatureMatch = new SignatureMatch(key, value.textValue());
-                found.add(signatureMatch);
-            }
-
-            // process overwritten and removed entries as the same
-            for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getOverwrittenEntries().entrySet().iterator(); it.hasNext();)
-            {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                signatureMatch = new SignatureMatch(key, value.textValue());
-                found.remove(signatureMatch);
-                lost.add(signatureMatch);
-            }
-            for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
-            {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                signatureMatch = new SignatureMatch(key, value.textValue());
-                found.remove(signatureMatch);
-                lost.add(signatureMatch);
-            }
-
-            try
-            {
-                if (this.listener != null)
-                {
-                    this.listener.onRadarChange(this, found, lost);
-                }
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not notify " + ObjectUtils.safeToString(this.listener) + " with radar results", e);
-            }
-        }
-
-        void destroy()
-        {
-        }
-
-        DataRadarSpecification getDataRadarSpecification()
-        {
-            return this.dataRadarSpecification;
-        }
-
-        @Override
-        public String toString()
-        {
-            return "DataRadar [" + this.dataRadarSpecification + "]";
-        }
-    }
-
     final long startTime;
     final String agentName;
     final String hostQualifiedAgentName;
@@ -199,9 +102,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners;
     final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners;
     final NotifyingCache<IRegistryAvailableListener, String> registryAvailableListeners;
-    final Set<IDataRadar> radars;
     ScheduledFuture<?> dynamicAttributeUpdateTask;
-    IPlatformServiceProxy radarStationProxy;
     boolean onPlatformServiceConnectedInvoked;
 
     /**
@@ -273,7 +174,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.agentName = agentName + "-" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
         this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
         this.createLock = new ReentrantLock();
-        this.radars = new CopyOnWriteArraySet<IDataRadar>();
         this.localPlatformServiceInstances = new ConcurrentHashMap<String, PlatformServiceInstance>();
         this.serviceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
         this.serviceInstanceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
@@ -342,31 +242,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 onRegistryConnected(true);
             }
         };
-
-        this.serviceAvailableListeners.addListener(new IServiceAvailableListener()
-        {
-            @Override
-            public void onServiceUnavailable(String serviceFamily)
-            {
-                // when we lose the radar station, clear scans
-                if (DataRadarScanManager.RADAR_STATION.equals(serviceFamily))
-                {
-                    for (PlatformServiceInstance serviceInstance : PlatformRegistryAgent.this.localPlatformServiceInstances.values())
-                    {
-                        serviceInstance.dataRadarScanManager.clearDataRadarScans();
-                    }
-                }
-            }
-
-            @Override
-            public void onServiceAvailable(String serviceFamily)
-            {
-                if (DataRadarScanManager.RADAR_STATION.equals(serviceFamily))
-                {
-                    registerAllDataRadars();
-                }
-            }
-        });
 
         // wait for the registry name to be received...
         synchronized (this.createLock)
@@ -862,17 +737,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 this.dynamicAttributeUpdateTask.cancel(false);
             }
-            for (IDataRadar dataRadar : new HashSet<IDataRadar>(this.radars))
-            {
-                try
-                {
-                    deleteDataRadar(dataRadar);
-                }
-                catch (Exception e)
-                {
-                    Log.log(PlatformRegistryAgent.this, "Could not destroy " + ObjectUtils.safeToString(dataRadar), e);
-                }
-            }
             try
             {
                 this.registryProxy.destroy();
@@ -981,80 +845,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     public void removeRegistryAvailableListener(IRegistryAvailableListener listener)
     {
         this.registryAvailableListeners.removeListener(listener);
-    }
-
-    @Override
-    public IDataRadar registerDataRadar(String name, IExpression dataRadarSignatureExpression,
-        IDataRadarListener listener) throws TimeOutException, ExecutionException
-    {
-        if (this.radarStationProxy == null)
-        {
-            this.radarStationProxy = getPlatformServiceProxy(DataRadarScanManager.RADAR_STATION);
-            if (this.radarStationProxy == null)
-            {
-                throw new RuntimeException("No radar station exists on the platform");
-            }
-        }
-
-        final DataRadarSpecification dataRadarSpecification =
-            new DataRadarSpecification(name, dataRadarSignatureExpression);
-
-        final DataRadar radar = new DataRadar(dataRadarSpecification, listener);
-
-        this.radarStationProxy.addRecordListener(radar, dataRadarSpecification.getName());
-        this.radars.add(radar);
-
-        PlatformUtils.executeRpc(this.radarStationProxy, getRegistryReconnectPeriodMillis(),
-            DataRadarScanManager.RPC_REGISTER_DATA_RADAR, TextValue.valueOf(dataRadarSpecification.toWireString()));
-
-        return radar;
-    }
-
-    @Override
-    public void deleteDataRadar(IDataRadar dataRadar) throws TimeOutException, ExecutionException
-    {
-        if (this.radars.remove(dataRadar))
-        {
-            final DataRadar dataRadarImpl = (DataRadar) dataRadar;
-
-            dataRadarImpl.destroy();
-
-            PlatformUtils.executeRpc(this.radarStationProxy, getRegistryReconnectPeriodMillis(),
-                DataRadarScanManager.RPC_DEREGISTER_DATA_RADAR,
-                TextValue.valueOf(dataRadarImpl.getDataRadarSpecification().toWireString()));
-        }
-
-    }
-
-    void registerAllDataRadars()
-    {
-        if (this.radarStationProxy == null)
-        {
-            this.radarStationProxy = getPlatformServiceProxy(DataRadarScanManager.RADAR_STATION);
-            if (this.radarStationProxy == null)
-            {
-                throw new RuntimeException("No radar station exists on the platform");
-            }
-        }
-        if (this.radars.size() > 0)
-        {
-            Log.log(this, "Registering all data radars");
-            for (IDataRadar radar : this.radars)
-            {
-                this.radarStationProxy.addRecordListener(((DataRadar) radar),
-                    ((DataRadar) radar).dataRadarSpecification.getName());
-                try
-                {
-                    PlatformUtils.executeRpc(this.radarStationProxy, getRegistryReconnectPeriodMillis(),
-                        DataRadarScanManager.RPC_REGISTER_DATA_RADAR,
-                        TextValue.valueOf(((DataRadar) radar).dataRadarSpecification.toWireString()));
-                }
-                catch (Exception e)
-                {
-                    Log.log(this, "Could not register " + radar, e);
-                }
-            }
-        }
     }
 
     @Override

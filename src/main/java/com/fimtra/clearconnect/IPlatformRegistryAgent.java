@@ -21,13 +21,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.clearconnect.core.PlatformUtils;
-import com.fimtra.clearconnect.event.IDataRadarListener;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.clearconnect.expression.IExpression;
-import com.fimtra.datafission.IRpcInstance.ExecutionException;
-import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.thimble.ThimbleExecutor;
 
 /**
@@ -329,29 +325,6 @@ public interface IPlatformRegistryAgent
      * @see IPlatformServiceComponent#isActive()
      */
     boolean destroyPlatformServiceInstanceProxy(String serviceInstanceId);
-
-    /**
-     * Create a new data radar instance. The instance is active upon construction.
-     * 
-     * @param listener
-     *            the listener that the radar is constructed with
-     * 
-     * @return the created data radar
-     * @throws ExecutionException
-     * @throws TimeOutException
-     */
-    IDataRadar registerDataRadar(String name, IExpression dataRadarSignatureExpression, IDataRadarListener listener)
-        throws TimeOutException, ExecutionException;
-
-    /**
-     * Delete the data radar instance.
-     * 
-     * @param dataRadar
-     *            the data radar to delete
-     * @throws ExecutionException
-     * @throws TimeOutException
-     */
-    void deleteDataRadar(IDataRadar dataRadar) throws TimeOutException, ExecutionException;
 
     /**
      * Get the executor for utility type tasks

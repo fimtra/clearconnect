@@ -100,7 +100,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     final Publisher publisher;
     final WireProtocolEnum wireProtocol;
     final RedundancyModeEnum redundancyMode;
-    final DataRadarScanManager dataRadarScanManager;
     final List<IFtStatusListener> ftStatusListeners;
     final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache;
     final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache;
@@ -195,8 +194,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.subscriptionNotifyingCache =
             PlatformUtils.createSubscriptionNotifyingCache(this.context, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, this);
         this.active = true;
-
-        this.dataRadarScanManager = new DataRadarScanManager(this);
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
@@ -389,7 +386,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
         this.statsUpdateTask.cancel(false);
-        this.dataRadarScanManager.destroy();
         this.publisher.destroy();
         this.context.destroy();
         this.active = false;
