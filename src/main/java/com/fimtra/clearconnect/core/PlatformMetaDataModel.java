@@ -52,11 +52,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
-import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
-import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IPublisherContext;
@@ -70,9 +68,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.CoalescingRecordListener;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
-import com.fimtra.datafission.core.GZipProtocolCodec;
 import com.fimtra.datafission.core.ProxyContext;
-import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ThimbleExecutor;
@@ -383,7 +379,6 @@ public final class PlatformMetaDataModel
     final ConcurrentMap<String, Context> serviceRecordsContext;
     final ConcurrentMap<String, Context> serviceInstanceRpcsContext;
     final ConcurrentMap<String, Context> serviceInstanceRecordsContext;
-    final ConcurrentMap<String, ProxyContext> serviceInstanceProxyContexts;
 
     final Set<String> pendingRemoves;
     final ThimbleExecutor coalescingExecutor;
@@ -407,7 +402,6 @@ public final class PlatformMetaDataModel
         this.serviceRpcsContext = new ConcurrentHashMap<String, Context>();
         this.serviceRecordsContext = new ConcurrentHashMap<String, Context>();
         this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
-        this.serviceInstanceProxyContexts = new ConcurrentHashMap<String, ProxyContext>();
         this.serviceInstanceRecordsContext = new ConcurrentHashMap<String, Context>();
 
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
@@ -551,7 +545,6 @@ public final class PlatformMetaDataModel
             reset(PlatformMetaDataModel.this.serviceRecordsContext);
             reset(PlatformMetaDataModel.this.serviceInstanceRpcsContext);
             reset(PlatformMetaDataModel.this.serviceInstanceRecordsContext);
-            reset(PlatformMetaDataModel.this.serviceInstanceProxyContexts);
 
             final IRecord record =
                 PlatformMetaDataModel.this.servicesContext.getOrCreateRecord(PlatformRegistry.SERVICE_NAME);
@@ -727,48 +720,10 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getProxyContextForPlatformServiceInstance(String platformServiceInstanceID)
     {
-        final IRecord serviceInstance = getPlatformServiceInstancesContext().getRecord(platformServiceInstanceID);
-        synchronized (this.serviceInstanceProxyContexts)
-        {
-            ProxyContext proxyContext = this.serviceInstanceProxyContexts.get(platformServiceInstanceID);
-            if (proxyContext == null)
-            {
-                String host =
-                    serviceInstance.get(PlatformMetaDataModel.ServiceInstanceMetaDataRecordDefinition.Node.toString()).textValue();
-                String port =
-                    serviceInstance.get(PlatformMetaDataModel.ServiceInstanceMetaDataRecordDefinition.Port.toString()).textValue();
-                String codec =
-                    serviceInstance.get(PlatformMetaDataModel.ServiceInstanceMetaDataRecordDefinition.Codec.toString()).textValue();
-                ICodec<String> codecInstance = null;
-                if (codec.equals(StringProtocolCodec.class.getSimpleName()))
-                {
-                    codecInstance = WireProtocolEnum.STRING.<String>getCodec();
-                }
-                else
-                {
-                    if (codec.equals(GZipProtocolCodec.class.getSimpleName()))
-                    {
-                        codecInstance = WireProtocolEnum.GZIP.<String>getCodec();
-                    }
-                    else
-                    {
-                        throw new IllegalStateException("Unhandled codec: " + codec);
-                    }
-                }
-                try
-                {
-                    proxyContext =
-                        new ProxyContext(PlatformUtils.composeProxyName(platformServiceInstanceID,
-                            getAgent().getAgentName()), codecInstance, host, Integer.parseInt(port));
-                }
-                catch (Exception e)
-                {
-                    throw new RuntimeException(e);
-                }
-                this.serviceInstanceProxyContexts.put(platformServiceInstanceID, proxyContext);
-            }
-            return proxyContext;
-        }
+        final String[] family_member = PlatformUtils.decomposePlatformServiceInstanceID(platformServiceInstanceID);
+        // todo this leaves a connection leak if the proxy is not destroyed when no more components
+        // need it from the model
+        return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0], family_member[1])).proxyContext;
     }
 
     /**
