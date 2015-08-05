@@ -124,58 +124,94 @@ public final class PlatformMetaDataModel
 
     static final int PAUSE_BEFORE_REMOVING_SERVICE_MILLIS = 1000;
 
-    /** The fields for each record in the hosts context */
+    /**
+     * The fields for each record in the hosts context
+     * 
+     * @see PlatformMetaDataModel#getPlatformNodesContext()
+     */
     public static enum NodesMetaDataRecordDefinition
     {
         InstanceCount
     }
 
-    /** The fields for each record in the agents context */
+    /**
+     * The fields for each record in the agents context
+     * 
+     * @see PlatformMetaDataModel#getPlatformRegsitryAgentsContext()
+     */
     public static enum AgentMetaDataRecordDefinition
     {
         Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
             Runtime, User, EPM
     }
 
-    /** The fields for each record in the service-proxies context */
+    /**
+     * The fields for each record in the service-proxies context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceProxiesContext()
+     * */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
         EndPoint, SubscriptionCount, MessagesReceived, DataCountKb, ConnectionUptime, Service, ServiceInstance,
             ServiceEndPoint
     }
 
-    /** The fields for each record in the services context */
+    /**
+     * The fields for each record in the services context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServicesContext()
+     * */
     public static enum ServiceMetaDataRecordDefinition
     {
         Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount
     }
 
-    /** The fields for each record in the service instances context */
+    /**
+     * The fields for each record in the service instances context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceInstancesContext()
+     */
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
         Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
             MessagesSent, DataCountKb, MsgsPerMin, KbPerMin,
     }
 
-    /** The fields for each record in the records per service context */
+    /**
+     * The fields for each record in the records per service context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceRecordsContext(String)
+     */
     public static enum ServiceRecordMetaDataRecordDefinition
     {
         SubscriptionCount
     }
 
-    /** The fields for each record in the records per service instance context */
+    /**
+     * The fields for each record in the records per service instance context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceInstanceRecordsContext(String)
+     */
     public static enum ServiceInstanceRecordMetaDataRecordDefinition
     {
         SubscriptionCount
     }
 
-    /** The fields for each record in the rpcs per service context */
+    /**
+     * The fields for each record in the rpcs per service context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceRpcsContext(String)
+     */
     public static enum ServiceRpcMetaDataRecordDefinition
     {
         Definition
     }
 
-    /** The fields for each record in the rpcs per service instance context */
+    /**
+     * The fields for each record in the rpcs per service instance context
+     * 
+     * @see PlatformMetaDataModel#getPlatformServiceInstanceRpcsContext(String)
+     */
     public static enum ServiceInstanceRpcMetaDataRecordDefinition
     {
         Definition
