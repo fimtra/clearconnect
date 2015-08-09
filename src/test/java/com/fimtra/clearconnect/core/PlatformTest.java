@@ -1492,8 +1492,12 @@ public class PlatformTest
         final AtomicReference<IRecord> serviceInstanceRpcs = new AtomicReference<IRecord>();
         final AtomicReference<IRecord> serviceRpcs = new AtomicReference<IRecord>();
 
-        final int instanceCount = 6;
+        // note: the built-in ftServiceInstanceStatus RPC is published for all FT services
+        // automatically, hence we have 2 + 1 expected as the test publishes a custom RPC per
+        // service
         final int serviceCount = 3;
+        // similar story here - the 2 FT services have 2 RPCs, the 2 LB services have 1
+        final int instanceCount = 6;
 
         IRecordListener platformListener = new IRecordListener()
         {
