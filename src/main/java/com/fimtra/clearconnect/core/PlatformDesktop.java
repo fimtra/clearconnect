@@ -1118,7 +1118,8 @@ class PlatformDesktop
 
                     private void setTitle(String title)
                     {
-                        PlatformDesktop.this.desktopWindow.setTitle("ClearConnect | " + title + " | fimtra.com");
+                        PlatformDesktop.this.desktopWindow.setTitle("ClearConnect | " + title + " "
+                            + PlatformDesktop.this.getMetaDataModel().agent.registryProxy.getShortSocketDescription());
                     }
                 });
 
