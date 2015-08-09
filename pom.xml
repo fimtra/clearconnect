@@ -281,6 +281,13 @@
 						</executions>
 					</plugin>
 					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<configuration>
+							<classifier>java6-sources</classifier>
+						</configuration>
+					</plugin>						
+					<plugin>
 						<artifactId>maven-compiler-plugin</artifactId>
 						<version>${plugins.compiler.version}</version>
 						<configuration>
@@ -338,8 +345,15 @@
 									<classifier>java6</classifier>
 								</configuration>
 							</execution>
-						</executions>
+						</executions>						
 					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<configuration>
+							<classifier>java6-sources</classifier>
+						</configuration>
+					</plugin>						
 					<plugin>
 						<artifactId>maven-compiler-plugin</artifactId>
 						<version>${plugins.compiler.version}</version>
