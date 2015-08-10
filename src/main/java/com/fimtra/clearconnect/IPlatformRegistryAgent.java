@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
+import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
@@ -339,4 +340,9 @@ public interface IPlatformRegistryAgent
      *         {@link #getPlatformServiceProxy(String)}
      */
     Map<String, IPlatformServiceProxy> getActiveProxies();
+    
+    /**
+     * @return the {@link EndPointAddress} for the current registry connection, <code>null</code> if not connected 
+     */
+    EndPointAddress getRegistryEndPoint();
 }
