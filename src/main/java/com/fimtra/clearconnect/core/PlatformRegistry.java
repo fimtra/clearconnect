@@ -82,7 +82,7 @@ public final class PlatformRegistry
 {
     static final String RUNTIME_DYNAMIC = "runtimeDynamic";
 
-    // suppress logging of the the runtimeDynamic RPC inbound commands 
+    // suppress logging of the the runtimeDynamic RPC inbound commands
     static
     {
         String current =
@@ -969,7 +969,7 @@ public final class PlatformRegistry
             final IValue iValue = this.services.get(serviceFamily);
             if (iValue == null)
             {
-                throw new IllegalArgumentException("No service registered for '" + serviceFamily + "'");
+                return null;
             }
             RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(iValue.textValue());
 
@@ -1021,7 +1021,7 @@ public final class PlatformRegistry
             }
             else
             {
-                throw new IllegalArgumentException("No service instance available for service '" + serviceFamily + "'");
+                return null;
             }
         }
         finally
