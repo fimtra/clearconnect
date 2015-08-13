@@ -134,8 +134,7 @@ public final class PlatformRegistry
         catch (RuntimeException e)
         {
             throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + PlatformRegistry.class.getSimpleName()
-                + " platformName hostName [tcpPort]" 
-                + SystemUtils.lineSeparator() + "    platformName is mandatory"
+                + " platformName hostName [tcpPort]" + SystemUtils.lineSeparator() + "    platformName is mandatory"
                 + SystemUtils.lineSeparator() + "    hostName is mandatory and is either the hostname or IP address"
                 + SystemUtils.lineSeparator() + "    tcpPort is optional", e);
         }
@@ -759,8 +758,8 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                Map<String, IValue> runtimeRecord =
-                    PlatformRegistry.this.runtimeStatus.getOrCreateSubMap(args[0].textValue());
+                final String agentName = args[0].textValue();
+                Map<String, IValue> runtimeRecord = PlatformRegistry.this.runtimeStatus.getOrCreateSubMap(agentName);
                 runtimeRecord.put(IRuntimeStatusRecordFields.Q_OVERFLOW, args[1]);
                 runtimeRecord.put(IRuntimeStatusRecordFields.Q_TOTAL_SUBMITTED, args[2]);
                 runtimeRecord.put(IRuntimeStatusRecordFields.MEM_USED_MB, args[3]);
@@ -848,6 +847,7 @@ public final class PlatformRegistry
                 serviceRecordStructure);
 
             // register the service member
+            // todo check for leaks
             this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
                 LongValue.valueOf(System.currentTimeMillis()));
             this.context.publishAtomicChange(this.serviceInstancesPerServiceFamily);
@@ -1104,6 +1104,7 @@ public final class PlatformRegistry
         this.recordAccessLock.lock();
         try
         {
+            // todo check for leak
             final Map<String, IValue> statsForService = this.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
             statsForService.putAll(imageCopy);
             this.context.publishAtomicChange(this.serviceInstanceStats);
@@ -1114,15 +1115,39 @@ public final class PlatformRegistry
         }
     }
 
+    static final String AGENT_PROXY_ID_PREFIX = SERVICE_NAME + PlatformUtils.SERVICE_CLIENT_DELIMITER;
+    static final int AGENT_PROXY_ID_PREFIX_LEN = AGENT_PROXY_ID_PREFIX.length();
+
     void handleContextConnectionsUpdate(IRecordChange atomicChange)
     {
         this.recordAccessLock.lock();
         try
         {
-            for (String subMapKey : atomicChange.getSubMapKeys())
+            IValue proxyId;
+            String agent = null;
+            IRecordChange subMapAtomicChange;
+            Map<String, IValue> connection;
+            for (String connectionId : atomicChange.getSubMapKeys())
             {
-                atomicChange.getSubMapAtomicChange(subMapKey).applyTo(
-                    this.platformConnections.getOrCreateSubMap(subMapKey));
+                subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
+                if ((proxyId =
+                    subMapAtomicChange.getRemovedEntries().get(
+                        ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
+                {
+                    if (proxyId.textValue().startsWith(AGENT_PROXY_ID_PREFIX))
+                    {
+                        agent = proxyId.textValue().substring(AGENT_PROXY_ID_PREFIX_LEN);
+                    }
+                    // purge the runtimeStatus record
+                    this.runtimeStatus.removeSubMap(agent);
+                }
+                connection = this.platformConnections.getOrCreateSubMap(connectionId);
+                subMapAtomicChange.applyTo(connection);
+                if (connection.isEmpty())
+                {
+                    // purge the connection
+                    this.platformConnections.removeSubMap(connectionId);
+                }
             }
             this.context.publishAtomicChange(this.platformConnections);
         }
@@ -1141,6 +1166,7 @@ public final class PlatformRegistry
         {
             // first handle updates to the object record for the service instance
             Map<String, IValue> serviceInstanceObjects =
+                    // todo check for leak
                 objectsPerPlatformServiceInstanceRecord.getOrCreateSubMap(serviceInstanceId);
             atomicChange.applyTo(serviceInstanceObjects);
             if (serviceInstanceObjects.size() == 0)
@@ -1160,6 +1186,7 @@ public final class PlatformRegistry
             // here we work out if, for any removed objects in the atomic change, there are no more
             // occurrences of the object across all the service instances and thus we can remove the
             // object from the service (objects-per-service) record
+            // todo check for leak
             final Map<String, IValue> serviceObjects = objectsPerPlatformServiceRecord.getOrCreateSubMap(serviceFamily);
             Map<String, IValue> objectsPerServiceInstance;
             boolean existsForOneInstance = false;
@@ -1254,6 +1281,7 @@ public final class PlatformRegistry
                     serviceInstancesNamesForThisServiceArray[i]);
             if (subMapKeys.contains(serviceInstanceID))
             {
+                // todo check for leak
                 subMapsForAllServiceInstancesOfThisService.add(objectsPerPlatformServiceInstanceRecord.getOrCreateSubMap(serviceInstanceID));
             }
         }
