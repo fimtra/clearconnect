@@ -80,6 +80,26 @@ import com.fimtra.util.is;
  */
 public final class PlatformRegistry
 {
+    static final String RUNTIME_DYNAMIC = "runtimeDynamic";
+
+    // suppress logging of the the runtimeDynamic RPC inbound commands 
+    static
+    {
+        String current =
+            (String) System.getProperties().get(DataFissionProperties.Names.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX);
+        final String ignoreRxRpc = "rpc|" + RUNTIME_DYNAMIC;
+        if (current == null)
+        {
+            current = ignoreRxRpc;
+        }
+        else
+        {
+            current += "," + ignoreRxRpc;
+        }
+        Log.log(PlatformRegistry.class, "Setting ", DataFissionProperties.Names.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX,
+            "=", current);
+        System.getProperties().setProperty(DataFissionProperties.Names.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX, current);
+    }
 
     /**
      * Access for starting a {@link PlatformRegistry} using command line.
@@ -92,7 +112,7 @@ public final class PlatformRegistry
      *  arg[1] is the host (mandatory)
      *  arg[2] is the port (optional)
      * </pre>
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     @SuppressWarnings("unused")
     public static void main(String[] args) throws InterruptedException
@@ -291,7 +311,6 @@ public final class PlatformRegistry
     static final String DEREGISTER = "deregister";
     static final String REGISTER = "register";
     static final String RUNTIME_STATIC = "runtimeStatic";
-    static final String RUNTIME_DYNAMIC = "runtimeDynamic";
 
     final Context context;
     final String platformName;
