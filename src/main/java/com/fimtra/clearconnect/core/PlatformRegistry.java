@@ -388,7 +388,6 @@ public final class PlatformRegistry
      * @param port
      *            the TCP port to use for the server socket
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
     public PlatformRegistry(String platformName, String host, int port)
     {
         final String registryInstanceId = platformName + "@" + host + ":" + port;
@@ -399,8 +398,8 @@ public final class PlatformRegistry
         this.recordAccessLock = new ReentrantLock();
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
-        this.monitoredServiceInstances = new ConcurrentHashMap();
-        this.masterInstancePerFtService = new ConcurrentHashMap();
+        this.monitoredServiceInstances = new ConcurrentHashMap<String, ProxyContext>();
+        this.masterInstancePerFtService = new ConcurrentHashMap<String, String>();
         this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
 
         this.services = this.context.createRecord(IRegistryRecordNames.SERVICES);
@@ -1118,7 +1117,6 @@ public final class PlatformRegistry
         this.recordAccessLock.lock();
         try
         {
-            // todo check for leak
             final Map<String, IValue> statsForService = this.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
             statsForService.putAll(imageCopy);
             this.context.publishAtomicChange(this.serviceInstanceStats);
