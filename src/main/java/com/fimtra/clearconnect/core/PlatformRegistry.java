@@ -847,7 +847,6 @@ public final class PlatformRegistry
                 serviceRecordStructure);
 
             // register the service member
-            // todo check for leaks
             this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
                 LongValue.valueOf(System.currentTimeMillis()));
             this.context.publishAtomicChange(this.serviceInstancesPerServiceFamily);
@@ -921,12 +920,27 @@ public final class PlatformRegistry
                 final Map<String, IValue> serviceInstances =
                     this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
                 serviceInstances.remove(serviceMember);
+                if (serviceInstances.size() == 0)
+                {
+                    this.serviceInstancesPerServiceFamily.removeSubMap(serviceFamily);
+                }
 
                 // remove the service instance from the instances-per-agent
+                Map<String, IValue> instancesPerAgent;
+                Set<String> agentsWithNoServiceInstance = new HashSet<String>();
                 for (String agentName : this.serviceInstancesPerAgent.getSubMapKeys())
                 {
                     // we don't know which agent has it so scan them all
-                    this.serviceInstancesPerAgent.getOrCreateSubMap(agentName).remove(serviceInstanceId);
+                    instancesPerAgent = this.serviceInstancesPerAgent.getOrCreateSubMap(agentName);
+                    instancesPerAgent.remove(serviceInstanceId);
+                    if (instancesPerAgent.size() == 0)
+                    {
+                        agentsWithNoServiceInstance.add(agentName);
+                    }
+                }
+                for (String agentName : agentsWithNoServiceInstance)
+                {
+                    this.serviceInstancesPerAgent.removeSubMap(agentName);
                 }
 
                 if (serviceInstances.size() == 0)
@@ -973,56 +987,56 @@ public final class PlatformRegistry
             }
             RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(iValue.textValue());
 
-            final Map<String, IValue> serviceInstances =
-                this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
-            if (serviceInstances.size() > 0)
+            if (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
             {
-                // find the instance with the earliest timestamp
-                long earliest = Long.MAX_VALUE;
-                Map.Entry<String, IValue> entry = null;
-                String key = null;
-                IValue value = null;
-                for (Iterator<Map.Entry<String, IValue>> it = serviceInstances.entrySet().iterator(); it.hasNext();)
+                final Map<String, IValue> serviceInstances =
+                    this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
+                if (serviceInstances.size() > 0)
                 {
-                    entry = it.next();
-                    key = entry.getKey();
-                    value = entry.getValue();
-                    if (value.longValue() < earliest)
+                    // find the instance with the earliest timestamp
+                    long earliest = Long.MAX_VALUE;
+                    Map.Entry<String, IValue> entry = null;
+                    String key = null;
+                    IValue value = null;
+                    for (Iterator<Map.Entry<String, IValue>> it = serviceInstances.entrySet().iterator(); it.hasNext();)
                     {
-                        earliest = value.longValue();
-                        activeServiceMemberName = key;
+                        entry = it.next();
+                        key = entry.getKey();
+                        value = entry.getValue();
+                        if (value.longValue() < earliest)
+                        {
+                            earliest = value.longValue();
+                            activeServiceMemberName = key;
+                        }
                     }
-                }
 
-                final String serviceInstanceId =
-                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, activeServiceMemberName);
-                if (redundancyModeEnum == RedundancyModeEnum.LOAD_BALANCED)
-                {
-                    // for LB, the timestamp is updated to be the last selected time so the next
-                    // instance selected will be one with an earlier time and thus produce a
-                    // round-robin style selection policy
-                    serviceInstances.put(activeServiceMemberName, LongValue.valueOf(System.currentTimeMillis()));
-                }
-                else
-                {
-                    verifyMasterInstance(serviceFamily, serviceInstanceId);
-                }
+                    final String serviceInstanceId =
+                        PlatformUtils.composePlatformServiceInstanceID(serviceFamily, activeServiceMemberName);
+                    if (redundancyModeEnum == RedundancyModeEnum.LOAD_BALANCED)
+                    {
+                        // for LB, the timestamp is updated to be the last selected time so the next
+                        // instance selected will be one with an earlier time and thus produce a
+                        // round-robin style selection policy
+                        serviceInstances.put(activeServiceMemberName, LongValue.valueOf(System.currentTimeMillis()));
+                    }
+                    else
+                    {
+                        verifyMasterInstance(serviceFamily, serviceInstanceId);
+                    }
 
-                Log.log(
-                    this,
-                    "Selecting member '",
-                    activeServiceMemberName,
-                    "' for service '",
-                    serviceFamily,
-                    "' (service info details=",
-                    ObjectUtils.safeToString(this.context.getRecord(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
-                        + serviceInstanceId)), ")");
-                return serviceInstanceId;
+                    Log.log(
+                        this,
+                        "Selecting member '",
+                        activeServiceMemberName,
+                        "' for service '",
+                        serviceFamily,
+                        "' (service info details=",
+                        ObjectUtils.safeToString(this.context.getRecord(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
+                            + serviceInstanceId)), ")");
+                    return serviceInstanceId;
+                }
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
         finally
         {
@@ -1166,7 +1180,6 @@ public final class PlatformRegistry
         {
             // first handle updates to the object record for the service instance
             Map<String, IValue> serviceInstanceObjects =
-                    // todo check for leak
                 objectsPerPlatformServiceInstanceRecord.getOrCreateSubMap(serviceInstanceId);
             atomicChange.applyTo(serviceInstanceObjects);
             if (serviceInstanceObjects.size() == 0)
@@ -1182,73 +1195,81 @@ public final class PlatformRegistry
             final Map<String, IValue>[] objectsForEachServiceInstanceOfThisService =
                 getObjectsForEachServiceInstanceOfThisServiceName(serviceFamily,
                     objectsPerPlatformServiceInstanceRecord);
-
-            // here we work out if, for any removed objects in the atomic change, there are no more
-            // occurrences of the object across all the service instances and thus we can remove the
-            // object from the service (objects-per-service) record
-            // todo check for leak
-            final Map<String, IValue> serviceObjects = objectsPerPlatformServiceRecord.getOrCreateSubMap(serviceFamily);
-            Map<String, IValue> objectsPerServiceInstance;
-            boolean existsForOneInstance = false;
-            String objectName = null;
-            for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
+            if (objectsForEachServiceInstanceOfThisService != null)
             {
-                objectName = it.next().getKey();
-                for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
-                {
-                    objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
-                    existsForOneInstance = objectsPerServiceInstance.containsKey(objectName);
-                    if (existsForOneInstance)
-                    {
-                        break;
-                    }
-                }
-                if (!existsForOneInstance)
-                {
-                    serviceObjects.remove(objectName);
-                }
-            }
 
-            // some objects need to show the aggregation across all service instances (e.g.
-            // subscription counts for a record, we need to see the counts for the same record
-            // across all service instances)
-            if (aggregateValuesAsLongs)
-            {
-                final Set<String> keysChanged = new HashSet<String>(atomicChange.getPutEntries().keySet());
-                keysChanged.addAll(atomicChange.getRemovedEntries().keySet());
-                Map<String, IValue> additions = new HashMap<String, IValue>();
-                IValue value;
-                for (Iterator<String> iterator = keysChanged.iterator(); iterator.hasNext();)
+                // here we work out if, for any removed objects in the atomic change, there are no
+                // more occurrences of the object across all the service instances and thus we can
+                // remove the object from the service (objects-per-service) record
+                final Map<String, IValue> serviceObjects =
+                    objectsPerPlatformServiceRecord.getOrCreateSubMap(serviceFamily);
+                Map<String, IValue> objectsPerServiceInstance;
+                boolean existsForOneInstance = false;
+                String objectName = null;
+                for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
                 {
-                    objectName = iterator.next();
-                    additions.put(objectName, LongValue.valueOf(0));
-
-                    // aggregate the long value of all objects of the same name across all instances
-                    // of this service
+                    objectName = it.next().getKey();
                     for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
                     {
                         objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
-                        value = objectsPerServiceInstance.get(objectName);
-                        if (value != null)
+                        existsForOneInstance = objectsPerServiceInstance.containsKey(objectName);
+                        if (existsForOneInstance)
                         {
-                            additions.put(objectName,
-                                LongValue.valueOf(additions.get(objectName).longValue() + value.longValue()));
+                            break;
                         }
                     }
-
-                    if (additions.get(objectName).longValue() == 0
-                        && atomicChange.getRemovedEntries().containsKey(objectName))
+                    if (!existsForOneInstance)
                     {
-                        additions.remove(objectName);
+                        serviceObjects.remove(objectName);
                     }
                 }
-                serviceObjects.putAll(additions);
+
+                // some objects need to show the aggregation across all service instances (e.g.
+                // subscription counts for a record, we need to see the counts for the same record
+                // across all service instances)
+                if (aggregateValuesAsLongs)
+                {
+                    final Set<String> keysChanged = new HashSet<String>(atomicChange.getPutEntries().keySet());
+                    keysChanged.addAll(atomicChange.getRemovedEntries().keySet());
+                    Map<String, IValue> additions = new HashMap<String, IValue>();
+                    IValue value;
+                    for (Iterator<String> iterator = keysChanged.iterator(); iterator.hasNext();)
+                    {
+                        objectName = iterator.next();
+                        additions.put(objectName, LongValue.valueOf(0));
+
+                        // aggregate the long value of all objects of the same name across all
+                        // instances of this service
+                        for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
+                        {
+                            objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
+                            value = objectsPerServiceInstance.get(objectName);
+                            if (value != null)
+                            {
+                                additions.put(objectName,
+                                    LongValue.valueOf(additions.get(objectName).longValue() + value.longValue()));
+                            }
+                        }
+
+                        if (additions.get(objectName).longValue() == 0
+                            && atomicChange.getRemovedEntries().containsKey(objectName))
+                        {
+                            additions.remove(objectName);
+                        }
+                    }
+                    serviceObjects.putAll(additions);
+                }
+                else
+                {
+                    serviceObjects.putAll(atomicChange.getPutEntries());
+                }
+                this.context.publishAtomicChange(objectsPerPlatformServiceRecord);
+
+                if (serviceObjects.size() == 0)
+                {
+                    objectsPerPlatformServiceRecord.removeSubMap(serviceFamily);
+                }
             }
-            else
-            {
-                serviceObjects.putAll(atomicChange.getPutEntries());
-            }
-            this.context.publishAtomicChange(objectsPerPlatformServiceRecord);
         }
         catch (Exception e)
         {
@@ -1265,26 +1286,39 @@ public final class PlatformRegistry
     private Map<String, IValue>[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
         final IRecord objectsPerPlatformServiceInstanceRecord)
     {
-        final Map<String, IValue> serviceMembersForThisService =
-            this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
-        final String[] serviceInstancesNamesForThisServiceArray =
-            serviceMembersForThisService.keySet().toArray(new String[serviceMembersForThisService.keySet().size()]);
-
-        final Set<String> subMapKeys = objectsPerPlatformServiceInstanceRecord.getSubMapKeys();
-        final List<Map<String, IValue>> subMapsForAllServiceInstancesOfThisService =
-            new ArrayList<Map<String, IValue>>();
-        String serviceInstanceID;
-        for (int i = 0; i < serviceInstancesNamesForThisServiceArray.length; i++)
+        if (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
         {
-            serviceInstanceID =
-                PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
-                    serviceInstancesNamesForThisServiceArray[i]);
-            if (subMapKeys.contains(serviceInstanceID))
+            final Map<String, IValue> serviceMembersForThisService =
+                this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
+
+            final String[] serviceInstancesNamesForThisServiceArray =
+                serviceMembersForThisService.keySet().toArray(new String[serviceMembersForThisService.keySet().size()]);
+
+            // this block examines the subMapKeys (which are service instance IDs) and for all the
+            // members of the serviceFamily, if the member is found in the subMapKeys, then the
+            // associated objects (the submap) for the member is added to a return array
+            final Set<String> allServiceInstanceIds = objectsPerPlatformServiceInstanceRecord.getSubMapKeys();
+            final List<Map<String, IValue>> objectsForAllServiceInstancesOfThisService =
+                new ArrayList<Map<String, IValue>>(serviceInstancesNamesForThisServiceArray.length);
+            String serviceInstanceID;
+            for (int i = 0; i < serviceInstancesNamesForThisServiceArray.length; i++)
             {
-                // todo check for leak
-                subMapsForAllServiceInstancesOfThisService.add(objectsPerPlatformServiceInstanceRecord.getOrCreateSubMap(serviceInstanceID));
+                serviceInstanceID =
+                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
+                        serviceInstancesNamesForThisServiceArray[i]);
+                if (allServiceInstanceIds.contains(serviceInstanceID))
+                {
+                    // Note: there is no leak than can occur from this call to getOrCreateSubMap
+                    // because the serviceInstanceID is checked for existence in the
+                    // allServiceInstanceIds set, which are the submap keys
+                    objectsForAllServiceInstancesOfThisService.add(objectsPerPlatformServiceInstanceRecord.getOrCreateSubMap(serviceInstanceID));
+                }
             }
+            return objectsForAllServiceInstancesOfThisService.toArray(new Map[objectsForAllServiceInstancesOfThisService.size()]);
         }
-        return subMapsForAllServiceInstancesOfThisService.toArray(new Map[subMapsForAllServiceInstancesOfThisService.size()]);
+        else
+        {
+            return null;
+        }
     }
 }
