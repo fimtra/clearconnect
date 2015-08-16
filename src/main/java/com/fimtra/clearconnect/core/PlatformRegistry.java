@@ -631,8 +631,6 @@ public final class PlatformRegistry
                     }
                 };
 
-                registerListenersForServiceInstance(serviceFamily, serviceInstanceId, serviceProxy);
-
                 return new TextValue("Registered " + serviceInstanceId);
             }
         });
@@ -803,9 +801,14 @@ public final class PlatformRegistry
             this.context.publishAtomicChange(this.serviceInstancesPerAgent);
 
             this.services.put(serviceFamily, redundancyModeEnum.name());
+            // todo what if duplicate instances of the same family are registering simultaneously?
             this.pendingPlatformServices.remove(serviceFamily);
 
             this.context.publishAtomicChange(this.services);
+            
+            ProxyContext serviceProxy = this.monitoredServiceInstances.get(serviceInstanceId);
+            // todo check if serviceProxy is null????
+            registerListenersForServiceInstance(serviceFamily, serviceInstanceId, serviceProxy);
         }
         finally
         {
