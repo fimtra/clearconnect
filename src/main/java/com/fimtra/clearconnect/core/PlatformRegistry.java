@@ -903,17 +903,7 @@ public final class PlatformRegistry
                 }
                 this.context.publishAtomicChange(this.platformConnections);
 
-                // remove the records for this service instance
-                handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
-                    serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
-                        this.recordsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
-                    this.recordsPerServiceInstance, this.recordsPerServiceFamily, true);
-
-                // remove the rpcs for this service instance
-                handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
-                    serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
-                        this.rpcsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
-                    this.rpcsPerServiceInstance, this.rpcsPerServiceFamily, false);
+                removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
 
                 // remove the service instance from the instances-per-service
                 final Map<String, IValue> serviceInstances =
@@ -970,6 +960,21 @@ public final class PlatformRegistry
                 this.recordAccessLock.unlock();
             }
         }
+    }
+
+    void removeRecordsAndRpcsPerServiceInstance(String serviceInstanceId, final String serviceFamily)
+    {
+        // remove the records for this service instance
+        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
+            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
+                this.recordsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
+            this.recordsPerServiceInstance, this.recordsPerServiceFamily, true);
+
+        // remove the rpcs for this service instance
+        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
+            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
+                this.rpcsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
+            this.rpcsPerServiceInstance, this.rpcsPerServiceFamily, false);
     }
 
     String selectNextInstance(String serviceFamily)
