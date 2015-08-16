@@ -631,59 +631,7 @@ public final class PlatformRegistry
                     }
                 };
 
-                // add a listener to get the service-level statistics
-                serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-                    new IRecordListener()
-                    {
-                        @Override
-                        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                        {
-                            handleServiceStatsUpdate(serviceInstanceId, imageCopy);
-                        }
-                    }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
-                    PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
-
-                // add a listener to cache the context connections record of the service locally in
-                // the platformConnections record
-                serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-                    new IRecordListener()
-                    {
-                        @Override
-                        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                        {
-                            handleContextConnectionsUpdate(atomicChange);
-                        }
-                    }, serviceInstanceId + "-" + REMOTE_CONTEXT_CONNECTIONS), REMOTE_CONTEXT_CONNECTIONS);
-
-                // add listeners to handle platform objects published by this instance
-                serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-                    new IRecordListener()
-                    {
-                        @Override
-                        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                        {
-                            final IRecord serviceInstanceObjectsRecord =
-                                PlatformRegistry.this.recordsPerServiceInstance;
-                            final IRecord serviceObjectsRecord = PlatformRegistry.this.recordsPerServiceFamily;
-
-                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                                serviceInstanceObjectsRecord, serviceObjectsRecord, true);
-                        }
-                    }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
-
-                serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-                    new IRecordListener()
-                    {
-                        @Override
-                        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                        {
-                            final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.rpcsPerServiceInstance;
-                            final IRecord serviceObjectsRecord = PlatformRegistry.this.rpcsPerServiceFamily;
-
-                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                                serviceInstanceObjectsRecord, serviceObjectsRecord, false);
-                        }
-                    }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
+                registerListenersForServiceInstance(serviceFamily, serviceInstanceId, serviceProxy);
 
                 return new TextValue("Registered " + serviceInstanceId);
             }
@@ -1336,5 +1284,63 @@ public final class PlatformRegistry
         {
             return null;
         }
+    }
+
+    void registerListenersForServiceInstance(final String serviceFamily, final String serviceInstanceId,
+        final ProxyContext serviceProxy)
+    {
+        // add a listener to get the service-level statistics
+        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
+            new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    handleServiceStatsUpdate(serviceInstanceId, imageCopy);
+                }
+            }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
+            PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
+
+        // add a listener to cache the context connections record of the service locally in
+        // the platformConnections record
+        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
+            new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    handleContextConnectionsUpdate(atomicChange);
+                }
+            }, serviceInstanceId + "-" + REMOTE_CONTEXT_CONNECTIONS), REMOTE_CONTEXT_CONNECTIONS);
+
+        // add listeners to handle platform objects published by this instance
+        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
+            new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    final IRecord serviceInstanceObjectsRecord =
+                        PlatformRegistry.this.recordsPerServiceInstance;
+                    final IRecord serviceObjectsRecord = PlatformRegistry.this.recordsPerServiceFamily;
+
+                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                        serviceInstanceObjectsRecord, serviceObjectsRecord, true);
+                }
+            }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
+
+        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
+            new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.rpcsPerServiceInstance;
+                    final IRecord serviceObjectsRecord = PlatformRegistry.this.rpcsPerServiceFamily;
+
+                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                        serviceInstanceObjectsRecord, serviceObjectsRecord, false);
+                }
+            }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
     }
 }
