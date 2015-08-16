@@ -952,8 +952,7 @@ public final class PlatformRegistry
                 this.context.publishAtomicChange(this.serviceInstancesPerServiceFamily);
                 this.context.publishAtomicChange(this.serviceInstancesPerAgent);
 
-                this.serviceInstanceStats.removeSubMap(serviceInstanceId);
-                this.context.publishAtomicChange(this.serviceInstanceStats);
+                removeServiceStats(serviceInstanceId);
             }
             finally
             {
@@ -1124,6 +1123,20 @@ public final class PlatformRegistry
         {
             final Map<String, IValue> statsForService = this.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
             statsForService.putAll(imageCopy);
+            this.context.publishAtomicChange(this.serviceInstanceStats);
+        }
+        finally
+        {
+            this.recordAccessLock.unlock();
+        }
+    }
+
+    void removeServiceStats(String serviceInstanceId)
+    {
+        this.recordAccessLock.lock();
+        try
+        {
+            this.serviceInstanceStats.removeSubMap(serviceInstanceId);
             this.context.publishAtomicChange(this.serviceInstanceStats);
         }
         finally
