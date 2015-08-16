@@ -805,10 +805,10 @@ public final class PlatformRegistry
             this.pendingPlatformServices.remove(serviceFamily);
 
             this.context.publishAtomicChange(this.services);
-            
+
             ProxyContext serviceProxy = this.monitoredServiceInstances.get(serviceInstanceId);
             // todo check if serviceProxy is null????
-            registerListenersForServiceInstance(serviceFamily, serviceInstanceId, serviceProxy);
+            registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
         }
         finally
         {
@@ -1289,8 +1289,8 @@ public final class PlatformRegistry
         }
     }
 
-    void registerListenersForServiceInstance(final String serviceFamily, final String serviceInstanceId,
-        final ProxyContext serviceProxy)
+    void registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
+        final String serviceInstanceId, final ProxyContext serviceProxy)
     {
         // add a listener to get the service-level statistics
         serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
@@ -1299,7 +1299,21 @@ public final class PlatformRegistry
                 @Override
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    handleServiceStatsUpdate(serviceInstanceId, imageCopy);
+                    recordAccessLock.lock();
+                    try
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeServiceStats(serviceInstanceId);
+                            return;
+                        }
+
+                        handleServiceStatsUpdate(serviceInstanceId, imageCopy);
+                    }
+                    finally
+                    {
+                        recordAccessLock.unlock();
+                    }
                 }
             }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
             PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
@@ -1323,12 +1337,25 @@ public final class PlatformRegistry
                 @Override
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    final IRecord serviceInstanceObjectsRecord =
-                        PlatformRegistry.this.recordsPerServiceInstance;
-                    final IRecord serviceObjectsRecord = PlatformRegistry.this.recordsPerServiceFamily;
+                    recordAccessLock.lock();
+                    try
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                            return;
+                        }
 
-                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                        serviceInstanceObjectsRecord, serviceObjectsRecord, true);
+                        final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.recordsPerServiceInstance;
+                        final IRecord serviceObjectsRecord = PlatformRegistry.this.recordsPerServiceFamily;
+
+                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                            serviceInstanceObjectsRecord, serviceObjectsRecord, true);
+                    }
+                    finally
+                    {
+                        recordAccessLock.unlock();
+                    }
                 }
             }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
 
@@ -1338,12 +1365,33 @@ public final class PlatformRegistry
                 @Override
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.rpcsPerServiceInstance;
-                    final IRecord serviceObjectsRecord = PlatformRegistry.this.rpcsPerServiceFamily;
+                    recordAccessLock.lock();
+                    try
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                            return;
+                        }
 
-                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                        serviceInstanceObjectsRecord, serviceObjectsRecord, false);
+                        final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.rpcsPerServiceInstance;
+                        final IRecord serviceObjectsRecord = PlatformRegistry.this.rpcsPerServiceFamily;
+
+                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                            serviceInstanceObjectsRecord, serviceObjectsRecord, false);
+                    }
+                    finally
+                    {
+                        recordAccessLock.unlock();
+                    }
                 }
             }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
+    }
+
+    boolean serviceInstanceNotRegistered(final String serviceFamily, String serviceMember)
+    {
+        return !this.services.containsKey(serviceFamily)
+            || (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily) && !this.serviceInstancesPerServiceFamily.getOrCreateSubMap(
+                serviceFamily).containsKey(serviceMember));
     }
 }
