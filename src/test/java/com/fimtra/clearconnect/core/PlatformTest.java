@@ -587,8 +587,8 @@ public class PlatformTest
         assertTrue(this.agent.addServiceAvailableListener(listener));
 
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-        assertTrue(this.registry.isFaultTolerantPlatformService(SERVICE1));
-        assertFalse(this.registry.isLoadBalancedPlatformService(SERVICE1));
+        assertTrue(this.registry.singleThreadLogic.innerLogic.isFaultTolerantPlatformService(SERVICE1));
+        assertFalse(this.registry.singleThreadLogic.innerLogic.isLoadBalancedPlatformService(SERVICE1));
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
@@ -602,8 +602,8 @@ public class PlatformTest
         assertFalse(this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary));
         assertFalse(this.agent.destroyPlatformServiceInstance(SERVICE3, this.primary));
 
-        assertFalse(this.registry.isFaultTolerantPlatformService(SERVICE1));
-        assertFalse(this.registry.isLoadBalancedPlatformService(SERVICE1));
+        assertFalse(this.registry.singleThreadLogic.innerLogic.isFaultTolerantPlatformService(SERVICE1));
+        assertFalse(this.registry.singleThreadLogic.innerLogic.isLoadBalancedPlatformService(SERVICE1));
 
         listener.verifyNoMoreInteractions();
     }

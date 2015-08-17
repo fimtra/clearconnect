@@ -28,10 +28,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -64,6 +66,7 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SystemUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
@@ -80,6 +83,10 @@ import com.fimtra.util.is;
  */
 public final class PlatformRegistry
 {
+    static final String AGENT_PROXY_ID_PREFIX = PlatformRegistry.SERVICE_NAME + PlatformUtils.SERVICE_CLIENT_DELIMITER;
+    static final int AGENT_PROXY_ID_PREFIX_LEN = AGENT_PROXY_ID_PREFIX.length();
+    static final IValue BLANK_VALUE = new TextValue("");
+
     static final String RUNTIME_DYNAMIC = "runtimeDynamic";
 
     // suppress logging of the the runtimeDynamic RPC inbound commands
@@ -144,7 +151,6 @@ public final class PlatformRegistry
         }
     }
 
-    static final IValue BLANK_VALUE = new TextValue("");
     static final StringProtocolCodec CODEC = new StringProtocolCodec();
 
     /**
@@ -338,7 +344,7 @@ public final class PlatformRegistry
     final IRecord rpcsPerServiceFamily;
     /** @see IRegistryRecordNames#RUNTIME_STATUS */
     final IRecord runtimeStatus;
-    final Lock recordAccessLock;
+
     /**
      * Tracks services that are pending registration completion
      * 
@@ -346,6 +352,7 @@ public final class PlatformRegistry
      */
     final Map<String, IValue> pendingPlatformServices;
     final ThimbleExecutor coalescingExecutor;
+    final RegistrySingleThreadLogic singleThreadLogic;
 
     /**
      * Construct the platform registry using the default platform registry port.
@@ -393,9 +400,9 @@ public final class PlatformRegistry
         final String registryInstanceId = platformName + "@" + host + ":" + port;
         Log.log(this, "Creating ", registryInstanceId);
         this.coalescingExecutor = new ThimbleExecutor("coalescing-executor-" + registryInstanceId, 1);
+        this.singleThreadLogic = new RegistrySingleThreadLogic(this);
 
         this.platformName = platformName;
-        this.recordAccessLock = new ReentrantLock();
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
         this.monitoredServiceInstances = new ConcurrentHashMap<String, ProxyContext>();
@@ -415,24 +422,16 @@ public final class PlatformRegistry
         this.runtimeStatus = this.context.createRecord(IRegistryRecordNames.RUNTIME_STATUS);
 
         // register the RegistryService as a service!
-        this.recordAccessLock.lock();
-        try
-        {
-            this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
-            this.context.publishAtomicChange(this.services);
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
+        this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
+        this.context.publishAtomicChange(this.services);
 
         // the registry's connections
         this.context.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
         {
             @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
             {
-                handleContextConnectionsUpdate(atomicChange);
+                PlatformRegistry.this.singleThreadLogic.handleRegistyContextConnectionsUpdate(atomicChange);
             }
 
         }, ISystemRecordNames.CONTEXT_CONNECTIONS), ISystemRecordNames.CONTEXT_CONNECTIONS);
@@ -455,10 +454,17 @@ public final class PlatformRegistry
         getServiceInfoRecordNameForServiceRpc.setHandler(new IRpcExecutionHandler()
         {
             @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
             {
-                return new TextValue(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
-                    + selectNextInstance(args[0].textValue()));
+                try
+                {
+                    return new TextValue(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
+                        + PlatformRegistry.this.singleThreadLogic.selectNextInstance(args[0].textValue()));
+                }
+                catch (Exception e)
+                {
+                    throw new ExecutionException(e);
+                }
             }
         });
         this.context.createRpc(getServiceInfoRecordNameForServiceRpc);
@@ -503,9 +509,9 @@ public final class PlatformRegistry
                 TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);
         register.setHandler(new IRpcExecutionHandler()
         {
-            @SuppressWarnings({ "unused", "rawtypes", "unchecked" })
+            @SuppressWarnings({ "rawtypes", "unchecked" })
             @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
             {
                 int i = 0;
                 final String serviceFamily = args[i++].textValue();
@@ -535,104 +541,21 @@ public final class PlatformRegistry
                 final String serviceInstanceId =
                     PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
 
-                final ProxyContext serviceProxy;
                 final RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(redundancyMode);
 
-                PlatformRegistry.this.recordAccessLock.lock();
                 try
                 {
-                    if (PlatformRegistry.this.monitoredServiceInstances.containsKey(serviceInstanceId))
-                    {
-                        throw new IllegalStateException("Already registered: " + serviceInstanceId);
-                    }
-
-                    switch(redundancyModeEnum)
-                    {
-                        case FAULT_TOLERANT:
-                            if (isLoadBalancedPlatformService(serviceFamily))
-                            {
-                                throw new IllegalArgumentException("Platform service '" + serviceFamily
-                                    + "' is already registered as load-balanced.");
-                            }
-                            break;
-                        case LOAD_BALANCED:
-                            if (isFaultTolerantPlatformService(serviceFamily))
-                            {
-                                throw new IllegalArgumentException("Platform service '" + serviceFamily
-                                    + "' is already registered as fault-tolerant.");
-                            }
-                            break;
-                        default :
-                            throw new IllegalArgumentException("Unhandled mode '" + redundancyMode + "' for service '"
-                                + serviceFamily + "'");
-                    }
-
-                    try
-                    {
-                        serviceProxy =
-                            new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId,
-                                PlatformRegistry.this.context.getName()),
-                                PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
-                                PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
-                                PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure));
-                    }
-                    catch (IOException e)
-                    {
-                        Log.log(
-                            PlatformRegistry.this,
-                            "Could not construct service proxy with connection settings RPC args "
-                                + Arrays.toString(args), e);
-                        throw new ExecutionException("Could not register");
-                    }
-
-                    PlatformRegistry.this.pendingPlatformServices.put(serviceFamily,
-                        TextValue.valueOf(redundancyModeEnum.name()));
-                    PlatformRegistry.this.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
+                    PlatformRegistry.this.singleThreadLogic.registerServiceInstance(serviceFamily, redundancyMode,
+                        agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, args);
                 }
-                finally
+                catch (Exception e)
                 {
-                    PlatformRegistry.this.recordAccessLock.unlock();
+                    throw new ExecutionException(e);
                 }
-
-                serviceProxy.setReconnectPeriodMillis(PlatformRegistry.this.reconnectPeriodMillis);
-                new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
-                {
-                    @Override
-                    protected void onPlatformServiceDisconnected()
-                    {
-                        deregisterPlatformServiceInstance(this.serviceInstanceId);
-                    }
-
-                    @Override
-                    protected void onPlatformServiceConnected()
-                    {
-                        try
-                        {
-                            // register the service when the monitoring of the service is connected
-                            registerPlatformServiceInstance(agentName, this.serviceInstanceId, serviceRecordStructure,
-                                redundancyModeEnum);
-
-                            Log.log(PlatformRegistry.this, "Registered ", redundancyMode, " service ",
-                                this.serviceInstanceId, " (monitoring with " + serviceProxy.getChannelString(), ")");
-                        }
-                        catch (Exception e)
-                        {
-                            Log.log(PlatformRegistry.this, "Error registering service " + this.serviceInstanceId, e);
-                            try
-                            {
-                                deregisterPlatformServiceInstance(this.serviceInstanceId);
-                            }
-                            catch (Exception e2)
-                            {
-                                Log.log(PlatformRegistry.this, "Error deregistering service " + this.serviceInstanceId,
-                                    e2);
-                            }
-                        }
-                    }
-                };
 
                 return new TextValue("Registered " + serviceInstanceId);
             }
+
         });
         this.context.createRpc(register);
     }
@@ -648,8 +571,17 @@ public final class PlatformRegistry
                 int i = 0;
                 String serviceFamily = args[i++].textValue();
                 String serviceMember = args[i++].textValue();
-                String serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                deregisterPlatformServiceInstance(serviceInstanceId);
+                final String serviceInstanceId =
+                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                try
+                {
+                    PlatformRegistry.this.singleThreadLogic.deregisterPlatformServiceInstance(serviceInstanceId);
+                }
+                catch (Exception e)
+                {
+                    throw new ExecutionException(e);
+                }
+
                 return new TextValue("Deregistered " + serviceInstanceId);
             }
         });
@@ -672,13 +604,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                Map<String, IValue> runtimeRecord =
-                    PlatformRegistry.this.runtimeStatus.getOrCreateSubMap(args[0].textValue());
-                runtimeRecord.put(IRuntimeStatusRecordFields.RUNTIME_HOST, args[1]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.RUNTIME, args[2]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.USER, args[3]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.CPU_COUNT, args[4]);
-                PlatformRegistry.this.context.publishAtomicChange(PlatformRegistry.this.runtimeStatus);
+                PlatformRegistry.this.singleThreadLogic.handleRpcStaticRuntime(args);
                 return PlatformUtils.OK;
             }
         });
@@ -703,17 +629,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                final String agentName = args[0].textValue();
-                Map<String, IValue> runtimeRecord = PlatformRegistry.this.runtimeStatus.getOrCreateSubMap(agentName);
-                runtimeRecord.put(IRuntimeStatusRecordFields.Q_OVERFLOW, args[1]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.Q_TOTAL_SUBMITTED, args[2]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.MEM_USED_MB, args[3]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.MEM_AVAILABLE_MB, args[4]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.THREAD_COUNT, args[5]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.SYSTEM_LOAD, args[6]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.EPM, args[7]);
-                runtimeRecord.put(IRuntimeStatusRecordFields.UPTIME_SECS, args[8]);
-                PlatformRegistry.this.context.publishAtomicChange(PlatformRegistry.this.runtimeStatus);
+                PlatformRegistry.this.singleThreadLogic.handleRpcRuntimeDynamic(args);
                 return PlatformUtils.OK;
             }
         });
@@ -723,6 +639,7 @@ public final class PlatformRegistry
     public void destroy()
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+        this.singleThreadLogic.destroy();
         this.publisher.destroy();
         this.context.destroy();
         // NOTE: destroy proxies AFTER destroying the publisher and context - we don't want to tell
@@ -766,243 +683,61 @@ public final class PlatformRegistry
         this.reconnectPeriodMillis = reconnectPeriodMillis;
     }
 
-    void registerPlatformServiceInstance(final String agentName, String serviceInstanceId,
-        final Map<String, IValue> serviceRecordStructure, final RedundancyModeEnum redundancyModeEnum)
+    @Override
+    public String toString()
     {
-        final String[] serviceParts = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
-        final String serviceFamily = serviceParts[0];
-        final String serviceMember = serviceParts[1];
+        return "PlatformRegistry [" + this.platformName + "] " + this.publisher.getEndPointAddress();
+    }
+}
 
-        this.recordAccessLock.lock();
-        try
-        {
-            if (redundancyModeEnum == RedundancyModeEnum.FAULT_TOLERANT)
-            {
-                if (this.masterInstancePerFtService.get(serviceFamily) == null)
-                {
-                    verifyMasterInstance(serviceFamily, serviceInstanceId);
-                }
-                else
-                {
-                    callFtServiceStatusRpc(serviceInstanceId, false);
-                }
-            }
+final class RegistryInnerLogic
+{
+    final PlatformRegistry registry;
+    final LogicExecutor executor;
 
-            this.context.createRecord(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
-                serviceRecordStructure);
-
-            // register the service member
-            this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
-                LongValue.valueOf(System.currentTimeMillis()));
-            this.context.publishAtomicChange(this.serviceInstancesPerServiceFamily);
-
-            // register the service instance against the agent
-            this.serviceInstancesPerAgent.getOrCreateSubMap(agentName).put(serviceInstanceId, BLANK_VALUE);
-            this.context.publishAtomicChange(this.serviceInstancesPerAgent);
-
-            this.services.put(serviceFamily, redundancyModeEnum.name());
-            // todo what if duplicate instances of the same family are registering simultaneously?
-            this.pendingPlatformServices.remove(serviceFamily);
-
-            this.context.publishAtomicChange(this.services);
-
-            ProxyContext serviceProxy = this.monitoredServiceInstances.get(serviceInstanceId);
-            // todo check if serviceProxy is null????
-            registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
+    RegistryInnerLogic(PlatformRegistry registry, LogicExecutor executor)
+    {
+        this.registry = registry;
+        this.executor = executor;
     }
 
-    /**
-     * De-register the service instance and destroy the {@link ProxyContext} that was used to
-     * monitor the platform.
-     */
-    void deregisterPlatformServiceInstance(String serviceInstanceId)
+    void processConnectionsUpdate(final IRecordChange atomicChange)
     {
-        final String[] serviceParts = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
-        final String serviceFamily = serviceParts[0];
-        final String serviceMember = serviceParts[1];
-        ProxyContext proxy = this.monitoredServiceInstances.remove(serviceInstanceId);
-        if (proxy != null)
+        IValue proxyId;
+        String agent = null;
+        IRecordChange subMapAtomicChange;
+        Map<String, IValue> connection;
+        for (String connectionId : atomicChange.getSubMapKeys())
         {
-            Log.log(this, "Deregistering service instance ", serviceInstanceId, " (monitored with ",
-                proxy.getChannelString(), ")");
-            proxy.destroy();
-
-            this.recordAccessLock.lock();
-            try
+            subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
+            if ((proxyId =
+                subMapAtomicChange.getRemovedEntries().get(ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
             {
-                // remove the service instance info record
-                this.context.removeRecord(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId);
-
-                // remove connections - we need to scan the entire platform connections to find
-                // matching connections from the publisher that is now dead
-                for (String connection : this.platformConnections.getSubMapKeys())
+                if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX))
                 {
-                    final Map<String, IValue> subMap = this.platformConnections.getOrCreateSubMap(connection);
-                    final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);
-                    if (iValue != null)
-                    {
-                        if (serviceInstanceId.equals(iValue.textValue()))
-                        {
-                            this.platformConnections.removeSubMap(connection);
-                        }
-                    }
+                    agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
                 }
-                this.context.publishAtomicChange(this.platformConnections);
-
-                removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-
-                // remove the service instance from the instances-per-service
-                final Map<String, IValue> serviceInstances =
-                    this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
-                serviceInstances.remove(serviceMember);
-                if (serviceInstances.size() == 0)
-                {
-                    this.serviceInstancesPerServiceFamily.removeSubMap(serviceFamily);
-                }
-
-                // remove the service instance from the instances-per-agent
-                Map<String, IValue> instancesPerAgent;
-                Set<String> agentsWithNoServiceInstance = new HashSet<String>();
-                for (String agentName : this.serviceInstancesPerAgent.getSubMapKeys())
-                {
-                    // we don't know which agent has it so scan them all
-                    instancesPerAgent = this.serviceInstancesPerAgent.getOrCreateSubMap(agentName);
-                    instancesPerAgent.remove(serviceInstanceId);
-                    if (instancesPerAgent.size() == 0)
-                    {
-                        agentsWithNoServiceInstance.add(agentName);
-                    }
-                }
-                for (String agentName : agentsWithNoServiceInstance)
-                {
-                    this.serviceInstancesPerAgent.removeSubMap(agentName);
-                }
-
-                if (serviceInstances.size() == 0)
-                {
-                    if (this.services.remove(serviceFamily) != null)
-                    {
-                        Log.log(this, "Removing service '", serviceFamily, "' from registry");
-                        this.masterInstancePerFtService.remove(serviceFamily);
-                        this.context.publishAtomicChange(this.services);
-                    }
-                }
-                else
-                {
-                    if (isFaultTolerantPlatformService(serviceFamily))
-                    {
-                        // this will verify the current master of the FT service
-                        selectNextInstance(serviceFamily);
-                    }
-                }
-                this.context.publishAtomicChange(this.serviceInstancesPerServiceFamily);
-                this.context.publishAtomicChange(this.serviceInstancesPerAgent);
-
-                removeServiceStats(serviceInstanceId);
+                // purge the runtimeStatus record
+                this.registry.runtimeStatus.removeSubMap(agent);
+                this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
             }
-            finally
+            connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
+            subMapAtomicChange.applyTo(connection);
+            if (connection.isEmpty())
             {
-                this.recordAccessLock.unlock();
+                // purge the connection
+                this.registry.platformConnections.removeSubMap(connectionId);
             }
         }
+        this.registry.context.publishAtomicChange(this.registry.platformConnections);
     }
 
-    void removeRecordsAndRpcsPerServiceInstance(String serviceInstanceId, final String serviceFamily)
-    {
-        // remove the records for this service instance
-        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
-            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
-                this.recordsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
-            this.recordsPerServiceInstance, this.recordsPerServiceFamily, true);
-
-        // remove the rpcs for this service instance
-        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
-            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
-                this.rpcsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
-            this.rpcsPerServiceInstance, this.rpcsPerServiceFamily, false);
-    }
-
-    String selectNextInstance(String serviceFamily)
-    {
-        this.recordAccessLock.lock();
-        try
-        {
-            String activeServiceMemberName = null;
-
-            final IValue iValue = this.services.get(serviceFamily);
-            if (iValue == null)
-            {
-                return null;
-            }
-            RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(iValue.textValue());
-
-            if (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
-            {
-                final Map<String, IValue> serviceInstances =
-                    this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
-                if (serviceInstances.size() > 0)
-                {
-                    // find the instance with the earliest timestamp
-                    long earliest = Long.MAX_VALUE;
-                    Map.Entry<String, IValue> entry = null;
-                    String key = null;
-                    IValue value = null;
-                    for (Iterator<Map.Entry<String, IValue>> it = serviceInstances.entrySet().iterator(); it.hasNext();)
-                    {
-                        entry = it.next();
-                        key = entry.getKey();
-                        value = entry.getValue();
-                        if (value.longValue() < earliest)
-                        {
-                            earliest = value.longValue();
-                            activeServiceMemberName = key;
-                        }
-                    }
-
-                    final String serviceInstanceId =
-                        PlatformUtils.composePlatformServiceInstanceID(serviceFamily, activeServiceMemberName);
-                    if (redundancyModeEnum == RedundancyModeEnum.LOAD_BALANCED)
-                    {
-                        // for LB, the timestamp is updated to be the last selected time so the next
-                        // instance selected will be one with an earlier time and thus produce a
-                        // round-robin style selection policy
-                        serviceInstances.put(activeServiceMemberName, LongValue.valueOf(System.currentTimeMillis()));
-                    }
-                    else
-                    {
-                        verifyMasterInstance(serviceFamily, serviceInstanceId);
-                    }
-
-                    Log.log(
-                        this,
-                        "Selecting member '",
-                        activeServiceMemberName,
-                        "' for service '",
-                        serviceFamily,
-                        "' (service info details=",
-                        ObjectUtils.safeToString(this.context.getRecord(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
-                            + serviceInstanceId)), ")");
-                    return serviceInstanceId;
-                }
-            }
-            return null;
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
-    }
-
-    private void verifyMasterInstance(String serviceFamily, String activeServiceInstanceId)
+    void verifyMasterInstance(String serviceFamily, String activeServiceInstanceId)
     {
         final String previousMasterInstance;
         if (!is.eq(
-            (previousMasterInstance = this.masterInstancePerFtService.put(serviceFamily, activeServiceInstanceId)),
+            (previousMasterInstance =
+                this.registry.masterInstancePerFtService.put(serviceFamily, activeServiceInstanceId)),
             activeServiceInstanceId))
         {
             if (previousMasterInstance != null)
@@ -1013,31 +748,31 @@ public final class PlatformRegistry
         }
     }
 
-    private void callFtServiceStatusRpc(String activeServiceInstanceId, boolean active)
+    void callFtServiceStatusRpc(String activeServiceInstanceId, boolean active)
     {
         try
         {
-            final ProxyContext proxyContext = this.monitoredServiceInstances.get(activeServiceInstanceId);
+            final ProxyContext proxyContext = this.registry.monitoredServiceInstances.get(activeServiceInstanceId);
             ContextUtils.getRpc(proxyContext, proxyContext.getReconnectPeriodMillis(),
                 PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
                 TextValue.valueOf(Boolean.valueOf(active).toString()));
         }
         catch (Exception e)
         {
-            Log.log(PlatformRegistry.this, "Could not call RPC to " + (active ? "activate" : "deactivate OLD")
+            Log.log(this.registry, "Could not call RPC to " + (active ? "activate" : "deactivate OLD")
                 + " master service: " + activeServiceInstanceId, e);
         }
     }
 
     boolean isLoadBalancedPlatformService(final String serviceFamily)
     {
-        IValue iValue = this.pendingPlatformServices.get(serviceFamily);
+        IValue iValue = this.registry.pendingPlatformServices.get(serviceFamily);
         if (iValue != null)
         {
             return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.LOAD_BALANCED;
         }
         // check registered services
-        iValue = this.services.get(serviceFamily);
+        iValue = this.registry.services.get(serviceFamily);
         if (iValue == null)
         {
             return false;
@@ -1047,13 +782,13 @@ public final class PlatformRegistry
 
     boolean isFaultTolerantPlatformService(final String serviceFamily)
     {
-        IValue iValue = this.pendingPlatformServices.get(serviceFamily);
+        IValue iValue = this.registry.pendingPlatformServices.get(serviceFamily);
         if (iValue != null)
         {
             return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.FAULT_TOLERANT;
         }
         // check registered services
-        iValue = this.services.get(serviceFamily);
+        iValue = this.registry.services.get(serviceFamily);
         if (iValue == null)
         {
             return false;
@@ -1061,88 +796,10 @@ public final class PlatformRegistry
         return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.FAULT_TOLERANT;
     }
 
-    @Override
-    public String toString()
-    {
-        return "PlatformRegistry [" + this.platformName + "] " + this.publisher.getEndPointAddress();
-    }
-
-    void handleServiceStatsUpdate(String serviceInstanceId, IRecord imageCopy)
-    {
-        this.recordAccessLock.lock();
-        try
-        {
-            final Map<String, IValue> statsForService = this.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
-            statsForService.putAll(imageCopy);
-            this.context.publishAtomicChange(this.serviceInstanceStats);
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
-    }
-
-    void removeServiceStats(String serviceInstanceId)
-    {
-        this.recordAccessLock.lock();
-        try
-        {
-            this.serviceInstanceStats.removeSubMap(serviceInstanceId);
-            this.context.publishAtomicChange(this.serviceInstanceStats);
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
-    }
-
-    static final String AGENT_PROXY_ID_PREFIX = SERVICE_NAME + PlatformUtils.SERVICE_CLIENT_DELIMITER;
-    static final int AGENT_PROXY_ID_PREFIX_LEN = AGENT_PROXY_ID_PREFIX.length();
-
-    void handleContextConnectionsUpdate(IRecordChange atomicChange)
-    {
-        this.recordAccessLock.lock();
-        try
-        {
-            IValue proxyId;
-            String agent = null;
-            IRecordChange subMapAtomicChange;
-            Map<String, IValue> connection;
-            for (String connectionId : atomicChange.getSubMapKeys())
-            {
-                subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
-                if ((proxyId =
-                    subMapAtomicChange.getRemovedEntries().get(
-                        ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
-                {
-                    if (proxyId.textValue().startsWith(AGENT_PROXY_ID_PREFIX))
-                    {
-                        agent = proxyId.textValue().substring(AGENT_PROXY_ID_PREFIX_LEN);
-                    }
-                    // purge the runtimeStatus record
-                    this.runtimeStatus.removeSubMap(agent);
-                }
-                connection = this.platformConnections.getOrCreateSubMap(connectionId);
-                subMapAtomicChange.applyTo(connection);
-                if (connection.isEmpty())
-                {
-                    // purge the connection
-                    this.platformConnections.removeSubMap(connectionId);
-                }
-            }
-            this.context.publishAtomicChange(this.platformConnections);
-        }
-        finally
-        {
-            this.recordAccessLock.unlock();
-        }
-    }
-
     void handleChangeForObjectsPerServiceAndInstance(final String serviceFamily, final String serviceInstanceId,
         IRecordChange atomicChange, final IRecord objectsPerPlatformServiceInstanceRecord,
         final IRecord objectsPerPlatformServiceRecord, final boolean aggregateValuesAsLongs)
     {
-        this.recordAccessLock.lock();
         try
         {
             // first handle updates to the object record for the service instance
@@ -1153,21 +810,25 @@ public final class PlatformRegistry
             {
                 objectsPerPlatformServiceInstanceRecord.removeSubMap(serviceInstanceId);
             }
-            this.context.publishAtomicChange(objectsPerPlatformServiceInstanceRecord);
+            this.registry.context.publishAtomicChange(objectsPerPlatformServiceInstanceRecord);
 
-            // build up an array of the objects for each service instance of this service,
-            // we need all service instance objects to work out if an object should be removed from
-            // the service level; if it exists in ANY service instance, it cannot be removed from
-            // the service level
+            /*
+             * build up an array of the objects for each service instance of this service, we need
+             * all service instance objects to work out if an object should be removed from the
+             * service level; if it exists in ANY service instance, it cannot be removed from the
+             * service level
+             */
             final Map<String, IValue>[] objectsForEachServiceInstanceOfThisService =
                 getObjectsForEachServiceInstanceOfThisServiceName(serviceFamily,
                     objectsPerPlatformServiceInstanceRecord);
             if (objectsForEachServiceInstanceOfThisService != null)
             {
 
-                // here we work out if, for any removed objects in the atomic change, there are no
-                // more occurrences of the object across all the service instances and thus we can
-                // remove the object from the service (objects-per-service) record
+                /*
+                 * here we work out if, for any removed objects in the atomic change, there are no
+                 * more occurrences of the object across all the service instances and thus we can
+                 * remove the object from the service (objects-per-service) record
+                 */
                 final Map<String, IValue> serviceObjects =
                     objectsPerPlatformServiceRecord.getOrCreateSubMap(serviceFamily);
                 Map<String, IValue> objectsPerServiceInstance;
@@ -1191,9 +852,11 @@ public final class PlatformRegistry
                     }
                 }
 
-                // some objects need to show the aggregation across all service instances (e.g.
-                // subscription counts for a record, we need to see the counts for the same record
-                // across all service instances)
+                /*
+                 * some objects need to show the aggregation across all service instances (e.g.
+                 * subscription counts for a record, we need to see the counts for the same record
+                 * across all service instances)
+                 */
                 if (aggregateValuesAsLongs)
                 {
                     final Set<String> keysChanged = new HashSet<String>(atomicChange.getPutEntries().keySet());
@@ -1230,7 +893,7 @@ public final class PlatformRegistry
                 {
                     serviceObjects.putAll(atomicChange.getPutEntries());
                 }
-                this.context.publishAtomicChange(objectsPerPlatformServiceRecord);
+                this.registry.context.publishAtomicChange(objectsPerPlatformServiceRecord);
 
                 if (serviceObjects.size() == 0)
                 {
@@ -1243,20 +906,201 @@ public final class PlatformRegistry
             Log.log(this,
                 "Could not handle change for " + serviceInstanceId + ", " + ObjectUtils.safeToString(atomicChange), e);
         }
-        finally
+    }
+
+    boolean serviceInstanceNotRegistered(final String serviceFamily, String serviceMember)
+    {
+        return !this.registry.services.containsKey(serviceFamily)
+            || (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily) && !this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(
+                serviceFamily).containsKey(serviceMember));
+    }
+
+    void removeServiceStats(String serviceInstanceId)
+    {
+        this.registry.serviceInstanceStats.removeSubMap(serviceInstanceId);
+        this.registry.context.publishAtomicChange(this.registry.serviceInstanceStats);
+    }
+
+    void removeRecordsAndRpcsPerServiceInstance(String serviceInstanceId, final String serviceFamily)
+    {
+        // remove the records for this service instance
+        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
+            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
+                this.registry.recordsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
+            this.registry.recordsPerServiceInstance, this.registry.recordsPerServiceFamily, true);
+
+        // remove the rpcs for this service instance
+        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, new AtomicChange(
+            serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(
+                this.registry.rpcsPerServiceInstance.getOrCreateSubMap(serviceInstanceId))),
+            this.registry.rpcsPerServiceInstance, this.registry.rpcsPerServiceFamily, false);
+    }
+
+    void registerPlatformServiceInstance(final String agentName, String serviceInstanceId,
+        final Map<String, IValue> serviceRecordStructure, final RedundancyModeEnum redundancyModeEnum)
+    {
+        final String[] serviceParts = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
+        final String serviceFamily = serviceParts[0];
+        final String serviceMember = serviceParts[1];
+
+        if (redundancyModeEnum == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.recordAccessLock.unlock();
+            if (this.registry.masterInstancePerFtService.get(serviceFamily) == null)
+            {
+                verifyMasterInstance(serviceFamily, serviceInstanceId);
+            }
+            else
+            {
+                callFtServiceStatusRpc(serviceInstanceId, false);
+            }
         }
+
+        this.registry.context.createRecord(PlatformRegistry.ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
+            + serviceInstanceId, serviceRecordStructure);
+
+        // register the service member
+        this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
+            LongValue.valueOf(System.currentTimeMillis()));
+        this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerServiceFamily);
+
+        // register the service instance against the agent
+        this.registry.serviceInstancesPerAgent.getOrCreateSubMap(agentName).put(serviceInstanceId,
+            PlatformRegistry.BLANK_VALUE);
+        this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerAgent);
+
+        this.registry.services.put(serviceFamily, redundancyModeEnum.name());
+        // todo what if duplicate instances of the same family are registering simultaneously?
+        this.registry.pendingPlatformServices.remove(serviceFamily);
+
+        this.registry.context.publishAtomicChange(this.registry.services);
+
+        ProxyContext serviceProxy = this.registry.monitoredServiceInstances.get(serviceInstanceId);
+        // todo check if serviceProxy is null????
+        registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
+    }
+
+    void registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
+        final String serviceInstanceId, final ProxyContext serviceProxy)
+    {
+        // add a listener to get the service-level statistics
+        serviceProxy.addObserver(
+            new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+            {
+                @Override
+                public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    RegistryInnerLogic.this.executor.executeSingleThreaded(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                            {
+                                removeServiceStats(serviceInstanceId);
+                            }
+                            else
+                            {
+                                final Map<String, IValue> statsForService =
+                                    RegistryInnerLogic.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
+                                statsForService.putAll(imageCopy);
+                                RegistryInnerLogic.this.registry.context.publishAtomicChange(RegistryInnerLogic.this.registry.serviceInstanceStats);
+                            }
+                        }
+                    });
+                }
+            }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
+            PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
+
+        // add a listener to cache the context connections record of the service locally in
+        // the platformConnections record
+        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+            {
+                RegistryInnerLogic.this.executor.executeSingleThreaded(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            // removeConnection(atomicChange);
+                        }
+                        else
+                        {
+                            processConnectionsUpdate(atomicChange);
+                        }
+                    }
+                });
+            }
+        }, serviceInstanceId + "-" + REMOTE_CONTEXT_CONNECTIONS), REMOTE_CONTEXT_CONNECTIONS);
+
+        // add listeners to handle platform objects published by this instance
+        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+            {
+                RegistryInnerLogic.this.executor.executeSingleThreaded(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                        }
+                        else
+                        {
+                            final IRecord serviceInstanceObjectsRecord =
+                                RegistryInnerLogic.this.registry.recordsPerServiceInstance;
+                            final IRecord serviceObjectsRecord =
+                                RegistryInnerLogic.this.registry.recordsPerServiceFamily;
+                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                                serviceInstanceObjectsRecord, serviceObjectsRecord, true);
+                        }
+                    }
+                });
+            }
+        }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
+
+        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+            {
+                RegistryInnerLogic.this.executor.executeSingleThreaded(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                        }
+                        else
+                        {
+                            final IRecord serviceInstanceObjectsRecord =
+                                RegistryInnerLogic.this.registry.rpcsPerServiceInstance;
+                            final IRecord serviceObjectsRecord = RegistryInnerLogic.this.registry.rpcsPerServiceFamily;
+                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                                serviceInstanceObjectsRecord, serviceObjectsRecord, false);
+                        }
+                    }
+                });
+            }
+        }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, IValue>[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
+    Map<String, IValue>[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
         final IRecord objectsPerPlatformServiceInstanceRecord)
     {
-        if (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
+        if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
         {
             final Map<String, IValue> serviceMembersForThisService =
-                this.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
+                this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
 
             final String[] serviceInstancesNamesForThisServiceArray =
                 serviceMembersForThisService.keySet().toArray(new String[serviceMembersForThisService.keySet().size()]);
@@ -1288,110 +1132,455 @@ public final class PlatformRegistry
             return null;
         }
     }
+}
 
-    void registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
-        final String serviceInstanceId, final ProxyContext serviceProxy)
+final class LogicExecutor
+{
+    final ExecutorService processingLogicExecutor;
+    /** Tracks the current processing logic thread */
+    volatile Thread processingLogicThread = null;
+
+    LogicExecutor()
     {
-        // add a listener to get the service-level statistics
-        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-            new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    recordAccessLock.lock();
-                    try
-                    {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeServiceStats(serviceInstanceId);
-                            return;
-                        }
-
-                        handleServiceStatsUpdate(serviceInstanceId, imageCopy);
-                    }
-                    finally
-                    {
-                        recordAccessLock.unlock();
-                    }
-                }
-            }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
-            PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
-
-        // add a listener to cache the context connections record of the service locally in
-        // the platformConnections record
-        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-            new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    handleContextConnectionsUpdate(atomicChange);
-                }
-            }, serviceInstanceId + "-" + REMOTE_CONTEXT_CONNECTIONS), REMOTE_CONTEXT_CONNECTIONS);
-
-        // add listeners to handle platform objects published by this instance
-        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-            new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    recordAccessLock.lock();
-                    try
-                    {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                            return;
-                        }
-
-                        final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.recordsPerServiceInstance;
-                        final IRecord serviceObjectsRecord = PlatformRegistry.this.recordsPerServiceFamily;
-
-                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                            serviceInstanceObjectsRecord, serviceObjectsRecord, true);
-                    }
-                    finally
-                    {
-                        recordAccessLock.unlock();
-                    }
-                }
-            }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
-
-        serviceProxy.addObserver(new CoalescingRecordListener(PlatformRegistry.this.coalescingExecutor,
-            new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    recordAccessLock.lock();
-                    try
-                    {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                            return;
-                        }
-
-                        final IRecord serviceInstanceObjectsRecord = PlatformRegistry.this.rpcsPerServiceInstance;
-                        final IRecord serviceObjectsRecord = PlatformRegistry.this.rpcsPerServiceFamily;
-
-                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                            serviceInstanceObjectsRecord, serviceObjectsRecord, false);
-                    }
-                    finally
-                    {
-                        recordAccessLock.unlock();
-                    }
-                }
-            }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
+        this.processingLogicExecutor = ThreadUtils.newSingleThreadExecutorService("processing-logic");
     }
 
-    boolean serviceInstanceNotRegistered(final String serviceFamily, String serviceMember)
+    <T> Future<T> executeSingleThreaded(final Callable<T> callable)
     {
-        return !this.services.containsKey(serviceFamily)
-            || (this.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily) && !this.serviceInstancesPerServiceFamily.getOrCreateSubMap(
-                serviceFamily).containsKey(serviceMember));
+        final FutureTask<T> result = new FutureTask<T>(callable);
+        if (Thread.currentThread() == this.processingLogicThread)
+        {
+            result.run();
+        }
+        else
+        {
+            this.processingLogicExecutor.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    LogicExecutor.this.processingLogicThread = Thread.currentThread();
+                    result.run();
+                    LogicExecutor.this.processingLogicThread = null;
+                }
+            });
+        }
+        return result;
+    }
+
+    Future<Void> executeSingleThreaded(final Runnable runnable)
+    {
+        final FutureTask<Void> result = new FutureTask<Void>(runnable, null);
+        if (Thread.currentThread() == this.processingLogicThread)
+        {
+            result.run();
+        }
+        else
+        {
+            this.processingLogicExecutor.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    LogicExecutor.this.processingLogicThread = Thread.currentThread();
+                    try
+                    {
+                        result.run();
+                    }
+                    finally
+                    {
+                        LogicExecutor.this.processingLogicThread = null;
+                    }
+                }
+            });
+        }
+        return result;
+    }
+
+    void destroy()
+    {
+        this.processingLogicExecutor.shutdown();
+    }
+}
+
+final class RegistrySingleThreadLogic
+{
+    final PlatformRegistry registry;
+    final LogicExecutor executor;
+    final RegistryInnerLogic innerLogic;
+
+    RegistrySingleThreadLogic(PlatformRegistry registry)
+    {
+        super();
+        this.registry = registry;
+        this.executor = new LogicExecutor();
+        this.innerLogic = new RegistryInnerLogic(registry, this.executor);
+    }
+
+    void destroy()
+    {
+        this.executor.destroy();
+    }
+
+    void handleRpcRuntimeDynamic(final IValue... args)
+    {
+        this.executor.executeSingleThreaded(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                final String agentName = args[0].textValue();
+                if (RegistrySingleThreadLogic.this.registry.runtimeStatus.getSubMapKeys().contains(agentName))
+                {
+                    Map<String, IValue> runtimeRecord =
+                        RegistrySingleThreadLogic.this.registry.runtimeStatus.getOrCreateSubMap(agentName);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.Q_OVERFLOW, args[1]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.Q_TOTAL_SUBMITTED, args[2]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.MEM_USED_MB, args[3]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.MEM_AVAILABLE_MB, args[4]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.THREAD_COUNT, args[5]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.SYSTEM_LOAD, args[6]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.EPM, args[7]);
+                    runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.UPTIME_SECS, args[8]);
+                    RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.runtimeStatus);
+                }
+            }
+        });
+    }
+
+    void handleRpcStaticRuntime(final IValue... args)
+    {
+        this.executor.executeSingleThreaded(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                final String agentName = args[0].textValue();
+                Map<String, IValue> runtimeRecord =
+                    RegistrySingleThreadLogic.this.registry.runtimeStatus.getOrCreateSubMap(agentName);
+                runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.RUNTIME_HOST, args[1]);
+                runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.RUNTIME, args[2]);
+                runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.USER, args[3]);
+                runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.CPU_COUNT, args[4]);
+                RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.runtimeStatus);
+            }
+        });
+    }
+
+    @SuppressWarnings("unused")
+    void registerServiceInstance(final String serviceFamily, final String redundancyMode, final String agentName,
+        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
+        final RedundancyModeEnum redundancyModeEnum, final IValue... args) throws ExecutionException
+    {
+        try
+        {
+            this.executor.executeSingleThreaded(new Callable<Void>()
+            {
+                @Override
+                public Void call() throws Exception
+                {
+                    if (RegistrySingleThreadLogic.this.registry.monitoredServiceInstances.containsKey(serviceInstanceId))
+                    {
+                        throw new IllegalStateException("Already registered: " + serviceInstanceId);
+                    }
+                    switch(redundancyModeEnum)
+                    {
+                        case FAULT_TOLERANT:
+                            if (RegistrySingleThreadLogic.this.innerLogic.isLoadBalancedPlatformService(serviceFamily))
+                            {
+                                throw new IllegalArgumentException("Platform service '" + serviceFamily
+                                    + "' is already registered as load-balanced.");
+                            }
+                            break;
+                        case LOAD_BALANCED:
+                            if (RegistrySingleThreadLogic.this.innerLogic.isFaultTolerantPlatformService(serviceFamily))
+                            {
+                                throw new IllegalArgumentException("Platform service '" + serviceFamily
+                                    + "' is already registered as fault-tolerant.");
+                            }
+                            break;
+                        default :
+                            throw new IllegalArgumentException("Unhandled mode '" + redundancyMode + "' for service '"
+                                + serviceFamily + "'");
+                    }
+                    final ProxyContext serviceProxy;
+                    try
+                    {
+                        serviceProxy =
+                            new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId,
+                                RegistrySingleThreadLogic.this.registry.context.getName()),
+                                PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
+                                PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
+                                PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure));
+                    }
+                    catch (IOException e)
+                    {
+                        Log.log(
+                            RegistrySingleThreadLogic.this.registry,
+                            "Could not construct service proxy with connection settings RPC args "
+                                + Arrays.toString(args), e);
+                        throw new ExecutionException("Could not register");
+                    }
+                    RegistrySingleThreadLogic.this.registry.pendingPlatformServices.put(serviceFamily,
+                        TextValue.valueOf(redundancyModeEnum.name()));
+                    RegistrySingleThreadLogic.this.registry.monitoredServiceInstances.put(serviceInstanceId,
+                        serviceProxy);
+                    serviceProxy.setReconnectPeriodMillis(RegistrySingleThreadLogic.this.registry.reconnectPeriodMillis);
+                    new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
+                    {
+                        @Override
+                        protected void onPlatformServiceDisconnected()
+                        {
+                            RegistrySingleThreadLogic.this.executor.executeSingleThreaded(new Runnable()
+                            {
+                                @SuppressWarnings("unqualified-field-access")
+                                @Override
+                                public void run()
+                                {
+                                    deregisterPlatformServiceInstance(serviceInstanceId);
+                                }
+                            });
+                        }
+
+                        @Override
+                        protected void onPlatformServiceConnected()
+                        {
+                            RegistrySingleThreadLogic.this.executor.executeSingleThreaded(new Runnable()
+                            {
+                                @SuppressWarnings("unqualified-field-access")
+                                @Override
+                                public void run()
+                                {
+                                    try
+                                    {
+                                        // register the service when the monitoring of the
+                                        // service is connected
+                                        RegistrySingleThreadLogic.this.innerLogic.registerPlatformServiceInstance(
+                                            agentName, serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
+
+                                        Log.log(RegistrySingleThreadLogic.this.registry, "Registered ", redundancyMode,
+                                            " service ", serviceInstanceId,
+                                            " (monitoring with " + serviceProxy.getChannelString(), ")");
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.log(RegistrySingleThreadLogic.this.registry, "Error registering service "
+                                            + serviceInstanceId, e);
+                                        try
+                                        {
+                                            deregisterPlatformServiceInstance(serviceInstanceId);
+                                        }
+                                        catch (Exception e2)
+                                        {
+                                            Log.log(RegistrySingleThreadLogic.this.registry,
+                                                "Error deregistering service " + serviceInstanceId, e2);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    };
+                    return null;
+                }
+            }).get();
+        }
+        catch (Exception e)
+        {
+            throw new ExecutionException(e);
+        }
+    }
+
+    void handleRegistyContextConnectionsUpdate(final IRecordChange atomicChange)
+    {
+        this.executor.executeSingleThreaded(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                RegistrySingleThreadLogic.this.innerLogic.processConnectionsUpdate(atomicChange);
+            }
+        });
+    }
+
+    /**
+     * De-register the service instance and destroy the {@link ProxyContext} that was used to
+     * monitor the platform.
+     */
+    void deregisterPlatformServiceInstance(final String serviceInstanceId)
+    {
+        this.executor.executeSingleThreaded(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                final String[] serviceParts = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
+                final String serviceFamily = serviceParts[0];
+                final String serviceMember = serviceParts[1];
+                ProxyContext proxy =
+                    RegistrySingleThreadLogic.this.registry.monitoredServiceInstances.remove(serviceInstanceId);
+                if (proxy != null)
+                {
+                    Log.log(RegistrySingleThreadLogic.this.registry, "Deregistering service instance ",
+                        serviceInstanceId, " (monitored with ", proxy.getChannelString(), ")");
+                    proxy.destroy();
+
+                    // remove the service instance info record
+                    RegistrySingleThreadLogic.this.registry.context.removeRecord(PlatformRegistry.ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
+                        + serviceInstanceId);
+
+                    // remove connections - we need to scan the entire platform connections to find
+                    // matching connections from the publisher that is now dead
+                    for (String connection : RegistrySingleThreadLogic.this.registry.platformConnections.getSubMapKeys())
+                    {
+                        final Map<String, IValue> subMap =
+                            RegistrySingleThreadLogic.this.registry.platformConnections.getOrCreateSubMap(connection);
+                        final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);
+                        if (iValue != null)
+                        {
+                            if (serviceInstanceId.equals(iValue.textValue()))
+                            {
+                                RegistrySingleThreadLogic.this.registry.platformConnections.removeSubMap(connection);
+                            }
+                        }
+                    }
+                    RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.platformConnections);
+
+                    RegistrySingleThreadLogic.this.innerLogic.removeRecordsAndRpcsPerServiceInstance(serviceInstanceId,
+                        serviceFamily);
+
+                    // remove the service instance from the instances-per-service
+                    final Map<String, IValue> serviceInstances =
+                        RegistrySingleThreadLogic.this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
+                    serviceInstances.remove(serviceMember);
+                    if (serviceInstances.size() == 0)
+                    {
+                        RegistrySingleThreadLogic.this.registry.serviceInstancesPerServiceFamily.removeSubMap(serviceFamily);
+                    }
+
+                    // remove the service instance from the instances-per-agent
+                    Map<String, IValue> instancesPerAgent;
+                    Set<String> agentsWithNoServiceInstance = new HashSet<String>();
+                    for (String agentName : RegistrySingleThreadLogic.this.registry.serviceInstancesPerAgent.getSubMapKeys())
+                    {
+                        // we don't know which agent has it so scan them all
+                        instancesPerAgent =
+                            RegistrySingleThreadLogic.this.registry.serviceInstancesPerAgent.getOrCreateSubMap(agentName);
+                        instancesPerAgent.remove(serviceInstanceId);
+                        if (instancesPerAgent.size() == 0)
+                        {
+                            agentsWithNoServiceInstance.add(agentName);
+                        }
+                    }
+                    for (String agentName : agentsWithNoServiceInstance)
+                    {
+                        RegistrySingleThreadLogic.this.registry.serviceInstancesPerAgent.removeSubMap(agentName);
+                    }
+
+                    if (serviceInstances.size() == 0)
+                    {
+                        if (RegistrySingleThreadLogic.this.registry.services.remove(serviceFamily) != null)
+                        {
+                            Log.log(RegistrySingleThreadLogic.this.registry, "Removing service '", serviceFamily,
+                                "' from registry");
+                            RegistrySingleThreadLogic.this.registry.masterInstancePerFtService.remove(serviceFamily);
+                            RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.services);
+                        }
+                    }
+                    else
+                    {
+                        if (RegistrySingleThreadLogic.this.innerLogic.isFaultTolerantPlatformService(serviceFamily))
+                        {
+                            // this will verify the current master of the FT service
+                            selectNextInstance(serviceFamily);
+                        }
+                    }
+                    RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.serviceInstancesPerServiceFamily);
+                    RegistrySingleThreadLogic.this.registry.context.publishAtomicChange(RegistrySingleThreadLogic.this.registry.serviceInstancesPerAgent);
+
+                    RegistrySingleThreadLogic.this.innerLogic.removeServiceStats(serviceInstanceId);
+                }
+            }
+        });
+    }
+
+    String selectNextInstance(final String serviceFamily)
+    {
+        try
+        {
+            return this.executor.executeSingleThreaded(new Callable<String>()
+            {
+                @Override
+                public String call() throws Exception
+                {
+                    String activeServiceMemberName = null;
+                    final IValue iValue = RegistrySingleThreadLogic.this.registry.services.get(serviceFamily);
+                    if (iValue == null)
+                    {
+                        return null;
+                    }
+                    RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(iValue.textValue());
+                    if (RegistrySingleThreadLogic.this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(
+                        serviceFamily))
+                    {
+                        final Map<String, IValue> serviceInstances =
+                            RegistrySingleThreadLogic.this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
+                        if (serviceInstances.size() > 0)
+                        {
+                            // find the instance with the earliest timestamp
+                            long earliest = Long.MAX_VALUE;
+                            Map.Entry<String, IValue> entry = null;
+                            String key = null;
+                            IValue value = null;
+                            for (Iterator<Map.Entry<String, IValue>> it = serviceInstances.entrySet().iterator(); it.hasNext();)
+                            {
+                                entry = it.next();
+                                key = entry.getKey();
+                                value = entry.getValue();
+                                if (value.longValue() < earliest)
+                                {
+                                    earliest = value.longValue();
+                                    activeServiceMemberName = key;
+                                }
+                            }
+
+                            final String serviceInstanceId =
+                                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, activeServiceMemberName);
+                            if (redundancyModeEnum == RedundancyModeEnum.LOAD_BALANCED)
+                            {
+                                /*
+                                 * for LB, the timestamp is updated to be the last selected time so
+                                 * the next instance selected will be one with an earlier time and
+                                 * thus produce a round-robin style selection policy
+                                 */
+                                serviceInstances.put(activeServiceMemberName,
+                                    LongValue.valueOf(System.currentTimeMillis()));
+                            }
+                            else
+                            {
+                                RegistrySingleThreadLogic.this.innerLogic.verifyMasterInstance(serviceFamily,
+                                    serviceInstanceId);
+                            }
+
+                            Log.log(
+                                RegistrySingleThreadLogic.this,
+                                "Selecting member '",
+                                activeServiceMemberName,
+                                "' for service '",
+                                serviceFamily,
+                                "' (service info details=",
+                                ObjectUtils.safeToString(RegistrySingleThreadLogic.this.registry.context.getRecord(PlatformRegistry.ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
+                                    + serviceInstanceId)), ")");
+                            return serviceInstanceId;
+                        }
+                    }
+                    return null;
+                }
+            }).get();
+        }
+        catch (Exception e)
+        {
+            throw new IllegalStateException(e);
+        }
+
     }
 }
