@@ -248,14 +248,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         // wait for the registry name to be received...
         synchronized (this.createLock)
         {
-            try
+            if (this.platformName == null)
             {
-                this.createLock.wait(PlatformCoreProperties.Values.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS);
-            }
-            catch (InterruptedException e)
-            {
-                throw new RuntimeException("Interrupted whilst waiting for registry name from " + registryAddresses[0],
-                    e);
+                try
+                {
+                    this.createLock.wait(PlatformCoreProperties.Values.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS);
+                }
+                catch (InterruptedException e)
+                {
+                    throw new RuntimeException("Interrupted whilst waiting for registry name from "
+                        + registryAddresses[0], e);
+                }
             }
         }
         if (this.platformName == null)
@@ -313,7 +316,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             {
                                 Log.log(PlatformRegistryAgent.this, "Completing registry connection activities...");
 
-                                PlatformRegistryAgent.this.platformName =
+                                final String rpcGetPlatformNameResult = 
                                     PlatformRegistryAgent.this.registryProxy.getRpc(PlatformRegistry.GET_PLATFORM_NAME).execute().textValue();
 
                                 // configure the channel watchdog heartbeat
@@ -338,6 +341,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
                                 synchronized (PlatformRegistryAgent.this.createLock)
                                 {
+                                    PlatformRegistryAgent.this.platformName = rpcGetPlatformNameResult;
                                     PlatformRegistryAgent.this.createLock.notifyAll();
                                 }
                                 PlatformRegistryAgent.this.registryAvailableListeners.notifyListenersDataAdded(
