@@ -679,7 +679,7 @@ public final class PlatformRegistry
 /**
  * Encapsulates handling of events for the registry.
  * <p>
- * Methods should only be called in a single thread context.
+ * This executes in a single thread context.
  * 
  * @author Ramon Servadei
  */
