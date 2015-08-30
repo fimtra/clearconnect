@@ -431,9 +431,15 @@ public final class PlatformRegistry
 
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
-        final IValue count = LongValue.valueOf(0);
-        this.recordsPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(IRegistryRecordNames.PLATFORM_SUMMARY, count);
-       
+        this.context.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
+            {
+                PlatformRegistry.this.eventHandler.executeHandleRecordsUpdate(atomicChange);
+            }
+        }, ISystemRecordNames.CONTEXT_RECORDS);
+
         this.context.publishAtomicChange(this.services);
 
         // the registry's connections
@@ -717,15 +723,14 @@ final class EventHandler
     {
         this.registry = registry;
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
-        this.eventExecutor.scheduleWithFixedDelay(
-            new Runnable()
+        this.eventExecutor.scheduleWithFixedDelay(new Runnable()
+        {
+            @Override
+            public void run()
             {
-                @Override
-                public void run()
-                {
-                    computePlatformSummary();
-                }
-            }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
+                computePlatformSummary();
+            }
+        }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
             DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
     }
 
@@ -798,6 +803,18 @@ final class EventHandler
         });
     }
 
+    void executeHandleRecordsUpdate(final IRecordChange atomicChange)
+    {
+        this.eventExecutor.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                handleRecordsUpdate(atomicChange);
+            }
+        });
+    }
+
     String executeSelectNextInstance(final String serviceFamily) throws InterruptedException,
         java.util.concurrent.ExecutionException
     {
@@ -822,7 +839,7 @@ final class EventHandler
                 IRuntimeStatusRecordFields.RUNTIME_HOST).textValue());
         }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.NODES, LongValue.valueOf(hosts.size()));
-    
+
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICES,
             LongValue.valueOf(this.registry.services.size()));
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
@@ -1534,5 +1551,13 @@ final class EventHandler
         {
             return null;
         }
+    }
+
+    void handleRecordsUpdate(final IRecordChange atomicChange)
+    {
+        final Map<String, IValue> serviceNameSubMap =
+            this.registry.recordsPerServiceFamily.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
+        atomicChange.applyTo(serviceNameSubMap);
+        this.registry.context.publishAtomicChange(this.registry.recordsPerServiceFamily);
     }
 }
