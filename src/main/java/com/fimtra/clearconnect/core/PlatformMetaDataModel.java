@@ -707,6 +707,11 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getProxyContextForPlatformService(String serviceFamily)
     {
+        // NOTE: this is a small hack to work just for viewing the registry records...
+        if (is.eq(serviceFamily, PlatformRegistry.SERVICE_NAME))
+        {
+            return this.agent.registryProxy;
+        }
         return ((PlatformServiceProxy) getAgent().getPlatformServiceProxy(serviceFamily)).proxyContext;
     }
 
