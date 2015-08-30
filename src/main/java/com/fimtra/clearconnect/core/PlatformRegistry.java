@@ -32,12 +32,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.RedundancyModeEnum;
+import com.fimtra.clearconnect.core.PlatformRegistry.IPlatformSummaryRecordFields;
+import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -189,6 +192,14 @@ public final class PlatformRegistry
         String UPTIME_SECS = "Uptime";
     }
 
+    static interface IPlatformSummaryRecordFields
+    {
+        String NODES = "Nodes";
+        String SERVICES = "Services";
+        String SERVICE_INSTANCES = "ServiceInstances";
+        String CONNECTIONS = "Connections";
+    }
+
     public static final String SERVICE_NAME = "PlatformRegistry";
 
     /**
@@ -302,6 +313,13 @@ public final class PlatformRegistry
          * @see IRuntimeStatusRecordFields
          */
         String RUNTIME_STATUS = "Runtime Status";
+
+        /**
+         * A summary of the hosts, services and connections on the platform
+         * 
+         * @see IPlatformSummaryRecordFields
+         */
+        String PLATFORM_SUMMARY = "Platform Summary";
     }
 
     final Context context;
@@ -331,6 +349,8 @@ public final class PlatformRegistry
     final IRecord rpcsPerServiceFamily;
     /** @see IRegistryRecordNames#RUNTIME_STATUS */
     final IRecord runtimeStatus;
+    /** @see IRegistryRecordNames#PLATFORM_SUMMARY */
+    final IRecord platformSummary;
 
     /**
      * Tracks services that are pending registration completion
@@ -407,9 +427,13 @@ public final class PlatformRegistry
         this.recordsPerServiceFamily = this.context.createRecord(IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY);
         this.rpcsPerServiceFamily = this.context.createRecord(IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY);
         this.runtimeStatus = this.context.createRecord(IRegistryRecordNames.RUNTIME_STATUS);
+        this.platformSummary = this.context.createRecord(IRegistryRecordNames.PLATFORM_SUMMARY);
 
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
+        final IValue count = LongValue.valueOf(0);
+        this.recordsPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(IRegistryRecordNames.PLATFORM_SUMMARY, count);
+       
         this.context.publishAtomicChange(this.services);
 
         // the registry's connections
@@ -532,8 +556,8 @@ public final class PlatformRegistry
 
                 try
                 {
-                    PlatformRegistry.this.eventHandler.executeRegisterPlatformServiceInstance(serviceFamily, redundancyMode, agentName,
-                        serviceInstanceId, redundancyModeEnum, serviceRecordStructure, args);
+                    PlatformRegistry.this.eventHandler.executeRegisterPlatformServiceInstance(serviceFamily,
+                        redundancyMode, agentName, serviceInstanceId, redundancyModeEnum, serviceRecordStructure, args);
                 }
                 catch (Exception e)
                 {
@@ -689,10 +713,20 @@ final class EventHandler
     final PlatformRegistry registry;
     private final ScheduledExecutorService eventExecutor;
 
-    EventHandler(PlatformRegistry registry)
+    EventHandler(final PlatformRegistry registry)
     {
         this.registry = registry;
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
+        this.eventExecutor.scheduleWithFixedDelay(
+            new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    computePlatformSummary();
+                }
+            }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
+            DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
     }
 
     void destroy()
@@ -776,6 +810,27 @@ final class EventHandler
             }
         }).get();
         return nextInstance;
+    }
+
+    void computePlatformSummary()
+    {
+        final Set<String> hosts = new HashSet<String>();
+        final Set<String> agentNames = this.registry.runtimeStatus.getSubMapKeys();
+        for (String agentName : agentNames)
+        {
+            hosts.add(this.registry.runtimeStatus.getOrCreateSubMap(agentName).get(
+                IRuntimeStatusRecordFields.RUNTIME_HOST).textValue());
+        }
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.NODES, LongValue.valueOf(hosts.size()));
+    
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICES,
+            LongValue.valueOf(this.registry.services.size()));
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
+            LongValue.valueOf(this.registry.serviceInstanceStats.getSubMapKeys().size()));
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
+            LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
+        this.registry.context.publishAtomicChange(this.registry.platformSummary);
+        Log.log(this.registry, this.registry.platformSummary.toString());
     }
 
     private String selectNextInstance(final String serviceFamily)
