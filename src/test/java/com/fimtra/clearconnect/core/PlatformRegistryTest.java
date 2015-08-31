@@ -127,14 +127,18 @@ public class PlatformRegistryTest
     {
         checkZeroSize(this.candidate.platformConnections);
         checkZeroSize(this.candidate.serviceInstancesPerAgent);
-        checkZeroSize(this.candidate.serviceInstancesPerServiceFamily);
+        // the platform registry adds itself as a service instance
+        checkSize(0, 1, this.candidate.serviceInstancesPerServiceFamily);
         checkZeroSize(this.candidate.serviceInstanceStats);
+        // the platform registry adds itself as a service 
         checkSize(1, 0, this.candidate.services);
         checkZeroSize(this.candidate.monitoredServiceInstances);
         checkZeroSize(this.candidate.masterInstancePerFtService);
 
-        checkZeroSize(this.candidate.recordsPerServiceInstance);
+        // the platform registry adds its records as a service instance
+        checkSize(0, 1, this.candidate.recordsPerServiceInstance);
         checkZeroSize(this.candidate.rpcsPerServiceInstance);
+        // the platform registry adds its records as a service 
         checkSize(0, 1, this.candidate.recordsPerServiceFamily);
         checkZeroSize(this.candidate.rpcsPerServiceFamily);
 
