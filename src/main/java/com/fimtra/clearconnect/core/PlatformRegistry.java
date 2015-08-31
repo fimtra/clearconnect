@@ -431,6 +431,8 @@ public final class PlatformRegistry
 
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
+        this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,
+            LongValue.valueOf(System.currentTimeMillis()));
         this.context.addObserver(new IRecordListener()
         {
             @Override
@@ -1555,9 +1557,12 @@ final class EventHandler
 
     void handleRecordsUpdate(final IRecordChange atomicChange)
     {
-        final Map<String, IValue> serviceNameSubMap =
-            this.registry.recordsPerServiceFamily.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
-        atomicChange.applyTo(serviceNameSubMap);
+        atomicChange.applyTo(this.registry.recordsPerServiceFamily.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME));
         this.registry.context.publishAtomicChange(this.registry.recordsPerServiceFamily);
+
+        final String registryInstanceName =
+            PlatformUtils.composePlatformServiceInstanceID(PlatformRegistry.SERVICE_NAME, this.registry.platformName);
+        atomicChange.applyTo(this.registry.recordsPerServiceInstance.getOrCreateSubMap(registryInstanceName));
+        this.registry.context.publishAtomicChange(this.registry.recordsPerServiceInstance);
     }
 }
