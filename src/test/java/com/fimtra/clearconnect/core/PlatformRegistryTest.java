@@ -135,7 +135,7 @@ public class PlatformRegistryTest
 
         checkZeroSize(this.candidate.recordsPerServiceInstance);
         checkZeroSize(this.candidate.rpcsPerServiceInstance);
-        checkZeroSize(this.candidate.recordsPerServiceFamily);
+        checkSize(0, 1, this.candidate.recordsPerServiceFamily);
         checkZeroSize(this.candidate.rpcsPerServiceFamily);
 
         // need to wait for connections to be destroyed?

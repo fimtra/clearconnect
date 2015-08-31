@@ -1651,7 +1651,9 @@ public class PlatformTest
          */
         final int recordsForOneInstance = 7;
         int expectedRecordsAcrossInstancesCount = 4 * recordsForOneInstance;
-        int expectedRecordsAcrossFamiliesCount = 2 * recordsForOneInstance;
+        // registry has 5 system records, 11 registry records, 4 serviceInfo records for the services
+        int registryServiceRecords = 5 + 11 + 4;
+        int expectedRecordsAcrossFamiliesCount = 2 * recordsForOneInstance + registryServiceRecords;
 
         checkRecordSubmapSize(recordsAcrossInstances, expectedRecordsAcrossInstancesCount);
         checkRecordSubmapSize(recordsAcrossFamilies, expectedRecordsAcrossFamiliesCount);
@@ -1719,7 +1721,9 @@ public class PlatformTest
         this.agent008.destroyPlatformServiceInstance(SERVICE2, this.secondary);
 
         checkRecordSubmapSize(recordsAcrossInstances, (recordsForOneInstance * 2) + 6);
-        checkRecordSubmapSize(recordsAcrossFamilies, recordsForOneInstance + 6);
+        checkRecordSubmapSize(recordsAcrossFamilies, recordsForOneInstance + 6
+            // a ServiceInfo record is removed when service2 is destroyed, hence 19 not 20
+            + registryServiceRecords - 1);
     }
 
     @Test
