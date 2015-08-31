@@ -844,8 +844,16 @@ final class EventHandler
 
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICES,
             LongValue.valueOf(this.registry.services.size()));
+
+        int serviceInstanceCount = 0;
+        for (String serviceName : this.registry.serviceInstancesPerServiceFamily.getSubMapKeys())
+        {
+            serviceInstanceCount +=
+                this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceName).size();
+        }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
-            LongValue.valueOf(this.registry.serviceInstanceStats.getSubMapKeys().size()));
+            LongValue.valueOf(serviceInstanceCount));
+        
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
         this.registry.context.publishAtomicChange(this.registry.platformSummary);
