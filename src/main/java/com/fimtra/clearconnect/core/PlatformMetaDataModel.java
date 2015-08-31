@@ -726,6 +726,12 @@ public final class PlatformMetaDataModel
     public IObserverContext getProxyContextForPlatformServiceInstance(String platformServiceInstanceID)
     {
         final String[] family_member = PlatformUtils.decomposePlatformServiceInstanceID(platformServiceInstanceID);
+        // NOTE: another small hack to get the registry proxy
+        if (PlatformRegistry.SERVICE_NAME.equals(family_member[0]))
+        {
+            return this.agent.registryProxy;
+        }
+        
         // todo this leaves a connection leak if the proxy is not destroyed when no more components
         // need it from the model
         return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0], family_member[1])).proxyContext;
