@@ -32,7 +32,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -63,6 +62,7 @@ import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -443,6 +443,44 @@ public final class PlatformRegistry
         }, ISystemRecordNames.CONTEXT_RECORDS);
 
         this.context.publishAtomicChange(this.services);
+       
+        // log when platform summary changes occur
+        this.context.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+            {
+                Log.log(PlatformRegistry.this, imageCopy.toString());
+            }
+        }, IRegistryRecordNames.PLATFORM_SUMMARY);
+
+        // handle real-time updates for the platform summary
+        final IRecordListener platformSummaryListener =
+            new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+                {
+                    PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
+                    {                        
+                        @Override
+                        public void run()
+                        {
+                            PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
+                        }
+                        
+                        @Override
+                        public Object context()
+                        {
+                            return IRegistryRecordNames.PLATFORM_SUMMARY;
+                        }
+                    });
+                }
+            };
+        this.context.addObserver(platformSummaryListener, IRegistryRecordNames.RUNTIME_STATUS);
+        this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICES);
+        this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+        this.context.addObserver(platformSummaryListener, IRegistryRecordNames.PLATFORM_CONNECTIONS);
 
         // the registry's connections
         this.context.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
@@ -725,15 +763,6 @@ final class EventHandler
     {
         this.registry = registry;
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
-        this.eventExecutor.scheduleWithFixedDelay(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                computePlatformSummary();
-            }
-        }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
-            DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
     }
 
     void destroy()
@@ -831,7 +860,19 @@ final class EventHandler
         return nextInstance;
     }
 
-    void computePlatformSummary()
+    void executeComputePlatformSummary()
+    {
+        this.eventExecutor.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                computePlatformSummary();
+            }
+        });
+    }
+
+    private void computePlatformSummary()
     {
         final Set<String> hosts = new HashSet<String>();
         final Set<String> agentNames = this.registry.runtimeStatus.getSubMapKeys();
@@ -853,11 +894,10 @@ final class EventHandler
         }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
             LongValue.valueOf(serviceInstanceCount));
-        
+
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
         this.registry.context.publishAtomicChange(this.registry.platformSummary);
-        Log.log(this.registry, this.registry.platformSummary.toString());
     }
 
     private String selectNextInstance(final String serviceFamily)
