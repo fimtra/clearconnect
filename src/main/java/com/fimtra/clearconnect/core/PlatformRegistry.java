@@ -1194,10 +1194,9 @@ final class EventHandler
                 if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX))
                 {
                     agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
+                    // purge the runtimeStatus record
+                    this.registry.runtimeStatus.removeSubMap(agent);
                 }
-                // purge the runtimeStatus record
-                this.registry.runtimeStatus.removeSubMap(agent);
-                this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
             }
             connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
             subMapAtomicChange.applyTo(connection);
@@ -1207,6 +1206,7 @@ final class EventHandler
                 this.registry.platformConnections.removeSubMap(connectionId);
             }
         }
+        this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
         this.registry.context.publishAtomicChange(this.registry.platformConnections);
     }
 
