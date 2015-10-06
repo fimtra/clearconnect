@@ -10,6 +10,7 @@ package com.fimtra.clearconnect.config.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -104,7 +105,8 @@ public class ConfigServiceGCTester {
 			}
 		}
 
-		long cycles = 0l;
+		BigInteger cycles1 = new BigInteger("0");
+		double cycles = 0d;
 		// Randomly change config
 		while (this.stopLatch.getCount() == 1) {
 			switch (random.nextInt(3)) {
@@ -121,9 +123,11 @@ public class ConfigServiceGCTester {
 				deleteFamilyConfig(ServiceInstance.A, getRandomKey());
 				break;
 			}
-			cycles++;
+			if (cycles++ % 100000 == 0) {
+				System.out.println(cycles);
+			}
 		}
-		System.out.println(cycles);
+		System.out.println("Total cycles: " + cycles);
 	}
 
 	private void deleteMemberConfig(ServiceInstance serviceInstance, String k1) {
@@ -161,7 +165,7 @@ public class ConfigServiceGCTester {
 	}
 
 	public static void main(String[] args) {
-		int timeoutSecs = (args != null && args.length > 0) ? Integer.parseInt(args[0]) : 600;
+		int timeoutSecs = (args != null && args.length > 0) ? Integer.parseInt(args[0]) : 400;
 		final ConfigServiceGCTester tester = new ConfigServiceGCTester();
 		ThreadUtils.newScheduledExecutorService(ConfigServiceGCTester.class.getSimpleName(), 1).schedule(new Runnable() {
 			@Override
