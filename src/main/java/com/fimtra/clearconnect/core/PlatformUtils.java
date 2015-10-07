@@ -85,7 +85,7 @@ public class PlatformUtils
                     final String[] tokens = version.split(SystemUtils.lineSeparator());
                     for (String token : tokens)
                     {
-                        if(token.toLowerCase().startsWith("version"))
+                        if (token.toLowerCase().startsWith("version"))
                         {
                             version = token;
                             break;
@@ -102,11 +102,14 @@ public class PlatformUtils
 
         final StringBuilder sb = new StringBuilder();
         sb.append("ClearConnect").append(SystemUtils.lineSeparator());
-        sb.append(version).append(SystemUtils.lineSeparator()); 
-        sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(SystemUtils.lineSeparator());
+        sb.append(version).append(SystemUtils.lineSeparator());
+        sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
+            SystemUtils.lineSeparator());
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(SystemUtils.lineSeparator());
-        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(SystemUtils.lineSeparator());
-        sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(SystemUtils.lineSeparator());
+        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(
+            SystemUtils.lineSeparator());
+        sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(
+            SystemUtils.lineSeparator());
         sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
     }
@@ -209,7 +212,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return serviceAvailableListeners;
     }
 
@@ -277,7 +280,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
 
@@ -322,7 +325,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, contextRecordsRecordName);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return recordAvailableNotifyingCache;
     }
 
@@ -389,7 +392,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, contextRpcRecordName);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, contextRpcRecordName, updateWaitLatch);
         return rpcAvailableNotifyingCache;
     }
 
@@ -456,7 +459,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, contextSubscriptionsRecordName);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, contextSubscriptionsRecordName, updateWaitLatch);
         return subscriptionNotifyingCache;
     }
 
@@ -514,7 +517,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, ProxyContext.RECORD_CONNECTION_STATUS_NAME, updateWaitLatch);
         return recordStatusNotifyingCache;
     }
 
@@ -565,7 +568,7 @@ public class PlatformUtils
                 updateWaitLatch.countDown();
             }
         }, ISystemRecordNames.CONTEXT_STATUS);
-        awaitUpdateLatch(logContext, updateWaitLatch);
+        awaitUpdateLatch(logContext, ISystemRecordNames.CONTEXT_STATUS, updateWaitLatch);
         return serviceStatusNotifyingCache;
     }
 
@@ -795,7 +798,7 @@ public class PlatformUtils
             PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_END);
     }
 
-    private static void awaitUpdateLatch(final Object logContext, final OneShotLatch updateWaitLatch)
+    private static void awaitUpdateLatch(final Object logContext, String recordName, final OneShotLatch updateWaitLatch)
     {
         try
         {
@@ -804,7 +807,7 @@ public class PlatformUtils
                     TimeUnit.MILLISECONDS);
             if (!isCountedDown)
             {
-                Log.log(logContext, "Initial image was not processed in [",
+                Log.log(logContext, "Initial image for '", recordName, "' was not received after waiting [",
                     String.valueOf(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS), "] millis.");
             }
         }
