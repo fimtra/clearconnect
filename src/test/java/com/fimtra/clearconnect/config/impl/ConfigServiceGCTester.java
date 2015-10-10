@@ -20,7 +20,6 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.config.IConfigServiceProxy;
-import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
@@ -28,7 +27,7 @@ import com.fimtra.util.ThreadUtils;
 
 /**
  * Will aggressively create, update and delete config in the {@link ConfigService} - use this to check it's performance using a tool like
- * VisualVM. By default this will run for approximately 400 seconds in a non-random fashion (config will be changed in a predicatable
+ * VisualVM. By default this will run for approximately 300 seconds in a non-random fashion (config will be changed in a predicatable
  * and ordered fashion).
  * <p>
  * The time to live can be controlled by using the number of seconds desired in the 1st argument of
@@ -44,11 +43,14 @@ import com.fimtra.util.ThreadUtils;
  * <li>
  * start {@link ConfigServiceGCTester} with appropriate arguments</li>
  * <p>
- * T
  * 
  * @author Paul Mackinlay
  */
 public class ConfigServiceGCTester {
+
+	static {
+		System.setProperty("dataFission.proxyReconnectPeriodMillis", "200");
+	}
 
 	enum ServiceInstance {
 		A("service1", "member1"), B("service1", "member2"), C("service1", "member3"), D("service2", "member1"), E("service3", "member1"), F(
@@ -79,27 +81,30 @@ public class ConfigServiceGCTester {
 			TextValue.valueOf("value23"), TextValue.valueOf("value24"), TextValue.valueOf("value25"), TextValue.valueOf("value26"),
 			TextValue.valueOf("value27"), TextValue.valueOf("value28"), TextValue.valueOf("value29"), TextValue.valueOf("value30"));
 	private static final Random random = new Random();
+	private static final boolean isWin = (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0);
 
 	private final boolean isRandom;
 	private final CountDownLatch stopLatch;
 	private final ConfigService configService;
-	private final PlatformRegistry registry;
 	private final ConfigServiceProxy configServiceProxy;
 	private final IPlatformRegistryAgent agent;
+	double cycles;
 
 	ConfigServiceGCTester(boolean isRandom) {
 		try {
 			deleteDir("logs");
 			deleteDir("config");
+			this.cycles = 0d;
 			this.isRandom = isRandom;
 			this.stopLatch = new CountDownLatch(1);
-			this.registry = new PlatformRegistry(getClass().getSimpleName(), TcpChannelUtils.LOCALHOST_IP);
 			this.configService = new ConfigService(TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
 			this.agent = new PlatformRegistryAgent(getClass().getSimpleName(), TcpChannelUtils.LOCALHOST_IP);
 			this.agent.waitForPlatformService(IConfigServiceProxy.CONFIG_SERVICE);
 			IPlatformServiceProxy platformServiceProxy = this.agent.getPlatformServiceProxy(IConfigServiceProxy.CONFIG_SERVICE);
 			this.configServiceProxy = new ConfigServiceProxy(platformServiceProxy);
-			System.out.println(new StringBuffer("Is random: ").append(this.isRandom).toString());
+			System.out.println(new StringBuffer("Is random: ").append(this.isRandom)
+					.append("\nTake heap dump and then press any key to continue.").toString());
+			System.in.read();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -107,26 +112,25 @@ public class ConfigServiceGCTester {
 
 	void stop() {
 		this.stopLatch.countDown();
-		this.configService.destroy();
-		this.registry.destroy();
+		System.out.println(new StringBuffer("Total cycles: ").append(this.cycles).append("\n")
+				.append("Take heap dump and then press any key to continue.").toString());
 		try {
-			Thread.sleep(500);
-		} catch (InterruptedException e) {
-			// ignore
+			System.in.read();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
+		this.configService.destroy();
 		deleteDir("config");
+		System.exit(0);
 	}
 
 	void start() {
 		// Fully populate config
 		for (ServiceInstance serviceInstance : ServiceInstance.values()) {
-			for (String configKey : configKeys) {
-				addMemberConfig(serviceInstance, configKey, getRandomValue());
-				addFamilyConfig(serviceInstance, configKey, getRandomValue());
-			}
+			addMemberConfig(serviceInstance, getRandomKey(), getRandomValue());
+			addFamilyConfig(serviceInstance, getRandomKey(), getRandomValue());
 		}
 
-		double cycles = 0d;
 		while (this.stopLatch.getCount() == 1) {
 			if (this.isRandom) {
 				// Randomly change config
@@ -144,37 +148,53 @@ public class ConfigServiceGCTester {
 					deleteFamilyConfig(getRandomServiceInstance(), getRandomKey());
 					break;
 				}
+				this.cycles++;
 			} else {
 				for (ServiceInstance serviceInstance : ServiceInstance.values()) {
 					for (String key : configKeys) {
 						for (TextValue value : configValues) {
 							addMemberConfig(serviceInstance, key, value);
+							this.cycles++;
 							addFamilyConfig(serviceInstance, key, value);
+							this.cycles++;
 							deleteMemberConfig(serviceInstance, key);
+							this.cycles++;
 							deleteFamilyConfig(serviceInstance, key);
+							this.cycles++;
 						}
 					}
 				}
 			}
-			cycles++;
 		}
-		System.out.println("Total cycles: " + cycles);
 	}
 
 	private void deleteMemberConfig(ServiceInstance serviceInstance, String k1) {
 		this.configServiceProxy.getConfigManager(serviceInstance.family, serviceInstance.member).deleteMemberConfig(k1);
+		pause();
 	}
 
 	private void addMemberConfig(ServiceInstance serviceInstance, String k1, TextValue v1) {
 		this.configServiceProxy.getConfigManager(serviceInstance.family, serviceInstance.member).createOrUpdateMemberConfig(k1, v1);
+		pause();
 	}
 
 	private void deleteFamilyConfig(ServiceInstance serviceInstance, String k1) {
 		this.configServiceProxy.getConfigManager(serviceInstance.family, serviceInstance.member).deleteFamilyConfig(k1);
+		pause();
 	}
 
 	private void addFamilyConfig(ServiceInstance serviceInstance, String k1, TextValue v1) {
 		this.configServiceProxy.getConfigManager(serviceInstance.family, serviceInstance.member).createOrUpdateFamilyConfig(k1, v1);
+		pause();
+	}
+
+	// let disk IO settle
+	private static void pause() {
+		try {
+			Thread.sleep((isWin ? 10 : 1));
+		} catch (InterruptedException e) {
+			// ignore
+		}
 	}
 
 	private static TextValue getRandomValue() {
@@ -203,7 +223,7 @@ public class ConfigServiceGCTester {
 	 * @see ConfigServiceGCTester
 	 */
 	public static void main(String[] args) {
-		int timeoutSecs = (args != null && args.length > 0) ? Integer.parseInt(args[0]) : 400;
+		int timeoutSecs = (args != null && args.length > 0) ? Integer.parseInt(args[0]) : 300;
 		boolean isRandom = (args != null && args.length > 1) ? true : false;
 		final ConfigServiceGCTester tester = new ConfigServiceGCTester(isRandom);
 		ThreadUtils.newScheduledExecutorService(ConfigServiceGCTester.class.getSimpleName(), 1).schedule(new Runnable() {
