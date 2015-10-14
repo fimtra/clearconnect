@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -87,6 +87,11 @@ class ConfigDirReader {
 	private final File configDir;
 	private final Map<File, FileMetaData> fileCache;
 
+	// These are lazy initialised and reused
+	private List<File> changedFilesCollection;
+	private List<File> allFilesCollection;
+	private Set<File> deletedFilesCollection;
+
 	ConfigDirReader(File configDir) {
 		this.configDir = configDir;
 		this.fileCache = new HashMap<File, FileMetaData>();
@@ -98,8 +103,8 @@ class ConfigDirReader {
 	 */
 	List<File> updateRecordFileCache() {
 		final File[] propertyFiles = FileUtils.readFiles(this.configDir, recordFileFilter);
-		final List<File> changedFiles = new ArrayList<File>(propertyFiles.length);
-		final List<File> allFiles = new ArrayList<File>(propertyFiles.length);
+		final List<File> changedFiles = emptyChangedFiles(propertyFiles);
+		final List<File> allFiles = emptyAllFiles(propertyFiles);
 		FileMetaData fileMetaData;
 		for (File propertyFile : propertyFiles) {
 			allFiles.add(propertyFile);
@@ -110,10 +115,38 @@ class ConfigDirReader {
 				changedFiles.add(propertyFile);
 			}
 		}
-		final Set<File> deletedFiles = new HashSet<File>(this.fileCache.keySet());
+		final Set<File> deletedFiles = setWithCachedFiles();
 		deletedFiles.removeAll(allFiles);
 		changedFiles.addAll(deletedFiles);
 		return changedFiles;
+	}
+
+	private Set<File> setWithCachedFiles() {
+		if (this.deletedFilesCollection == null) {
+			this.deletedFilesCollection = new HashSet<File>(this.fileCache.keySet());
+			return this.deletedFilesCollection;
+		}
+		this.deletedFilesCollection.clear();
+		this.deletedFilesCollection.addAll(this.fileCache.keySet());
+		return this.deletedFilesCollection;
+	}
+
+	private List<File> emptyChangedFiles(final File[] propertyFiles) {
+		if (this.changedFilesCollection == null) {
+			this.changedFilesCollection = new ArrayList<File>(propertyFiles.length);
+			return this.changedFilesCollection;
+		}
+		this.changedFilesCollection.clear();
+		return this.changedFilesCollection;
+	}
+
+	private List<File> emptyAllFiles(final File[] propertyFiles) {
+		if (this.allFilesCollection == null) {
+			this.allFilesCollection = new ArrayList<File>(propertyFiles.length);
+			return this.allFilesCollection;
+		}
+		this.allFilesCollection.clear();
+		return this.allFilesCollection;
 	}
 
 	File getConfigDir() {
