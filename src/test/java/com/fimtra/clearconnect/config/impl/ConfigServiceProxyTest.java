@@ -18,7 +18,6 @@ import static org.mockito.Mockito.mock;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class ConfigServiceProxyTest {
 
@@ -32,11 +31,6 @@ public class ConfigServiceProxyTest {
 	public void setUp() {
 		IPlatformServiceProxy proxyForConfigService = mock(IPlatformServiceProxy.class);
 		this.configServiceProxy = new ConfigServiceProxy(proxyForConfigService);
-	}
-
-	@Test
-	public void shouldDo() {
-		fail("Not yet implemented");
 	}
 
 	@Test

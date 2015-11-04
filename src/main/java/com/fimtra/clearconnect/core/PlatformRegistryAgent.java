@@ -77,7 +77,8 @@ import com.fimtra.util.is;
  * <p>
  * This has a round-robin approach to connecting to the registry service if it loses its connection.
  * 
- * @author Ramon Servadei, Paul Mackinlay
+ * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 {
@@ -450,7 +451,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             try
             {
-                if (!servicesAvailable.await(60, TimeUnit.SECONDS))
+				if (!servicesAvailable.await(PlatformCoreProperties.Values.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS,
+						TimeUnit.MILLISECONDS))
                 {
                     throw new RuntimeException("Service '" + serviceFamily + "' is not available");
                 }
