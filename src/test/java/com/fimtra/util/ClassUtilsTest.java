@@ -19,9 +19,6 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-import com.fimtra.util.ClassUtils;
-import com.fimtra.util.SystemUtils;
-
 /**
  * @author Paul Mackinlay
  */

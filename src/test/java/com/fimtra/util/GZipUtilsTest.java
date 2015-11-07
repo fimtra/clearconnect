@@ -22,8 +22,6 @@ import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.GZipUtils;
-
 /**
  * Tests {@link GZipUtils}
  * 

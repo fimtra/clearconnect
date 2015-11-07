@@ -24,8 +24,6 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.fimtra.util.StringUtils;
-
 /**
  * @author Paul Mackinlay
  */

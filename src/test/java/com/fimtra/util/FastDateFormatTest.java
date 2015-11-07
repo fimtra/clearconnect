@@ -27,8 +27,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.FastDateFormat;
-
 /**
  * Tests the {@link FastDateFormat}
  * 

@@ -25,8 +25,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.SerializationUtils;
-
 /**
  * Tests for {@link SerializationUtils}
  * @author Ramon Servadei

@@ -19,8 +19,6 @@ import static org.junit.Assert.assertNotNull;
 
 import org.junit.Test;
 
-import com.fimtra.util.ObjectUtils;
-
 /**
  * Tests for the {@link ObjectUtils}
  * 

@@ -22,8 +22,6 @@ import java.nio.ByteBuffer;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.ByteBufferUtils;
-
 /**
  * Tests for the {@link ByteBufferUtils}
  * 

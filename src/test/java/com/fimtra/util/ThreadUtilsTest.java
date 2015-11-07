@@ -26,8 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
 
-import com.fimtra.util.ThreadUtils;
-
 /**
  * Tests for {@link ThreadUtils}
  * 

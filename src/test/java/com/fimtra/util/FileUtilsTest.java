@@ -29,7 +29,6 @@ import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.FileUtils;
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
 
 /**

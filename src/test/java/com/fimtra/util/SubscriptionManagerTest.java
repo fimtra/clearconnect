@@ -25,9 +25,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.ArrayUtils;
-import com.fimtra.util.SubscriptionManager;
-
 /**
  * Tests for the {@link SubscriptionManager}.
  * 

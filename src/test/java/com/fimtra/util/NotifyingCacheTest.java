@@ -33,8 +33,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.NotifyingCache;
-
 /**
  * Tests for the {@link NotifyingCache}
  * 
