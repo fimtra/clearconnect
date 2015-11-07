@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Ramon Servadei, Fimtra
+ * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay, Fimtra
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.fimtra.clearconnect.core.PlatformRegistry;
  * Defines the properties and property keys used by platform-core
  * 
  * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 public abstract class PlatformCoreProperties
 {
@@ -42,6 +43,13 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.agentInitialisationTimeout=2000</code><br>
          */
         String PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = BASE + "agentInitialisationTimeout";
+
+        /**
+		 * The system property name to define the timeout in milliseconds that an agent waits for
+		 * services to become available.<br>
+		 * E.g. <code>-Dplatform.agentServicesAvailableTimeout=10000</code><br>
+		 */
+		String PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = BASE + "agentServicesAvailableTimeout";
 
         /**
          * The system property name to define the TCP server port used by the
@@ -127,6 +135,16 @@ public abstract class PlatformCoreProperties
          */
         long PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
             Names.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS, "30000"));
+
+		/**
+		 * The period in milliseconds that an agent will wait for services to become available.
+		 * <p>
+		 * Default is: 60000
+		 * 
+		 * @see Names#PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS
+		 */
+		long PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
+				Names.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS, "60000"));
     }
 
     private PlatformCoreProperties()

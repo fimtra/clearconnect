@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,37 +35,39 @@ abstract class AbstractCreateOrUpdateConfig implements IRpcExecutionHandler {
 
 	private final ConfigService configService;
 	private final ConfigDirReader configDirReader;
+	private final StringBuilder responseBuilder;
 	final IPlatformServiceInstance platformServiceInstance;
 
 	AbstractCreateOrUpdateConfig(ConfigService configService, ConfigDirReader configDirReader,
 			IPlatformServiceInstance platformServiceInstance) {
 		this.configService = configService;
 		this.configDirReader = configDirReader;
+		this.responseBuilder = new StringBuilder();
 		this.platformServiceInstance = platformServiceInstance;
 	}
 
 	final IValue createOrUpdateConfig(String configRecordName, String configKey, String configValue) {
-		StringBuilder responseBuilder = new StringBuilder();
+		this.responseBuilder.setLength(0);
 		File configDir = this.configDirReader.getConfigDir();
 		IRecord record = this.platformServiceInstance.getOrCreateRecord(configRecordName);
 		try {
 			ContextUtils.resolveRecordFromFile(record, configDir);
 		} catch (IOException e) {
-			responseBuilder.append("A new record file for ").append(configRecordName).append(" will be created. ");
+			this.responseBuilder.append("A new record file for ").append(configRecordName).append(" will be created. ");
 		}
 		record.put(configKey, configValue);
 		try {
 			ContextUtils.serializeRecordToFile(record, configDir);
 		} catch (IOException e) {
-			String message = "RPC failed: unable to save config record file (" + e.getMessage() + ")";
+			this.responseBuilder.append("RPC failed: unable to save config record file.");
+			String message = this.responseBuilder.toString();
 			Log.log(this, message, e);
-			return new TextValue(message);
+			return TextValue.valueOf(message);
 		}
 		this.configService.publishConfig();
-		responseBuilder.append("Amended config for ").append(configRecordName).append(" published: ").append(configKey).append("=")
+		this.responseBuilder.append("Amended config for ").append(configRecordName).append(" published: ").append(configKey).append("=")
 				.append(configValue);
-		String message = responseBuilder.toString();
-		Log.log(this, message);
-		return new TextValue(message);
+		String message = this.responseBuilder.toString();
+		return TextValue.valueOf(message);
 	}
 }

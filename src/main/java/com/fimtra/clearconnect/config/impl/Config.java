@@ -145,7 +145,7 @@ final class Config implements IConfig {
 						System.getProperty("file.separator"), this.localServiceInstanceIdConfig, ".properties");
 				for (String configKey : configKeys) {
 					String configValue = configResources.getString(configKey);
-					localProperties.put(configKey, new TextValue(configValue));
+					localProperties.put(configKey, TextValue.valueOf(configValue));
 					Log.log(this, "File config: ", configKey, "=", configValue);
 				}
 			}
@@ -297,6 +297,7 @@ final class Config implements IConfig {
  * Simple implementation for the ConfigService
  *
  * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 class SimplePropertiesConfig implements IConfig {
 	final Properties properties;
@@ -310,7 +311,7 @@ class SimplePropertiesConfig implements IConfig {
 	public IValue getProperty(String propertyKey) {
 		final String property = this.properties.getProperty(propertyKey);
 		if (property != null) {
-			return new TextValue(property);
+			return TextValue.valueOf(property);
 		}
 		return null;
 	}
@@ -318,7 +319,7 @@ class SimplePropertiesConfig implements IConfig {
 	@Override
 	public Set<String> getPropertyKeys() {
 		final Set<Object> keySet = this.properties.keySet();
-		Set<String> keys = new HashSet<String>();
+		Set<String> keys = new HashSet<String>(keySet.size());
 		for (Object object : keySet) {
 			keys.add(ObjectUtils.safeToString(object));
 		}

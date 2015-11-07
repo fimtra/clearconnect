@@ -35,31 +35,38 @@ abstract class AbstractDeleteConfig implements IRpcExecutionHandler {
 
 	private final ConfigService configService;
 	private final ConfigDirReader configDirReader;
+	private final StringBuilder responseBuilder;
 	final IPlatformServiceInstance platformServiceInstance;
 
 	AbstractDeleteConfig(ConfigService configService, ConfigDirReader configDirReader, IPlatformServiceInstance platformServiceInstance) {
 		this.configService = configService;
 		this.configDirReader = configDirReader;
+		this.responseBuilder = new StringBuilder();
 		this.platformServiceInstance = platformServiceInstance;
 	}
 
 	IValue deleteConfig(String configRecordName, String configKey) {
+		this.responseBuilder.setLength(0);
 		File configDir = this.configDirReader.getConfigDir();
 		IRecord record = this.platformServiceInstance.getOrCreateRecord(configRecordName);
 		try {
 			ContextUtils.resolveRecordFromFile(record, configDir);
 		} catch (IOException e) {
-			return new TextValue("RPC failed: unable to delete config from record file (" + e.getMessage() + ")");
+			this.responseBuilder.append("RPC failed: unable to delete config from record file (").append(e.getMessage()).append(")");
+			return TextValue.valueOf(this.responseBuilder.toString());
 		}
 		record.remove(configKey);
 		try {
 			ContextUtils.serializeRecordToFile(record, configDir);
 		} catch (IOException e) {
-			return new TextValue("RPC failed: unable to save config record file (" + e.getMessage() + ")");
+			this.responseBuilder.append("RPC failed: unable to save config record file");
+			String message = this.responseBuilder.toString();
+			Log.log(this, message, e);
+			return TextValue.valueOf(message);
 		}
 		this.configService.publishConfig();
-		final String message = "Deleted config with key [" + configKey + "] for " + configRecordName;
-		Log.log(this, message);
-		return new TextValue(message);
+		this.responseBuilder.append("Deleted config with key [").append(configKey).append("] for ").append(configRecordName);
+		final String message = this.responseBuilder.toString();
+		return TextValue.valueOf(message);
 	}
 }
