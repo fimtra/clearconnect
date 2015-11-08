@@ -45,7 +45,6 @@
 	</scm>
 
 	<properties>
-		<datafission.version>1.4.0</datafission.version>
 		<plugins.compiler.version>3.1</plugins.compiler.version>
 		<plugins.eclipse.version>2.9</plugins.eclipse.version>
 		<plugins.jar.version>2.4</plugins.jar.version>
