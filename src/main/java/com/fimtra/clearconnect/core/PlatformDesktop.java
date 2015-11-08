@@ -1277,6 +1277,10 @@ class PlatformDesktop
         return new ImageIcon(hexIcon.byteValue()).getImage();
     }
 
+    /**
+     * @param args
+     *            - Optional. args[0]=node IP, args[1]=registry port (optional)
+     */
     public static void main(String[] args) throws Exception
     {
         try
@@ -1299,9 +1303,13 @@ class PlatformDesktop
         final String node = "Platform node";
         final String port = "platform port";
 
+        final String nodeArg = args.length > 0 ? args[0] : TcpChannelUtils.LOCALHOST_IP;
+        final int registryPortArg =
+            args.length > 1 ? Integer.valueOf(args[1]).intValue() : PlatformCoreProperties.Values.REGISTRY_PORT;
+
         ParametersPanel parameters = new ParametersPanel();
-        parameters.addParameter(node, TcpChannelUtils.LOCALHOST_IP);
-        parameters.addParameter(port, "" + PlatformCoreProperties.Values.REGISTRY_PORT);
+        parameters.addParameter(node, nodeArg);
+        parameters.addParameter(port, "" + registryPortArg);
 
         final JFrame frame = new JFrame("ClearConnect | fimtra.com");
         frame.setIconImage(createIcon());
