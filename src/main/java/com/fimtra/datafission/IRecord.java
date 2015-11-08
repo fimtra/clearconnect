@@ -25,14 +25,24 @@ import java.util.concurrent.locks.Lock;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 
 /**
- * A {@link Map} implementation that holds <code>String=IValue</code> entries.
+ * A {@link Map} implementation that holds <code>String=IValue</code> entries. A record can be used
+ * just like a map. Calling any <code>get</code> method will be threadsafe for viewing of changes
+ * made from calls to the various <code>put</code> methods.
  * <p>
  * A change in a field only occurs if the value associated with the key changes. Updating a value
  * with an object that is equal to the previous value according to its {@link Object#equals(Object)}
- * method does not count as a change. Therefore the equals method for the value objects must be a
- * correct implementation for changes to be detected.
+ * method does not count as a change. All {@link IValue} implementations have semantically correct
+ * equals implementations.
  * <p>
  * <b>Storing a <code>null</code> value against a key is the same as removing the key.</b>
+ * <p>
+ * <h2>Atomic changes</h2>
+ * All <code>put</code> calls that change the record are grouped into an "atomic change". This
+ * atomic change is published to {@link IRecordListener} instances only when the record is
+ * "published" by a call to {@link IPublisherContext#publishAtomicChange(IRecord)}. Atomic changes
+ * allow a publisher to define what constitues an atomic change to a record for viewing by
+ * observers.
+ * <p>
  * <h2>Internal maps</h2> A record can hold maps associated with a key in the record - these are
  * called 'sub-maps'. A sub-map can be used in the same way as using a standard {@link Map}. This is
  * a convenience feature of a record to solve the common requirement for having a map-of-maps (more
