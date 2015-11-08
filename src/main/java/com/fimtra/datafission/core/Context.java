@@ -75,6 +75,7 @@ import com.fimtra.util.UtilProperties;
  * Operations that mutate any record are performed using a {@link Lock} associated with the name of
  * the record. This allows operations on different records to run in parallel.
  * 
+ * @see IRecord
  * @author Ramon Servadei
  */
 public final class Context implements IPublisherContext, IAtomicChangeManager
@@ -445,7 +446,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         contextRecords.getWriteLock().lock();
         try
         {
-            contextRecords.put(name, LongValue.valueOf(subscribersForInstance.length));
+            // important to access subscriptions whilst holding the write lock of CONTEXT_RECORDS -
+            // see addDeltaToSubscriptionCount - this ensures we create the record with the correct
+            // subscriptions count
+            final IRecord contextSubscriptions = this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+            final IValue subscriptionCount = contextSubscriptions.get(name);
+            contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
         }
         finally
@@ -917,6 +923,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             @Override
             public void run()
             {
+                long count = 0;
                 final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
                 if (contextSubscriptions != null)
                 {
@@ -928,11 +935,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         {
                             observerCount = LongValue.valueOf(0);
                         }
-                        final long count = observerCount.longValue() + delta;
+                        count = observerCount.longValue() + delta;
                         if (count <= 0)
                         {
                             contextSubscriptions.remove(recordName);
                             Context.this.tokenPerRecord.remove(recordName);
+                            count = 0;
                         }
                         else
                         {
@@ -953,8 +961,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     {
                         if (contextRecords.containsKey(recordName))
                         {
-                            contextRecords.put(recordName,
-                                LongValue.valueOf(contextRecords.get(recordName).longValue() + delta));
+                            contextRecords.put(recordName, LongValue.valueOf(count));
                             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
                         }
                     }
