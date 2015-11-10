@@ -57,6 +57,7 @@ public class RowOrientedRecordTable extends JTable
         setRowSorter(new TableRowSorterForStringWithNumbers(getModel()));
         setDefaultRenderer(IValue.class, new RecordTableUtils.DefaultIValueCellRenderer());
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        getTableHeader().setDefaultRenderer(new FimtraTableCellHeaderRenderer());
 
         // add the mouse double-click listener to display sub-map data
         addMouseListener(new MouseAdapter()
