@@ -78,6 +78,7 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
+import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
@@ -704,6 +705,7 @@ class PlatformDesktop
         ParametersPanel()
         {
             this.ok = new JButton("OK");
+            this.ok.setDefaultCapable(true);
             this.parameters = new LinkedHashMap<String, Parameter>();
             this.parametersPanel = new JPanel(new GridLayout(0, 2));
             this.result = new AtomicReference<LinkedHashMap<String, String>>();
@@ -1314,6 +1316,7 @@ class PlatformDesktop
         final JFrame frame = new JFrame("ClearConnect | fimtra.com");
         frame.setIconImage(createIcon());
         frame.getContentPane().add(parameters);
+        frame.getRootPane().setDefaultButton(parameters.ok);
         frame.pack();
         frame.addWindowListener(new WindowAdapter()
         {
