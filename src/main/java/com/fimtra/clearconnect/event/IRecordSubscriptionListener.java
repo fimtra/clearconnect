@@ -81,8 +81,8 @@ public interface IRecordSubscriptionListener
         @Override
         public String toString()
         {
-            return "SubscriptionInfo [recordName=" + this.recordName + ", currentSubscriberCount="
-                + this.currentSubscriberCount + ", previousSubscriberCount=" + this.previousSubscriberCount + "]";
+            return "SubscriptionInfo [" + this.recordName + ", " + this.currentSubscriberCount + "("
+                + this.previousSubscriberCount + ")]";
         }
     }
 
