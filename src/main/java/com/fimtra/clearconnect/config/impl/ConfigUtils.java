@@ -47,7 +47,7 @@ public abstract class ConfigUtils {
 	public synchronized static int getPort(IConfig config, String host) {
 		IValue portProperty = config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT);
 		if (isEmptyConfigProperty(portProperty)) {
-			return PlatformUtils.getNextFreeDefaultTcpServerPort(host);
+			return PlatformUtils.getNextAvailableServicePort(host);
 		}
 		return Integer.parseInt(portProperty.textValue());
 	}

@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarFile;
 
+import com.fimtra.channel.ChannelUtils;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceComponent;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.WireProtocolEnum;
@@ -790,10 +792,27 @@ public class PlatformUtils
      *            the hostname to use to find the next free default TCP server
      * @return a free TCP server port that can have a TCP server socket bound to it, -1 if there is
      *         not a free port
+     * @deprecated use {@link #getNextAvailableServicePort(String)}
      */
+    @Deprecated
     public static int getNextFreeDefaultTcpServerPort(String host)
     {
-        return TcpChannelUtils.getNextFreeTcpServerPort(host,
+        return getNextAvailableServicePort(host);
+    }
+
+    /**
+     * Get the next available service port to use for the host.
+     * 
+     * @see TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)
+     * @see PlatformCoreProperties#TCP_SERVER_PORT_RANGE_START
+     * @param host
+     *            the hostname to use to find the next free default TCP server
+     * @return a free server port that can have a server socket bound to it, -1 if there is not a
+     *         free port
+     */
+    public static int getNextAvailableServicePort(String host)
+    {
+        return ChannelUtils.getNextAvailableServicePort(host,
             PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_START,
             PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_END);
     }
