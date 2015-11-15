@@ -57,7 +57,8 @@ public class RowOrientedRecordTable extends JTable
         setRowSorter(new TableRowSorterForStringWithNumbers(getModel()));
         setDefaultRenderer(IValue.class, new RecordTableUtils.DefaultIValueCellRenderer());
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        getTableHeader().setDefaultRenderer(new FimtraTableCellHeaderRenderer());
+        // todo re-enable when the header renderer is fixed to show header cells nicely drawn
+        // getTableHeader().setDefaultRenderer(new FimtraTableCellHeaderRenderer());
 
         // add the mouse double-click listener to display sub-map data
         addMouseListener(new MouseAdapter()
