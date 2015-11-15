@@ -39,7 +39,7 @@ class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
     private EmptyIcon emptyIcon = new EmptyIcon();
 
     public FimtraTableCellHeaderRenderer() {
-        setHorizontalAlignment(JLabel.CENTER);
+        setHorizontalAlignment(SwingConstants.CENTER);
     }
 
     @Override
@@ -82,7 +82,7 @@ class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
                 if (!this.horizontalTextPositionSet) {
                     // There is a row sorter, and the developer hasn't
                     // set a text position, change to leading.
-                    setHorizontalTextPosition(JLabel.LEADING);
+                    setHorizontalTextPosition(SwingConstants.LEADING);
                 }
                 SortOrder sortOrder = getColumnSortOrder(table, column);
                 if (sortOrder != null) {
