@@ -80,6 +80,18 @@ import com.fimtra.util.UtilProperties;
  */
 public final class Context implements IPublisherContext, IAtomicChangeManager
 {
+    /**
+     * Controls logging:
+     * <ul>
+     * <li>subscriber changes
+     * <li>record create/delete
+     * <li>add/remove listener
+     * <li>notify initial image
+     * </ul>
+     * This can be useful to improve performance for situations where there is high-throughput of
+     * record creates
+     */
+    public static boolean log = true;
 
     static
     {
@@ -462,8 +474,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // now notify observers of the record with its initial image
         if (subscribersForInstance.length > 0)
         {
-            Log.log(this, "Subscriber count is ", Integer.toString(subscribersForInstance.length),
-                " for created record '", name, "'");
+            if (log)
+            {
+                Log.log(this, "Subscriber count is ", Integer.toString(subscribersForInstance.length),
+                    " for created record '", name, "'");
+            }
 
             record.getWriteLock().lock();
             try
@@ -533,7 +548,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         record = new Record(name, initialData, this);
         if (!ContextUtils.isSystemRecordName(record.getName()))
         {
-            Log.log(this, "Created record '", record.getName(), "' in context '", record.getContextName(), "'");
+            if (log)
+            {
+                Log.log(this, "Created record '", record.getName(), "' in context '", record.getContextName(), "'");
+            }
         }
         this.records.put(name, record);
         return record;
@@ -564,7 +582,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 this.pendingAtomicChanges.remove(name);
                 this.sequences.remove(name);
                 this.imageCache.remove(name);
-                Log.log(this, "Removed '", removed.getName(), "' from context '", removed.getContextName(), "'");
+                if (log)
+                {
+                    Log.log(this, "Removed '", removed.getName(), "' from context '", removed.getContextName(), "'");
+                }
 
                 synchronized (this.recordsToRemoveFromSystemRecords)
                 {
@@ -826,7 +847,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             if (this.recordObservers.addSubscriberFor(name, observer))
             {
-                Log.log(this, "Added listener to '", name, "' listener=", ObjectUtils.safeToString(observer));
+                if (log)
+                {
+                    Log.log(this, "Added listener to '", name, "' listener=", ObjectUtils.safeToString(observer));
+                }
 
                 // Check if there is an image before creating a task to notify with the image.
                 // Don't try an optimise by re-use the published image we get here - its not safe to
@@ -838,8 +862,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         @Override
                         public void run()
                         {
-                            Log.log(this, "Notifying initial image '", name, "', listener=",
-                                ObjectUtils.safeToString(observer));
+                            if (log)
+                            {
+                                Log.log(this, "Notifying initial image '", name, "', listener=",
+                                    ObjectUtils.safeToString(observer));
+                            }
                             final long start = System.nanoTime();
                             final IRecord imageSnapshot = getLastPublishedImage(name);
                             observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
@@ -890,7 +917,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             if (this.recordObservers.removeSubscriberFor(name, observer))
             {
-                Log.log(this, "Removed listener from '", name, "' listener=", ObjectUtils.safeToString(observer));
+                if (log)
+                {
+                    Log.log(this, "Removed listener from '", name, "' listener=", ObjectUtils.safeToString(observer));
+                }
                 addDeltaToSubscriptionCount(name, -1);
             }
         }
