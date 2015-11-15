@@ -30,7 +30,7 @@ import javax.swing.plaf.UIResource;
 import javax.swing.border.Border;
 import javax.swing.table.*;
 
-public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
+class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
         implements UIResource {
 	private static final long serialVersionUID = 1L;
 	
@@ -42,11 +42,13 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
         setHorizontalAlignment(JLabel.CENTER);
     }
 
+    @Override
     public void setHorizontalTextPosition(int textPosition) {
-        horizontalTextPositionSet = true;
+        this.horizontalTextPositionSet = true;
         super.setHorizontalTextPosition(textPosition);
     }
 
+    @Override
     public Component getTableCellRendererComponent(JTable table, Object value,
             boolean isSelected, boolean hasFocus, int row, int column) {
         Icon sortIcon = null;
@@ -77,7 +79,7 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
             }
 
             if (!isPaintingForPrint && table.getRowSorter() != null) {
-                if (!horizontalTextPositionSet) {
+                if (!this.horizontalTextPositionSet) {
                     // There is a row sorter, and the developer hasn't
                     // set a text position, change to leading.
                     setHorizontalTextPosition(JLabel.LEADING);
@@ -104,7 +106,7 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
 
         setText(value == null ? "" : value.toString());
         setIcon(sortIcon);
-        sortArrow = sortIcon;
+        this.sortArrow = sortIcon;
 
         Border border = null;
         if (hasFocus) {
@@ -141,17 +143,17 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
     public void paintComponent(Graphics g) {
         boolean b = getUIBoolean(this, 
                 "TableHeader.rightAlignSortArrow", false);
-        if (b && sortArrow != null) {
+        if (b && this.sortArrow != null) {
             //emptyIcon is used so that if the text in the header is right
             //aligned, or if the column is too narrow, then the text will
             //be sized appropriately to make room for the icon that is about
             //to be painted manually here.
-            emptyIcon.width = sortArrow.getIconWidth();
-            emptyIcon.height = sortArrow.getIconHeight();
-            setIcon(emptyIcon);
+            this.emptyIcon.width = this.sortArrow.getIconWidth();
+            this.emptyIcon.height = this.sortArrow.getIconHeight();
+            setIcon(this.emptyIcon);
             super.paintComponent(g);
             Point position = computeIconPosition(g);
-            sortArrow.paintIcon(this, g, position.x, position.y);
+            this.sortArrow.paintIcon(this, g, position.x, position.y);
         } else {
             super.paintComponent(g);
         }
@@ -171,7 +173,7 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
             this,
             fontMetrics,
             getText(),
-            sortArrow,
+            this.sortArrow,
             getVerticalAlignment(),
             getHorizontalAlignment(),
             getVerticalTextPosition(),
@@ -180,7 +182,7 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
             iconR,
             textR,
             getIconTextGap());
-        int x = getWidth() - i.right - sortArrow.getIconWidth();
+        int x = getWidth() - i.right - this.sortArrow.getIconWidth();
         int y = iconR.y;
         return new Point(x, y);
     }
@@ -219,14 +221,22 @@ public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer
 		return ((Boolean) iValue).booleanValue();
 	}
     
-    private class EmptyIcon implements Icon, Serializable {
+    private static final class EmptyIcon implements Icon, Serializable {
 		private static final long serialVersionUID = 1L;
 		
 		int width = 0;
         int height = 0;
+
+        EmptyIcon()
+        {
+        }
+        
+        @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {}
-        public int getIconWidth() { return width; }
-        public int getIconHeight() { return height; }
+        @Override
+        public int getIconWidth() { return this.width; }
+        @Override
+        public int getIconHeight() { return this.height; }
     }
 }
 
