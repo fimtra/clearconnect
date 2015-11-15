@@ -17,12 +17,13 @@ package com.fimtra.datafission.ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
@@ -54,7 +55,7 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
     final Map<Pair<String, String>, Integer> recordIndexByName;
     final List<IRecord> records;
     final List<String> fieldIndexes;
-    final Set<String> fieldNames;
+    final Map<String, AtomicInteger> fieldIndexLookupMap;
     ColumnOrientedRecordTable recordTable;
 
     public ColumnOrientedRecordTableModel()
@@ -62,7 +63,7 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
         this.recordIndexByName = new HashMap<Pair<String, String>, Integer>();
         this.records = new ArrayList<IRecord>();
         this.fieldIndexes = new ArrayList<String>();
-        this.fieldNames = new HashSet<String>();
+        this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
         checkAddFieldRow(RecordTableUtils.CONTEXT);
     }
@@ -299,9 +300,10 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
 
     void checkAddFieldRow(String fieldName)
     {
-        if (this.fieldNames.add(fieldName))
+        if (!this.fieldIndexLookupMap.containsKey(fieldName))
         {
             this.fieldIndexes.add(fieldName);
+            this.fieldIndexLookupMap.put(fieldName, new AtomicInteger(this.fieldIndexes.size() - 1));
             int index = getRowIndexForFieldName(fieldName);
             fireTableRowsInserted(index, index);
         }
@@ -309,10 +311,22 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
 
     void deleteFieldRow(String fieldName)
     {
-        if (this.fieldNames.remove(fieldName))
+        final AtomicInteger removed = this.fieldIndexLookupMap.remove(fieldName);
+        if (removed != null)
         {
-            int index = getRowIndexForFieldName(fieldName);
+            final int index = removed.intValue();
             this.fieldIndexes.remove(index);
+            
+            AtomicInteger value = null;
+            for (Iterator<Map.Entry<String, AtomicInteger>> it = this.fieldIndexLookupMap.entrySet().iterator(); it.hasNext();)
+            {
+                value = it.next().getValue();
+                if(value.intValue() > index)
+                {
+                    value.decrementAndGet();
+                }
+            }
+
             fireTableRowsDeleted(index, index);
         }
     }
@@ -329,7 +343,12 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
 
     int getRowIndexForFieldName(String fieldName)
     {
-        return this.fieldIndexes.indexOf(fieldName);
+        final AtomicInteger index = this.fieldIndexLookupMap.get(fieldName);
+        if (index == null)
+        {
+            throw new NullPointerException("No index for field " + fieldName);
+        }
+        return index.intValue();
     }
 
     public IRecord getRecord(int selectedColumn)

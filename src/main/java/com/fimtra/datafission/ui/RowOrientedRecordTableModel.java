@@ -23,7 +23,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -83,7 +83,7 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
     final Map<Pair<String, String>, Integer> recordIndexByName;
     final List<IRecord> records;
     final List<String> fieldIndexes;
-    final Set<String> fieldNames;
+    final Map<String, AtomicInteger> fieldIndexLookupMap;
     RowOrientedRecordTable recordTable;
 
     public RowOrientedRecordTableModel()
@@ -91,7 +91,7 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
         this.recordIndexByName = new HashMap<Pair<String, String>, Integer>();
         this.records = new ArrayList<IRecord>();
         this.fieldIndexes = new ArrayList<String>();
-        this.fieldNames = new HashSet<String>();
+        this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
         checkAddColumn(RecordTableUtils.NAME);
         checkAddColumn(RecordTableUtils.CONTEXT);
@@ -269,9 +269,9 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
                         fireTableCellUpdated(rowIndex, columnIndex);
                     }
                 }
-                // this may not be the most efficient way but the auto-sorting on update
+                // todo this may not be the most efficient way but the auto-sorting on update
                 // does not appear to work
-                // todo huge perf hit as the table row count increases
+                // todo perf hit as the table row count increases...
                 // RowOrientedRecordTableModel.this.recordTable.getRowSorter().allRowsChanged();
             }
         });
@@ -324,18 +324,32 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
 
     void checkAddColumn(String columnName)
     {
-        if (this.fieldNames.add(columnName))
+        if (!this.fieldIndexLookupMap.containsKey(columnName))
         {
             this.fieldIndexes.add(columnName);
+            this.fieldIndexLookupMap.put(columnName, new AtomicInteger(this.fieldIndexes.size() - 1));
             fireTableStructureChanged();
         }
     }
 
     void deleteColumn(String columnName)
     {
-        if (this.fieldNames.remove(columnName))
+        final AtomicInteger removed = this.fieldIndexLookupMap.remove(columnName);
+        if (removed != null)
         {
-            this.fieldIndexes.remove(columnName);
+            final int index = removed.intValue();
+            this.fieldIndexes.remove(index);
+
+            AtomicInteger value = null;
+            for (Iterator<Map.Entry<String, AtomicInteger>> it = this.fieldIndexLookupMap.entrySet().iterator(); it.hasNext();)
+            {
+                value = it.next().getValue();
+                if (value.intValue() > index)
+                {
+                    value.decrementAndGet();
+                }
+            }
+
             fireTableStructureChanged();
         }
     }
@@ -352,7 +366,12 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
 
     int getColumnIndexForColumnName(String columnName)
     {
-        return RowOrientedRecordTableModel.this.fieldIndexes.indexOf(columnName);
+        final AtomicInteger index = RowOrientedRecordTableModel.this.fieldIndexLookupMap.get(columnName);
+        if (index == null)
+        {
+            throw new NullPointerException("No index for " + columnName);
+        }
+        return index.intValue();
     }
 
     public IRecord getRecord(int selectedRow)
