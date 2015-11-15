@@ -20,6 +20,7 @@ import java.awt.Color;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -88,6 +89,7 @@ import com.fimtra.datafission.ui.ColumnOrientedRecordTable;
 import com.fimtra.datafission.ui.ColumnOrientedRecordTableModel;
 import com.fimtra.datafission.ui.RowOrientedRecordTable;
 import com.fimtra.datafission.ui.RowOrientedRecordTableModel;
+import com.fimtra.lf.FimtraTableHeaderUI;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ThreadUtils;
@@ -119,8 +121,42 @@ class PlatformDesktop
         {
             super();
             this.desktop = desktop;
+            JInternalFrame currentFrame = this.desktop.getDesktopPane().getSelectedFrame();
             this.frame = new JInternalFrame(title, true, true, true, true);
-            this.frame.setSize(400, 200);
+            int w = 400;
+            int h = 200;
+            this.frame.setSize(w, h);
+            if(currentFrame != null){
+            	Rectangle bounds = currentFrame.getBounds();
+            	int deskWidth = desktop.getDesktopPane().getWidth();
+            	int deskHeight = desktop.getDesktopPane().getHeight();
+            	Double hgt;
+            	Double wdt;
+            	//first check to the right
+            	double rand = Math.random();
+            	if(deskWidth - (bounds.x + bounds.width) > w){
+            		//anywhere to the right
+            		hgt = (deskHeight - h) * rand;
+            		wdt = bounds.x + bounds.width + ((deskWidth - (w + bounds.x + bounds.width)) * rand);
+            	} else if(deskHeight - (bounds.y + bounds.height) > h){
+            		//anywhere below
+            		wdt = (deskWidth - w) * rand;
+            		hgt = bounds.y + bounds.height + ((deskHeight - (h + bounds.y + bounds.height)) * rand);
+            	} else if(bounds.x > w){
+            		//anywhere to the left
+            		hgt = (deskHeight - h) * rand;
+            		wdt = (bounds.x-w) * rand;
+            	} else if(bounds.y > h){
+            		//anywhere above            		
+            		wdt = (deskWidth - w) * rand;
+            		hgt = (bounds.y-h) * rand;
+            	} else {
+            		//anywhere as it will overlap anyway
+            		wdt = deskWidth * rand;
+            		hgt = deskHeight * rand;
+            	}
+            	frame.setLocation(wdt.intValue(), hgt.intValue());
+            }
             this.frame.setVisible(true);
             this.frame.addInternalFrameListener(new InternalFrameAdapter()
             {
@@ -1074,6 +1110,7 @@ class PlatformDesktop
         try
         {
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
+            UIManager.put("TableHeaderUI", FimtraTableHeaderUI.class.getName());
         }
         catch (Exception e)
         {
