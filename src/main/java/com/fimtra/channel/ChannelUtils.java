@@ -61,4 +61,31 @@ public abstract class ChannelUtils
     {
         return TRANSPORT == TransportTechnologyEnum.SOLACE ? "/" : ":";
     }
+
+    /**
+     * For the transport technology being used for the channels, finds an available "service" port
+     * to use. The definition of a "service" port is technology dependent; for TCP it is a TCP
+     * server socket port, for subject-based technologies (Solace, say) the port is just a suffix in
+     * the server topic address so just needs to be unique.
+     * <ul>
+     * <li>For {@link TransportTechnologyEnum#TCP} (<code>-Dtransport=TCP</code>) this will perform
+     * proper TCP port scanning to find an available port.
+     * <li>For {@link TransportTechnologyEnum#SOLACE} (<code>-Dtransport=SOLACE</code>) this method
+     * will simply return a unique integer.
+     * </ul>
+     * 
+     * @param hostName
+     *            (TCP usage only) the hostname to use to find the next free default TCP server
+     * @param startPortRangeInclusive
+     *            (TCP usage only) the start port to use for the free server socket scan
+     * @param endPortRangeExclusive
+     *            (TCP usage only) the end port <b>exclusive</b> to use for the free server socket
+     *            scan
+     * @return the service port to use, -1 if no port is available
+     */
+    public static int getNextAvailableServicePort(String hostName, int startPortRangeInclusive,
+        int endPortRangeExclusive)
+    {
+        return TRANSPORT.getNextAvailableServicePort(hostName, startPortRangeInclusive, endPortRangeExclusive);
+    }
 }

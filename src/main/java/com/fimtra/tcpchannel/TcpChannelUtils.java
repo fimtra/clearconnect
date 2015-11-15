@@ -19,8 +19,6 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -98,59 +96,25 @@ public abstract class TcpChannelUtils
 
     /**
      * Get the next free TCP server port in the passed in ranges for the given host.
+     * <p>
+     * <b>NOTE: the operation is dependent on the transport technology in use (see
+     * {@link TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)} ).</b>
      * 
      * @param hostName
-     *            the hostname to use to find the next free default TCP server
-     * @return a free TCP server port that can have a TCP server socket bound to it, -1 if there is
-     *         not a free port
+     *            the hostname to use to find the next free server port
+     * @param startPortRangeInclusive
+     *            (TCP usage only) the start port to use for the free server socket scan
+     * @param endPortRangeExclusive
+     *            (TCP usage only) the end port <b>exclusive</b> to use for the free server socket
+     *            scan
+     * @return the server port to use that is free, -1 if there is not a free port
+     * @see TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)
+     * @deprecated use {@link ChannelUtils#getNextAvailableServicePort(String, int, int)}
      */
-    public synchronized static int getNextFreeTcpServerPort(String hostName, int startPortRangeInclusive,
-        int endPortRangeExclusive)
+    @Deprecated
+    public static int getNextFreeTcpServerPort(String hostName, int startPortRangeInclusive, int endPortRangeExclusive)
     {
-        if (ChannelUtils.TRANSPORT == TransportTechnologyEnum.SOLACE)
-        {
-            return System.identityHashCode(Runtime.getRuntime()) + (int) System.nanoTime();
-        }
-
-        String hostAddress = TcpChannelUtils.LOCALHOST_IP;
-        try
-        {
-            hostAddress = InetAddress.getByName(hostName).getHostAddress();
-        }
-        catch (UnknownHostException e)
-        {
-        }
-        for (int i = startPortRangeInclusive; i < endPortRangeExclusive; i++)
-        {
-            try
-            {
-                Log.log(TcpChannelUtils.class, "Trying ", hostAddress, ":", Integer.toString(i));
-                final ServerSocket serverSocket = new ServerSocket();
-                serverSocket.bind(new InetSocketAddress(hostAddress, i));
-                serverSocket.close();
-                // now ensure the server socket is closed before saying we can use it
-                try
-                {
-                    int j = 0;
-                    while (j++ < 10)
-                    {
-                        new Socket(hostAddress, i).close();
-                        Thread.sleep(100);
-                    }
-                }
-                catch (Exception e)
-                {
-                }
-                Log.log(TcpChannelUtils.class, "Using ", hostAddress, ":", Integer.toString(i));
-                return i;
-            }
-            catch (IOException e)
-            {
-                Log.log(TcpChannelUtils.class, e.getMessage());
-            }
-        }
-        throw new RuntimeException("No free TCP port available betwen " + startPortRangeInclusive + " and "
-            + endPortRangeExclusive);
+        return ChannelUtils.getNextAvailableServicePort(hostName, startPortRangeInclusive, endPortRangeExclusive);
     }
 
     /**

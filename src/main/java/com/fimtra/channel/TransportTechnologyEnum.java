@@ -15,7 +15,16 @@
  */
 package com.fimtra.channel;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.UnknownHostException;
+
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
+import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
 /**
@@ -90,6 +99,79 @@ public enum TransportTechnologyEnum
         {
             throw new RuntimeException("Could not construct EndPointServiceBuilder from class name "
                 + ObjectUtils.safeToString(this.endPointServiceBuilderClassName), e);
+        }
+    }
+
+    /**
+     * For the transport technology, finds an available "service" port to use.
+     * <ul>
+     * <li>For {@link TransportTechnologyEnum#TCP} (<code>-Dtransport=TCP</code>) this will perform
+     * proper TCP port scanning to find an available port.
+     * <li>For {@link TransportTechnologyEnum#SOLACE} (<code>-Dtransport=SOLACE</code>) this method
+     * will simply return a unique integer.
+     * </ul>
+     * 
+     * @param hostName
+     *            (TCP usage only) the hostname to use to find the next free default TCP server
+     * @param startPortRangeInclusive
+     *            (TCP usage only) the start port to use for the free server socket scan
+     * @param endPortRangeExclusive
+     *            (TCP usage only) the end port <b>exclusive</b> to use for the free server socket
+     *            scan
+     * @return the server port to use, -1 if no port is available
+     */
+    public synchronized int getNextAvailableServicePort(String hostName, int startPortRangeInclusive,
+        int endPortRangeExclusive)
+    {
+        switch(this)
+        {
+            case SOLACE:
+                // number of millis since ~15:21 on 15-Nov-2015 GMT
+                return System.identityHashCode(SOLACE) + (int) (System.currentTimeMillis() - 1447600859369l);
+            case TCP:
+            {
+                String hostAddress = TcpChannelUtils.LOCALHOST_IP;
+                try
+                {
+                    hostAddress = InetAddress.getByName(hostName).getHostAddress();
+                }
+                catch (UnknownHostException e)
+                {
+                }
+                for (int i = startPortRangeInclusive; i < endPortRangeExclusive; i++)
+                {
+                    try
+                    {
+                        Log.log(this, "Trying ", hostAddress, ":", Integer.toString(i));
+                        final ServerSocket serverSocket = new ServerSocket();
+                        serverSocket.bind(new InetSocketAddress(hostAddress, i));
+                        serverSocket.close();
+                        // now ensure the server socket is closed before saying we can use it
+                        try
+                        {
+                            int j = 0;
+                            while (j++ < 10)
+                            {
+                                new Socket(hostAddress, i).close();
+                                Thread.sleep(100);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                        }
+                        Log.log(this, "Using ", hostAddress, ":", Integer.toString(i));
+                        return i;
+                    }
+                    catch (IOException e)
+                    {
+                        Log.log(this, e.getMessage());
+                    }
+                }
+                throw new RuntimeException("No free TCP port available betwen " + startPortRangeInclusive + " and "
+                    + endPortRangeExclusive);
+            }
+            default :
+                throw new IllegalArgumentException("Unsupported transport technology: " + this);
         }
     }
 }
