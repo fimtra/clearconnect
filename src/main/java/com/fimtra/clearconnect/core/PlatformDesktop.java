@@ -705,7 +705,6 @@ class PlatformDesktop
         ParametersPanel()
         {
             this.ok = new JButton("OK");
-            this.ok.setDefaultCapable(true);
             this.parameters = new LinkedHashMap<String, Parameter>();
             this.parametersPanel = new JPanel(new GridLayout(0, 2));
             this.result = new AtomicReference<LinkedHashMap<String, String>>();
@@ -1302,6 +1301,8 @@ class PlatformDesktop
             }
         }
 
+        Context.log = false;
+        
         final String node = "Platform node";
         final String port = "platform port";
 
@@ -1311,6 +1312,7 @@ class PlatformDesktop
 
         ParametersPanel parameters = new ParametersPanel();
         parameters.addParameter(node, nodeArg);
+        parameters.parameters.get(node).value.selectAll();
         parameters.addParameter(port, "" + registryPortArg);
 
         final JFrame frame = new JFrame("ClearConnect | fimtra.com");
