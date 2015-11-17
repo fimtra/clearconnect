@@ -54,6 +54,16 @@ import com.fimtra.util.Log;
 @SuppressWarnings("rawtypes")
 public final class RpcInstance implements IRpcInstance
 {
+    /**
+     * Controls logging of RPC actions:
+     * <ul>
+     * <li>Calling an RPC
+     * <li>When an RPC is started
+     * <li>When an RPC is finishes
+     * </ul>
+     */
+    public static boolean log = Boolean.getBoolean("log." + RpcInstance.class.getCanonicalName());
+    
     static final String RPC_RECORD_RESULT_PREFIX = "_RPC_";
     static final TextValue NO_ACK = TextValue.valueOf(RPC_RECORD_RESULT_PREFIX);
 
@@ -187,9 +197,12 @@ public final class RpcInstance implements IRpcInstance
                 else
                 {
                     final Map<String, IValue> resultEntries = new HashMap<String, IValue>(2);
-                   
+
                     // tell the remote caller we have started
-                    Log.log(CallReceiver.class, "(->) STARTED ", resultRecordName);
+                    if (log)
+                    {
+                        Log.log(CallReceiver.class, "(->) STARTED ", resultRecordName);
+                    }
                     this.caller.sendAsync(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                         resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP)));
 
@@ -204,8 +217,11 @@ public final class RpcInstance implements IRpcInstance
                         Log.log(CallReceiver.class, "Exception handling RPC: " + callDetails, e);
                     }
 
-                    Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName, ", ",
-                        ContextUtils.mapToString(resultEntries));
+                    if (log)
+                    {
+                        Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName, ", ",
+                            ContextUtils.mapToString(resultEntries));
+                    }
                     this.caller.sendAsync(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                         resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP)));
                 }
@@ -277,7 +293,10 @@ public final class RpcInstance implements IRpcInstance
                 {
                     IValue[] callArgs = new IValue[args.length - 1];
                     System.arraycopy(args, 0, callArgs, 0, args.length - 1);
-                    Log.log(Caller.class, "(->) CALLING RPC (no ack) ", this.rpcName);
+                    if(log)
+                    {
+                        Log.log(Caller.class, "(->) CALLING RPC (no ack) ", this.rpcName);
+                    }
                     this.callReceiver.sendAsync(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName));
                     return null;
                 }
@@ -286,7 +305,10 @@ public final class RpcInstance implements IRpcInstance
                     try
                     {
                         this.context.addObserver(resultHandler, resultMapName);
-                        Log.log(Caller.class, "(->) CALLING RPC ", resultMapName);
+                        if(log)
+                        {
+                            Log.log(Caller.class, "(->) CALLING RPC ", resultMapName);
+                        }
                         if (ContextUtils.isCoreThread() || ContextUtils.isRpcThread())
                         {
                             Log.log(this,

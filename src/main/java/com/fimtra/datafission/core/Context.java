@@ -81,7 +81,7 @@ import com.fimtra.util.UtilProperties;
 public final class Context implements IPublisherContext, IAtomicChangeManager
 {
     /**
-     * Controls logging:
+     * Controls logging of:
      * <ul>
      * <li>subscriber changes
      * <li>record create/delete
@@ -91,7 +91,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * This can be useful to improve performance for situations where there is high-throughput of
      * record creates
      */
-    public static boolean log = true;
+    public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
 
     static
     {
@@ -1063,12 +1063,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    @SuppressWarnings("null")
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
     {
         Log.log(this, ObjectUtils.safeToString(statusAttribute), " ", this.getName());
         final IRecord contextStatus = this.records.get(ISystemRecordNames.CONTEXT_STATUS);
-        if (contextStatus == null && !this.active)
+        if (contextStatus == null || !this.active)
         {
             // on shutdown, contextStatus can be null
             return;

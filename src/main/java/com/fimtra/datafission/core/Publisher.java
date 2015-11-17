@@ -34,7 +34,6 @@ import com.fimtra.channel.IEndPointService;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.datafission.DataFissionProperties;
-import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.ICodec.CommandEnum;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -72,36 +71,21 @@ import com.fimtra.util.SubscriptionManager;
 public class Publisher
 {
     /**
+     * Controls logging of:
+     * <ul>
+     * <li>Inbound requests (subscriptions, RPC calls)
+     * <li>Outbound subscription responses
+     * </ul>
+     * This can be useful to improve performance for situations where there is high-throughput of
+     * record creates
+     */
+    public static boolean log = Boolean.getBoolean("log." + Publisher.class.getCanonicalName());
+
+    /**
      * Delimiter for statistics attributes published for each proxy context connection in the
      * {@link ISystemRecordNames#CONTEXT_STATUS}
      */
     public static final String ATTR_DELIM = ",";
-
-    final static char[][] IGNORE_RX_COMMANDS_PREFIX;
-
-    static
-    {
-        final String[] stringPrefixes =
-            Values.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX.toArray(new String[Values.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX.size()]);
-        IGNORE_RX_COMMANDS_PREFIX = new char[stringPrefixes.length][];
-        for (int i = 0; i < stringPrefixes.length; i++)
-        {
-            String prefix = stringPrefixes[i];
-            IGNORE_RX_COMMANDS_PREFIX[i] = prefix.toCharArray();
-        }
-    }
-
-    static boolean canLog(char[] decodedMessage)
-    {
-        for (int i = 0; i < IGNORE_RX_COMMANDS_PREFIX.length; i++)
-        {
-            if (StringUtils.startsWith(IGNORE_RX_COMMANDS_PREFIX[i], decodedMessage))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
 
     /**
      * @return the field name for the transmission statistics for a connection to a single
@@ -539,10 +523,10 @@ public class Publisher
                                 final ICodec channelsCodec = getProxyContextPublisher(source).codec;
                                 Object decodedMessage = channelsCodec.decode(data);
                                 final CommandEnum command = channelsCodec.getCommand(decodedMessage);
-                                final int maxLogLength = 128;
-                                if (decodedMessage instanceof char[])
+                                if (log)
                                 {
-                                    if (canLog((char[]) decodedMessage))
+                                    final int maxLogLength = 128;
+                                    if (decodedMessage instanceof char[])
                                     {
                                         if (((char[]) decodedMessage).length < maxLogLength)
                                         {
@@ -555,11 +539,11 @@ public class Publisher
                                                 maxLogLength), "...(too long)' from ", ObjectUtils.safeToString(source));
                                         }
                                     }
-                                }
-                                else
-                                {
-                                    Log.log(Publisher.class, "(<-) ", command.toString(), " from ",
-                                        ObjectUtils.safeToString(source));
+                                    else
+                                    {
+                                        Log.log(Publisher.class, "(<-) ", command.toString(), " from ",
+                                            ObjectUtils.safeToString(source));
+                                    }
                                 }
                                 switch(command)
                                 {
@@ -774,7 +758,10 @@ public class Publisher
             StringUtils.join(recordNames, ProxyContext.ACK_ARGS_DELIMITER));
         final IRecordChange atomicChange =
             new AtomicChange(sb.toString(), ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
-        Log.log(Publisher.class, "(->) ", atomicChange.getName());
+        if (log)
+        {
+            Log.log(Publisher.class, "(->) ", atomicChange.getName());
+        }
         client.sendAsync(proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange));
     }
 

@@ -106,6 +106,15 @@ import com.fimtra.util.SubscriptionManager;
 @SuppressWarnings("rawtypes")
 public final class ProxyContext implements IObserverContext
 {
+    /**
+     * Controls logging of:
+     * <ul>
+     * <li>Subscription responses
+     * <li>RPC call responses
+     * </ul>
+     */
+    public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
+    
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = "_ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
@@ -872,7 +881,10 @@ public final class ProxyContext implements IObserverContext
         final String changeName = changeToApply.getName();
         if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
         {
-            Log.log(this, "(<-) ", changeName);
+            if (log)
+            {
+                Log.log(this, "(<-) ", changeName);
+            }
 
             final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
 
@@ -919,7 +931,10 @@ public final class ProxyContext implements IObserverContext
                 @Override
                 public void run()
                 {
-                    Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
+                    if (log)
+                    {
+                        Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
+                    }
                     final IRecordListener[] subscribersFor =
                         ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
                     IRecordListener iAtomicChangeObserver = null;
@@ -1194,7 +1209,7 @@ public final class ProxyContext implements IObserverContext
             this.lock.unlock();
         }
     }
-    
+
     /**
      * Updates the connection status of all subscribed records and the ContextStatus record.
      */

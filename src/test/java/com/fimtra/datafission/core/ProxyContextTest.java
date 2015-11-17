@@ -112,8 +112,6 @@ public class ProxyContextTest
     @Before
     public void setUp() throws Exception
     {
-        // no way to test this really
-        System.getProperties().put(DataFissionProperties.Names.IGNORE_LOGGING_RX_COMMANDS_WITH_PREFIX, "rpc|concat2");
         ChannelUtils.WATCHDOG.configure(200, 10);
         observers.clear();
         // cycle the ports for each test
