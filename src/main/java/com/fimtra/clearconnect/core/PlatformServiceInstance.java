@@ -388,6 +388,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.statsUpdateTask.cancel(false);
         this.publisher.destroy();
         this.context.destroy();
+        
+        this.recordAvailableNotifyingCache.destroy();
+        this.rpcAvailableNotifyingCache.destroy();
+        this.subscriptionNotifyingCache.destroy();
+
         this.active = false;
     }
 

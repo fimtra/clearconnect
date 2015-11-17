@@ -221,6 +221,12 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
         this.proxyContext.destroy();
+        
+        this.recordAvailableNotifyingCache.destroy();
+        this.recordConnectionStatusNotifyingCache.destroy();
+        this.rpcAvailableNotifyingCache.destroy();
+        this.serviceConnectionStatusNotifyingCache.destroy();
+        this.subscriptionNotifyingCache.destroy();
     }
 
     @Override

@@ -798,6 +798,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
 
             this.serviceAvailableListeners.destroy();
+            this.serviceInstanceAvailableListeners.destroy();
+            this.registryAvailableListeners.destroy();
         }
         finally
         {
