@@ -152,8 +152,8 @@ class PlatformDesktop
             		hgt = (bounds.y-h) * rand;
             	} else {
             		//anywhere as it will overlap anyway
-            		wdt = deskWidth * rand;
-            		hgt = deskHeight * rand;
+            		wdt = (deskWidth-w) * rand;
+            		hgt = (deskHeight-h) * rand;
             	}
             	frame.setLocation(wdt.intValue(), hgt.intValue());
             }
