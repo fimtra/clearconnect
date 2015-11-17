@@ -440,7 +440,6 @@ public class PlatformUtils
                     int currentSubscriberCount = (int) subsription.getValue().longValue();
                     SubscriptionInfo info =
                         new SubscriptionInfo(subsription.getKey(), currentSubscriberCount, previousSubscriberCount);
-                    Log.log(logContext, ObjectUtils.safeToString(info), " in ", ObjectUtils.safeToString(logContext));
                     subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
                 }
 
@@ -451,7 +450,6 @@ public class PlatformUtils
                     int previousSubscriberCount = (int) removed.getValue().longValue();
                     SubscriptionInfo info =
                         new SubscriptionInfo(removed.getKey(), currentSubscriberCount, previousSubscriberCount);
-                    Log.log(logContext, ObjectUtils.safeToString(info), " in ", ObjectUtils.safeToString(logContext));
                     subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
                     if (currentSubscriberCount == 0)
                     {
