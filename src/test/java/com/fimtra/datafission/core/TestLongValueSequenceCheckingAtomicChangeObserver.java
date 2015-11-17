@@ -25,6 +25,8 @@ import junit.framework.TestCase;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.LongValue;
 
 /**
@@ -60,7 +62,12 @@ class TestLongValueSequenceCheckingAtomicChangeObserver implements IRecordListen
 
     private void checkLongValue(IRecordChange atomicChange, String theKey)
     {
-        LongValue vNow = (LongValue) atomicChange.getPutEntries().get(theKey);
+        final IValue key = atomicChange.getPutEntries().get(theKey);
+        if(key == null || key.getType() != TypeEnum.LONG)
+        {
+            return;
+        }
+        LongValue vNow = (LongValue) key;
         LongValue vThen = (LongValue) atomicChange.getOverwrittenEntries().get(theKey);
         if (vThen != null)
         {
@@ -71,7 +78,7 @@ class TestLongValueSequenceCheckingAtomicChangeObserver implements IRecordListen
             }
             if (this.lastAtomicChange != null)
             {
-                vNow = (LongValue) atomicChange.getPutEntries().get(theKey);
+                vNow = (LongValue) key;
                 vThen = (LongValue) this.lastAtomicChange.getPutEntries().get(theKey);
                 if (vThen != null && !(vNow.longValue() >= vThen.longValue()))
                 {
