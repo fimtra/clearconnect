@@ -687,6 +687,7 @@ public class ContextUtils
      */
     public static void clearNonSystemRecords(IPublisherContext context)
     {
+        Log.log(context, "Clearing records in ", context.getName());
         final Set<String> recordNames = context.getRecordNames();
         IRecord record;
         for (String recordName : recordNames)
@@ -698,7 +699,6 @@ public class ContextUtils
                 continue;
             }
             record = context.getRecord(recordName);
-            Log.log(context, "Clearing record '", ObjectUtils.safeToString(record.getName()), "'");
             record.clear();
             context.publishAtomicChange(record);
         }
