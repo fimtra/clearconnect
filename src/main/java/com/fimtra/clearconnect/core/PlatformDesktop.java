@@ -130,8 +130,8 @@ class PlatformDesktop
             	Rectangle bounds = currentFrame.getBounds();
             	int deskWidth = desktop.getDesktopPane().getWidth();
             	int deskHeight = desktop.getDesktopPane().getHeight();
-            	Double hgt;
-            	Double wdt;
+            	Double hgt = 0.0;
+            	Double wdt = 0.0;
             	//first check to the right
             	double rand = Math.random();
             	if(deskWidth - (bounds.x + bounds.width) > w){
@@ -152,8 +152,12 @@ class PlatformDesktop
             		hgt = (bounds.y-h) * rand;
             	} else {
             		//anywhere as it will overlap anyway
-            		wdt = (deskWidth-w) * rand;
-            		hgt = (deskHeight-h) * rand;
+            		if(deskWidth > w){
+            			wdt = (deskWidth-w) * rand;
+            		}
+            		if(deskHeight > h){
+            			hgt = (deskHeight-h) * rand;
+            		}
             	}
             	frame.setLocation(wdt.intValue(), hgt.intValue());
             }
