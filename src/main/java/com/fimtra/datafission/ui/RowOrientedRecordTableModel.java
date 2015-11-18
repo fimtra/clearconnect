@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -93,8 +94,12 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
         this.fieldIndexes = new ArrayList<String>();
         this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
-        checkAddColumn(RecordTableUtils.NAME);
-        checkAddColumn(RecordTableUtils.CONTEXT);
+
+        // add these by hand
+        this.fieldIndexes.add(RecordTableUtils.NAME);
+        this.fieldIndexLookupMap.put(RecordTableUtils.NAME, new AtomicInteger(this.fieldIndexes.size() - 1));
+        this.fieldIndexes.add(RecordTableUtils.CONTEXT);
+        this.fieldIndexLookupMap.put(RecordTableUtils.CONTEXT, new AtomicInteger(this.fieldIndexes.size() - 1));
     }
 
     /**
@@ -328,6 +333,21 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
         {
             this.fieldIndexes.add(columnName);
             this.fieldIndexLookupMap.put(columnName, new AtomicInteger(this.fieldIndexes.size() - 1));
+
+            // remove the NAME and CONTEXT
+            this.fieldIndexes.remove(0);
+            this.fieldIndexes.remove(0);
+
+            Collections.sort(this.fieldIndexes);
+
+            // re-add NAME and CONTEXT
+            this.fieldIndexes.add(0, RecordTableUtils.CONTEXT);
+            this.fieldIndexes.add(0, RecordTableUtils.NAME);
+
+            for (int i = 0; i < this.fieldIndexes.size(); i++)
+            {
+                this.fieldIndexLookupMap.get(this.fieldIndexes.get(i)).set(i);
+            }
             fireTableStructureChanged();
         }
     }
