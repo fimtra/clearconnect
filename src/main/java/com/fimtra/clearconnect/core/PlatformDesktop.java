@@ -17,6 +17,7 @@ package com.fimtra.clearconnect.core;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
@@ -63,6 +64,9 @@ import javax.swing.WindowConstants;
 import javax.swing.border.Border;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
+import javax.swing.table.TableModel;
 
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceInstanceMetaDataRecordDefinition;
@@ -125,8 +129,11 @@ class PlatformDesktop
             int h = 200;
             this.frame.setSize(w, h);
             final Point p = desktop.desktopPane.getMousePosition();
-            this.frame.setLocation((int)p.getX(), (int)p.getY());
-                
+            if (p != null)
+            {
+                this.frame.setLocation((int) p.getX() - 30, (int) p.getY() - 5);
+            }
+
             this.frame.setVisible(true);
             this.frame.addInternalFrameListener(new InternalFrameAdapter()
             {
@@ -292,6 +299,7 @@ class PlatformDesktop
 
             this.model = new ColumnOrientedRecordTableModel();
             this.table = new ColumnOrientedRecordTable(this.model);
+
             // metaDataViewType will either be RECORDS_PER_SERVICE or RECORDS_PER_INSTANCE and the
             // metaDataViewKey will then either be the serviceFamily or serviceMember
             switch(metaDataViewType)
@@ -315,6 +323,8 @@ class PlatformDesktop
             prepareTablePopupMenu();
 
             this.frame.add(new JScrollPane(this.table));
+            this.frame.add(new TableSummaryPanel(this.table.getModel()), BorderLayout.SOUTH);
+
             synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
             {
                 PlatformMetaDataViewEnum.recordSubscriptionViews.put(this.metaDataViewKey, this);
@@ -629,6 +639,8 @@ class PlatformDesktop
             prepareTablePopupMenu();
 
             this.frame.add(new JScrollPane(this.table));
+            this.frame.add(new TableSummaryPanel(this.table.getModel()), BorderLayout.SOUTH);
+
             try
             {
                 this.frame.setSelected(true);
@@ -663,6 +675,51 @@ class PlatformDesktop
         IRecord getSelectedRecord()
         {
             return this.table.getSelectedRecord();
+        }
+    }
+
+    /**
+     * Mini summary of rows,cols for a {@link TableModel}
+     * 
+     * @author Ramon Servadei
+     */
+    static class TableSummaryPanel extends JPanel
+    {
+        private static final long serialVersionUID = 1L;
+        final JLabel rows, columns;
+        final TableModel model;
+
+        TableSummaryPanel(TableModel model)
+        {
+            setBorder(BorderFactory.createEmptyBorder());
+            this.model = model;
+            this.rows = new JLabel();
+            this.rows.setBorder(BorderFactory.createEmptyBorder());
+            this.columns = new JLabel();
+            this.columns.setBorder(BorderFactory.createEmptyBorder());
+            setLayout(new FlowLayout(FlowLayout.RIGHT));
+            add(this.rows);
+            add(this.columns);
+
+            model.addTableModelListener(new TableModelListener()
+            {
+                @Override
+                public void tableChanged(TableModelEvent e)
+                {
+                    String text = "rows:" + TableSummaryPanel.this.model.getRowCount();
+                    if (!text.equals(TableSummaryPanel.this.rows.getText()))
+                    {
+                        TableSummaryPanel.this.rows.setText(text);
+                    }
+
+                    text = "cols:" + TableSummaryPanel.this.model.getColumnCount();
+                    if (!text.equals(TableSummaryPanel.this.columns.getText()))
+                    {
+                        TableSummaryPanel.this.columns.setText(text);
+                    }
+                }
+            });
+
         }
     }
 
@@ -1309,7 +1366,7 @@ class PlatformDesktop
         }
 
         Context.log = false;
-        
+
         final String node = "Platform node";
         final String port = "platform port";
 
@@ -1317,9 +1374,8 @@ class PlatformDesktop
         final int registryPortArg =
             args.length > 1 ? Integer.valueOf(args[1]).intValue() : PlatformCoreProperties.Values.REGISTRY_PORT;
 
-        ParametersPanel parameters = new ParametersPanel();
+        final ParametersPanel parameters = new ParametersPanel();
         parameters.addParameter(node, nodeArg);
-        parameters.parameters.get(node).value.selectAll();
         parameters.addParameter(port, "" + registryPortArg);
 
         final JFrame frame = new JFrame("ClearConnect | fimtra.com");
@@ -1348,7 +1404,16 @@ class PlatformDesktop
         });
 
         frame.setVisible(true);
-        parameters.ok.requestFocusInWindow();
+
+        SwingUtilities.invokeLater(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                parameters.parameters.get(node).value.requestFocusInWindow();
+                parameters.parameters.get(node).value.selectAll();
+            }
+        });
 
         Map<String, String> result = parameters.get();
         final PlatformMetaDataModel metaDatModel =
