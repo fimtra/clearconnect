@@ -242,7 +242,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         IRecord imageCopy = null;
         int rowIndex = 0;
         IRecordChange atomicChange;
-        boolean callStructureChanged = false;
         int columnIndex;
         // we do +1 because the table always shows the field names at index 0
         int column_plus1;
@@ -252,7 +251,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
             entry = it.next();
             nameAndContext = entry.getKey();
             imageCopy = entry.getValue();
-            
+
             index = this.recordIndexByName.get(nameAndContext);
             if (index == null)
             {
@@ -291,39 +290,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 ColumnOrientedRecordTableModel.this.records.set(columnIndex, imageCopy);
 
                 // first handle removing any fields (rows)
-                for (String removedKey : atomicChange.getRemovedEntries().keySet())
-                {
-                    boolean exists = false;
-                    // check if the field that has been removed exists in any other records
-                    for (IRecord record : ColumnOrientedRecordTableModel.this.records)
-                    {
-                        if (record.keySet().contains(removedKey))
-                        {
-                            exists = true;
-                            break;
-                        }
-                    }
-                    if (!exists)
-                    {
-                        fieldsToDelete.add(removedKey);
-                    }
-                }
-                if (fieldsToDelete.size() > 0)
-                {
-                    // process deletes in a batch
-                    rowIndex =
-                        RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes,
-                            this.fieldIndexLookupMap);
-                    // we can handle 1 row delete, anymore and we call structure changed
-                    if (!callStructureChanged && rowIndex > -1)
-                    {
-                        fireTableRowsDeleted(rowIndex, rowIndex);
-                    }
-                    else
-                    {
-                        fireTableDataChanged();
-                    }
-                }
+                removeRows(fieldsToDelete, atomicChange.getRemovedEntries().keySet());
 
                 // handle updates now
                 // add any new rows first...
@@ -359,6 +326,44 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         }
     }
 
+    void removeRows(final Set<String> fieldsToDelete, final Set<String> deletedFields)
+    {
+        int rowIndex;
+        boolean exists;
+        for (String removedKey : deletedFields)
+        {
+            exists = false;
+            // check if the field that has been removed exists in any other records
+            for (IRecord record : ColumnOrientedRecordTableModel.this.records)
+            {
+                if (record.keySet().contains(removedKey))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists)
+            {
+                fieldsToDelete.add(removedKey);
+            }
+        }
+        if (fieldsToDelete.size() > 0)
+        {
+            // process deletes in a batch
+            rowIndex =
+                RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes, this.fieldIndexLookupMap);
+            // we can handle 1 row delete, anymore and we call structure changed
+            if (rowIndex > -1)
+            {
+                fireTableRowsDeleted(rowIndex, rowIndex);
+            }
+            else
+            {
+                fireTableDataChanged();
+            }
+        }
+    }
+
     public void recordUnsubscribed(final String recordName, final String contextName)
     {
         SwingUtilities.invokeLater(new Runnable()
@@ -371,7 +376,9 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                         recordName, contextName));
                 if (index != null)
                 {
-                    ColumnOrientedRecordTableModel.this.records.remove(index.intValue());
+                    final IRecord removed = ColumnOrientedRecordTableModel.this.records.remove(index.intValue());
+                    removeRows(new HashSet<String>(), removed.keySet());
+
                     // rebuild indexes
                     ColumnOrientedRecordTableModel.this.recordIndexByName.clear();
                     for (int i = 0; i < ColumnOrientedRecordTableModel.this.records.size(); i++)
@@ -380,7 +387,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                             RowOrientedRecordTableModel.getRecordLookupKey(ColumnOrientedRecordTableModel.this.records.get(i)),
                             Integer.valueOf(i));
                     }
-                    // todo need to remove fields (rows) that are no longer displaying
                     fireTableStructureChanged();
                 }
             }
