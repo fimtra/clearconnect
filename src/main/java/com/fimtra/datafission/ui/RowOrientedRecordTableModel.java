@@ -15,36 +15,23 @@
  */
 package com.fimtra.datafission.ui;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.ListSelectionModel;
-import javax.swing.RowSorter.SortKey;
-import javax.swing.SortOrder;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableModel;
 
 import com.fimtra.datafission.IObserverContext;
@@ -53,10 +40,10 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.ImmutableSnapshotRecord;
-import com.fimtra.datafission.field.TextValue;
+import com.fimtra.datafission.ui.RecordTableUtils.ICellUpdateHandler;
+import com.fimtra.datafission.ui.RecordTableUtils.ICoalescedUpdatesHandler;
+import com.fimtra.util.Log;
 import com.fimtra.util.Pair;
-import com.fimtra.util.ThreadUtils;
 
 /**
  * A {@link TableModel} implementation that can be attached as an {@link IRecordListener} for any
@@ -66,7 +53,8 @@ import com.fimtra.util.ThreadUtils;
  * @see RowOrientedRecordTable
  * @author Ramon Servadei
  */
-public class RowOrientedRecordTableModel extends AbstractTableModel implements IRecordListener
+public final class RowOrientedRecordTableModel extends AbstractTableModel implements IRecordListener,
+    ICoalescedUpdatesHandler
 {
     private static final long serialVersionUID = 1L;
 
@@ -85,7 +73,33 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
     final List<IRecord> records;
     final List<String> fieldIndexes;
     final Map<String, AtomicInteger> fieldIndexLookupMap;
-    RowOrientedRecordTable recordTable;
+    ICellUpdateHandler cellUpdateHandler = new ICellUpdateHandler()
+    {
+        @Override
+        public void cellUpdated(int row, int column)
+        {
+            // noop
+        }
+    };
+
+    // these members handle batching up of updates and removes
+    final AtomicBoolean batchUpdateScheduled;
+    final AtomicBoolean batchRemoveScheduled;
+
+    /**
+     * Record updates keyed by {recordname,context}
+     * 
+     * @see {@link #getRecordLookupKey(String, String)}
+     */
+    final Map<Pair<String, String>, IRecord> pendingBatchUpdates;
+    /**
+     * Coalesced atomic updates keyed by {recordname,context}
+     * 
+     * @see {@link #getRecordLookupKey(String, String)}
+     */
+    final Map<Pair<String, String>, IRecordChange> pendingBatchAtomicChanges;
+    /** list of records to remove identified by name and keyed per context */
+    final Map<String, List<String>> pendingBatchRemoves;
 
     public RowOrientedRecordTableModel()
     {
@@ -94,6 +108,12 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
         this.fieldIndexes = new ArrayList<String>();
         this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
+
+        this.batchUpdateScheduled = new AtomicBoolean();
+        this.batchRemoveScheduled = new AtomicBoolean();
+        this.pendingBatchUpdates = new HashMap<Pair<String, String>, IRecord>();
+        this.pendingBatchAtomicChanges = new HashMap<Pair<String, String>, IRecordChange>();
+        this.pendingBatchRemoves = new HashMap<String, List<String>>();
 
         // add these by hand
         this.fieldIndexes.add(RecordTableUtils.NAME);
@@ -119,9 +139,9 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
                     final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
-                    for (String removedRecordName : removedRecords)
+                    if (removedRecords.size() > 0)
                     {
-                        recordUnsubscribed(removedRecordName, context.getName());
+                        recordUnsubscribedBatch(new HashSet<String>(removedRecords), context.getName());
                     }
                 }
             };
@@ -208,131 +228,265 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
     @Override
     public void onChange(final IRecord imageCopyValidInCallingThreadOnly, final IRecordChange atomicChange)
     {
-        final IRecord imageCopy = ImmutableSnapshotRecord.create(imageCopyValidInCallingThreadOnly);
+        RecordTableUtils.coalesceAndSchedule(this, imageCopyValidInCallingThreadOnly, atomicChange,
+            this.batchUpdateScheduled, this.pendingBatchUpdates, this.pendingBatchAtomicChanges);
+    }
+
+    @Override
+    public void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
+        Map<Pair<String, String>, IRecordChange> recordAtomicChanges)
+    {
+        final Set<String> fieldsToDelete = new HashSet<String>();
+        final AtomicBoolean stuctureChanged = new AtomicBoolean();
+
+        int startInsert = -1;
+        int endInsert = -1;
+        Map.Entry<Pair<String, String>, IRecord> entry = null;
+        Pair<String, String> nameAndContext = null;
+        IRecord imageCopy = null;
+        Integer index;
+        int rowIndex = 0;
+        int colIndex = 0;
+        IRecordChange atomicChange;
+
+        for (Iterator<Map.Entry<Pair<String, String>, IRecord>> it = recordImages.entrySet().iterator(); it.hasNext();)
+        {
+            entry = it.next();
+            nameAndContext = entry.getKey();
+            imageCopy = entry.getValue();
+
+            index = this.recordIndexByName.get(nameAndContext);
+            if (index == null)
+            {
+                // its new
+                rowIndex = this.records.size();
+                this.records.add(imageCopy);
+                this.recordIndexByName.put(getRecordLookupKey(imageCopy), Integer.valueOf(rowIndex));
+                for (String key : imageCopy.keySet())
+                {
+                    colIndex = checkAddColumn(key, stuctureChanged);
+                    cellUpdated(rowIndex, colIndex);
+                }
+                for (String key : imageCopy.getSubMapKeys())
+                {
+                    colIndex = checkAddColumn(key, stuctureChanged);
+                    cellUpdated(rowIndex, colIndex);
+                }
+                if (startInsert == -1)
+                {
+                    startInsert = rowIndex;
+                    endInsert = rowIndex;
+                }
+                else
+                {
+                    endInsert = rowIndex;
+                }
+            }
+            else
+            {
+                // an update
+                rowIndex = index.intValue();
+                this.records.set(rowIndex, imageCopy);
+                atomicChange = recordAtomicChanges.get(nameAndContext);
+
+                for (String removedKey : atomicChange.getRemovedEntries().keySet())
+                {
+                    boolean exists = false;
+                    for (IRecord record : this.records)
+                    {
+                        if (record.keySet().contains(removedKey))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                    {
+                        fieldsToDelete.add(removedKey);
+                    }
+                }
+
+                if (fieldsToDelete.size() > 0)
+                {
+                    RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes, this.fieldIndexLookupMap);
+                    // NOTE: when a column is deleted, we need to process as a structure change
+                    stuctureChanged.set(true);
+                }
+
+                for (String changedKey : atomicChange.getPutEntries().keySet())
+                {
+                    colIndex = checkAddColumn(changedKey, stuctureChanged);
+                    cellUpdated(rowIndex, colIndex);
+                    fireTableCellUpdated(rowIndex, colIndex);
+                }
+
+                // todo what happens if a sub-map is removed?
+                // flash updates for submap keys
+                for (String changedKey : atomicChange.getSubMapKeys())
+                {
+                    colIndex = checkAddColumn(changedKey, stuctureChanged);
+                    cellUpdated(rowIndex, colIndex);
+                    fireTableCellUpdated(rowIndex, colIndex);
+                }
+            }
+        }
+
+        if (stuctureChanged.get())
+        {
+            fireTableStructureChanged();
+        }
+        else
+        {
+            if (startInsert > -1)
+            {
+                try
+                {
+                    fireTableRowsInserted(startInsert, endInsert);
+                }
+                catch (IndexOutOfBoundsException e)
+                {
+                    Log.log(this, "Error with startInsert=" + startInsert + ", endInsert=" + endInsert, e);
+                }
+            }
+        }
+    }
+
+    void recordUnsubscribedBatch(final Collection<String> recordNames, final String contextName)
+    {
+        synchronized (this.pendingBatchRemoves)
+        {
+            List<String> list = this.pendingBatchRemoves.get(contextName);
+            if (list == null)
+            {
+                list = new ArrayList<String>(recordNames.size());
+                this.pendingBatchRemoves.put(contextName, list);
+            }
+            list.addAll(recordNames);
+
+            if (!this.batchRemoveScheduled.getAndSet(true))
+            {
+                RecordTableUtils.cellUpdater.schedule(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        scheduleHandlePendingRemoves();
+                    }
+                }, 250, TimeUnit.MILLISECONDS);
+            }
+        }
+    }
+
+    void scheduleHandlePendingRemoves()
+    {
+        final Map<String, List<String>> local = new HashMap<String, List<String>>();
+
+        synchronized (this.pendingBatchRemoves)
+        {
+            local.putAll(this.pendingBatchRemoves);
+
+            this.pendingBatchRemoves.clear();
+            this.batchRemoveScheduled.set(false);
+        }
+
+        final Set<Pair<String, String>> nameAndContextToRemove = new HashSet<Pair<String, String>>();
+
+        Map.Entry<String, List<String>> entry = null;
+        String contextName = null;
+        List<String> listOfRecordNames = null;
+        int i;
+        for (Iterator<Map.Entry<String, List<String>>> it = local.entrySet().iterator(); it.hasNext();)
+        {
+            entry = it.next();
+            contextName = entry.getKey();
+            listOfRecordNames = entry.getValue();
+            for (i = 0; i < listOfRecordNames.size(); i++)
+            {
+                nameAndContextToRemove.add(getRecordLookupKey(listOfRecordNames.get(i), contextName));
+            }
+        }
+
         SwingUtilities.invokeLater(new Runnable()
         {
             @Override
             public void run()
             {
-                int rowIndex = getRowIndexForRecord(imageCopy);
-                if (rowIndex == -1)
-                {
-                    // its new
-                    rowIndex = RowOrientedRecordTableModel.this.records.size();
-                    RowOrientedRecordTableModel.this.records.add(imageCopy);
-                    RowOrientedRecordTableModel.this.recordIndexByName.put(getRecordLookupKey(imageCopy),
-                        Integer.valueOf(rowIndex));
-                    for (String key : imageCopy.keySet())
-                    {
-                        checkAddColumn(key);
-                        cellUpdated(rowIndex, getColumnIndexForColumnName(key));
-                    }
-                    for (String key : imageCopy.getSubMapKeys())
-                    {
-                        checkAddColumn(key);
-                        cellUpdated(rowIndex, getColumnIndexForColumnName(key));
-                    }
-                    fireTableRowsInserted(rowIndex, rowIndex);
-                }
-                else
-                {
-                    RowOrientedRecordTableModel.this.records.set(rowIndex, imageCopy);
-
-                    for (String removedKey : atomicChange.getRemovedEntries().keySet())
-                    {
-                        boolean exists = false;
-                        for (IRecord record : RowOrientedRecordTableModel.this.records)
-                        {
-                            if (record.keySet().contains(removedKey))
-                            {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (!exists)
-                        {
-                            deleteColumn(removedKey);
-                        }
-                    }
-
-                    int columnIndex;
-                    for (String changedKey : atomicChange.getPutEntries().keySet())
-                    {
-                        checkAddColumn(changedKey);
-                        columnIndex = getColumnIndexForColumnName(changedKey);
-                        cellUpdated(rowIndex, columnIndex);
-                        fireTableCellUpdated(rowIndex, columnIndex);
-                    }
-
-                    // todo what happens if a sub-map is removed?
-                    // flash updates for submap keys
-                    for (String changedKey : atomicChange.getSubMapKeys())
-                    {
-                        checkAddColumn(changedKey);
-                        columnIndex = getColumnIndexForColumnName(changedKey);
-                        cellUpdated(rowIndex, columnIndex);
-                        fireTableCellUpdated(rowIndex, columnIndex);
-                    }
-                }
-                // todo this may not be the most efficient way but the auto-sorting on update
-                // does not appear to work
-                // todo perf hit as the table row count increases...
-                // RowOrientedRecordTableModel.this.recordTable.getRowSorter().allRowsChanged();
+                handlePendingRemoves(nameAndContextToRemove);
             }
         });
     }
 
-    public void recordUnsubscribed(final String recordName, final String contextName)
+    void handlePendingRemoves(final Set<Pair<String, String>> nameAndContextToRemove)
     {
-        // todo this will hurt for lots of records deleted
-        SwingUtilities.invokeLater(new Runnable()
+        List<IRecord> copy = new ArrayList<IRecord>(this.records);
+        this.records.clear();
+
+        int singleIndex = -1;
+        if (nameAndContextToRemove.size() == 1)
         {
-            @Override
-            public void run()
+            final Integer index = this.recordIndexByName.get(nameAndContextToRemove.iterator().next());
+            if (index != null)
             {
-                final Integer index =
-                    RowOrientedRecordTableModel.this.recordIndexByName.remove(getRecordLookupKey(recordName,
-                        contextName));
-                if (index != null)
-                {
-                    RowOrientedRecordTableModel.this.records.remove(index.intValue());
-                    // rebuild indexes
-                    RowOrientedRecordTableModel.this.recordIndexByName.clear();
-                    for (int i = 0; i < RowOrientedRecordTableModel.this.records.size(); i++)
-                    {
-                        RowOrientedRecordTableModel.this.recordIndexByName.put(
-                            getRecordLookupKey(RowOrientedRecordTableModel.this.records.get(i)), Integer.valueOf(i));
-                    }
-                    fireTableRowsDeleted(index.intValue(), index.intValue());
-                }
+                singleIndex = index.intValue();
             }
-        });
+        }
+
+        // first rebuild records without the deleted records
+        final int size = copy.size();
+        IRecord record;
+        int i;
+        for (i = 0; i < size; i++)
+        {
+            record = copy.get(i);
+            if (!nameAndContextToRemove.remove(getRecordLookupKey(record)))
+            {
+                this.records.add(record);
+            }
+        }
+
+        // rebuild indexes
+        this.recordIndexByName.clear();
+        for (i = 0; i < this.records.size(); i++)
+        {
+            this.recordIndexByName.put(getRecordLookupKey(this.records.get(i)), Integer.valueOf(i));
+        }
+
+        if (singleIndex > -1)
+        {
+            fireTableRowsDeleted(singleIndex, singleIndex);
+        }
+        else
+        {
+            fireTableDataChanged();
+        }
     }
 
     public void recordUnsubscribed(IRecord record)
     {
-        recordUnsubscribed(record.getName(), record.getContextName());
+        final Set<String> recordNames = new HashSet<String>();
+        recordNames.add(record.getName());
+        recordUnsubscribedBatch(recordNames, record.getContextName());
     }
 
-    void addCellUpdatedListener(RowOrientedRecordTable recordTable)
+    void setCellUpdatedHandler(ICellUpdateHandler recordTable)
     {
-        this.recordTable = recordTable;
+        this.cellUpdateHandler = recordTable;
     }
 
     void cellUpdated(int row, int column)
     {
-        if (this.recordTable != null)
-        {
-            this.recordTable.cellUpdated(row, column);
-        }
+        this.cellUpdateHandler.cellUpdated(row, column);
     }
 
-    void checkAddColumn(String columnName)
+    int checkAddColumn(String columnName, AtomicBoolean stuctureChanged)
     {
-        if (!this.fieldIndexLookupMap.containsKey(columnName))
+        AtomicInteger index = RowOrientedRecordTableModel.this.fieldIndexLookupMap.get(columnName);
+        if (index == null)
         {
             this.fieldIndexes.add(columnName);
-            this.fieldIndexLookupMap.put(columnName, new AtomicInteger(this.fieldIndexes.size() - 1));
+
+            index = new AtomicInteger(this.fieldIndexes.size() - 1);
+            this.fieldIndexLookupMap.put(columnName, index);
 
             // remove the NAME and CONTEXT
             this.fieldIndexes.remove(0);
@@ -348,48 +502,7 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
             {
                 this.fieldIndexLookupMap.get(this.fieldIndexes.get(i)).set(i);
             }
-            fireTableStructureChanged();
-        }
-    }
-
-    void deleteColumn(String columnName)
-    {
-        final AtomicInteger removed = this.fieldIndexLookupMap.remove(columnName);
-        if (removed != null)
-        {
-            final int index = removed.intValue();
-            this.fieldIndexes.remove(index);
-
-            AtomicInteger value = null;
-            for (Iterator<Map.Entry<String, AtomicInteger>> it = this.fieldIndexLookupMap.entrySet().iterator(); it.hasNext();)
-            {
-                value = it.next().getValue();
-                if (value.intValue() > index)
-                {
-                    value.decrementAndGet();
-                }
-            }
-
-            fireTableStructureChanged();
-        }
-    }
-
-    int getRowIndexForRecord(IRecord imageCopy)
-    {
-        Integer index = this.recordIndexByName.get(getRecordLookupKey(imageCopy));
-        if (index == null)
-        {
-            return -1;
-        }
-        return index.intValue();
-    }
-
-    int getColumnIndexForColumnName(String columnName)
-    {
-        final AtomicInteger index = RowOrientedRecordTableModel.this.fieldIndexLookupMap.get(columnName);
-        if (index == null)
-        {
-            throw new NullPointerException("No index for " + columnName);
+            stuctureChanged.set(true);
         }
         return index.intValue();
     }
@@ -397,176 +510,5 @@ public class RowOrientedRecordTableModel extends AbstractTableModel implements I
     public IRecord getRecord(int selectedRow)
     {
         return this.records.get(selectedRow);
-    }
-
-}
-
-/**
- * Encapsulates all common util components for record tables.
- * 
- * @author Ramon Servadei
- */
-abstract class RecordTableUtils
-{
-    static final TextValue SUBMAP = TextValue.valueOf("SUB-MAP...");
-    static final IValue BLANK = TextValue.valueOf("");
-    static final ScheduledExecutorService cellUpdater = ThreadUtils.newScheduledExecutorService(
-        "RecordTable-cellupdater", 1);
-    static final Color UPDATE_COLOUR = new Color(255, 0, 0);
-    static final long TTL = 250;
-    static final String NAME = "Name";
-    static final String CONTEXT = "Context";
-    static final String FIELD = "Field";
-
-    /**
-     * A standard renderer for {@link IValue} objects
-     * 
-     * @author Ramon Servadei
-     */
-    static final class DefaultIValueCellRenderer extends DefaultTableCellRenderer
-    {
-        private static final long serialVersionUID = 1L;
-
-        DefaultIValueCellRenderer()
-        {
-        }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-            boolean hasFocus, int row, int column)
-        {
-            final Component tableCellRendererComponent =
-                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            setValue(((IValue) value).textValue());
-            return tableCellRendererComponent;
-        }
-    }
-
-    static class CellUpdate
-    {
-        final int row, col, hashCode;
-        final long start;
-
-        @Override
-        public String toString()
-        {
-            return "Coord [row=" + this.row + ", col=" + this.col + "]";
-        }
-
-        CellUpdate(int row, int col)
-        {
-            super();
-            this.row = row;
-            this.col = col;
-            this.start = System.currentTimeMillis();
-
-            final int prime = 31;
-            int hashCode = 1;
-            hashCode = prime * hashCode + this.col;
-            hashCode = prime * hashCode + this.row;
-            this.hashCode = hashCode;
-        }
-
-        boolean isActive()
-        {
-            return System.currentTimeMillis() - this.start < RecordTableUtils.TTL;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return this.hashCode;
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (this == obj)
-                return true;
-            if (obj == null)
-                return false;
-            if (getClass() != obj.getClass())
-                return false;
-            CellUpdate other = (CellUpdate) obj;
-            if (this.col != other.col)
-                return false;
-            if (this.row != other.row)
-                return false;
-            return true;
-        }
-
-    }
-
-    private RecordTableUtils()
-    {
-    }
-
-    /**
-     * Shows a pop-up view of a sub-map. This does not update in real-time
-     */
-    static void showSnapshotSubMapData(MouseEvent evt, IRecord record, String subMapKey)
-    {
-        final JPopupMenu submapPopup = new JPopupMenu();
-        Map<String, IValue> subMapData = record.getOrCreateSubMap(subMapKey);
-
-        final DefaultTableModel model = new DefaultTableModel()
-        {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public Class<?> getColumnClass(int columnIndex)
-            {
-                switch(columnIndex)
-                {
-                    case 0:
-                        return String.class;
-                }
-                return super.getColumnClass(columnIndex);
-            }
-        };
-        model.addColumn("Field");
-        model.addColumn("Value");
-
-        // populate the model
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
-        for (Iterator<Map.Entry<String, IValue>> it = subMapData.entrySet().iterator(); it.hasNext();)
-        {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            model.addRow(new Object[] { key, value });
-        }
-
-        JTable table = new JTable(model);
-        table.setDefaultRenderer(IValue.class, new RecordTableUtils.DefaultIValueCellRenderer());
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        TableRowSorterForStringWithNumbers sorter = new TableRowSorterForStringWithNumbers(model);
-        table.setRowSorter(sorter);
-        sorter.modelStructureChanged();
-
-        // force sorting when opened
-        List<SortKey> sortKeys = new ArrayList<SortKey>(1);
-        sortKeys.add(new SortKey(0, SortOrder.ASCENDING));
-        sorter.setSortKeys(sortKeys);
-        sorter.sort();
-
-        submapPopup.add(new JLabel("Submap: " + subMapKey));
-        JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(new ActionListener()
-        {
-            @Override
-            public void actionPerformed(ActionEvent e)
-            {
-                submapPopup.setVisible(false);
-                submapPopup.removeAll();
-            }
-        });
-        submapPopup.add(closeButton);
-        submapPopup.add(new JScrollPane(table));
-        submapPopup.setPreferredSize(new Dimension(450, 300));
-        submapPopup.setLocation(evt.getLocationOnScreen());
-        submapPopup.setVisible(true);
     }
 }

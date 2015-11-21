@@ -21,6 +21,7 @@ import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.JComponent;
 import javax.swing.JTable;
@@ -34,6 +35,7 @@ import javax.swing.table.TableModel;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.ui.RecordTableUtils.ICellUpdateHandler;
 import com.fimtra.util.Log;
 
 /**
@@ -43,7 +45,7 @@ import com.fimtra.util.Log;
  * 
  * @author Ramon Servadei
  */
-public class RowOrientedRecordTable extends JTable
+public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
 {
     private static final long serialVersionUID = 1L;
 
@@ -57,8 +59,6 @@ public class RowOrientedRecordTable extends JTable
         setRowSorter(new TableRowSorterForStringWithNumbers(getModel()));
         setDefaultRenderer(IValue.class, new RecordTableUtils.DefaultIValueCellRenderer());
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        // todo re-enable when the header renderer is fixed to show header cells nicely drawn
-        // getTableHeader().setDefaultRenderer(new FimtraTableCellHeaderRenderer());
 
         // add the mouse double-click listener to display sub-map data
         addMouseListener(new MouseAdapter()
@@ -87,13 +87,14 @@ public class RowOrientedRecordTable extends JTable
     {
         try
         {
+            final AtomicBoolean stuctureChanged = new AtomicBoolean();
             Map<String, Integer> widths = new HashMap<String, Integer>();
             final String[] tokens = stateString.split(",");
             String columnName;
             for (int i = 0; i < tokens.length; i++)
             {
                 columnName = tokens[i++];
-                getModel().checkAddColumn(columnName);
+                getModel().checkAddColumn(columnName, stuctureChanged);
                 widths.put(columnName, Integer.valueOf(tokens[i]));
             }
 
@@ -109,6 +110,8 @@ public class RowOrientedRecordTable extends JTable
                     column.setPreferredWidth(preferredWidth.intValue());
                 }
             }
+            
+            getModel().fireTableStructureChanged();
         }
         catch (Exception e)
         {
@@ -159,7 +162,7 @@ public class RowOrientedRecordTable extends JTable
     {
         if (dataModel instanceof RowOrientedRecordTableModel)
         {
-            ((RowOrientedRecordTableModel) dataModel).addCellUpdatedListener(this);
+            ((RowOrientedRecordTableModel) dataModel).setCellUpdatedHandler(this);
             super.setModel(dataModel);
         }
         else
@@ -232,7 +235,8 @@ public class RowOrientedRecordTable extends JTable
         return prepareRenderer;
     }
 
-    void cellUpdated(int row, int column)
+    @Override
+    public final void cellUpdated(int row, int column)
     {
         final RecordTableUtils.CellUpdate coord = new RecordTableUtils.CellUpdate(row, column);
         this.updates.put(coord, coord);
