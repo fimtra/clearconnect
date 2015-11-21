@@ -17,12 +17,14 @@ package com.fimtra.datafission.ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.SwingUtilities;
@@ -35,8 +37,8 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.datafission.ui.RecordTableUtils.ICellUpdateHandler;
 import com.fimtra.util.Pair;
 
 /**
@@ -47,7 +49,8 @@ import com.fimtra.util.Pair;
  * @see ColumnOrientedRecordTable
  * @author Ramon Servadei
  */
-public class ColumnOrientedRecordTableModel extends AbstractTableModel implements IRecordListener
+public final class ColumnOrientedRecordTableModel extends AbstractTableModel implements IRecordListener,
+    RecordTableUtils.ICoalescedUpdatesHandler
 {
     private static final long serialVersionUID = 1L;
 
@@ -56,7 +59,33 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
     final List<IRecord> records;
     final List<String> fieldIndexes;
     final Map<String, AtomicInteger> fieldIndexLookupMap;
-    ColumnOrientedRecordTable recordTable;
+    ICellUpdateHandler cellUpdateHandler = new ICellUpdateHandler()
+    {
+        @Override
+        public void cellUpdated(int row, int column)
+        {
+            // noop
+        }
+    };
+
+    // these members handle batching up of updates and removes
+    final AtomicBoolean batchUpdateScheduled;
+    final AtomicBoolean batchRemoveScheduled;
+
+    /**
+     * Record updates keyed by {recordname,context}
+     * 
+     * @see {@link #getRecordLookupKey(String, String)}
+     */
+    final Map<Pair<String, String>, IRecord> pendingBatchUpdates;
+    /**
+     * Coalesced atomic updates keyed by {recordname,context}
+     * 
+     * @see {@link #getRecordLookupKey(String, String)}
+     */
+    final Map<Pair<String, String>, IRecordChange> pendingBatchAtomicChanges;
+    /** list of records to remove identified by name and keyed per context */
+    final Map<String, List<String>> pendingBatchRemoves;
 
     public ColumnOrientedRecordTableModel()
     {
@@ -65,7 +94,20 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
         this.fieldIndexes = new ArrayList<String>();
         this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
-        checkAddFieldRow(RecordTableUtils.CONTEXT);
+
+        this.batchUpdateScheduled = new AtomicBoolean();
+        this.batchRemoveScheduled = new AtomicBoolean();
+        this.pendingBatchUpdates = new HashMap<Pair<String, String>, IRecord>();
+        this.pendingBatchAtomicChanges = new HashMap<Pair<String, String>, IRecordChange>();
+        this.pendingBatchRemoves = new HashMap<String, List<String>>();
+
+        final ArrayList<Integer> inserts = new ArrayList<Integer>();
+        checkAddFieldRow(RecordTableUtils.CONTEXT, inserts);
+        if (inserts.size() > 0)
+        {
+            fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+        }
+
     }
 
     /**
@@ -84,6 +126,8 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
                 @Override
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
+                    // todo should batch handling be added? (situations where 100's of records are
+                    // being viewed are UNLIKELY)
                     final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
                     for (String removedRecordName : removedRecords)
                     {
@@ -182,75 +226,137 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
     @Override
     public void onChange(final IRecord imageCopyValidInCallingThreadOnly, final IRecordChange atomicChange)
     {
-        final IRecord imageCopy = ImmutableSnapshotRecord.create(imageCopyValidInCallingThreadOnly);
-        SwingUtilities.invokeLater(new Runnable()
+        RecordTableUtils.coalesceAndSchedule(this, imageCopyValidInCallingThreadOnly, atomicChange,
+            this.batchUpdateScheduled, this.pendingBatchUpdates, this.pendingBatchAtomicChanges);
+    }
+
+    @Override
+    public void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
+        Map<Pair<String, String>, IRecordChange> recordAtomicChanges)
+    {
+        final Set<String> fieldsToDelete = new HashSet<String>();
+        final List<Integer> inserts = new ArrayList<Integer>();
+
+        Map.Entry<Pair<String, String>, IRecord> entry = null;
+        Pair<String, String> nameAndContext = null;
+        IRecord imageCopy = null;
+        int rowIndex = 0;
+        IRecordChange atomicChange;
+        boolean callStructureChanged = false;
+        int columnIndex;
+        // we do +1 because the table always shows the field names at index 0
+        int column_plus1;
+        Integer index;
+        for (Iterator<Map.Entry<Pair<String, String>, IRecord>> it = recordImages.entrySet().iterator(); it.hasNext();)
         {
-            @Override
-            public void run()
+            entry = it.next();
+            nameAndContext = entry.getKey();
+            imageCopy = entry.getValue();
+            
+            index = this.recordIndexByName.get(nameAndContext);
+            if (index == null)
             {
-                int columnIndex = getColumnIndexForRecord(imageCopy);
-                int column_plus1 = columnIndex + 1;
-                if (columnIndex == -1)
+                // its a new record (and a new column for the record must be added)
+                columnIndex = ColumnOrientedRecordTableModel.this.records.size();
+                column_plus1 = columnIndex + 1;
+                ColumnOrientedRecordTableModel.this.records.add(imageCopy);
+                ColumnOrientedRecordTableModel.this.recordIndexByName.put(
+                    RowOrientedRecordTableModel.getRecordLookupKey(imageCopy), Integer.valueOf(columnIndex));
+                fireTableStructureChanged();
+
+                // as its a new record, we need to add the fields (some might be new)
+                for (String key : imageCopy.keySet())
                 {
-                    // its new
-                    columnIndex = ColumnOrientedRecordTableModel.this.records.size();
-                    ColumnOrientedRecordTableModel.this.records.add(imageCopy);
-                    ColumnOrientedRecordTableModel.this.recordIndexByName.put(
-                        RowOrientedRecordTableModel.getRecordLookupKey(imageCopy), Integer.valueOf(columnIndex));
-                    for (String key : imageCopy.keySet())
-                    {
-                        checkAddFieldRow(key);
-                        cellUpdated(getRowIndexForFieldName(key), column_plus1);
-                    }
-                    for (String key : imageCopy.getSubMapKeys())
-                    {
-                        checkAddFieldRow(key);
-                        cellUpdated(getRowIndexForFieldName(key), column_plus1);
-                    }
-                    fireTableStructureChanged();
+                    rowIndex = checkAddFieldRow(key, inserts);
+                    cellUpdated(rowIndex, column_plus1);
                 }
-                else
+                for (String key : imageCopy.getSubMapKeys())
                 {
-                    ColumnOrientedRecordTableModel.this.records.set(columnIndex, imageCopy);
-
-                    for (String removedKey : atomicChange.getRemovedEntries().keySet())
-                    {
-                        boolean exists = false;
-                        for (IRecord record : ColumnOrientedRecordTableModel.this.records)
-                        {
-                            if (record.keySet().contains(removedKey))
-                            {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (!exists)
-                        {
-                            deleteFieldRow(removedKey);
-                        }
-                    }
-
-                    int rowIndex;
-                    for (String changedKey : atomicChange.getPutEntries().keySet())
-                    {
-                        checkAddFieldRow(changedKey);
-                        rowIndex = getRowIndexForFieldName(changedKey);
-                        cellUpdated(rowIndex, column_plus1);
-                        fireTableCellUpdated(rowIndex, column_plus1);
-                    }
-
-                    // todo what happens if a sub-map is removed?
-                    // flash updates for submap keys
-                    for (String changedKey : atomicChange.getSubMapKeys())
-                    {
-                        checkAddFieldRow(changedKey);
-                        rowIndex = getRowIndexForFieldName(changedKey);
-                        cellUpdated(rowIndex, column_plus1);
-                        fireTableCellUpdated(rowIndex, column_plus1);
-                    }
+                    rowIndex = checkAddFieldRow(key, inserts);
+                    cellUpdated(rowIndex, column_plus1);
+                }
+                if (inserts.size() > 0)
+                {
+                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    inserts.clear();
                 }
             }
-        });
+            else
+            {
+                columnIndex = index.intValue();
+                column_plus1 = columnIndex + 1;
+
+                // an update to an existing record
+                atomicChange = recordAtomicChanges.get(nameAndContext);
+                ColumnOrientedRecordTableModel.this.records.set(columnIndex, imageCopy);
+
+                // first handle removing any fields (rows)
+                for (String removedKey : atomicChange.getRemovedEntries().keySet())
+                {
+                    boolean exists = false;
+                    // check if the field that has been removed exists in any other records
+                    for (IRecord record : ColumnOrientedRecordTableModel.this.records)
+                    {
+                        if (record.keySet().contains(removedKey))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                    {
+                        fieldsToDelete.add(removedKey);
+                    }
+                }
+                if (fieldsToDelete.size() > 0)
+                {
+                    // process deletes in a batch
+                    rowIndex =
+                        RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes,
+                            this.fieldIndexLookupMap);
+                    // we can handle 1 row delete, anymore and we call structure changed
+                    if (!callStructureChanged && rowIndex > -1)
+                    {
+                        fireTableRowsDeleted(rowIndex, rowIndex);
+                    }
+                    else
+                    {
+                        fireTableDataChanged();
+                    }
+                }
+
+                // handle updates now
+                // add any new rows first...
+                for (String changedKey : atomicChange.getPutEntries().keySet())
+                {
+                    checkAddFieldRow(changedKey, inserts);
+                }
+                // todo what happens if a sub-map is removed?
+                for (String changedKey : atomicChange.getSubMapKeys())
+                {
+                    checkAddFieldRow(changedKey, inserts);
+                }
+                if (inserts.size() > 0)
+                {
+                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    inserts.clear();
+                }
+
+                // now flash changes
+                for (String changedKey : atomicChange.getPutEntries().keySet())
+                {
+                    rowIndex = checkAddFieldRow(changedKey, inserts);
+                    cellUpdated(rowIndex, column_plus1);
+                    fireTableCellUpdated(rowIndex, column_plus1);
+                }
+                for (String changedKey : atomicChange.getSubMapKeys())
+                {
+                    rowIndex = checkAddFieldRow(changedKey, inserts);
+                    cellUpdated(rowIndex, column_plus1);
+                    fireTableCellUpdated(rowIndex, column_plus1);
+                }
+            }
+        }
     }
 
     public void recordUnsubscribed(final String recordName, final String contextName)
@@ -274,6 +380,7 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
                             RowOrientedRecordTableModel.getRecordLookupKey(ColumnOrientedRecordTableModel.this.records.get(i)),
                             Integer.valueOf(i));
                     }
+                    // todo need to remove fields (rows) that are no longer displaying
                     fireTableStructureChanged();
                 }
             }
@@ -285,58 +392,25 @@ public class ColumnOrientedRecordTableModel extends AbstractTableModel implement
         recordUnsubscribed(record.getName(), record.getContextName());
     }
 
-    void addCellUpdatedListener(ColumnOrientedRecordTable recordTable)
+    void setCellUpdatedHandler(ICellUpdateHandler recordTable)
     {
-        this.recordTable = recordTable;
+        this.cellUpdateHandler = recordTable;
     }
 
     void cellUpdated(int row, int column)
     {
-        if (this.recordTable != null)
-        {
-            this.recordTable.cellUpdated(row, column);
-        }
+        this.cellUpdateHandler.cellUpdated(row, column);
     }
 
-    void checkAddFieldRow(String fieldName)
+    int checkAddFieldRow(String fieldName, List<Integer> inserts)
     {
-        if (!this.fieldIndexLookupMap.containsKey(fieldName))
-        {
-            this.fieldIndexes.add(fieldName);
-            this.fieldIndexLookupMap.put(fieldName, new AtomicInteger(this.fieldIndexes.size() - 1));
-            int index = getRowIndexForFieldName(fieldName);
-            fireTableRowsInserted(index, index);
-        }
-    }
-
-    void deleteFieldRow(String fieldName)
-    {
-        final AtomicInteger removed = this.fieldIndexLookupMap.remove(fieldName);
-        if (removed != null)
-        {
-            final int index = removed.intValue();
-            this.fieldIndexes.remove(index);
-            
-            AtomicInteger value = null;
-            for (Iterator<Map.Entry<String, AtomicInteger>> it = this.fieldIndexLookupMap.entrySet().iterator(); it.hasNext();)
-            {
-                value = it.next().getValue();
-                if(value.intValue() > index)
-                {
-                    value.decrementAndGet();
-                }
-            }
-
-            fireTableRowsDeleted(index, index);
-        }
-    }
-
-    int getColumnIndexForRecord(IRecord imageCopy)
-    {
-        Integer index = this.recordIndexByName.get(RowOrientedRecordTableModel.getRecordLookupKey(imageCopy));
+        AtomicInteger index = this.fieldIndexLookupMap.get(fieldName);
         if (index == null)
         {
-            return -1;
+            this.fieldIndexes.add(fieldName);
+            index = new AtomicInteger(this.fieldIndexes.size() - 1);
+            this.fieldIndexLookupMap.put(fieldName, index);
+            inserts.add(Integer.valueOf(index.intValue()));
         }
         return index.intValue();
     }

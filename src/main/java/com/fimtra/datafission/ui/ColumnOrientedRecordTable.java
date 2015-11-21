@@ -44,6 +44,7 @@ import javax.swing.table.TableRowSorter;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.Context;
+import com.fimtra.datafission.ui.RecordTableUtils.ICellUpdateHandler;
 import com.fimtra.util.Log;
 import com.fimtra.util.StringWithNumbersComparator;
 import com.fimtra.util.ThreadUtils;
@@ -55,7 +56,7 @@ import com.fimtra.util.ThreadUtils;
  * 
  * @author Ramon Servadei
  */
-public class ColumnOrientedRecordTable extends JTable
+public final class ColumnOrientedRecordTable extends JTable implements ICellUpdateHandler
 {
     public static void main(String[] args)
     {
@@ -121,8 +122,6 @@ public class ColumnOrientedRecordTable extends JTable
         setRowSorter(new TableRowSorterForStringWithNumbers(getModel()));
         setDefaultRenderer(IValue.class, new RecordTableUtils.DefaultIValueCellRenderer());
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        // todo re-enable when the header renderer is fixed to show header cells nicely drawn
-        // getTableHeader().setDefaultRenderer(new FimtraTableCellHeaderRenderer());
 
         // add the mouse double-click listener to display sub-map data
         addMouseListener(new MouseAdapter()
@@ -242,7 +241,7 @@ public class ColumnOrientedRecordTable extends JTable
     {
         if (dataModel instanceof ColumnOrientedRecordTableModel)
         {
-            ((ColumnOrientedRecordTableModel) dataModel).addCellUpdatedListener(this);
+            ((ColumnOrientedRecordTableModel) dataModel).setCellUpdatedHandler(this);
             super.setModel(dataModel);
         }
         else
@@ -300,7 +299,7 @@ public class ColumnOrientedRecordTable extends JTable
                 prepareRenderer.setBackground(null);
             }
         }
-        
+
         final Object valueAt = getValueAt(row, column);
         if (valueAt instanceof IValue)
         {
@@ -311,11 +310,12 @@ public class ColumnOrientedRecordTable extends JTable
         {
             ((JComponent) prepareRenderer).setToolTipText(valueAt.toString());
         }
-        
+
         return prepareRenderer;
     }
 
-    void cellUpdated(int row, int column)
+    @Override
+    public final void cellUpdated(int row, int column)
     {
         final RecordTableUtils.CellUpdate coord = new RecordTableUtils.CellUpdate(row, column);
         this.updates.put(coord, coord);
