@@ -289,6 +289,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 this.records.set(rowIndex, imageCopy);
                 atomicChange = recordAtomicChanges.get(nameAndContext);
 
+                // first handle removed fields
                 for (String removedKey : atomicChange.getRemovedEntries().keySet())
                 {
                     boolean exists = false;
@@ -305,7 +306,6 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                         fieldsToDelete.add(removedKey);
                     }
                 }
-
                 if (fieldsToDelete.size() > 0)
                 {
                     RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes, this.fieldIndexLookupMap);
@@ -313,15 +313,30 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                     stuctureChanged.set(true);
                 }
 
+                // now handle updates
+                // first handle adding any new fields...
+                for (String changedKey : atomicChange.getPutEntries().keySet())
+                {
+                    checkAddColumn(changedKey, stuctureChanged);
+                }
+                // todo what happens if a sub-map is removed?
+                for (String changedKey : atomicChange.getSubMapKeys())
+                {
+                    checkAddColumn(changedKey, stuctureChanged);
+                }
+                
+                if (stuctureChanged.getAndSet(false))
+                {
+                    fireTableStructureChanged();
+                }
+
+                // now flash updates
                 for (String changedKey : atomicChange.getPutEntries().keySet())
                 {
                     colIndex = checkAddColumn(changedKey, stuctureChanged);
                     cellUpdated(rowIndex, colIndex);
                     fireTableCellUpdated(rowIndex, colIndex);
                 }
-
-                // todo what happens if a sub-map is removed?
-                // flash updates for submap keys
                 for (String changedKey : atomicChange.getSubMapKeys())
                 {
                     colIndex = checkAddColumn(changedKey, stuctureChanged);
@@ -329,24 +344,22 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                     fireTableCellUpdated(rowIndex, colIndex);
                 }
             }
+
+            if (stuctureChanged.getAndSet(false))
+            {
+                fireTableStructureChanged();
+            }
         }
 
-        if (stuctureChanged.get())
+        if (startInsert > -1)
         {
-            fireTableStructureChanged();
-        }
-        else
-        {
-            if (startInsert > -1)
+            try
             {
-                try
-                {
-                    fireTableRowsInserted(startInsert, endInsert);
-                }
-                catch (IndexOutOfBoundsException e)
-                {
-                    Log.log(this, "Error with startInsert=" + startInsert + ", endInsert=" + endInsert, e);
-                }
+                fireTableRowsInserted(startInsert, endInsert);
+            }
+            catch (IndexOutOfBoundsException e)
+            {
+                Log.log(this, "Error with startInsert=" + startInsert + ", endInsert=" + endInsert, e);
             }
         }
     }
