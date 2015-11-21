@@ -98,13 +98,15 @@ final class ImageDeltaChangeProcessor
             else
             {
                 // its an image
-                Log.log(this, "Processing image for ", name, ", image.seq=", Long.toString(changeToApply.getSequence()));
 
                 changeToApply.applyCompleteAtomicChangeToRecord(record);
                 // apply any subsequent deltas
                 Map<Long, IRecordChange> deltas = this.cachedDeltas.remove(name);
                 if (deltas != null)
                 {
+                    Log.log(this, "Processing deltas for image ", name, ", image.seq=",
+                        Long.toString(changeToApply.getSequence()));
+
                     Map.Entry<Long, IRecordChange> entry = null;
                     Long deltaSequence = null;
                     IRecordChange deltaChange = null;
