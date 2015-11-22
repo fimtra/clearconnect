@@ -43,6 +43,23 @@ public enum TransportTechnologyEnum
 
     public static final String SYSTEM_PROPERTY = "transport";
 
+    /**
+     * @return the {@link TransportTechnologyEnum} defined by the system property
+     *         {@link #SYSTEM_PROPERTY}, defaulting to {@link #TCP} if not defined.
+     */
+    public static TransportTechnologyEnum getDefaultFromSystemProperty()
+    {
+        Object tte = System.getProperties().get(TransportTechnologyEnum.SYSTEM_PROPERTY);
+        if (tte != null)
+        {
+            return valueOf(tte.toString());
+        }
+        else
+        {
+            return TCP;
+        }
+    }
+
     final String endPointServiceBuilderClassName;
     final String transportChannelBuilderFactoryLoaderClassName;
 
