@@ -47,7 +47,6 @@ import com.fimtra.util.ThreadUtils;
  * @see TcpChannelUtils#READER
  * @see TcpChannelUtils#WRITER
  * @see TcpChannelUtils#ACCEPT_PROCESSOR
- * @see TcpChannelUtils#CONNECTION_PROCESSOR
  * @author Ramon Servadei
  */
 final class SelectorProcessor implements Runnable
@@ -129,11 +128,20 @@ final class SelectorProcessor implements Runnable
                     {
                         return;
                     }
-                    if(this.registrationLatch != null)
+                    // NOTE: leave this "double check" pattern in place...
+                    // the latch is volatile and we use the fact of it being not-null to optimise
+                    // when we REALLY need to synchronize to wait for the registration to finish
+                    if (this.registrationLatch != null)
                     {
-                        this.registrationLatch.await();
+                        synchronized (this)
+                        {
+                            if (this.registrationLatch != null)
+                            {
+                                this.registrationLatch.await();
+                            }
+                        }
                     }
-                    
+
                     try
                     {
                         selectedKeys = this.selector.selectedKeys();
