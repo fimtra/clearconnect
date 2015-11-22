@@ -39,6 +39,7 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
@@ -508,13 +509,30 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode)
     {
         return createPlatformServiceInstance(serviceFamily, serviceMember, host, port, wireProtocol, redundacyMode,
-            null, null, null);
+            TransportTechnologyEnum.getDefaultFromSystemProperty());
+    }
+
+    @Override
+    public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology)
+    {
+        return createPlatformServiceInstance(serviceFamily, serviceMember, hostName,
+            PlatformUtils.getNextAvailableServicePort(hostName), wireProtocol, redundacyMode, transportTechnology);
+    }
+
+    @Override
+    public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology)
+    {
+        return createPlatformServiceInstance(serviceFamily, serviceMember, hostName, port, wireProtocol, redundacyMode,
+            null, null, null, transportTechnology);
     }
 
     @Override
     public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host, int port,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, ThimbleExecutor coreExecutor,
-        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor)
+        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
+        TransportTechnologyEnum transportTechnology)
     {
         this.createLock.lock();
         try
@@ -530,7 +548,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 platformServiceInstance =
                     new PlatformServiceInstance(this.platformName, serviceFamily, serviceMember, wireProtocol,
-                        redundacyMode, host, port, coreExecutor, rpcExecutor, utilityExecutor);
+                        redundacyMode, host, port, coreExecutor, rpcExecutor, utilityExecutor, transportTechnology);
                 registerService(platformServiceInstance);
             }
             catch (Exception e)
