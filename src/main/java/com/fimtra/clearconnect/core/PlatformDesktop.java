@@ -697,7 +697,9 @@ class PlatformDesktop
             this.rows.setBorder(BorderFactory.createEmptyBorder());
             this.columns = new JLabel();
             this.columns.setBorder(BorderFactory.createEmptyBorder());
-            setLayout(new FlowLayout(FlowLayout.RIGHT));
+            final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
+            layout.setVgap(0);
+            setLayout(layout);
             add(this.rows);
             add(this.columns);
 
@@ -719,7 +721,6 @@ class PlatformDesktop
                     }
                 }
             });
-
         }
     }
 
