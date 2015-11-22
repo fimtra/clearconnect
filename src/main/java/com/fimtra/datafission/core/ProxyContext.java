@@ -45,7 +45,9 @@ import com.fimtra.channel.ISubscribingChannel;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.channel.ITransportChannelBuilder;
 import com.fimtra.channel.ITransportChannelBuilderFactory;
+import com.fimtra.channel.StaticEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.ICodec;
@@ -114,7 +116,7 @@ public final class ProxyContext implements IObserverContext
      * </ul>
      */
     public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
-    
+
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = "_ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
@@ -343,6 +345,9 @@ public final class ProxyContext implements IObserverContext
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
      * and port.
+     * <p>
+     * This uses the transport technology defined by
+     * {@link TransportTechnologyEnum#getDefaultFromSystemProperty()}
      * 
      * @param name
      *            the name for this proxy context - this is used by the remote context to identify
@@ -358,8 +363,31 @@ public final class ProxyContext implements IObserverContext
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort)
         throws IOException
     {
-        this(name, codec, TransportChannelBuilderFactoryLoader.load(codec.getFrameEncodingFormat(),
-            new EndPointAddress(publisherNode, publisherPort)));
+        this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty());
+    }
+
+    /**
+     * Construct the proxy context and connect it to a {@link Publisher} using the specified host,
+     * port and transport technology
+     * 
+     * @param name
+     *            the name for this proxy context - this is used by the remote context to identify
+     *            this proxy
+     * @param codec
+     *            the codec to use for sending/receiving messages from the {@link Publisher}
+     * @param publisherNode
+     *            the end-point node of the publisher process
+     * @param publisherPort
+     *            the end-point port of the publisher process
+     * @param transportTechnology
+     *            the transport technology to use
+     * @throws IOException
+     */
+    public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort,
+        TransportTechnologyEnum transportTechnology)
+    {
+        this(name, codec, transportTechnology.constructTransportChannelBuilderFactory(codec.getFrameEncodingFormat(),
+            new StaticEndPointAddressFactory(new EndPointAddress(publisherNode, publisherPort))));
     }
 
     public ProxyContext(String name, ICodec codec, ITransportChannelBuilderFactory channelBuilderFactory)
