@@ -175,6 +175,7 @@ public final class PlatformRegistry
 
     static interface IPlatformSummaryRecordFields
     {
+        String VERSION = "Version";
         String NODES = "Nodes";
         String SERVICES = "Services";
         String SERVICE_INSTANCES = "ServiceInstances";
@@ -410,6 +411,8 @@ public final class PlatformRegistry
         this.runtimeStatus = this.context.createRecord(IRegistryRecordNames.RUNTIME_STATUS);
         this.platformSummary = this.context.createRecord(IRegistryRecordNames.PLATFORM_SUMMARY);
 
+        this.platformSummary.put(IPlatformSummaryRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
+        
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
         this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,

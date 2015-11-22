@@ -73,6 +73,7 @@ import com.fimtra.util.is;
  */
 public class PlatformUtils
 {
+    public final static String VERSION;
     static
     {
         String version = "";
@@ -114,6 +115,7 @@ public class PlatformUtils
             SystemUtils.lineSeparator());
         sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
+        VERSION = version;
     }
 
     public static final TextValue OK = new TextValue("OK");
@@ -704,6 +706,7 @@ public class PlatformUtils
     public static IValue executeRpc(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException, ExecutionException
     {
+        // todo throw exception if is fission thread
         return getRpc(component, discoveryTimeoutMillis, rpcName, rpcArgs).execute(rpcArgs);
     }
 

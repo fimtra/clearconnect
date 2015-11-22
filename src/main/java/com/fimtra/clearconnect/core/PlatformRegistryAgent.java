@@ -317,7 +317,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             {
                                 Log.log(PlatformRegistryAgent.this, "Completing registry connection activities...");
 
-                                final String rpcGetPlatformNameResult = 
+                                final String rpcGetPlatformNameResult =
                                     PlatformRegistryAgent.this.registryProxy.getRpc(PlatformRegistry.GET_PLATFORM_NAME).execute().textValue();
 
                                 // configure the channel watchdog heartbeat
@@ -451,8 +451,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             try
             {
-				if (!servicesAvailable.await(PlatformCoreProperties.Values.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS,
-						TimeUnit.MILLISECONDS))
+                if (!servicesAvailable.await(
+                    PlatformCoreProperties.Values.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS,
+                    TimeUnit.MILLISECONDS))
                 {
                     throw new RuntimeException("Service '" + serviceFamily + "' is not available");
                 }
@@ -826,7 +827,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             String instanceForService =
                 this.registryProxy.getRpc(PlatformRegistry.GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE).execute(
                     new TextValue(serviceFamily)).textValue();
-            if(instanceForService == null)
+            if (instanceForService == null)
             {
                 Log.log("Registry has no service registered for '", serviceFamily, "'");
                 return null;
@@ -900,7 +901,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     {
                         final String runtimeDescription =
                             System.getProperty("os.name") + " (" + System.getProperty("os.version") + "), "
-                                + System.getProperty("os.arch") + ", Java " + System.getProperty("java.version");
+                                + System.getProperty("os.arch") + ", Java " + System.getProperty("java.version")
+                                + ", ClearConnect " + PlatformUtils.VERSION;
                         final String host = TcpChannelUtils.LOCALHOST_IP;
                         final Runtime runtime = Runtime.getRuntime();
                         final long cpuCount = runtime.availableProcessors();
