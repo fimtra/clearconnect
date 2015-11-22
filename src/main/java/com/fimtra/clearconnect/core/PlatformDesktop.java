@@ -679,11 +679,62 @@ class PlatformDesktop
     }
 
     /**
+     * Displays runtime summary information
+     * 
+     * @author Ramon Servadei
+     */
+    static final class RuntimeSummaryPanel extends JPanel
+    {
+        private static final double inverse_1MB = 1d / (1024 * 1024);
+        private static final long serialVersionUID = 1L;
+       
+        final Thread t;
+        final JLabel memory;
+
+        RuntimeSummaryPanel()
+        {
+            this.memory = new JLabel();
+            final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
+            layout.setHgap(0);
+            setLayout(layout);
+            add(this.memory);
+            this.t = ThreadUtils.newThread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    while (true)
+                    {
+                        final String text =
+                            "Memory: " + (long) (Runtime.getRuntime().totalMemory() * inverse_1MB) + "M ";
+                        SwingUtilities.invokeLater(new Runnable()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                RuntimeSummaryPanel.this.memory.setText(text);
+                            }
+                        });
+                        try
+                        {
+                            Thread.sleep(1000);
+                        }
+                        catch (InterruptedException e)
+                        {
+                        }
+                    }
+                }
+            }, "desktop-runtime-summary");
+            this.t.start();
+        }        
+    }
+
+    /**
      * Mini summary of rows,cols for a {@link TableModel}
      * 
      * @author Ramon Servadei
      */
-    static class TableSummaryPanel extends JPanel
+    static final class TableSummaryPanel extends JPanel
     {
         private static final long serialVersionUID = 1L;
         final JLabel rows, columns;
@@ -1160,8 +1211,11 @@ class PlatformDesktop
             public void run()
             {
                 PlatformDesktop.this.desktopPane = new JDesktopPane();
+
                 PlatformDesktop.this.desktopWindow = new JFrame();
                 PlatformDesktop.this.desktopWindow.setIconImage(createIcon());
+
+                PlatformDesktop.this.desktopWindow.add(new RuntimeSummaryPanel(), BorderLayout.SOUTH);
 
                 platformMetaDataModel.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
                 {
