@@ -1,10 +1,17 @@
 /*
  * Copyright (c) 2014 James Lupton, Ramon Servadei, Paul Mackinlay, Fimtra
- * All rights reserved.
- * 
- * This file is subject to the terms and conditions defined in 
- * file 'LICENSE.txt', which is part of this source code package. 
- * The terms and conditions can also be found at http://fimtra.com/LICENSE.txt.
+ *  
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *    
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.fimtra.lf;
 
@@ -35,8 +42,9 @@ import javax.swing.table.TableCellRenderer;
 
 
 /**
+ * A table header UI that shows the header text in a tooltip.
+ * 
  * @author James
- *
  */
 public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 
@@ -72,15 +80,6 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		public Component getTableCellRendererComponent(JTable table,
 				Object value, boolean isSelected, boolean hasFocus, int row,
 				int column) {
-
-//			boolean hasRollover = (column == getRolloverColumn());
-//			if (isSelected || hasRollover || hasFocus) {
-//				SynthLookAndFeel.setSelectedUI((SynthLabelUI) SynthLookAndFeel
-//						.getUIOfType(getUI(), SynthLabelUI.class), isSelected,
-//						hasFocus, table.isEnabled(), hasRollover);
-//			} else {
-//				SynthLookAndFeel.resetSelectedUI();
-//			}
 
 			// stuff a variable into the client property of this renderer
 			// indicating the sort order,
@@ -140,12 +139,14 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 			setHorizontalAlignment(JLabel.CENTER);
 		}
 
-		public void setHorizontalTextPosition(int textPosition) {
+		@Override
+        public void setHorizontalTextPosition(int textPosition) {
 			horizontalTextPositionSet = true;
 			super.setHorizontalTextPosition(textPosition);
 		}
 
-		public Component getTableCellRendererComponent(JTable table,
+		@Override
+        public Component getTableCellRendererComponent(JTable table,
 				Object value, boolean isSelected, boolean hasFocus, int row,
 				int column) {
 			Icon sortIcon = null;
@@ -320,14 +321,17 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		int width = 0;
 		int height = 0;
 
-		public void paintIcon(Component c, Graphics g, int x, int y) {
+		@Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
 		}
 
-		public int getIconWidth() {
+		@Override
+        public int getIconWidth() {
 			return width;
 		}
 
-		public int getIconHeight() {
+		@Override
+        public int getIconHeight() {
 			return height;
 		}
 	}
