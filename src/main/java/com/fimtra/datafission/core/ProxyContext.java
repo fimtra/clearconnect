@@ -361,7 +361,6 @@ public final class ProxyContext implements IObserverContext
      * @throws IOException
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort)
-        throws IOException
     {
         this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty());
     }
