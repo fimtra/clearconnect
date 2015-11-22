@@ -133,7 +133,6 @@ class PlatformDesktop
             {
                 this.frame.setLocation((int) p.getX() - 30, (int) p.getY() - 5);
             }
-
             this.frame.setVisible(true);
             this.frame.addInternalFrameListener(new InternalFrameAdapter()
             {
