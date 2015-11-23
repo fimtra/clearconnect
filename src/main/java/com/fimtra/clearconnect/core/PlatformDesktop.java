@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
@@ -686,16 +687,20 @@ class PlatformDesktop
     {
         private static final double inverse_1MB = 1d / (1024 * 1024);
         private static final long serialVersionUID = 1L;
-       
+
         final Thread t;
+        final JLabel version;
         final JLabel memory;
 
         RuntimeSummaryPanel()
         {
+            this.version = new JLabel("Version: " + PlatformUtils.VERSION);
             this.memory = new JLabel();
             final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
             layout.setHgap(0);
             setLayout(layout);
+            add(this.version);
+            add(Box.createHorizontalStrut(6));
             add(this.memory);
             this.t = ThreadUtils.newThread(new Runnable()
             {
@@ -725,7 +730,7 @@ class PlatformDesktop
                 }
             }, "desktop-runtime-summary");
             this.t.start();
-        }        
+        }
     }
 
     /**
