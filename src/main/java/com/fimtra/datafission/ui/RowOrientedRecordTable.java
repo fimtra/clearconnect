@@ -74,7 +74,8 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
                     {
                         if (RecordTableUtils.SUBMAP.equals(getValueAt(row, col)))
                         {
-                            RecordTableUtils.showSnapshotSubMapData(evt, getModel().records.get(row),
+                            RecordTableUtils.showSnapshotSubMapData(evt,
+                                getModel().records.get(convertRowIndexToModel(row)),
                                 getModel().fieldIndexes.get(convertColumnIndexToModel(col)));
                         }
                     }
@@ -110,7 +111,7 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
                     column.setPreferredWidth(preferredWidth.intValue());
                 }
             }
-            
+
             getModel().fireTableStructureChanged();
         }
         catch (Exception e)
