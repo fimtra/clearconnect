@@ -63,6 +63,13 @@ public abstract class UtilProperties
          * E.g. <code>-Dutil.useRollingThreaddumpFile=true</code>
          */
         String USE_ROLLING_THREADDUMP_FILE = BASE + "useRollingThreaddumpFile";
+
+		/**
+		 * The system property name that defines the number of minutes for log files to be archived.
+		 * A number smaller than 1 will result in no archiving taking place.<br>
+		 * E.g. <code>-Dutil.archiveLogsOlderThanMinutes=1440</code>
+		 */
+		String ARCHIVE_LOGS_OLDER_THAN_MINUTES = BASE + "archiveLogsOlderThanMinutes";
     }
 
     /**
@@ -100,6 +107,12 @@ public abstract class UtilProperties
          */
         boolean USE_ROLLING_THREADDUMP_FILE = Boolean.parseBoolean(System.getProperty(Names.USE_ROLLING_THREADDUMP_FILE,
             "false"));
+
+		/**
+		 * When logging initialises it will archive all files in the {@link Values#LOG_DIR} that are older than this
+		 * many minutes to an archive sub-directory. Default is <code>1</code>
+		 */
+		int ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(System.getProperty(Names.ARCHIVE_LOGS_OLDER_THAN_MINUTES, "1"));
     }
 
 }
