@@ -115,7 +115,17 @@ public class PlatformUtils
             SystemUtils.lineSeparator());
         sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
-        VERSION = version;
+
+        String versionNumber = "?.?.?";
+        for (int i = 0; i < version.length(); i++)
+        {
+            if (Character.isDigit(version.charAt(i)))
+            {
+                versionNumber = version.substring(i);
+                break;
+            }
+        }
+        VERSION = versionNumber;
     }
 
     public static final TextValue OK = new TextValue("OK");
