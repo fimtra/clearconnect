@@ -76,6 +76,9 @@ public abstract class Log {
 		if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
 			archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
 		}
+		if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
+			purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+		}
 		try {
 			FILE_APPENDER = RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
 			System.out.println("Log file " + FILE_APPENDER);
@@ -171,6 +174,15 @@ public abstract class Log {
 			if (isGzipped) {
 				file.delete();
 			}
+		}
+	}
+
+	/**
+	 * Deletes all archived log files that are olderThanMinutes.
+	 */
+	public static void purgeArchiveLogs(long olderThanMinutes) {
+		for (File file : FileUtils.findFiles(archiveDir, olderThanMinutes)) {
+			file.delete();
 		}
 	}
 

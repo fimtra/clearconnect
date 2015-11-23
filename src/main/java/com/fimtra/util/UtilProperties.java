@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Defines the properties and property keys used by Util
  * 
@@ -28,10 +30,12 @@ public abstract class UtilProperties
     }
 
     /**
-     * The names of the properties
-     * 
-     * @author Ramon Servadei
-     */
+	 * The names of the properties
+	 * 
+	 * @author Ramon Servadei
+	 * @author Paul Mackinlay
+	 * 
+	 */
     public static interface Names
     {
         String BASE = "util.";
@@ -70,13 +74,21 @@ public abstract class UtilProperties
 		 * E.g. <code>-Dutil.archiveLogsOlderThanMinutes=1440</code>
 		 */
 		String ARCHIVE_LOGS_OLDER_THAN_MINUTES = BASE + "archiveLogsOlderThanMinutes";
+
+		/**
+		 * The system property name that defines the number of minutes for archive log files to be deleted.
+		 * A number smaller than 1 will result in no purging taking place.<br>
+		 * E.g. <code>-Dutil.purgeArchiveLogsOlderThanMinutes=14400</code>
+		 */
+		String PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES = BASE + "purgeArchiveLogsOlderThanMinutes";
     }
 
     /**
-     * The values of the properties described in {@link Names}
-     * 
-     * @author Ramon Servadei
-     */
+	 * The values of the properties described in {@link Names}
+	 * 
+	 * @author Ramon Servadei
+	 * @author Paul Mackinlay
+	 */
     public static interface Values
     {
         /**
@@ -109,10 +121,19 @@ public abstract class UtilProperties
             "false"));
 
 		/**
-		 * When logging initialises it will archive all files in the {@link Values#LOG_DIR} that are older than this
-		 * many minutes to an archive sub-directory. Default is <code>1</code>
+		 * When logging initialises it will archive all files in the {@link Values#LOG_DIR}
+		 * that are older than this many minutes to an archive sub-directory. Default is
+		 * <code>1</code>
 		 */
 		int ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(System.getProperty(Names.ARCHIVE_LOGS_OLDER_THAN_MINUTES, "1"));
+
+		/**
+		 * When logging initialises it will delete archive logs that are older than this many
+		 * minutes. Default is <code>20160</code> (14 days)
+		 */
+		int PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(System.getProperty(Names.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES,
+				String.valueOf(TimeUnit.MINUTES.convert(14, TimeUnit.DAYS))));
+
     }
 
 }
