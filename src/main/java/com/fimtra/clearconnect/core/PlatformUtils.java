@@ -644,6 +644,11 @@ public class PlatformUtils
         return (int) serviceRecord.get(ServiceInfoRecordFields.PORT_FIELD).longValue();
     }
 
+    static TransportTechnologyEnum getTransportTechnologyFromServiceInfoRecord(Map<String, IValue> serviceRecord)
+    {
+        return TransportTechnologyEnum.valueOf(serviceRecord.get(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD).textValue());
+    }
+
     static ICodec<?> getCodecFromServiceInfoRecord(Map<String, IValue> serviceRecord)
     {
         String codecName = serviceRecord.get(ServiceInfoRecordFields.WIRE_PROTOCOL_FIELD).textValue();

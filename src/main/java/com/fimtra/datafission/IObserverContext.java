@@ -177,6 +177,7 @@ public interface IObserverContext
             String SUBSCRIPTION_COUNT = "Subscriptions";
             String UPTIME = "Uptime(sec)";
             String PROTOCOL = "Protocol";
+            String TRANSPORT = "Transport";
         }
     }
 

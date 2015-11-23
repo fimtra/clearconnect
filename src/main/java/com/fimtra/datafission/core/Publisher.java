@@ -317,6 +317,8 @@ public class Publisher
             submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, new TextValue(clientSocket));
             submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, new TextValue(
                 this.codec.getClass().getSimpleName()));
+            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT, new TextValue(
+                Publisher.this.getTransportTechnology().toString()));
 
             scheduleStatsUpdateTask();
 

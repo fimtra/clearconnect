@@ -35,6 +35,7 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_NODE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_PORT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.SUBSCRIPTION_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TRANSPORT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
 import java.io.IOException;
@@ -170,7 +171,7 @@ public final class PlatformMetaDataModel
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
         Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
-            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin,
+            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin, Transport,
     }
 
     /**
@@ -1011,6 +1012,7 @@ public final class PlatformMetaDataModel
         String serviceFamily;
         TextValue proxyEndPoint;
         TextValue codec;
+        TextValue transport;
         LongValue publisherPort;
         TextValue publisherNode;
         LongValue messageCount;
@@ -1057,6 +1059,7 @@ public final class PlatformMetaDataModel
                 kbCount = connectionRecord.get(KB_COUNT);
                 connectionUptime = connectionRecord.get(UPTIME);
                 codec = connectionRecord.get(PROTOCOL);
+                transport = connectionRecord.get(TRANSPORT);
 
                 if (publisherNode == null)
                 {
@@ -1093,6 +1096,7 @@ public final class PlatformMetaDataModel
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Port.toString(),
                                 publisherPort);
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Codec.toString(), codec);
+                            serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Transport.toString(), transport);
                         }
                     }
 
