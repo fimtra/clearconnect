@@ -26,10 +26,10 @@ import java.io.Serializable;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.RowSorter;
 import javax.swing.SortOrder;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
@@ -61,9 +61,9 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 
 	@Override
 	protected void installDefaults() {
-		TableCellRenderer prevRenderer = header.getDefaultRenderer();
+		TableCellRenderer prevRenderer = this.header.getDefaultRenderer();
 		if (prevRenderer instanceof UIResource) {
-			header.setDefaultRenderer(new HeaderRenderer());
+			this.header.setDefaultRenderer(new HeaderRenderer());
 		}
 		super.installDefaults();
 	}
@@ -72,7 +72,7 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		private static final long serialVersionUID = 1L;
 
 		HeaderRenderer() {
-			setHorizontalAlignment(JLabel.LEADING);
+			setHorizontalAlignment(SwingConstants.LEADING);
 			setName("TableHeader.renderer");
 		}
 
@@ -136,12 +136,12 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		private EmptyIcon emptyIcon = new EmptyIcon();
 
 		public FimtraTableCellHeaderRenderer() {
-			setHorizontalAlignment(JLabel.CENTER);
+			setHorizontalAlignment(SwingConstants.CENTER);
 		}
 
 		@Override
         public void setHorizontalTextPosition(int textPosition) {
-			horizontalTextPositionSet = true;
+			this.horizontalTextPositionSet = true;
 			super.setHorizontalTextPosition(textPosition);
 		}
 
@@ -179,10 +179,10 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 				}
 
 				if (!isPaintingForPrint && table.getRowSorter() != null) {
-					if (!horizontalTextPositionSet) {
+					if (!this.horizontalTextPositionSet) {
 						// There is a row sorter, and the developer hasn't
 						// set a text position, change to leading.
-						setHorizontalTextPosition(JLabel.LEADING);
+						setHorizontalTextPosition(SwingConstants.LEADING);
 					}
 					SortOrder sortOrder = getColumnSortOrder(table, column);
 					if (sortOrder != null) {
@@ -205,7 +205,7 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 
 			setText(value == null ? "" : value.toString());
 			setIcon(sortIcon);
-			sortArrow = sortIcon;
+			this.sortArrow = sortIcon;
 
 			Border border = null;
 			if (hasFocus) {
@@ -228,18 +228,18 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		public void paintComponent(Graphics g) {
 			boolean b = getUIBoolean(this, "TableHeader.rightAlignSortArrow",
 					false);
-			if (b && sortArrow != null) {
+			if (b && this.sortArrow != null) {
 				// emptyIcon is used so that if the text in the header is right
 				// aligned, or if the column is too narrow, then the text will
 				// be sized appropriately to make room for the icon that is
 				// about
 				// to be painted manually here.
-				emptyIcon.width = sortArrow.getIconWidth();
-				emptyIcon.height = sortArrow.getIconHeight();
-				setIcon(emptyIcon);
+				this.emptyIcon.width = this.sortArrow.getIconWidth();
+				this.emptyIcon.height = this.sortArrow.getIconHeight();
+				setIcon(this.emptyIcon);
 				super.paintComponent(g);
 				Point position = computeIconPosition(g);
-				sortArrow.paintIcon(this, g, position.x, position.y);
+				this.sortArrow.paintIcon(this, g, position.x, position.y);
 			} else {
 				super.paintComponent(g);
 			}
@@ -256,11 +256,11 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 			viewR.width = getWidth() - (i.left + i.right);
 			viewR.height = getHeight() - (i.top + i.bottom);
 			SwingUtilities.layoutCompoundLabel(this, fontMetrics, getText(),
-					sortArrow, getVerticalAlignment(),
+					this.sortArrow, getVerticalAlignment(),
 					getHorizontalAlignment(), getVerticalTextPosition(),
 					getHorizontalTextPosition(), viewR, iconR, textR,
 					getIconTextGap());
-			int x = getWidth() - i.right - sortArrow.getIconWidth();
+			int x = getWidth() - i.right - this.sortArrow.getIconWidth();
 			int y = iconR.y;
 			return new Point(x, y);
 		}
@@ -327,12 +327,12 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 
 		@Override
         public int getIconWidth() {
-			return width;
+			return this.width;
 		}
 
 		@Override
         public int getIconHeight() {
-			return height;
+			return this.height;
 		}
 	}
 }
