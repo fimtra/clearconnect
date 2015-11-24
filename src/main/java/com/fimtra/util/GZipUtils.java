@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +18,8 @@ package com.fimtra.util;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -26,6 +28,7 @@ import java.util.zip.GZIPOutputStream;
  * Utility methods for working with GZIP streams
  * 
  * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 public abstract class GZipUtils
 {
@@ -114,4 +117,20 @@ public abstract class GZipUtils
             return null;
         }
     }
+
+	/**
+	 * Compresses the data in the inputStream to the outputStream.
+	 */
+	public static void compressIntputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException {
+		GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
+		try {
+			byte[] buffer = new byte[1024];
+			int length;
+			while ((length = inputStream.read(buffer)) != -1) {
+				gzipOutputStream.write(buffer, 0, length);
+			}
+		} finally {
+			gzipOutputStream.close();
+		}
+	}
 }

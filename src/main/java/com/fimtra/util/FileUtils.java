@@ -21,10 +21,11 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Utility methods used to interact with the filesystem.
@@ -311,15 +312,9 @@ public abstract class FileUtils {
 		}
 		try {
 			File gzipFile = new File(gzipFileDir, sourceFile.getName() + ".gz");
-			FileInputStream inputStream = new FileInputStream(sourceFile);
-			FileOutputStream outputStream = new FileOutputStream(gzipFile);
-			GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
-			byte[] buffer = new byte[1024];
-			int length;
-			while ((length = inputStream.read(buffer)) != -1) {
-				gzipOutputStream.write(buffer, 0, length);
-			}
-			gzipOutputStream.close();
+			InputStream inputStream = new FileInputStream(sourceFile);
+			OutputStream outputStream = new FileOutputStream(gzipFile);
+			GZipUtils.compressIntputToOutput(inputStream, outputStream);
 			outputStream.close();
 			inputStream.close();
 			return true;
