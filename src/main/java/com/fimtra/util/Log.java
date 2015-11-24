@@ -15,7 +15,6 @@
  */
 package com.fimtra.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -43,8 +42,6 @@ public abstract class Log {
 	private static final FastDateFormat fastDateFormat = new FastDateFormat();
 	private static final ThimbleExecutor FILE_APPENDER_EXECUTOR = new ThimbleExecutor("LogAsyncFileAppender", 1);
 	private static final Lock lock = new ReentrantLock();
-	private static final File logDir = new File(UtilProperties.Values.LOG_DIR);
-	private static final File archiveDir = new File(logDir, "archive");
 	private static PrintStream consoleStream = System.err;
 
 	static final Queue<String> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<String>();
@@ -74,10 +71,10 @@ public abstract class Log {
 		}));
 		lock.lock();
 		if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
-			archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+			FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
 		}
 		if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
-			purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+			FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
 		}
 		try {
 			FILE_APPENDER = RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
@@ -161,28 +158,6 @@ public abstract class Log {
 			print(stringWriter.toString());
 		} finally {
 			lock.unlock();
-		}
-	}
-
-	/**
-	 * Archives all files that are in the log directory that are olderThanMinutes. Each archived file is gzipped, suffixed with
-	 * .gz and put into the archive directory.
-	 */
-	public static void archiveLogs(long olderThanMinutes) {
-		for (File file : FileUtils.findFiles(logDir, olderThanMinutes)) {
-			boolean isGzipped = FileUtils.gzip(file, archiveDir);
-			if (isGzipped) {
-				file.delete();
-			}
-		}
-	}
-
-	/**
-	 * Deletes all archived log files that are olderThanMinutes.
-	 */
-	public static void purgeArchiveLogs(long olderThanMinutes) {
-		for (File file : FileUtils.findFiles(archiveDir, olderThanMinutes)) {
-			file.delete();
 		}
 	}
 
