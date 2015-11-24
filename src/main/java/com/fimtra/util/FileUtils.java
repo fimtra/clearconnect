@@ -21,10 +21,11 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Utility methods used to interact with the filesystem.
@@ -36,6 +37,8 @@ public abstract class FileUtils {
 
 	public static final String recordFileExtension = "record";
 	public static final String propertyFileExtension = "properties";
+	private static final File logDir = new File(UtilProperties.Values.LOG_DIR);
+	private static final File archiveDir = new File(UtilProperties.Values.ARCHIVE_DIR);
 
 	private FileUtils() {
 		// Not for instantiation
@@ -191,6 +194,32 @@ public abstract class FileUtils {
 		return dir;
 	}
 
+	/**
+	 * Archives all files that are in the log directory that are olderThanMinutes. Each archived file is gzipped, suffixed with
+	 * .gz and put into the archive directory.
+	 */
+	public static void archiveLogs(long olderThanMinutes) {
+		if (logDir.exists() && logDir.isDirectory()) {
+			for (File file : FileUtils.findFiles(logDir, olderThanMinutes)) {
+				boolean isGzipped = FileUtils.gzip(file, archiveDir);
+				if (isGzipped) {
+					file.delete();
+				}
+			}
+		}
+	}
+
+	/**
+	 * Deletes all archived log files that are olderThanMinutes.
+	 */
+	public static void purgeArchiveLogs(long olderThanMinutes) {
+		if (archiveDir.exists() && archiveDir.isDirectory()) {
+			for (File file : FileUtils.findFiles(archiveDir, olderThanMinutes)) {
+				file.delete();
+			}
+		}
+	}
+
 	private static void copyFile(File src, File dest) throws IOException {
 		if (!dest.exists()) {
 			dest.createNewFile();
@@ -283,15 +312,9 @@ public abstract class FileUtils {
 		}
 		try {
 			File gzipFile = new File(gzipFileDir, sourceFile.getName() + ".gz");
-			FileInputStream inputStream = new FileInputStream(sourceFile);
-			FileOutputStream outputStream = new FileOutputStream(gzipFile);
-			GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
-			byte[] buffer = new byte[1024];
-			int length;
-			while ((length = inputStream.read(buffer)) != -1) {
-				gzipOutputStream.write(buffer, 0, length);
-			}
-			gzipOutputStream.close();
+			InputStream inputStream = new FileInputStream(sourceFile);
+			OutputStream outputStream = new FileOutputStream(gzipFile);
+			GZipUtils.compressIntputToOutput(inputStream, outputStream);
 			outputStream.close();
 			inputStream.close();
 			return true;
@@ -310,17 +333,8 @@ public abstract class FileUtils {
 	 * @param olderThanMinutes
 	 *            the age in minutes for files to delete
 	 */
-	public static final File[] findFiles(File dir, final long olderThanMinutes) {
-		File[] files = readFiles(dir, new FileFilter() {
-			@Override
-			public boolean accept(File file) {
-				if (file.isFile() && file.lastModified() < System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(olderThanMinutes)) {
-					return true;
-				}
-				return false;
-			}
-		});
-		return files;
+	public static final File[] findFiles(File dir, long olderThanMinutes) {
+		return readFiles(dir, new OlderThanFileFilter(olderThanMinutes, TimeUnit.MINUTES));
 	}
 
 	/**
@@ -337,20 +351,8 @@ public abstract class FileUtils {
     public static final void deleteFiles(File directory, final long olderThanMinutes,
         final String prefixToMatchWhenDeleting)
     {
-        File[] toDelete = readFiles(directory, new FileFilter()
-        {
-			@Override
-            public boolean accept(File file)
-            {
-                if (file.isFile()
-                    && file.lastModified() < System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(olderThanMinutes)
-                    && file.getName().startsWith(prefixToMatchWhenDeleting, 0))
-                {
-					return true;
-				}
-				return false;
-			}
-		});
+		File[] toDelete = readFiles(directory,
+				new OlderThanPrefixFileFilter(olderThanMinutes, TimeUnit.MINUTES, prefixToMatchWhenDeleting));
         for (File file : toDelete)
         {
 			Log.log(FileUtils.class, "DELETING ", ObjectUtils.safeToString(file));
@@ -364,4 +366,45 @@ public abstract class FileUtils {
 			}
 		}
 	}
+
+	private static class OlderThanFileFilter implements FileFilter {
+
+		private final long olderThan;
+		private final TimeUnit timeUnit;
+
+		/**
+		 * Filters files which have a last modified time that is olderThan the timeUnit.
+		 */
+		public OlderThanFileFilter(long olderThan, TimeUnit timeUnit) {
+			this.olderThan = olderThan;
+			this.timeUnit = timeUnit;
+		}
+
+		@Override
+		public boolean accept(File file) {
+			if (file.isFile() && file.lastModified() < System.currentTimeMillis() - this.timeUnit.toMillis(this.olderThan)) {
+				return true;
+			}
+			return false;
+		}
+	}
+
+	private static class OlderThanPrefixFileFilter extends OlderThanFileFilter {
+
+		private final String filenamePrefix;
+
+		public OlderThanPrefixFileFilter(long olderThan, TimeUnit timeUnit, String filenamePrefix) {
+			super(olderThan, timeUnit);
+			this.filenamePrefix = filenamePrefix;
+		}
+
+		@Override
+		public boolean accept(File file) {
+			if (file.getName().startsWith(this.filenamePrefix, 0)) {
+				return super.accept(file);
+			}
+			return false;
+		}
+	}
+
 }

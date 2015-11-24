@@ -15,12 +15,16 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.assertEquals;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.Random;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests {@link GZipUtils}
@@ -60,4 +64,19 @@ public class GZipUtilsTest
         assertEquals(s, new String(unzipped));
     }
 
+	@Test
+	public void shouldCompressStream() throws Exception {
+		File sourceFile = new File(this.getClass().getClassLoader().getResource("Test-messages_20151122_221934.log.0.logged").toURI());
+		File targetFile = new File("discard.gz");
+		FileInputStream inputStream = new FileInputStream(sourceFile);
+		FileOutputStream outputStream = new FileOutputStream(targetFile);
+		try {
+			GZipUtils.compressIntputToOutput(inputStream, outputStream);
+			assertTrue(sourceFile.length() > targetFile.length());
+		} finally {
+			targetFile.delete();
+			outputStream.close();
+			inputStream.close();
+		}
+    }
 }

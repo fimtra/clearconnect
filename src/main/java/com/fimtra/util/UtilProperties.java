@@ -47,11 +47,17 @@ public abstract class UtilProperties
         String SYSTEM_PROPERTY_LOG_DIR = BASE + "logDir";
 
         /**
-         * The system property name to define if log messages are written to std.err (in addition to
-         * the log file). <br>
-         * <b>SETTING THIS TO TRUE HAS A SEVERE PERFORMANCE IMPACT.</b><br>
-         * E.g. <code>-Dutil.logToStdErr=true</code>
-         */
+		 * The system property key that defines the log archive directory.<br>
+		 * E.g. <code>-Dutil.archiveDir=/path/to/log/archive/directory</code>
+		 */
+		String ARCHIVE_DIR = BASE + "archiveDir";
+
+		/**
+		 * The system property name to define if log messages are written to std.err (in addition to
+		 * the log file). <br>
+		 * <b>SETTING THIS TO TRUE HAS A SEVERE PERFORMANCE IMPACT.</b><br>
+		 * E.g. <code>-Dutil.logToStdErr=true</code>
+		 */
         String LOG_TO_STDERR = BASE + "logToStdErr";
 
         /**
@@ -106,10 +112,17 @@ public abstract class UtilProperties
         String LOG_DIR = System.getProperty(UtilProperties.Names.SYSTEM_PROPERTY_LOG_DIR, "logs");
 
         /**
-         * Determines if the {@link LowGcLinkedList} is used. Default is <code>true</code>
-         * 
-         * @see Names#USE_LOW_GC_LINKEDLIST
-         */
+		 * The log archive directory. Default is <tt>{@link Values#LOG_DIR}/archive</tt>
+		 * 
+		 * @see Names#ARCHIVE_DIR
+		 */
+		String ARCHIVE_DIR = System.getProperty(UtilProperties.Names.ARCHIVE_DIR, LOG_DIR + "/archive");
+
+		/**
+		 * Determines if the {@link LowGcLinkedList} is used. Default is <code>true</code>
+		 * 
+		 * @see Names#USE_LOW_GC_LINKEDLIST
+		 */
         boolean USE_LOW_GC_LINKEDLIST = Boolean.parseBoolean(System.getProperty(Names.USE_LOW_GC_LINKEDLIST, "true"));
 
         /**

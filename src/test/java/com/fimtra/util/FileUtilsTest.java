@@ -39,12 +39,6 @@ import static org.junit.Assert.assertTrue;
 @SuppressWarnings("boxing")
 public class FileUtilsTest {
 
-	private static final String logFileName1 = "PlatformDesktop-messages_20151118_221335.log";
-	private static final String logFileName2 = "PlatformDesktop-messages_20151118_222035.log";
-	private static final String loggedFileName1 = "PlatformDesktop-messages_20151118_221335.log.0.logged";
-	private static final String loggedFileName2 = "PlatformDesktop-messages_20151118_221335.log.1.logged";
-	private static final String loggedFileName3 = "PlatformDesktop-messages_20151118_222035.log.0.logged";
-	private static final String loggedFileName4 = "PlatformDesktop-messages_20151118_222035.log.1.logged";
 	private static final String logFileName = "Test-messages_20151122_221934.log.0.logged";
 	private static final String EXT_OK = "okext";
 	private static final String EXT_RECORD = "record";
