@@ -1,0 +1,7 @@
+20151118-22:19:34:119|deadlock-detector|com.fimtra.util.ThreadUtils:336454967|Starting
+20151118-22:19:34:121|RollingFileAppender-delete-0|com.fimtra.util.ThreadUtils:336454967|Starting
+20151118-22:19:34:121|main|com.fimtra.tcpchannel.TcpChannelUtils:1470643491|Socket options: {}
+20151118-22:19:34:129|tcp-channel-reader|com.fimtra.util.ThreadUtils:336454967|Starting
+20151118-22:19:34:130|tcp-channel-writer|com.fimtra.util.ThreadUtils:336454967|Starting
+20151118-22:19:34:130|tcp-channel-accept|com.fimtra.util.ThreadUtils:336454967|Starting
+20151118-22:19:36:235|main|com.fimtra.clearconnect.core.PlatformRegistryAgent:272123600|Registry addresses: [EndPoint [node=127.0.1.1, port=22222]]

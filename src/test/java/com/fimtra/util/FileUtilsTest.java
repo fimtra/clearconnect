@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Paul Mackinlay 
- *  
+ * Copyright (c) 2013 Paul Mackinlay
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,21 +15,23 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 
 import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Paul Mackinlay
@@ -37,6 +39,13 @@ import com.fimtra.util.FileUtils.ExtensionFileFilter;
 @SuppressWarnings("boxing")
 public class FileUtilsTest {
 
+	private static final String logFileName1 = "PlatformDesktop-messages_20151118_221335.log";
+	private static final String logFileName2 = "PlatformDesktop-messages_20151118_222035.log";
+	private static final String loggedFileName1 = "PlatformDesktop-messages_20151118_221335.log.0.logged";
+	private static final String loggedFileName2 = "PlatformDesktop-messages_20151118_221335.log.1.logged";
+	private static final String loggedFileName3 = "PlatformDesktop-messages_20151118_222035.log.0.logged";
+	private static final String loggedFileName4 = "PlatformDesktop-messages_20151118_222035.log.1.logged";
+	private static final String logFileName = "Test-messages_20151122_221934.log.0.logged";
 	private static final String EXT_OK = "okext";
 	private static final String EXT_RECORD = "record";
 	private ExtensionFileFilter recordFileFilter;
@@ -109,5 +118,41 @@ public class FileUtilsTest {
 		FileUtils.deleteRecursive(moveTarget);
 		assertTrue(!moveTarget.exists());
 		assertTrue(!targetDir.exists());
+	}
+
+	@Test
+	public void shouldGzipFile() throws URISyntaxException {
+		File sourceFile = new File(this.getClass().getClassLoader().getResource(logFileName).toURI());
+		File dir = sourceFile.getParentFile();
+
+		assertTrue(FileUtils.gzip(sourceFile, dir));
+		File gzipFile = new File(dir, logFileName + ".gz");
+		assertTrue(gzipFile.isFile() && gzipFile.exists());
+		assertTrue(gzipFile.length() < sourceFile.length());
+		gzipFile.delete();
+
+		File newDir = new File(dir.getAbsolutePath() + File.separator + "level1" + File.separator + "level2");
+		assertTrue(FileUtils.gzip(sourceFile, newDir));
+		gzipFile = new File(newDir, logFileName + ".gz");
+		assertTrue(gzipFile.isFile() && gzipFile.exists());
+		assertTrue(gzipFile.length() < sourceFile.length());
+		gzipFile.delete();
+
+		assertFalse(FileUtils.gzip(sourceFile, sourceFile));
+	}
+
+	@Test
+	public void shouldFindOldFiles() throws URISyntaxException {
+		File sourceFile = new File(this.getClass().getClassLoader().getResource(logFileName).toURI());
+		File dir = sourceFile.getParentFile();
+		File subDir = new File(dir, "subDir");
+		subDir.deleteOnExit();
+		assertTrue(subDir.mkdir());
+
+		File[] files = FileUtils.findFiles(dir, 1);
+		assertEquals(4, files.length);
+
+		files = FileUtils.findFiles(dir, Long.MAX_VALUE);
+		assertEquals(0, files.length);
 	}
 }
