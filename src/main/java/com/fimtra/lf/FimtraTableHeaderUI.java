@@ -39,6 +39,7 @@ import javax.swing.plaf.synth.SynthTableHeaderUI;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableModel;
 
 
 /**
@@ -85,7 +86,7 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 			// indicating the sort order,
 			// so that different rendering can be done for the header based on
 			// sorted state.
-			RowSorter rs = table == null ? null : table.getRowSorter();
+			RowSorter<? extends TableModel> rs = table == null ? null : table.getRowSorter();
 			java.util.List<? extends RowSorter.SortKey> sortKeys = rs == null ? null
 					: rs.getSortKeys();
 			if (sortKeys != null
@@ -127,7 +128,8 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 			return getText();
 		}
 	}
-
+	
+	@SuppressWarnings("synthetic-access")
 	public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer {
 		private static final long serialVersionUID = 1L;
 
@@ -145,7 +147,7 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 			super.setHorizontalTextPosition(textPosition);
 		}
 
-		@Override
+        @Override
         public Component getTableCellRendererComponent(JTable table,
 				Object value, boolean isSelected, boolean hasFocus, int row,
 				int column) {
