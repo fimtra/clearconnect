@@ -501,7 +501,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode)
     {
         return createPlatformServiceInstance(serviceFamily, serviceMember, host,
-            PlatformUtils.getNextAvailableServicePort(host), wireProtocol, redundacyMode);
+            PlatformUtils.getNextAvailableServicePort(), wireProtocol, redundacyMode);
     }
 
     @Override
@@ -517,7 +517,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology)
     {
         return createPlatformServiceInstance(serviceFamily, serviceMember, hostName,
-            PlatformUtils.getNextAvailableServicePort(hostName), wireProtocol, redundacyMode, transportTechnology);
+            transportTechnology.getNextAvailableServicePort(), wireProtocol, redundacyMode,
+            transportTechnology);
     }
 
     @Override

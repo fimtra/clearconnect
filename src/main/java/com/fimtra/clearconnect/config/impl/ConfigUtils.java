@@ -44,10 +44,11 @@ public abstract class ConfigUtils {
 	/**
 	 * Gets the port from config or uses a default.
 	 */
-	public synchronized static int getPort(IConfig config, String host) {
+	@SuppressWarnings("unused")
+    public synchronized static int getPort(IConfig config, String host) {
 		IValue portProperty = config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT);
 		if (isEmptyConfigProperty(portProperty)) {
-			return PlatformUtils.getNextAvailableServicePort(host);
+			return PlatformUtils.getNextAvailableServicePort();
 		}
 		return Integer.parseInt(portProperty.textValue());
 	}

@@ -78,7 +78,8 @@ public class ConfigUtilsTest {
 	public void shouldGetPort() {
 		String host = null;
 		String configPort = "112233";
-		assertTrue(ConfigUtils.getPort(this.config, host) > 0);
+		// default port is 0 (use ephemeral port)
+		assertTrue(ConfigUtils.getPort(this.config, host) == 0);
 		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT)).thenReturn(new TextValue(configPort));
 		assertEquals(Integer.parseInt(configPort), ConfigUtils.getPort(this.config, host));
 	}

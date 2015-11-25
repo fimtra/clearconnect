@@ -187,34 +187,4 @@ public class TestTcpChannelUtils
         final Deque<byte[]> decode = new LowGcLinkedList<byte[]>();
         TcpChannelUtils.decodeUsingTerminator(decode, buffer, terminator);
     }
-
-    @SuppressWarnings("unused")
-    @Test
-    public void testGetNextFreeTcpServerPort() throws IOException
-    {
-        final int startPortRangeInclusive = 23214;
-        final int endPortRangeExclusive = startPortRangeInclusive + 2;
-
-        final int nextFreeDefaultTcpServerPort =
-            TcpChannelUtils.getNextFreeTcpServerPort(TcpChannelUtils.LOCALHOST_IP, startPortRangeInclusive,
-                endPortRangeExclusive);
-        assertEquals(startPortRangeInclusive, nextFreeDefaultTcpServerPort);
-        ServerSocket ssoc = new ServerSocket(nextFreeDefaultTcpServerPort);
-
-        final int nextFreeDefaultTcpServerPort2 =
-            TcpChannelUtils.getNextFreeTcpServerPort(TcpChannelUtils.LOCALHOST_IP, startPortRangeInclusive,
-                endPortRangeExclusive);
-        assertEquals(startPortRangeInclusive + 1, nextFreeDefaultTcpServerPort2);
-        ServerSocket ssoc2 = new ServerSocket(nextFreeDefaultTcpServerPort2);
-
-        try
-        {
-            TcpChannelUtils.getNextFreeTcpServerPort(TcpChannelUtils.LOCALHOST_IP, startPortRangeInclusive,
-                endPortRangeExclusive);
-            fail("Should throw exception");
-        }
-        catch (RuntimeException e)
-        {
-        }
-    }
 }
