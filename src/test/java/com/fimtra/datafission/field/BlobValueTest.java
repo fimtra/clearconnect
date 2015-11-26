@@ -62,18 +62,11 @@ public class BlobValueTest
     }
 
     @Test
-    public void testFromString()
+    public void testFromCharCapitals()
     {
         final BlobValue other = new BlobValue();
-        other.fromString(_1AF3416);
-        assertEquals(other, this.candidate);
-    }
-
-    @Test
-    public void testFromStringCapitals()
-    {
-        final BlobValue other = new BlobValue();
-        other.fromString("1a0f34160A0B0C0D0E0F");
+        char[] charArray = "1a0f34160A0B0C0D0E0F".toCharArray();
+        other.fromChars(charArray, 0, charArray.length);
         assertEquals(other, this.candidate);
     }
 
@@ -116,7 +109,8 @@ public class BlobValueTest
         final byte[] bytes = new byte[] { 0xf, 0x0, 0x1 };
         this.candidate = new BlobValue(bytes);
         BlobValue other = new BlobValue();
-        other.fromString(this.candidate.textValue());
+        final char[] chars = this.candidate.textValue().toCharArray();
+        other.fromChars(chars, 0, chars.length);
         assertEquals(this.candidate, other);
     }
 
@@ -131,7 +125,8 @@ public class BlobValueTest
         }
         this.candidate = new BlobValue(bytes);
         BlobValue other = new BlobValue();
-        other.fromString(this.candidate.textValue());
+        final char[] chars = this.candidate.textValue().toCharArray();
+        other.fromChars(chars, 0, chars.length);
         assertEquals(this.candidate, other);
     }
     

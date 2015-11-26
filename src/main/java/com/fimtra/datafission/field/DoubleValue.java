@@ -63,6 +63,11 @@ public final class DoubleValue extends AbstractValue
         this.value = value;
     }
 
+    DoubleValue(char[] chars, int start, int len)
+    {
+        this.value = Double.valueOf(new String(chars, start, len)).doubleValue();
+    }
+
     @Override
     public TypeEnum getType()
     {
@@ -85,18 +90,6 @@ public final class DoubleValue extends AbstractValue
     public String textValue()
     {
         return Double.toString(this.value);
-    }
-
-    @Override
-    public void fromString(String value)
-    {
-        this.value = Double.valueOf(value).doubleValue();
-    }
-
-    @Override
-    void fromChars(char[] chars, int start, int len)
-    {
-        this.value = Double.valueOf(new String(chars, start, len)).doubleValue();
     }
 
     @Override

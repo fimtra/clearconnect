@@ -87,7 +87,8 @@ public class ValueTest
 
     public void doConvertTest(IValue v)
     {
-        final IValue result = AbstractValue.constructFromStringValue(v.toString());
+        final char[] chars = v.toString().toCharArray();
+        final IValue result = AbstractValue.constructFromCharValue(chars, 0, chars.length);
         assertEquals(v, result);
         assertNotSame(v, result);
         assertEquals(v.doubleValue(), result.doubleValue(), 0.0001);

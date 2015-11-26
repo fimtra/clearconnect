@@ -181,7 +181,7 @@ public final class BlobValue extends AbstractValue
             case 'E':
                 return 0xe;
             case 'F':
-                return 0xf;                
+                return 0xf;
         }
         throw new IllegalArgumentException("Unhandled char:" + c);
     }
@@ -209,7 +209,7 @@ public final class BlobValue extends AbstractValue
     {
         return target == null || !(target instanceof BlobValue) ? defaultValue : target.byteValue();
     }
-    
+
     byte[] value;
 
     /**
@@ -229,11 +229,18 @@ public final class BlobValue extends AbstractValue
     public BlobValue(String value)
     {
         this();
-        fromString(value);
+        final char[] charArray = value.toCharArray();
+        fromChars(charArray, 0, charArray.length);
     }
 
     BlobValue()
     {
+    }
+
+    BlobValue(char[] chars, int start, int len)
+    {
+        this();
+        fromChars(chars, start, len);
     }
 
     public byte[] getBytes()
@@ -286,24 +293,6 @@ public final class BlobValue extends AbstractValue
         return new String(cbuf);
     }
 
-    @Override
-    void fromString(String value)
-    {
-        if (value.length() % 2 != 0)
-        {
-            throw new IllegalStateException("BlobValue text length should be divisible by 2");
-        }
-        this.value = new byte[value.length() / 2];
-        final char[] hexStream = value.toCharArray();
-        final int len = hexStream.length;
-        int j = 0;
-        for (int i = 0; i < len;)
-        {
-            this.value[j++] = (byte) ((byte) (decodeHex(hexStream[i++]) << 4) | decodeHex(hexStream[i++]));
-        }
-    }
-
-    @Override
     void fromChars(char[] chars, int start, int len)
     {
         if (len % 2 != 0)

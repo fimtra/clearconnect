@@ -15,7 +15,9 @@
  */
 package com.fimtra.datafission.field;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IValue;
+import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
 /**
@@ -27,9 +29,12 @@ import com.fimtra.util.is;
  */
 public final class TextValue extends AbstractValue
 {
-    static final String NULL = "null";
+    static final ObjectPool<TextValue> pool = new ObjectPool<TextValue>("TextValues",
+        DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE);
 
-    final static TextValue BLANK = new TextValue("");
+    static final String NULL = "null";
+    // todo use this?
+    // static final String NULL = "<null>";
 
     private String value;
 
@@ -38,11 +43,20 @@ public final class TextValue extends AbstractValue
      */
     public static TextValue valueOf(String value)
     {
-        if ("".equals(value))
+        if (value.length() < DataFissionProperties.Values.TEXT_LENGTH_LIMIT_FOR_POOL)
         {
-            return BLANK;
+            return pool.intern(new TextValue(value));
         }
         return new TextValue(value);
+    }
+
+    public static TextValue valueOf(char[] chars, int start, int len)
+    {
+        if (chars == null)
+        {
+            throw new IllegalArgumentException("cannot construct from null");
+        }
+        return valueOf(new String(chars, start, len));
     }
 
     /**
@@ -61,7 +75,7 @@ public final class TextValue extends AbstractValue
     {
         return target == null ? defaultValue : target.textValue();
     }
-    
+
     /** Initialises the string value to "null". */
     TextValue()
     {
@@ -75,15 +89,18 @@ public final class TextValue extends AbstractValue
      *            the value to construct this with
      * @throws IllegalArgumentException
      *             if the value is null
+     * @deprecated use {@link #valueOf(String)} instead
      */
+    @Deprecated
     public TextValue(String value)
     {
         super();
+        // todo remove?
         if (value == null)
         {
             throw new IllegalArgumentException("null values are not allowed");
         }
-        setValue(value);
+        this.value = (value == null ? NULL : (NULL.equals(value) ? NULL : value));
     }
 
     @Override
@@ -118,25 +135,6 @@ public final class TextValue extends AbstractValue
     }
 
     @Override
-    public void fromString(String value)
-    {
-        setValue(value);
-    }
-
-    @Override
-    void fromChars(char[] chars, int start, int len)
-    {
-        if (chars == null)
-        {
-            setValue(null);
-        }
-        else
-        {
-            setValue(new String(chars, start, len));
-        }
-    }
-
-    @Override
     public int hashCode()
     {
         final int prime = 31;
@@ -158,11 +156,6 @@ public final class TextValue extends AbstractValue
         }
         TextValue other = (TextValue) obj;
         return is.eq(this.value, other.value);
-    }
-
-    private void setValue(String value)
-    {
-        this.value = (value == null ? NULL : (NULL.equals(value) ? NULL : value));
     }
 
 }
