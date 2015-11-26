@@ -27,10 +27,10 @@ import com.fimtra.util.ObjectUtils;
 public enum TransportTechnologyEnum
 {
     // specify the classes used per transport technology
-        TCP("com.fimtra.tcpchannel.TcpChannelBuilderFactory", "com.fimtra.tcpchannel.TcpServerBuilder"),
+        TCP("com.fimtra.tcpchannel.TcpChannelBuilderFactory", "com.fimtra.tcpchannel.TcpServerBuilder", ":"),
 
         SOLACE("com.fimtra.channel.solace.SolaceChannelBuilderFactory",
-            "com.fimtra.channel.solace.SolaceServiceBuilder");
+            "com.fimtra.channel.solace.SolaceServiceBuilder", "/");
 
     public static final String SYSTEM_PROPERTY = "transport";
 
@@ -53,11 +53,23 @@ public enum TransportTechnologyEnum
 
     final String endPointServiceBuilderClassName;
     final String transportChannelBuilderFactoryLoaderClassName;
+    final String nodePortDelimiter;
 
-    TransportTechnologyEnum(String transportChannelBuilderFactoryLoaderClassName, String endPointServiceBuilderClassName)
+    TransportTechnologyEnum(String transportChannelBuilderFactoryLoaderClassName,
+        String endPointServiceBuilderClassName, String nodePortDelimiter)
     {
         this.transportChannelBuilderFactoryLoaderClassName = transportChannelBuilderFactoryLoaderClassName;
         this.endPointServiceBuilderClassName = endPointServiceBuilderClassName;
+        this.nodePortDelimiter = nodePortDelimiter;
+    }
+
+    /**
+     * @return the delimiter to separate the node portion from the port portion of a service end
+     *         point description for this transport technology
+     */
+    public String getNodePortDelimiter()
+    {
+        return this.nodePortDelimiter;
     }
 
     public ITransportChannelBuilderFactory constructTransportChannelBuilderFactory(

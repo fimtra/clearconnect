@@ -51,7 +51,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.fimtra.channel.ChannelUtils;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
@@ -1114,7 +1114,9 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceInstance.toString(),
                         platformServiceInstanceID);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
-                        publisherNode.textValue() + (ChannelUtils.getNodePortDelimiter()) + publisherPort.textValue());
+                        publisherNode.textValue()
+                            + (TransportTechnologyEnum.valueOf(transport.textValue()).getNodePortDelimiter())
+                            + publisherPort.textValue());
 
                 }
 

@@ -39,16 +39,6 @@ public abstract class ChannelUtils
     }
 
     /**
-     * @return the delimiter to use between a node and port, depending on the transport technology
-     * @see #TRANSPORT
-     */
-    // todo move onto TransportTechnologyEnum
-    public static String getNodePortDelimiter()
-    {
-        return TRANSPORT == TransportTechnologyEnum.SOLACE ? "/" : ":";
-    }
-
-    /**
      * @see TransportTechnologyEnum#getNextAvailableServicePort()
      */
     public static int getNextAvailableServicePort()
