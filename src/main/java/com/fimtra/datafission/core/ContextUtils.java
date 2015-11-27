@@ -108,7 +108,7 @@ public class ContextUtils
      */
     final static ScheduledExecutorService UTILITY_SCHEDULER = ThreadUtils.newPermanentScheduledExecutorService(
         "fission-utility", 1);
-    
+
     /**
      * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
      * tasks
@@ -486,8 +486,10 @@ public class ContextUtils
                 }
             }
             // we have a line - escaped(key)=escaped(value)
-            key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false);
-            value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position());
+            key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
+            value =
+                StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(), new char[cbuf.position()
+                    - (index + 1)]);
             map.put(key, value);
             cbuf.position(0);
         }
