@@ -58,7 +58,7 @@ public interface IStatusAttribute
             if (record != null)
             {
                 record.put(statusAttribute.getClass().getSimpleName().toString(),
-                    new TextValue(statusAttribute.toString()));
+                    TextValue.valueOf(statusAttribute.toString()));
             }
         }
 
