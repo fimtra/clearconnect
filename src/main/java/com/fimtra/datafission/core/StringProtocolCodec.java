@@ -211,8 +211,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         try
         {
-            // todo we will never need tempArr to be this big..
-            final char[] tempArr = new char[decodedMessage.length];
+            char[] tempArr = new char[100];
             final char[][] tokens = findTokens(decodedMessage);
             final String name = stringFromCharBuffer(tokens[1]);
             final AtomicChange atomicChange = new AtomicChange(name);
@@ -261,6 +260,10 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     if (previous != '\\')
                                     {
                                         currentTokenChars = tokens[i];
+                                        if (tempArr.length < currentTokenChars.length)
+                                        {
+                                            tempArr = new char[currentTokenChars.length];
+                                        }
                                         if (processSubmaps)
                                         {
                                             if (put)
@@ -563,7 +566,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         return hasPreamble ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr
             - DOUBLE_KEY_PREAMBLE_LENGTH) : new String(unescaped, 0, unescapedPtr);
     }
-    
+
     static String encodeValue(IValue value)
     {
         return value == null ? NULL_VALUE : value.toString();
