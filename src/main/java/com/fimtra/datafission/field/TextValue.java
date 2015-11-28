@@ -100,7 +100,7 @@ public final class TextValue extends AbstractValue
         {
             throw new IllegalArgumentException("null values are not allowed");
         }
-        this.value = (value == null ? NULL : (NULL.equals(value) ? NULL : value));
+        this.value = (NULL.equals(value) ? NULL : value);
     }
 
     @Override
