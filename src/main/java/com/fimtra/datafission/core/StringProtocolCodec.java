@@ -560,11 +560,10 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
         }
 
-        // todo keep a pool of char-arr to String?
         return hasPreamble ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr
             - DOUBLE_KEY_PREAMBLE_LENGTH) : new String(unescaped, 0, unescapedPtr);
     }
-
+    
     static String encodeValue(IValue value)
     {
         return value == null ? NULL_VALUE : value.toString();
