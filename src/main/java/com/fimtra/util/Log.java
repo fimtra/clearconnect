@@ -80,14 +80,16 @@ public abstract class Log
             }
         }));
         lock.lock();
-        if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
-            FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-        }
-        if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
-            FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-        }
         try
         {
+            if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
+            {
+                FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+            }
+            if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
+            {
+                FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+            }
             FILE_APPENDER =
                 RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
             System.out.println("Log file " + FILE_APPENDER);
