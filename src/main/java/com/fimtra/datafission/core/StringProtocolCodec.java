@@ -211,7 +211,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         try
         {
-            char[] tempArr = new char[100];
+            char[] tempArr = new char[50];
             final char[][] tokens = findTokens(decodedMessage);
             final String name = stringFromCharBuffer(tokens[1]);
             final AtomicChange atomicChange = new AtomicChange(name);
