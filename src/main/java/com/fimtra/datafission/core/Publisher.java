@@ -309,15 +309,15 @@ public class Publisher
             final EndPointAddress endPointAddress = Publisher.this.server.getEndPointAddress();
             final String clientSocket = client.getEndPointDescription();
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_ID,
-                new TextValue(Publisher.this.context.getName()));
+                TextValue.valueOf(Publisher.this.context.getName()));
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_NODE,
-                new TextValue(endPointAddress.getNode()));
+                TextValue.valueOf(endPointAddress.getNode()));
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_PORT,
                 LongValue.valueOf(endPointAddress.getPort()));
-            submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, new TextValue(clientSocket));
-            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, new TextValue(
+            submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, TextValue.valueOf(clientSocket));
+            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, TextValue.valueOf(
                 this.codec.getClass().getSimpleName()));
-            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT, new TextValue(
+            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT, TextValue.valueOf(
                 Publisher.this.getTransportTechnology().toString()));
 
             scheduleStatsUpdateTask();
@@ -425,7 +425,7 @@ public class Publisher
         {
             this.identity = identity;
             Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.client)).put(
-                IContextConnectionsRecordFields.PROXY_ID, new TextValue(this.identity));
+                IContextConnectionsRecordFields.PROXY_ID, TextValue.valueOf(this.identity));
         }
 
         @Override

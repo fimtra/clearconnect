@@ -83,7 +83,7 @@ import com.fimtra.util.is;
  */
 public final class PlatformRegistry
 {
-    static final IValue BLANK_VALUE = new TextValue("");
+    static final IValue BLANK_VALUE = TextValue.valueOf("");
     static final String GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE = "getServiceInfoForService";
     static final String GET_HEARTBEAT_CONFIG = "getHeartbeatConfig";
     static final String GET_PLATFORM_NAME = "getPlatformName";
@@ -500,7 +500,7 @@ public final class PlatformRegistry
                     final String nextInstance =
                         PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue());
 
-                    return new TextValue(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
+                    return TextValue.valueOf(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
                 }
                 catch (Exception e)
                 {
@@ -519,7 +519,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                return new TextValue(PlatformRegistry.this.platformName);
+                return TextValue.valueOf(PlatformRegistry.this.platformName);
             }
         });
         this.context.createRpc(getPlatformName);
@@ -533,7 +533,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                return new TextValue(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
+                return TextValue.valueOf(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
                     + ChannelUtils.WATCHDOG.getMissedHeartbeatCount());
             }
         });
@@ -596,7 +596,7 @@ public final class PlatformRegistry
                     throw new ExecutionException(e);
                 }
 
-                return new TextValue("Registered " + serviceInstanceId);
+                return TextValue.valueOf("Registered " + serviceInstanceId);
             }
         });
         this.context.createRpc(register);
@@ -624,7 +624,7 @@ public final class PlatformRegistry
                     throw new ExecutionException(e);
                 }
 
-                return new TextValue("Deregistered " + serviceInstanceId);
+                return TextValue.valueOf("Deregistered " + serviceInstanceId);
             }
         });
         this.context.createRpc(deregister);

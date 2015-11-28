@@ -126,7 +126,7 @@ public class PlatformUtils
         VERSION = versionNumber;
     }
 
-    public static final TextValue OK = new TextValue("OK");
+    public static final TextValue OK = TextValue.valueOf("OK");
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";

@@ -571,13 +571,13 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
         this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
-            new TextValue(serviceInstance.getPlatformServiceFamily()),
-            new TextValue(serviceInstance.getWireProtocol().toString()),
-            new TextValue(serviceInstance.getEndPointAddress().getNode()),
+            TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
+            TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
+            TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
             LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
-            new TextValue(serviceInstance.getPlatformServiceMemberName()),
-            new TextValue(serviceInstance.getRedundancyMode().toString()), new TextValue(this.agentName),
-            new TextValue(serviceInstance.publisher.getTransportTechnology().toString()));
+            TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
+            TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
+            TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
     }
 
     @Override
@@ -590,8 +590,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             try
             {
-                this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(new TextValue(serviceFamily),
-                    new TextValue(serviceMember));
+                this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(TextValue.valueOf(serviceFamily),
+                    TextValue.valueOf(serviceMember));
                 this.localPlatformServiceInstances.remove(PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
                     serviceMember));
                 service.destroy();
@@ -835,7 +835,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             String instanceForService =
                 this.registryProxy.getRpc(PlatformRegistry.GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE).execute(
-                    new TextValue(serviceFamily)).textValue();
+                    TextValue.valueOf(serviceFamily)).textValue();
             if (instanceForService == null)
             {
                 Log.log("Registry has no service registered for '", serviceFamily, "'");

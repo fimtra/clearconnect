@@ -356,7 +356,7 @@ public final class PlatformMetaDataModel
         ContextUtils.clearNonSystemRecords(context);
     }
 
-    static final IValue BLANK_VALUE = new TextValue("");
+    static final IValue BLANK_VALUE = TextValue.valueOf("");
 
     static IValue safeGetTextValue(IRecord record, String field)
     {
@@ -818,7 +818,7 @@ public final class PlatformMetaDataModel
         TextValue agentTextValue;
         for (String agentName : atomicChange.getSubMapKeys())
         {
-            agentTextValue = new TextValue(agentName);
+            agentTextValue = TextValue.valueOf(agentName);
             for (String serviceInstanceID : atomicChange.getSubMapAtomicChange(agentName).getPutEntries().keySet())
             {
                 this.serviceInstancesContext.getOrCreateRecord(serviceInstanceID).put(
@@ -863,7 +863,7 @@ public final class PlatformMetaDataModel
         TextValue serviceFamilyTextValue;
         for (String serviceFamily : serviceFamilys)
         {
-            serviceFamilyTextValue = new TextValue(serviceFamily);
+            serviceFamilyTextValue = TextValue.valueOf(serviceFamily);
             instances = imageCopy.getOrCreateSubMap(serviceFamily);
 
             // update the instance count per service

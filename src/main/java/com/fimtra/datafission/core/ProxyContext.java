@@ -202,17 +202,17 @@ public final class ProxyContext implements IObserverContext
      * The value used to indicate a record is connected in the
      * {@link #RECORD_CONNECTION_STATUS_NAME} record
      */
-    public static final TextValue RECORD_CONNECTED = new TextValue("CONNECTED");
+    public static final TextValue RECORD_CONNECTED = TextValue.valueOf("CONNECTED");
     /**
      * The value used to indicate a record is (re)connecting in the
      * {@link #RECORD_CONNECTION_STATUS_NAME} record
      */
-    public static final TextValue RECORD_CONNECTING = new TextValue("CONNECTING");
+    public static final TextValue RECORD_CONNECTING = TextValue.valueOf("CONNECTING");
     /**
      * The value used to indicate a record is disconnected in the
      * {@link #RECORD_CONNECTION_STATUS_NAME} record
      */
-    public static final TextValue RECORD_DISCONNECTED = new TextValue("DISCONNECTED");
+    public static final TextValue RECORD_DISCONNECTED = TextValue.valueOf("DISCONNECTED");
 
     final static Executor SYNCHRONOUS_EXECUTOR = new Executor()
     {

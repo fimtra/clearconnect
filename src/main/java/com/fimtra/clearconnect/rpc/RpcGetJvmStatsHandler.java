@@ -58,6 +58,6 @@ public class RpcGetJvmStatsHandler implements IRpcExecutionHandler {
 			statsBuilder.append(systemPropertyKey).append(": ").append(systemProperties.getProperty(systemPropertyKey))
 					.append(SystemUtils.lineSeparator());
 		}
-		return new TextValue(statsBuilder.toString());
+		return TextValue.valueOf(statsBuilder.toString());
 	}
 }
