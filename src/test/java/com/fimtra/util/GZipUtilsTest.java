@@ -71,7 +71,7 @@ public class GZipUtilsTest
 		FileInputStream inputStream = new FileInputStream(sourceFile);
 		FileOutputStream outputStream = new FileOutputStream(targetFile);
 		try {
-			GZipUtils.compressIntputToOutput(inputStream, outputStream);
+			GZipUtils.compressInputToOutput(inputStream, outputStream);
 			assertTrue(sourceFile.length() > targetFile.length());
 		} finally {
 			targetFile.delete();

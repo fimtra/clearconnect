@@ -314,7 +314,7 @@ public abstract class FileUtils {
 			File gzipFile = new File(gzipFileDir, sourceFile.getName() + ".gz");
 			InputStream inputStream = new FileInputStream(sourceFile);
 			OutputStream outputStream = new FileOutputStream(gzipFile);
-			GZipUtils.compressIntputToOutput(inputStream, outputStream);
+			GZipUtils.compressInputToOutput(inputStream, outputStream);
 			outputStream.close();
 			inputStream.close();
 			return true;

@@ -121,7 +121,7 @@ public abstract class GZipUtils
 	/**
 	 * Compresses the data in the inputStream to the outputStream.
 	 */
-	public static void compressIntputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException {
+	public static void compressInputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException {
 		GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
 		try {
 			byte[] buffer = new byte[1024];
