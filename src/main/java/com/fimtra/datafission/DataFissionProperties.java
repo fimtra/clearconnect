@@ -141,7 +141,7 @@ public abstract class DataFissionProperties
          * held in the {@link TextValue} pool.<br>
          * E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>
          */
-        String TEXT_LENGTH_LIMIT_FOR_POOL = BASE + "textLengthLimitForTextValuePool";
+        String STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = BASE + "textLengthLimitForTextValuePool";
 
         /**
          * The system property name to define the estimated maximum number of concurrent threads
@@ -292,9 +292,9 @@ public abstract class DataFissionProperties
          * <p>
          * Default is 5.
          * 
-         * @see Names#TEXT_LENGTH_LIMIT_FOR_POOL
+         * @see Names#STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL
          */
-        int TEXT_LENGTH_LIMIT_FOR_POOL = Integer.parseInt(System.getProperty(Names.TEXT_LENGTH_LIMIT_FOR_POOL, "5"));
+        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = Integer.parseInt(System.getProperty(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
 
         /**
          * The estimated maximum number of concurrent threads that would access an {@link IRecord}.

@@ -44,7 +44,7 @@ public final class TextValue extends AbstractValue
      */
     public static TextValue valueOf(String value)
     {
-        if (value.length() < DataFissionProperties.Values.TEXT_LENGTH_LIMIT_FOR_POOL)
+        if (value.length() <= DataFissionProperties.Values.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL)
         {
             return pool.intern(new TextValue(value));
         }
