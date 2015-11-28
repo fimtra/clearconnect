@@ -79,17 +79,27 @@ public abstract class Log
                 }
             }
         }));
+        
+        // use a thread to perform archiving/purging to prevent startup delays
+        ThreadUtils.newThread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
+                {
+                    FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+                }
+                if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
+                {
+                    FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+                }
+            }
+        }, "log-archiver").start();
+        
         lock.lock();
         try
         {
-            if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
-            {
-                FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-            }
-            if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
-            {
-                FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-            }
             FILE_APPENDER =
                 RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
             System.out.println("Log file " + FILE_APPENDER);
