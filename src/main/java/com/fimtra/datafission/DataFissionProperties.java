@@ -15,10 +15,13 @@
  */
 package com.fimtra.datafission;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.field.LongValue;
+import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ThimbleExecutor;
 
 /**
@@ -122,8 +125,7 @@ public abstract class DataFissionProperties
         /**
          * The system property name to define the size of the {@link LongValue} pool.
          * <p>
-         * <b>MUST BE AN EVEN NUMBER.</b>
-         * <br>
+         * <b>MUST BE AN EVEN NUMBER.</b> <br>
          * E.g. <code>-DdataFission.longValuePoolSize=2048</code>
          */
         String LONG_VALUE_POOL_SIZE = BASE + "longValuePoolSize";
@@ -137,9 +139,17 @@ public abstract class DataFissionProperties
         /**
          * The system property name to define the length limit to be eligible for the value to be
          * held in the {@link TextValue} pool.<br>
-         * E.g. <code>-DdataFission.textLengthLimitForPool=5</code>
+         * E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>
          */
-        String TEXT_LENGTH_LIMIT_FOR_POOL = BASE + "textLengthLimitForPool";
+        String TEXT_LENGTH_LIMIT_FOR_POOL = BASE + "textLengthLimitForTextValuePool";
+
+        /**
+         * The system property name to define the estimated maximum number of concurrent threads
+         * that will access {@link IRecord} objects in the runtime. This is used to specify the
+         * concurrency of the {@link ConcurrentHashMap} components backing the records.<br>
+         * E.g. <code>-DdataFission.maxRecordConcurrency=2</code>
+         */
+        String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
 
     }
 
@@ -285,6 +295,17 @@ public abstract class DataFissionProperties
          * @see Names#TEXT_LENGTH_LIMIT_FOR_POOL
          */
         int TEXT_LENGTH_LIMIT_FOR_POOL = Integer.parseInt(System.getProperty(Names.TEXT_LENGTH_LIMIT_FOR_POOL, "5"));
+
+        /**
+         * The estimated maximum number of concurrent threads that would access an {@link IRecord}.
+         * This is used in constructing the {@link ConcurrentHashMap} components backing the
+         * records.
+         * <p>
+         * Default is 2.
+         * 
+         * @see Names#MAX_RECORD_CONCURRENCY
+         */
+        int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, "2"));
     }
 
     private DataFissionProperties()

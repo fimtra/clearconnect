@@ -75,18 +75,17 @@ import com.fimtra.util.is;
 final class Record implements IRecord, Cloneable
 {
     private static final float LOAD_FACTOR = .75f;
-    /** Assume a maximum of 2 threads will try to update at a time */
-    private static final int MAX_CONCURRENCY = 2;
 
     static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(int size)
     {
-        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(size, LOAD_FACTOR, MAX_CONCURRENCY);
+        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(size, LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
         return map;
     }
 
     static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(Map<K, V> data)
     {
-        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(data.size(), LOAD_FACTOR, MAX_CONCURRENCY);
+        ConcurrentHashMap<K, V> map =
+            new ConcurrentHashMap<K, V>(data.size(), LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
         map.putAll(data);
         return map;
     }
