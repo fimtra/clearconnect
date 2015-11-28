@@ -82,7 +82,7 @@ public class ValueTest
     @Test
     public void testBlankTextValueConversion()
     {
-        doConvertTest(new TextValue());
+        doConvertTest(new TextValue(""));
     }
 
     public void doConvertTest(IValue v)

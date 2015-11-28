@@ -33,13 +33,14 @@ public final class TextValue extends AbstractValue
         DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE);
 
     static final String NULL = "null";
-    // todo use this?
-    // static final String NULL = "<null>";
 
     private String value;
 
     /**
-     * Static short-hand constructor for a {@link TextValue}
+     * Static short-hand constructor for a {@link TextValue}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the string is <code>null</code>
      */
     public static TextValue valueOf(String value)
     {
@@ -50,6 +51,12 @@ public final class TextValue extends AbstractValue
         return new TextValue(value);
     }
 
+    /**
+     * Construct a {@link TextValue} from the string created from the char[].
+     * 
+     * @throws IllegalArgumentException
+     *             if the char[] is <code>null</code>
+     */
     public static TextValue valueOf(char[] chars, int start, int len)
     {
         if (chars == null)
@@ -76,12 +83,6 @@ public final class TextValue extends AbstractValue
         return target == null ? defaultValue : target.textValue();
     }
 
-    /** Initialises the string value to "null". */
-    TextValue()
-    {
-        this(NULL);
-    }
-
     /**
      * Construct the text value to represent the given string
      * 
@@ -95,7 +96,6 @@ public final class TextValue extends AbstractValue
     public TextValue(String value)
     {
         super();
-        // todo remove?
         if (value == null)
         {
             throw new IllegalArgumentException("null values are not allowed");

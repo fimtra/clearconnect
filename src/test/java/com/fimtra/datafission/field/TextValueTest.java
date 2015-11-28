@@ -39,7 +39,7 @@ public class TextValueTest
     @Test
     public void testCreating()
     {
-        TextValue textValue = new TextValue();
+        TextValue textValue = new TextValue("");
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -142,7 +142,7 @@ public class TextValueTest
     @Test
     public void testGetType()
     {
-        assertEquals(TypeEnum.TEXT, new TextValue().getType());
+        assertEquals(TypeEnum.TEXT, new TextValue("").getType());
     }
 
     @Test
