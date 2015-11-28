@@ -51,6 +51,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import com.fimtra.channel.ChannelUtils;
+import com.fimtra.clearconnect.core.PlatformServiceProxyTest;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IPermissionFilter;
@@ -71,6 +72,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
@@ -220,13 +222,6 @@ public class ProxyContextTest
     @After
     public void tearDown() throws Exception
     {
-        Log.log(this, ">>> teardown: " + this.candidate + "  " + this.publisher);
-
-        this.executor.shutdownNow();
-        this.publisher.destroy();
-        this.candidate.destroy();
-        this.context.destroy();
-
         List<TestLongValueSequenceCheckingAtomicChangeObserver> local =
             new ArrayList<TestLongValueSequenceCheckingAtomicChangeObserver>(observers);
         observers.clear();
@@ -234,8 +229,20 @@ public class ProxyContextTest
         {
             observer.verify();
         }
-        // IO sensitive
-        Thread.sleep(50);
+        
+        ThreadUtils.newThread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Log.log(this, ">>> teardown: " + ProxyContextTest.this.candidate + "  " + ProxyContextTest.this.publisher);
+                ProxyContextTest.this.executor.shutdownNow();
+                ProxyContextTest.this.publisher.destroy();
+                ProxyContextTest.this.candidate.destroy();
+                ProxyContextTest.this.context.destroy();
+            }
+        }, "tearDown").start();
+        
         ChannelUtils.WATCHDOG.configure(5000);
     }
 

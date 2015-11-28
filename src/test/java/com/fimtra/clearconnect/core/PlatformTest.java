@@ -287,12 +287,12 @@ public class PlatformTest
     {
         Log.log(this, "============== START TEAR DOWN =============================");
 
-        PlatformTest.this.registry.destroy();
         ThreadUtils.newThread(new Runnable()
         {
             @Override
             public void run()
             {
+                PlatformTest.this.registry.destroy();
                 if (PlatformTest.this.agent != null)
                 {
                     PlatformTest.this.agent.destroy();
@@ -302,10 +302,8 @@ public class PlatformTest
                     PlatformTest.this.agent008.destroy();
                 }
             }
-        }, "tearDown").run();
+        }, "tearDown").start();
         Log.log(this, "============== END TEAR DOWN =============================");
-        // IO sensitive tests
-        Thread.sleep(100);
 
         ChannelUtils.WATCHDOG.configure(5000);
     }
@@ -733,7 +731,8 @@ public class PlatformTest
         final String[] familyAndMember = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstance1);
         IPlatformServiceProxy proxy =
             this.agent.getPlatformServiceInstanceProxy(familyAndMember[0], familyAndMember[1]);
-
+        proxy.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
+        
         assertNotNull(proxy);
 
         // check the RPC for the service appears
@@ -760,7 +759,7 @@ public class PlatformTest
         assertEquals(0, proxy.getAllRpcs().size());
 
         // give time for IO to settle
-        Thread.sleep(1000);
+        Thread.sleep(500);
 
         // verify the socket is gone for us to proceed
         try
