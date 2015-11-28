@@ -39,7 +39,7 @@ public class TextValueTest
     @Test
     public void testCreating()
     {
-        TextValue textValue = new TextValue("");
+        TextValue textValue = new TextValue(TextValue.NULL);
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
