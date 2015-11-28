@@ -70,6 +70,7 @@ public abstract class Log {
 			}
 		}));
 		lock.lock();
+		// todo fixup for lock
 		if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0) {
 			FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
 		}
