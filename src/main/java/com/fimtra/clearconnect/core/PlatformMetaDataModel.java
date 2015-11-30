@@ -171,7 +171,7 @@ public final class PlatformMetaDataModel
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
         Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
-            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin, Transport,
+            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin, Transport, Version
     }
 
     /**
@@ -850,6 +850,8 @@ public final class PlatformMetaDataModel
                 ServiceInstanceMetaDataRecordDefinition.MsgsPerMin.toString());
             ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_PER_MIN, statsForServiceInstance,
                 ServiceInstanceMetaDataRecordDefinition.KbPerMin.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.VERSION, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.Version.toString());
             this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
         }
     }

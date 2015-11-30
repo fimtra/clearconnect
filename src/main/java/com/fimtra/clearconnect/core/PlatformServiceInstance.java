@@ -56,6 +56,7 @@ import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
+import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
@@ -75,7 +76,12 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     static final String SERVICE_STATS_RECORD_NAME = "Service Stats";
 
     /**
-     * Defines the fields for the service stats record
+     * Defines the fields for the service stats record.
+     * <p>
+     * This is different to the statistics in the {@link IContextConnectionsRecordFields}. The
+     * context connects record shows statistics about the individual connection between a Context
+     * (service) and ProxyContext (service proxy). The Service stats record shows the <b>overall</b>
+     * statistics for the service (Context).
      * 
      * @author Ramon Servadei
      */
@@ -87,6 +93,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         String KB_COUNT = "Kb published";
         String KB_PER_MIN = "Kb per min";
         String UPTIME = "Uptime(sec)";
+        String VERSION = "Version";
     }
 
     static final String RPC_FT_SERVICE_STATUS = "ftServiceInstanceStatus";
@@ -142,6 +149,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), coreExecutor,
                 rpcExecutor, utilityExecutor);
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
+        this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
 
         // update service stats periodically
         this.statsUpdateTask = this.context.getUtilityExecutor().scheduleWithFixedDelay(
@@ -245,7 +253,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
-    
+
     @Override
     public Future<Map<String, Boolean>> addRecordListener(IRecordListener listener, String... recordNames)
     {
@@ -253,7 +261,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     }
 
     @Override
-    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener, String... recordNames)
+    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener,
+        String... recordNames)
     {
         return this.context.addObserver(permissionToken, listener, recordNames);
     }
@@ -390,7 +399,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.statsUpdateTask.cancel(false);
         this.publisher.destroy();
         this.context.destroy();
-        
+
         this.recordAvailableNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.subscriptionNotifyingCache.destroy();
