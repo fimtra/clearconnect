@@ -517,7 +517,7 @@ public class PlatformUtils
                 Map.Entry<String, IValue> entry = null;
                 String key = null;
                 IValue value = null;
-                for (Iterator<Map.Entry<String, IValue>> it = imageCopy.entrySet().iterator(); it.hasNext();)
+                for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
                 {
                     entry = it.next();
                     key = entry.getKey();
