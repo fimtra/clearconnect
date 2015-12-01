@@ -52,7 +52,7 @@ public abstract class AbstractValue implements IValue
             case LONG:
                 return LongValue.valueOf(buffer.getLong());
             case TEXT:
-                return new TextValue(new String(ByteBufferUtils.getBytesFromBuffer(buffer, len), UTF8));
+                return TextValue.valueOf(new String(ByteBufferUtils.getBytesFromBuffer(buffer, len), UTF8));
             case BLOB:
                 return new BlobValue(ByteBufferUtils.getBytesFromBuffer(buffer, len));
             default :
@@ -89,42 +89,6 @@ public abstract class AbstractValue implements IValue
     }
 
     /**
-     * Construct the correct {@link IValue} object to represent the <code>toString</code>
-     * representation.
-     * 
-     * @param toStringRepresentation
-     *            the toString version of the IValue implementation
-     * @return the correct {@link IValue} type instance initialised to the value in the string
-     *         argument
-     */
-    public static IValue constructFromStringValue(String toStringRepresentation)
-    {
-        if (toStringRepresentation == null || toStringRepresentation.length() == 0)
-        {
-            return null;
-        }
-        AbstractValue value = null;
-        switch(toStringRepresentation.charAt(0))
-        {
-            case IValue.LONG_CODE:
-                return LongValue.valueOf(Long.parseLong(toStringRepresentation.substring(1)));
-            case IValue.DOUBLE_CODE:
-                value = new DoubleValue();
-                break;
-            case IValue.TEXT_CODE:
-                value = new TextValue();
-                break;
-            case IValue.BLOB_CODE:
-                value = new BlobValue();
-                break;
-            default :
-                throw new UnsupportedOperationException("Unhandled type: " + toStringRepresentation);
-        }
-        value.fromString(toStringRepresentation.substring(1));
-        return value;
-    }
-
-    /**
      * Construct the correct {@link IValue} object to represent the CharBuffer representation.
      * <p>
      * This is more efficient than {@link #constructFromStringValue(String)} as it skips the
@@ -142,25 +106,19 @@ public abstract class AbstractValue implements IValue
         {
             return null;
         }
-        AbstractValue value = null;
         switch(chars[0])
         {
             case IValue.LONG_CODE:
                 return LongValue.valueOf(chars, start + 1, len - 1);
             case IValue.DOUBLE_CODE:
-                value = new DoubleValue();
-                break;
+                return new DoubleValue(chars, start + 1, len - 1);
             case IValue.TEXT_CODE:
-                value = new TextValue();
-                break;
+                return TextValue.valueOf(chars, start + 1, len - 1);
             case IValue.BLOB_CODE:
-                value = new BlobValue();
-                break;
+                return new BlobValue(chars, start + 1, len - 1);
             default :
                 throw new UnsupportedOperationException("Unhandled type: " + new String(chars, start + 1, len - 1));
         }
-        value.fromChars(chars, start + 1, len - 1);
-        return value;
     }
 
     @Override
@@ -170,29 +128,6 @@ public abstract class AbstractValue implements IValue
         final String textValue = textValue();
         return new StringBuilder(textValue.length() + type.length()).append(type).append(textValue).toString();
     }
-
-    /**
-     * Opposite of {@link #toString()}, this initialises the IValue to the value in the string
-     * 
-     * @param value
-     *            the string value to initialise the IValue instance with
-     */
-    abstract void fromString(String value);
-
-    /**
-     * Optimised version of {@link #fromString(String)} that bypasses some of the internal char[]
-     * copying associated with {@link String} operations. This initialises the IValue to the value
-     * in the string
-     * 
-     * @param chars
-     *            the char[] holding the string value to initialise the IValue instance with.
-     * @param start
-     *            the start of the string in the char[]
-     * @param len
-     *            the lengh of the string in the char[]
-     * 
-     */
-    abstract void fromChars(char[] chars, int start, int len);
 
     @Override
     public int compareTo(IValue o)

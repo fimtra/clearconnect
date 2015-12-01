@@ -95,26 +95,16 @@ public abstract class TcpChannelUtils
     }
 
     /**
-     * Get the next free TCP server port in the passed in ranges for the given host.
-     * <p>
-     * <b>NOTE: the operation is dependent on the transport technology in use (see
-     * {@link TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)} ).</b>
+     * <b>None of the parameters are used.</b>
      * 
-     * @param hostName
-     *            the hostname to use to find the next free server port
-     * @param startPortRangeInclusive
-     *            (TCP usage only) the start port to use for the free server socket scan
-     * @param endPortRangeExclusive
-     *            (TCP usage only) the end port <b>exclusive</b> to use for the free server socket
-     *            scan
-     * @return the server port to use that is free, -1 if there is not a free port
-     * @see TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)
-     * @deprecated use {@link ChannelUtils#getNextAvailableServicePort(String, int, int)}
+     * @see TransportTechnologyEnum#getNextAvailableServicePort()
+     * @deprecated use {@link ChannelUtils#getNextAvailableServicePort()}
      */
+    @SuppressWarnings("unused")
     @Deprecated
     public static int getNextFreeTcpServerPort(String hostName, int startPortRangeInclusive, int endPortRangeExclusive)
     {
-        return ChannelUtils.getNextAvailableServicePort(hostName, startPortRangeInclusive, endPortRangeExclusive);
+        return ChannelUtils.getNextAvailableServicePort();
     }
 
     /**

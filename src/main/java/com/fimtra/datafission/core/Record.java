@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
@@ -42,6 +43,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
 /**
@@ -73,18 +75,17 @@ import com.fimtra.util.is;
 final class Record implements IRecord, Cloneable
 {
     private static final float LOAD_FACTOR = .75f;
-    /** Assume a maximum of 2 threads will try to update at a time */
-    private static final int MAX_CONCURRENCY = 2;
 
     static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(int size)
     {
-        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(size, LOAD_FACTOR, MAX_CONCURRENCY);
+        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(size, LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
         return map;
     }
 
     static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(Map<K, V> data)
     {
-        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(data.size(), LOAD_FACTOR, MAX_CONCURRENCY);
+        ConcurrentHashMap<K, V> map =
+            new ConcurrentHashMap<K, V>(data.size(), LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
         map.putAll(data);
         return map;
     }
@@ -142,6 +143,12 @@ final class Record implements IRecord, Cloneable
     }
 
     private static final ConcurrentMap<String, Map<String, IValue>> EMPTY_SUBMAP = newConcurrentHashMap(1);
+    /**
+     * A pool for the keys. Keys across records stand a VERY good chance of being repeated many
+     * times so this is a valuable memory optimisation.
+     */
+    static final ObjectPool<String> keysPool = new ObjectPool<String>("record-keys",
+        DataFissionProperties.Values.KEYS_POOL_MAX);
 
     final AtomicLong sequence;
     final String name;
@@ -154,7 +161,7 @@ final class Record implements IRecord, Cloneable
     Record(String name, Map<String, IValue> data, IAtomicChangeManager context)
     {
         super();
-        this.name = name;
+        this.name = keysPool.intern(name);
         this.data = newConcurrentHashMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
@@ -171,7 +178,7 @@ final class Record implements IRecord, Cloneable
         ConcurrentMap<String, Map<String, IValue>> subMaps)
     {
         super();
-        this.name = name;
+        this.name = keysPool.intern(name);
         this.data = newConcurrentHashMap(data);
         this.subMaps = subMaps;
         this.context = context;
@@ -419,7 +426,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public IValue put(String key, String value)
     {
-        return put(key, new TextValue(value));
+        return put(key, TextValue.valueOf(value));
     }
 
     @SuppressWarnings("unchecked")
@@ -544,12 +551,13 @@ final class Record implements IRecord, Cloneable
     @Override
     public Map<String, IValue> getOrCreateSubMap(String key)
     {
+        final String internKey = keysPool.intern(key);
         this.readLock.lock();
         try
         {
             if (this.subMaps != EMPTY_SUBMAP)
             {
-                Map<String, IValue> submap = this.subMaps.get(key);
+                Map<String, IValue> submap = this.subMaps.get(internKey);
                 if (submap != null)
                 {
                     return submap;
@@ -567,10 +575,10 @@ final class Record implements IRecord, Cloneable
             {
                 this.subMaps = newConcurrentHashMap(1);
             }
-            final SubMap newSubMap = new SubMap(this, key);
+            final SubMap newSubMap = new SubMap(this, internKey);
             // put if absent to handle multiple writers running concurrently but blocked by the lock
             // this ensures only the first added one is used
-            final Map<String, IValue> previous = this.subMaps.putIfAbsent(key, newSubMap);
+            final Map<String, IValue> previous = this.subMaps.putIfAbsent(internKey, newSubMap);
             return previous == null ? newSubMap : previous;
         }
         finally
@@ -741,16 +749,17 @@ final class Record implements IRecord, Cloneable
 
     IValue corePut_callWithWriteLock(String key, IValue value)
     {
+        final String internKey = keysPool.intern(key);
         // concurrent maps don't allow nulls
         if (value != null)
         {
-            final IValue previous = this.data.put(key, value);
+            final IValue previous = this.data.put(internKey, value);
             // if there is no change, we perform no update
             if (this.context != null)
             {
                 if (previous == null || !previous.equals(value))
                 {
-                    this.context.addEntryUpdatedToAtomicChange(this, key, value, previous);
+                    this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
                 }
             }
             return previous;
@@ -758,12 +767,12 @@ final class Record implements IRecord, Cloneable
         else
         {
             // a null is treated as if it removes the key
-            final IValue previous = this.data.remove(key);
+            final IValue previous = this.data.remove(internKey);
             if (this.context != null)
             {
                 if (previous != null)
                 {
-                    this.context.addEntryRemovedToAtomicChange(this, key, previous);
+                    this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
                 }
             }
             return previous;
@@ -1041,20 +1050,21 @@ final class SubMap implements Map<String, IValue>
 
     IValue corePut_callWithWriteLock(String key, IValue value)
     {
+        final String internKey = Record.keysPool.intern(key);
         // concurrent maps don't allow nulls
         if (value != null)
         {
-            final IValue previous = this.subMap.put(key, value);
+            final IValue previous = this.subMap.put(internKey, value);
             if (previous == null || !previous.equals(value))
             {
-                this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, key, value, previous);
+                this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
             }
             return previous;
         }
         else
         {
-            final IValue previous = this.subMap.remove(key);
-            this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key, previous);
+            final IValue previous = this.subMap.remove(internKey);
+            this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
             return previous;
         }
     }

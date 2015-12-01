@@ -213,7 +213,7 @@ public final class RpcInstance implements IRpcInstance
                     }
                     catch (Exception e)
                     {
-                        resultEntries.put(EXCEPTION, new TextValue(e.toString()));
+                        resultEntries.put(EXCEPTION, TextValue.valueOf(e.toString()));
                         Log.log(CallReceiver.class, "Exception handling RPC: " + callDetails, e);
                     }
 

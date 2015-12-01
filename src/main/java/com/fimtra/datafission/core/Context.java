@@ -1096,7 +1096,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 throw new IllegalStateException("An RPC already exists with name '" + rpc.getName() + "'");
             }
             this.rpcInstances.put(rpc.getName(), rpc);
-            contextRpcs.put(rpc.getName(), new TextValue(RpcInstance.constructDefinitionFromInstance(rpc)));
+            contextRpcs.put(rpc.getName(), TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
             Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc));
         }

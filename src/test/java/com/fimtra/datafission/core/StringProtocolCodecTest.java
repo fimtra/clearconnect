@@ -105,7 +105,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEncodeDecodeValue()
     {
         char[] chars = StringProtocolCodec.encodeValue(null).toString().toCharArray();
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length);
+        char[] tempArr = new char[chars.length];
+        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertNull("got: " + decodeValue, decodeValue);
     }
 
@@ -114,7 +115,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         TextValue value = new TextValue(StringProtocolCodec.NULL_VALUE);
         char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length);
+        char[] tempArr = new char[chars.length];
+        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertEquals(value, decodeValue);
     }
 
@@ -123,7 +125,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         TextValue value = new TextValue("");
         char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length);
+        char[] tempArr = new char[chars.length];
+        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertEquals(value, decodeValue);
     }
 

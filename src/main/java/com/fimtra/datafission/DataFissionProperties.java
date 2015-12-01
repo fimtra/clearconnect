@@ -15,9 +15,13 @@
  */
 package com.fimtra.datafission;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
+import com.fimtra.datafission.field.LongValue;
+import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ThimbleExecutor;
 
 /**
@@ -110,6 +114,43 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.reconnectThreadCount=2</code>
          */
         String RECONNECT_THREAD_COUNT = BASE + "reconnectThreadCount";
+
+        /**
+         * The system property name to define the maximum size of the keys pool used for record
+         * keys.<br>
+         * E.g. <code>-DdataFission.keysPoolMaxSize=200</code>
+         */
+        String KEYS_POOL_MAX = BASE + "keysPoolMaxSize";
+
+        /**
+         * The system property name to define the size of the {@link LongValue} pool.
+         * <p>
+         * <b>MUST BE AN EVEN NUMBER.</b> <br>
+         * E.g. <code>-DdataFission.longValuePoolSize=2048</code>
+         */
+        String LONG_VALUE_POOL_SIZE = BASE + "longValuePoolSize";
+
+        /**
+         * The system property name to define the size of the {@link TextValue} pool.<br>
+         * E.g. <code>-DdataFission.textValuePoolSize=2048</code>
+         */
+        String TEXT_VALUE_POOL_SIZE = BASE + "textValuePoolSize";
+
+        /**
+         * The system property name to define the length limit to be eligible for the value to be
+         * held in the {@link TextValue} pool.<br>
+         * E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>
+         */
+        String STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = BASE + "textLengthLimitForTextValuePool";
+
+        /**
+         * The system property name to define the estimated maximum number of concurrent threads
+         * that will access {@link IRecord} objects in the runtime. This is used to specify the
+         * concurrency of the {@link ConcurrentHashMap} components backing the records.<br>
+         * E.g. <code>-DdataFission.maxRecordConcurrency=2</code>
+         */
+        String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
+
     }
 
     /**
@@ -217,6 +258,54 @@ public abstract class DataFissionProperties
          * @see Names#RECONNECT_THREAD_COUNT
          */
         int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "2"));
+
+        /**
+         * The maximum size for the keys pool for records.
+         * <p>
+         * Default is 0 (unlimited).
+         * 
+         * @see Names#KEYS_POOL_MAX
+         */
+        int KEYS_POOL_MAX = Integer.parseInt(System.getProperty(Names.KEYS_POOL_MAX, "0"));
+
+        /**
+         * The size for the {@link LongValue} pool.
+         * <p>
+         * Default is 2048 (1024 to -1023).
+         * 
+         * @see Names#LONG_VALUE_POOL_SIZE
+         */
+        int LONG_VALUE_POOL_SIZE = Integer.parseInt(System.getProperty(Names.LONG_VALUE_POOL_SIZE, "2048"));
+
+        /**
+         * The size for the {@link TextValue} pool.
+         * <p>
+         * Default is 0 (unlimited).
+         * 
+         * @see Names#TEXT_VALUE_POOL_SIZE
+         */
+        int TEXT_VALUE_POOL_SIZE = Integer.parseInt(System.getProperty(Names.TEXT_VALUE_POOL_SIZE, "0"));
+
+        /**
+         * The text length limit to be eligible for the value to be held in the {@link TextValue}
+         * pool.
+         * <p>
+         * Default is 5.
+         * 
+         * @see Names#STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL
+         */
+        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = Integer.parseInt(System.getProperty(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
+
+        /**
+         * The estimated maximum number of concurrent threads that would access an {@link IRecord}.
+         * This is used in constructing the {@link ConcurrentHashMap} components backing the
+         * records.
+         * <p>
+         * Default is 2.
+         * 
+         * @see Names#MAX_RECORD_CONCURRENCY
+         */
+        int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, "2"));
     }
 
     private DataFissionProperties()

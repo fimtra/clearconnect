@@ -19,9 +19,7 @@ import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +33,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.RedundancyModeEnum;
@@ -84,7 +83,7 @@ import com.fimtra.util.is;
  */
 public final class PlatformRegistry
 {
-    static final IValue BLANK_VALUE = new TextValue("");
+    static final IValue BLANK_VALUE = TextValue.valueOf("");
     static final String GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE = "getServiceInfoForService";
     static final String GET_HEARTBEAT_CONFIG = "getHeartbeatConfig";
     static final String GET_PLATFORM_NAME = "getPlatformName";
@@ -152,6 +151,7 @@ public final class PlatformRegistry
         String HOST_NAME_FIELD = "HOST_NAME";
         String WIRE_PROTOCOL_FIELD = "WIRE_PROTOCOL";
         String REDUNDANCY_MODE_FIELD = "REDUNDANCY_MODE";
+        String TRANSPORT_TECHNOLOGY_FIELD = "TRANSPORT_TECHNOLOGY";
         /** The prefix for the record that holds the service info for a service instance */
         String SERVICE_INFO_RECORD_NAME_PREFIX = "ServiceInfo:";
     }
@@ -412,7 +412,7 @@ public final class PlatformRegistry
         this.platformSummary = this.context.createRecord(IRegistryRecordNames.PLATFORM_SUMMARY);
 
         this.platformSummary.put(IPlatformSummaryRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
-        
+
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
         this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,
@@ -427,7 +427,7 @@ public final class PlatformRegistry
         }, ISystemRecordNames.CONTEXT_RECORDS);
 
         this.context.publishAtomicChange(this.services);
-       
+
         // log when platform summary changes occur
         this.context.addObserver(new IRecordListener()
         {
@@ -439,28 +439,27 @@ public final class PlatformRegistry
         }, IRegistryRecordNames.PLATFORM_SUMMARY);
 
         // handle real-time updates for the platform summary
-        final IRecordListener platformSummaryListener =
-            new IRecordListener()
+        final IRecordListener platformSummaryListener = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+                PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
                 {
-                    PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
-                    {                        
-                        @Override
-                        public void run()
-                        {
-                            PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
-                        }
-                        
-                        @Override
-                        public Object context()
-                        {
-                            return IRegistryRecordNames.PLATFORM_SUMMARY;
-                        }
-                    });
-                }
-            };
+                    @Override
+                    public void run()
+                    {
+                        PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
+                    }
+
+                    @Override
+                    public Object context()
+                    {
+                        return IRegistryRecordNames.PLATFORM_SUMMARY;
+                    }
+                });
+            }
+        };
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.RUNTIME_STATUS);
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICES);
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
@@ -501,7 +500,7 @@ public final class PlatformRegistry
                     final String nextInstance =
                         PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue());
 
-                    return new TextValue(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
+                    return TextValue.valueOf(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
                 }
                 catch (Exception e)
                 {
@@ -520,7 +519,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                return new TextValue(PlatformRegistry.this.platformName);
+                return TextValue.valueOf(PlatformRegistry.this.platformName);
             }
         });
         this.context.createRpc(getPlatformName);
@@ -534,7 +533,7 @@ public final class PlatformRegistry
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                return new TextValue(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
+                return TextValue.valueOf(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
                     + ChannelUtils.WATCHDOG.getMissedHeartbeatCount());
             }
         });
@@ -545,10 +544,10 @@ public final class PlatformRegistry
     {
         // publish an RPC that allows registration
         // args: serviceFamily, objectWireProtocol, hostname, port, serviceMember,
-        // redundancyMode, agentName
+        // redundancyMode, agentName, TransportTechnologyEnum
         final RpcInstance register =
             new RpcInstance(TypeEnum.TEXT, REGISTER, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.LONG,
-                TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);
+                TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);
         register.setHandler(new IRpcExecutionHandler()
         {
             @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -563,6 +562,7 @@ public final class PlatformRegistry
                 final String serviceMember = args[i++].textValue();
                 final String redundancyMode = args[i++].textValue();
                 final String agentName = args[i++].textValue();
+                final String tte = args[i++].textValue();
 
                 if (serviceFamily.startsWith(PlatformRegistry.SERVICE_NAME))
                 {
@@ -583,18 +583,20 @@ public final class PlatformRegistry
                 serviceRecordStructure.put(ServiceInfoRecordFields.PORT_FIELD, LongValue.valueOf(port));
                 serviceRecordStructure.put(ServiceInfoRecordFields.REDUNDANCY_MODE_FIELD,
                     TextValue.valueOf(redundancyMode));
+                serviceRecordStructure.put(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD, TextValue.valueOf(tte));
 
                 try
                 {
                     PlatformRegistry.this.eventHandler.executeRegisterPlatformServiceInstance(serviceFamily,
-                        redundancyMode, agentName, serviceInstanceId, redundancyModeEnum, serviceRecordStructure, args);
+                        redundancyMode, agentName, serviceInstanceId, redundancyModeEnum,
+                        TransportTechnologyEnum.valueOf(tte), serviceRecordStructure, args);
                 }
                 catch (Exception e)
                 {
                     throw new ExecutionException(e);
                 }
 
-                return new TextValue("Registered " + serviceInstanceId);
+                return TextValue.valueOf("Registered " + serviceInstanceId);
             }
         });
         this.context.createRpc(register);
@@ -622,7 +624,7 @@ public final class PlatformRegistry
                     throw new ExecutionException(e);
                 }
 
-                return new TextValue("Deregistered " + serviceInstanceId);
+                return TextValue.valueOf("Deregistered " + serviceInstanceId);
             }
         });
         this.context.createRpc(deregister);
@@ -780,8 +782,8 @@ final class EventHandler
 
     Void executeRegisterPlatformServiceInstance(final String serviceFamily, final String redundancyMode,
         final String agentName, final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
-        final Map<String, IValue> serviceRecordStructure, final IValue... args) throws InterruptedException,
-        java.util.concurrent.ExecutionException
+        final TransportTechnologyEnum transportTechnology, final Map<String, IValue> serviceRecordStructure,
+        final IValue... args) throws InterruptedException, java.util.concurrent.ExecutionException
     {
         return this.eventExecutor.submit(new Callable<Void>()
         {
@@ -789,7 +791,7 @@ final class EventHandler
             public Void call() throws Exception
             {
                 return registerPlatformServiceInstance(serviceFamily, redundancyMode, agentName,
-                    serviceRecordStructure, serviceInstanceId, redundancyModeEnum, args);
+                    serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
             }
         }).get();
     }
@@ -1035,7 +1037,8 @@ final class EventHandler
     @SuppressWarnings("unused")
     private Void registerPlatformServiceInstance(final String serviceFamily, final String redundancyMode,
         final String agentName, final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
-        final RedundancyModeEnum redundancyModeEnum, final IValue... args) throws ExecutionException
+        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
+        final IValue... args) throws ExecutionException
     {
         if (this.registry.monitoredServiceInstances.containsKey(serviceInstanceId))
         {
@@ -1061,21 +1064,12 @@ final class EventHandler
                 throw new IllegalArgumentException("Unhandled mode '" + redundancyMode + "' for service '"
                     + serviceFamily + "'");
         }
-        final ProxyContext serviceProxy;
-        try
-        {
-            serviceProxy =
-                new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId, this.registry.context.getName()),
-                    PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
-                    PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
-                    PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure));
-        }
-        catch (IOException e)
-        {
-            Log.log(this.registry,
-                "Could not construct service proxy with connection settings RPC args " + Arrays.toString(args), e);
-            throw new ExecutionException("Could not register");
-        }
+        // connect to the service using the service's transport technology
+        final ProxyContext serviceProxy =
+            new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId, this.registry.context.getName()),
+                PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
+                PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
+                PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology);
         this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
         this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
         serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);

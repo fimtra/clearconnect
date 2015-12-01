@@ -29,6 +29,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.fimtra.channel.EndPointAddress;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
@@ -112,13 +113,14 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         WireProtocolEnum wireProtocol, String host, int port)
     {
         this(platformName, serviceFamily, serviceMember, wireProtocol, RedundancyModeEnum.FAULT_TOLERANT, host, port,
-            null, null, null);
+            null, null, null, TransportTechnologyEnum.getDefaultFromSystemProperty());
     }
 
     @SuppressWarnings({ "unchecked" })
     PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode, String host, int port,
-        ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor)
+        ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
+        TransportTechnologyEnum transportTechnology)
     {
         this.startTimeMillis = System.currentTimeMillis();
 
@@ -186,7 +188,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
             DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
 
-        this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port);
+        this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
         this.recordAvailableNotifyingCache =
             PlatformUtils.createRecordAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RECORDS, this);
         this.rpcAvailableNotifyingCache =

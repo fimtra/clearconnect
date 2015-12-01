@@ -39,6 +39,7 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
@@ -500,7 +501,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode)
     {
         return createPlatformServiceInstance(serviceFamily, serviceMember, host,
-            PlatformUtils.getNextAvailableServicePort(host), wireProtocol, redundacyMode);
+            PlatformUtils.getNextAvailableServicePort(), wireProtocol, redundacyMode);
     }
 
     @Override
@@ -508,13 +509,31 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode)
     {
         return createPlatformServiceInstance(serviceFamily, serviceMember, host, port, wireProtocol, redundacyMode,
-            null, null, null);
+            TransportTechnologyEnum.getDefaultFromSystemProperty());
+    }
+
+    @Override
+    public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology)
+    {
+        return createPlatformServiceInstance(serviceFamily, serviceMember, hostName,
+            transportTechnology.getNextAvailableServicePort(), wireProtocol, redundacyMode,
+            transportTechnology);
+    }
+
+    @Override
+    public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology)
+    {
+        return createPlatformServiceInstance(serviceFamily, serviceMember, hostName, port, wireProtocol, redundacyMode,
+            null, null, null, transportTechnology);
     }
 
     @Override
     public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host, int port,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, ThimbleExecutor coreExecutor,
-        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor)
+        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
+        TransportTechnologyEnum transportTechnology)
     {
         this.createLock.lock();
         try
@@ -530,7 +549,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 platformServiceInstance =
                     new PlatformServiceInstance(this.platformName, serviceFamily, serviceMember, wireProtocol,
-                        redundacyMode, host, port, coreExecutor, rpcExecutor, utilityExecutor);
+                        redundacyMode, host, port, coreExecutor, rpcExecutor, utilityExecutor, transportTechnology);
                 registerService(platformServiceInstance);
             }
             catch (Exception e)
@@ -552,12 +571,13 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
         this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
-            new TextValue(serviceInstance.getPlatformServiceFamily()),
-            new TextValue(serviceInstance.getWireProtocol().toString()),
-            new TextValue(serviceInstance.getEndPointAddress().getNode()),
+            TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
+            TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
+            TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
             LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
-            new TextValue(serviceInstance.getPlatformServiceMemberName()),
-            new TextValue(serviceInstance.getRedundancyMode().toString()), new TextValue(this.agentName));
+            TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
+            TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
+            TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
     }
 
     @Override
@@ -570,8 +590,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             try
             {
-                this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(new TextValue(serviceFamily),
-                    new TextValue(serviceMember));
+                this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(TextValue.valueOf(serviceFamily),
+                    TextValue.valueOf(serviceMember));
                 this.localPlatformServiceInstances.remove(PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
                     serviceMember));
                 service.destroy();
@@ -622,15 +642,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 final ICodec<?> codec = PlatformUtils.getCodecFromServiceInfoRecord(serviceInfoRecord);
                 final String host = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
                 final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
-                try
-                {
-                    proxy = new PlatformServiceProxy(this, serviceFamily, codec, host, port);
-                    this.serviceProxies.put(serviceFamily, proxy);
-                }
-                catch (IOException e)
-                {
-                    Log.log(PlatformRegistryAgent.this, "Could not create proxy to service " + serviceFamily, e);
-                }
+                final TransportTechnologyEnum transportTechnology =
+                    PlatformUtils.getTransportTechnologyFromServiceInfoRecord(serviceInfoRecord);
+                proxy = new PlatformServiceProxy(this, serviceFamily, codec, host, port, transportTechnology);
+                this.serviceProxies.put(serviceFamily, proxy);
             }
             return proxy;
         }
@@ -669,40 +684,34 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 final ICodec<?> codec = PlatformUtils.getCodecFromServiceInfoRecord(serviceInfoRecord);
                 final String host = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
                 final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
-                try
-                {
-                    proxy = new PlatformServiceProxy(this, serviceInstanceId, codec, host, port);
-                    proxy.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
-                        PlatformRegistry.CODEC.getFrameEncodingFormat(), new IEndPointAddressFactory()
+                final TransportTechnologyEnum transportTechnology =
+                    PlatformUtils.getTransportTechnologyFromServiceInfoRecord(serviceInfoRecord);
+                proxy = new PlatformServiceProxy(this, serviceInstanceId, codec, host, port, transportTechnology);
+                proxy.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
+                    PlatformRegistry.CODEC.getFrameEncodingFormat(), new IEndPointAddressFactory()
+                    {
+                        @Override
+                        public EndPointAddress next()
                         {
-                            @Override
-                            public EndPointAddress next()
+                            Log.log(this, "Obtaining service info record for '", serviceInstanceId, "'");
+                            Map<String, IValue> serviceInfoRecord =
+                                PlatformRegistryAgent.this.registryProxy.getRemoteRecordImage(
+                                    ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
+                                    getRegistryReconnectPeriodMillis());
+                            if (serviceInfoRecord == null)
                             {
-                                Log.log(this, "Obtaining service info record for '", serviceInstanceId, "'");
-                                Map<String, IValue> serviceInfoRecord =
-                                    PlatformRegistryAgent.this.registryProxy.getRemoteRecordImage(
-                                        ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
-                                        getRegistryReconnectPeriodMillis());
-                                if (serviceInfoRecord == null)
-                                {
-                                    Log.log(this, "No service info record found for '", serviceInstanceId, "'");
-                                    return null;
-                                }
-                                final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
-                                final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
-                                final EndPointAddress endPointAddress = new EndPointAddress(node, port);
-                                Log.log(this, "Service instance '" + serviceInstanceId, "' ",
-                                    ObjectUtils.safeToString(endPointAddress));
-                                return endPointAddress;
+                                Log.log(this, "No service info record found for '", serviceInstanceId, "'");
+                                return null;
                             }
-                        }));
-                    this.serviceInstanceProxies.put(serviceInstanceId, proxy);
-                }
-                catch (IOException e)
-                {
-                    Log.log(PlatformRegistryAgent.this, "Could not create proxy to service instance "
-                        + serviceInstanceId, e);
-                }
+                            final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
+                            final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
+                            final EndPointAddress endPointAddress = new EndPointAddress(node, port);
+                            Log.log(this, "Service instance '" + serviceInstanceId, "' ",
+                                ObjectUtils.safeToString(endPointAddress));
+                            return endPointAddress;
+                        }
+                    }));
+                this.serviceInstanceProxies.put(serviceInstanceId, proxy);
             }
             return proxy;
         }
@@ -826,7 +835,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             String instanceForService =
                 this.registryProxy.getRpc(PlatformRegistry.GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE).execute(
-                    new TextValue(serviceFamily)).textValue();
+                    TextValue.valueOf(serviceFamily)).textValue();
             if (instanceForService == null)
             {
                 Log.log("Registry has no service registered for '", serviceFamily, "'");

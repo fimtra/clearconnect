@@ -211,6 +211,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         try
         {
+            char[] tempArr = new char[50];
             final char[][] tokens = findTokens(decodedMessage);
             final String name = stringFromCharBuffer(tokens[1]);
             final AtomicChange atomicChange = new AtomicChange(name);
@@ -259,20 +260,27 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     if (previous != '\\')
                                     {
                                         currentTokenChars = tokens[i];
+                                        if (tempArr.length < currentTokenChars.length)
+                                        {
+                                            tempArr = new char[currentTokenChars.length];
+                                        }
                                         if (processSubmaps)
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
-                                                    decodeKey(currentTokenChars, 0, j, true),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length),
-                                                    null);
+                                                atomicChange.mergeSubMapEntryUpdatedChange(
+                                                    subMapName,
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
+                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
+                                                        tempArr), null);
                                             }
                                             else
                                             {
-                                                atomicChange.mergeSubMapEntryRemovedChange(subMapName,
-                                                    decodeKey(currentTokenChars, 0, j, true),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length));
+                                                atomicChange.mergeSubMapEntryRemovedChange(
+                                                    subMapName,
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
+                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
+                                                        tempArr));
                                             }
                                         }
                                         else
@@ -280,15 +288,16 @@ public class StringProtocolCodec implements ICodec<char[]>
                                             if (put)
                                             {
                                                 atomicChange.mergeEntryUpdatedChange(
-                                                    decodeKey(currentTokenChars, 0, j, true),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length),
-                                                    null);
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
+                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
+                                                        tempArr), null);
                                             }
                                             else
                                             {
                                                 atomicChange.mergeEntryRemovedChange(
-                                                    decodeKey(currentTokenChars, 0, j, true),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length));
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
+                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
+                                                        tempArr));
                                             }
                                         }
                                         j = chars.length;
@@ -533,10 +542,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     /**
      * Performs unescaping and decoding of a key
      */
-    static String decodeKey(char[] chars, int start, int end, boolean hasPreamble)
+    static String decodeKey(char[] chars, int start, int end, boolean hasPreamble, char[] unescaped)
     {
-        final int len = end - start;
-        final char[] unescaped = new char[len];
         final int unescapedPtr = doUnescape(chars, start, end, unescaped);
 
         if (KEY_PREAMBLE_CHARS.length == unescapedPtr)
@@ -568,9 +575,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     /**
      * Performs unescaping and decoding of a value
      */
-    static IValue decodeValue(char[] chars, int start, int end)
+    static IValue decodeValue(char[] chars, int start, int end, char[] unescaped)
     {
-        final char[] unescaped = new char[end - start];
         final int unescapedPtr = doUnescape(chars, start, end, unescaped);
 
         if (NULL_VALUE_CHARS.length == unescapedPtr)
@@ -683,7 +689,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
     {
         final Map<String, IValue> callDetails = new HashMap<String, IValue>();
-        callDetails.put(Remote.RESULT_RECORD_NAME, new TextValue(resultRecordName));
+        callDetails.put(Remote.RESULT_RECORD_NAME, TextValue.valueOf(resultRecordName));
         callDetails.put(Remote.ARGS_COUNT, LongValue.valueOf(args.length));
         for (int i = 0; i < args.length; i++)
         {

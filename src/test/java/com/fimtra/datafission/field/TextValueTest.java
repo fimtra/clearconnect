@@ -39,7 +39,7 @@ public class TextValueTest
     @Test
     public void testCreating()
     {
-        TextValue textValue = new TextValue();
+        TextValue textValue = new TextValue(TextValue.NULL);
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -73,23 +73,17 @@ public class TextValueTest
         assertEquals(0, textValue.longValue());
     }
 
-    @Test
+    @Test(expected=IllegalArgumentException.class)
     public void testFromCharsWithNull()
     {
-        TextValue textValue = new TextValue();
-        textValue.fromChars(null, 0, 1);
-        assertNotNull(textValue.textValue());
-        assertSame(TextValue.NULL, textValue.textValue());
-        assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
-        assertEquals(0, textValue.longValue());
+        TextValue.valueOf((char[]) null, 0, 1);
     }
 
     @Test
     public void testFromCharsWithNullString()
     {
-        TextValue textValue = new TextValue();
         char[] chars = "null".toCharArray();
-        textValue.fromChars(chars, 0, chars.length);
+        TextValue textValue = TextValue.valueOf(chars, 0, chars.length);
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -148,43 +142,9 @@ public class TextValueTest
     @Test
     public void testGetType()
     {
-        assertEquals(TypeEnum.TEXT, new TextValue().getType());
+        assertEquals(TypeEnum.TEXT, new TextValue("").getType());
     }
 
-    @Test
-    public void testFromStringWithNewNullString()
-    {
-        TextValue textValue = new TextValue();
-        // NOTE: this test is required for de-serialisation where the string will be new
-        textValue.fromString(new String("null"));
-        assertNotNull(textValue.textValue());
-        assertSame(TextValue.NULL, textValue.textValue());
-        assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
-        assertEquals(0, textValue.longValue());
-    }
-
-    @Test
-    public void testFromStringWithNull()
-    {
-        TextValue textValue = new TextValue();
-        textValue.fromString(null);
-        assertNotNull(textValue.textValue());
-        assertSame(TextValue.NULL, textValue.textValue());
-        assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
-        assertEquals(0, textValue.longValue());
-    }
-
-    @Test
-    public void testFromStringWithNullString()
-    {
-        TextValue textValue = new TextValue();
-        textValue.fromString("null");
-        assertNotNull(textValue.textValue());
-        assertSame(TextValue.NULL, textValue.textValue());
-        assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
-        assertEquals(0, textValue.longValue());
-    }
-    
     @Test
     public void testGet()
     {

@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission.field;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.is;
 
@@ -25,7 +26,7 @@ import com.fimtra.util.is;
  */
 public final class LongValue extends AbstractValue
 {
-    static final int POOL_SIZE = 2048;
+    static final int POOL_SIZE = DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;
     static final LongValue[] pool = new LongValue[POOL_SIZE];
     static final int poolTop = POOL_SIZE / 2;
     static final int poolBottom = -((POOL_SIZE / 2) - 1);
@@ -108,18 +109,6 @@ public final class LongValue extends AbstractValue
     public String textValue()
     {
         return Long.toString(this.value);
-    }
-
-    @Override
-    public void fromString(String value)
-    {
-        this.value = Long.valueOf(value).longValue();
-    }
-
-    @Override
-    void fromChars(char[] chars, int start, int len)
-    {
-        this.value = Long.valueOf(new String(chars, start, len)).longValue();
     }
 
     @Override

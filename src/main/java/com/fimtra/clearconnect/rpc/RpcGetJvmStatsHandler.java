@@ -37,15 +37,15 @@ public class RpcGetJvmStatsHandler implements IRpcExecutionHandler {
 	private static final String freeMemoryLabel = "Free memory (MB): ";
 	private static final String maxMemoryLabel = "Max memory (MB): ";
 	private static final String totalMemoryLabel = "Total memory (MB): ";
-	private static int megaByteFactor = 1024 * 1024;
+	private static double megaByteFactor = 1d / (1024 * 1024);
 
 	@Override
 	public IValue execute(IValue... args) throws TimeOutException, ExecutionException {
 		Runtime runtime = Runtime.getRuntime();
 		int processorCount = runtime.availableProcessors();
-		long freeMemoryMegaBytes = runtime.freeMemory() / megaByteFactor;
-		long maxMemoryMegaBytpes = runtime.maxMemory() / megaByteFactor;
-		long totalMemoryMegaBytes = runtime.totalMemory() / megaByteFactor;
+		long freeMemoryMegaBytes = (long) (runtime.freeMemory() * megaByteFactor);
+		long maxMemoryMegaBytpes = (long) (runtime.maxMemory() * megaByteFactor);
+		long totalMemoryMegaBytes = (long) (runtime.totalMemory() * megaByteFactor);
 		Properties systemProperties = System.getProperties();
 
 		StringBuilder statsBuilder = new StringBuilder();
@@ -58,6 +58,6 @@ public class RpcGetJvmStatsHandler implements IRpcExecutionHandler {
 			statsBuilder.append(systemPropertyKey).append(": ").append(systemProperties.getProperty(systemPropertyKey))
 					.append(SystemUtils.lineSeparator());
 		}
-		return new TextValue(statsBuilder.toString());
+		return TextValue.valueOf(statsBuilder.toString());
 	}
 }

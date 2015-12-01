@@ -15,7 +15,6 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -25,13 +24,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
+import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
-import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
@@ -67,14 +67,21 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
 
     @SuppressWarnings({ "rawtypes" })
     PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
-        final int port) throws IOException
+        final int port)
+    {
+        this(registryAgent, serviceFamily, codec, host, port, TransportTechnologyEnum.getDefaultFromSystemProperty());
+    }
+
+    @SuppressWarnings({ "rawtypes" })
+    PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
+        final int port, TransportTechnologyEnum transportTechnology)
     {
         this.platformName = registryAgent.getPlatformName();
         this.serviceFamily = serviceFamily;
         this.registryAgent = registryAgent;
         this.proxyContext =
             new ProxyContext(PlatformUtils.composeProxyName(serviceFamily, registryAgent.getAgentName()), codec, host,
-                port);
+                port, transportTechnology);
 
         // set the channel builder factory to use an end-point factory that gets end-points from the
         // registry
@@ -119,7 +126,6 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
-    
     @Override
     public Future<Map<String, Boolean>> addRecordListener(IRecordListener listener, String... recordNames)
     {
@@ -127,7 +133,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     }
 
     @Override
-    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener, String... recordNames)
+    public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener,
+        String... recordNames)
     {
         return this.proxyContext.addObserver(permissionToken, listener, recordNames);
     }
@@ -221,7 +228,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
         this.proxyContext.destroy();
-        
+
         this.recordAvailableNotifyingCache.destroy();
         this.recordConnectionStatusNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
@@ -301,7 +308,6 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         return this.serviceConnectionStatusNotifyingCache.removeListener(listener);
     }
-
 
     @Override
     public boolean isConnected()

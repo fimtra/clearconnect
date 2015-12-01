@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.Log;
+import com.fimtra.util.ObjectUtils;
 
 /**
  * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
@@ -131,7 +132,6 @@ public final class ChannelWatchdog implements Runnable
      */
     public void addChannel(final ITransportChannel channel)
     {
-        // Log.log(this, "Monitoring " + channel);
         this.channels.add(channel);
         this.executor.execute(new Runnable()
         {
@@ -169,7 +169,8 @@ public final class ChannelWatchdog implements Runnable
                         Integer missedCount = this.channelsMissingHeartbeat.get(channel);
                         if (missedCount != null && missedCount.intValue() > this.missedHeartbeatCount)
                         {
-                            channel.destroy("Heartbeat not received");
+                            channel.destroy("Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount
+                                + " heartbeats");
                             stopMonitoring(channel);
                         }
 
@@ -185,6 +186,9 @@ public final class ChannelWatchdog implements Runnable
                             {
                                 count = Integer.valueOf(count.intValue() + 1);
                             }
+                            Log.log(this, "Missed heartbeat ", count.toString(), "/",
+                                Integer.toString(this.missedHeartbeatCount), " from ",
+                                ObjectUtils.safeToString(channel));
                             this.channelsMissingHeartbeat.put(channel, count);
                         }
                     }
@@ -209,7 +213,6 @@ public final class ChannelWatchdog implements Runnable
         {
             ChannelWatchdog.this.channelsReceivingHeartbeat.remove(channel);
             ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel);
-            // Log.log(this, "Not monitoring " + channel);
         }
     }
 

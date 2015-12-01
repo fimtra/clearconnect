@@ -29,10 +29,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.EndPointAddress;
-import com.fimtra.channel.EndPointServiceLoader;
 import com.fimtra.channel.IEndPointService;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.ICodec.CommandEnum;
@@ -309,14 +309,16 @@ public class Publisher
             final EndPointAddress endPointAddress = Publisher.this.server.getEndPointAddress();
             final String clientSocket = client.getEndPointDescription();
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_ID,
-                new TextValue(Publisher.this.context.getName()));
+                TextValue.valueOf(Publisher.this.context.getName()));
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_NODE,
-                new TextValue(endPointAddress.getNode()));
+                TextValue.valueOf(endPointAddress.getNode()));
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_PORT,
                 LongValue.valueOf(endPointAddress.getPort()));
-            submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, new TextValue(clientSocket));
-            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, new TextValue(
+            submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, TextValue.valueOf(clientSocket));
+            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, TextValue.valueOf(
                 this.codec.getClass().getSimpleName()));
+            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT, TextValue.valueOf(
+                Publisher.this.getTransportTechnology().toString()));
 
             scheduleStatsUpdateTask();
 
@@ -423,7 +425,7 @@ public class Publisher
         {
             this.identity = identity;
             Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.client)).put(
-                IContextConnectionsRecordFields.PROXY_ID, new TextValue(this.identity));
+                IContextConnectionsRecordFields.PROXY_ID, TextValue.valueOf(this.identity));
         }
 
         @Override
@@ -469,6 +471,7 @@ public class Publisher
     final IEndPointService server;
     final IRecord connectionsRecord;
     final ProxyContextMultiplexer multiplexer;
+    final TransportTechnologyEnum transportTechnology;
     volatile long contextConnectionsRecordPublishPeriodMillis = 10000;
     ScheduledFuture contextConnectionsRecordPublishTask;
     volatile long messagesPublished;
@@ -477,6 +480,8 @@ public class Publisher
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
      * {@link ProxyContext} objects.
+     * <p>
+     * This uses the transport technology defined by the system property <code>-Dtransport</code>
      * 
      * @param context
      *            the context the publisher is for
@@ -486,11 +491,34 @@ public class Publisher
      *            the node for the {@link EndPointAddress} of this publisher
      * @param port
      *            the port for the {@link EndPointAddress} of this publisher
+     * @see TransportTechnologyEnum
      */
     public Publisher(Context context, ICodec codec, String node, int port)
     {
+        this(context, codec, node, port, TransportTechnologyEnum.getDefaultFromSystemProperty());
+    }
+
+    /**
+     * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
+     * {@link ProxyContext} objects. This constructor provides the {@link TransportTechnologyEnum}
+     * to use.
+     * 
+     * @param context
+     *            the context the publisher is for
+     * @param codec
+     *            the codec to use for sending/receiving messages from the {@link ProxyContext}
+     * @param node
+     *            the node for the {@link EndPointAddress} of this publisher
+     * @param port
+     *            the port for the {@link EndPointAddress} of this publisher
+     * @param transportTechnology
+     *            the enum expressing the transport technology to use
+     */
+    public Publisher(Context context, ICodec codec, String node, int port, TransportTechnologyEnum transportTechnology)
+    {
         super();
         this.context = context;
+        this.transportTechnology = transportTechnology;
         this.lock = new ReentrantLock();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
@@ -500,96 +528,94 @@ public class Publisher
 
         this.mainCodec = codec;
         this.server =
-            EndPointServiceLoader.load(this.mainCodec.getFrameEncodingFormat(), new EndPointAddress(node, port)).buildService(
-                new IReceiver()
+            transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
+                new EndPointAddress(node, port)).buildService(new IReceiver()
+            {
+                @Override
+                public void onChannelConnected(ITransportChannel channel)
                 {
-                    @Override
-                    public void onChannelConnected(ITransportChannel channel)
-                    {
-                        // construct the ProxyContextPublisher
-                        Publisher.this.proxyContextPublishers.put(channel, new ProxyContextPublisher(channel,
-                            Publisher.this.mainCodec.newInstance()));
-                    }
+                    // construct the ProxyContextPublisher
+                    Publisher.this.proxyContextPublishers.put(channel, new ProxyContextPublisher(channel,
+                        Publisher.this.mainCodec.newInstance()));
+                }
 
-                    @Override
-                    public void onDataReceived(final byte[] data, final ITransportChannel source)
+                @Override
+                public void onDataReceived(final byte[] data, final ITransportChannel source)
+                {
+                    Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                     {
-                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
+                        @SuppressWarnings("unchecked")
+                        @Override
+                        public void run()
                         {
-                            @SuppressWarnings("unchecked")
-                            @Override
-                            public void run()
+                            final ICodec channelsCodec = getProxyContextPublisher(source).codec;
+                            Object decodedMessage = channelsCodec.decode(data);
+                            final CommandEnum command = channelsCodec.getCommand(decodedMessage);
+                            if (log)
                             {
-                                final ICodec channelsCodec = getProxyContextPublisher(source).codec;
-                                Object decodedMessage = channelsCodec.decode(data);
-                                final CommandEnum command = channelsCodec.getCommand(decodedMessage);
-                                if (log)
+                                final int maxLogLength = 128;
+                                if (decodedMessage instanceof char[])
                                 {
-                                    final int maxLogLength = 128;
-                                    if (decodedMessage instanceof char[])
+                                    if (((char[]) decodedMessage).length < maxLogLength)
                                     {
-                                        if (((char[]) decodedMessage).length < maxLogLength)
-                                        {
-                                            Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage),
-                                                "' from ", ObjectUtils.safeToString(source));
-                                        }
-                                        else
-                                        {
-                                            Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage, 0,
-                                                maxLogLength), "...(too long)' from ", ObjectUtils.safeToString(source));
-                                        }
+                                        Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage),
+                                            "' from ", ObjectUtils.safeToString(source));
                                     }
                                     else
                                     {
-                                        Log.log(Publisher.class, "(<-) ", command.toString(), " from ",
-                                            ObjectUtils.safeToString(source));
+                                        Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage, 0,
+                                            maxLogLength), "...(too long)' from ", ObjectUtils.safeToString(source));
                                     }
                                 }
-                                switch(command)
+                                else
                                 {
-                                    case RPC:
-                                        rpc(decodedMessage, source);
-                                        break;
-                                    case IDENTIFY:
-                                        identify(channelsCodec.getIdentityArgumentFromDecodedMessage(decodedMessage),
-                                            source);
-                                        break;
-                                    case SHOW:
-                                        show(source);
-                                        break;
-                                    case SUBSCRIBE:
-                                        subscribe(
-                                            channelsCodec.getSubscribeArgumentsFromDecodedMessage(decodedMessage),
-                                            source);
-                                        break;
-                                    case UNSUBSCRIBE:
-                                        unsubscribe(
-                                            channelsCodec.getUnsubscribeArgumentsFromDecodedMessage(decodedMessage),
-                                            source);
-                                        break;
-                                    case NOOP:
-                                        break;
+                                    Log.log(Publisher.class, "(<-) ", command.toString(), " from ",
+                                        ObjectUtils.safeToString(source));
                                 }
                             }
-
-                            @Override
-                            public Object context()
+                            switch(command)
                             {
-                                return Publisher.this;
+                                case RPC:
+                                    rpc(decodedMessage, source);
+                                    break;
+                                case IDENTIFY:
+                                    identify(channelsCodec.getIdentityArgumentFromDecodedMessage(decodedMessage),
+                                        source);
+                                    break;
+                                case SHOW:
+                                    show(source);
+                                    break;
+                                case SUBSCRIBE:
+                                    subscribe(channelsCodec.getSubscribeArgumentsFromDecodedMessage(decodedMessage),
+                                        source);
+                                    break;
+                                case UNSUBSCRIBE:
+                                    unsubscribe(
+                                        channelsCodec.getUnsubscribeArgumentsFromDecodedMessage(decodedMessage), source);
+                                    break;
+                                case NOOP:
+                                    break;
                             }
-                        });
-                    }
-
-                    @Override
-                    public void onChannelClosed(ITransportChannel channel)
-                    {
-                        ProxyContextPublisher clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
-                        if (clientPublisher != null)
-                        {
-                            clientPublisher.destroy();
                         }
+
+                        @Override
+                        public Object context()
+                        {
+                            return Publisher.this;
+                        }
+                    });
+                }
+
+                @Override
+                public void onChannelClosed(ITransportChannel channel)
+                {
+                    ProxyContextPublisher clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
+                    if (clientPublisher != null)
+                    {
+                        clientPublisher.destroy();
                     }
-                });
+                }
+            });
 
         this.multiplexer = new ProxyContextMultiplexer(this.server);
     }
@@ -799,5 +825,10 @@ public class Publisher
     public long getBytesPublished()
     {
         return this.bytesPublished;
+    }
+
+    public TransportTechnologyEnum getTransportTechnology()
+    {
+        return this.transportTechnology;
     }
 }

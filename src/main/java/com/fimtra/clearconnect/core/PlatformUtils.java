@@ -26,10 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarFile;
 
-import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceComponent;
-import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
@@ -115,10 +113,20 @@ public class PlatformUtils
             SystemUtils.lineSeparator());
         sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
-        VERSION = version;
+
+        String versionNumber = "?.?.?";
+        for (int i = 0; i < version.length(); i++)
+        {
+            if (Character.isDigit(version.charAt(i)))
+            {
+                versionNumber = version.substring(i);
+                break;
+            }
+        }
+        VERSION = versionNumber;
     }
 
-    public static final TextValue OK = new TextValue("OK");
+    public static final TextValue OK = TextValue.valueOf("OK");
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";
@@ -644,6 +652,11 @@ public class PlatformUtils
         return (int) serviceRecord.get(ServiceInfoRecordFields.PORT_FIELD).longValue();
     }
 
+    static TransportTechnologyEnum getTransportTechnologyFromServiceInfoRecord(Map<String, IValue> serviceRecord)
+    {
+        return TransportTechnologyEnum.valueOf(serviceRecord.get(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD).textValue());
+    }
+
     static ICodec<?> getCodecFromServiceInfoRecord(Map<String, IValue> serviceRecord)
     {
         String codecName = serviceRecord.get(ServiceInfoRecordFields.WIRE_PROTOCOL_FIELD).textValue();
@@ -786,36 +799,21 @@ public class PlatformUtils
     }
 
     /**
-     * Get the next free default TCP server port for the given host.
-     * 
-     * @see PlatformCoreProperties#TCP_SERVER_PORT_RANGE_START
-     * @param host
-     *            the hostname to use to find the next free default TCP server
-     * @return a free TCP server port that can have a TCP server socket bound to it, -1 if there is
-     *         not a free port
-     * @deprecated use {@link #getNextAvailableServicePort(String)}
+     * @deprecated use {@link #getNextAvailableServicePort()}
      */
+    @SuppressWarnings("unused")
     @Deprecated
     public static int getNextFreeDefaultTcpServerPort(String host)
     {
-        return getNextAvailableServicePort(host);
+        return getNextAvailableServicePort();
     }
 
     /**
-     * Get the next available service port to use for the host.
-     * 
-     * @see TransportTechnologyEnum#getNextAvailableServicePort(String, int, int)
-     * @see PlatformCoreProperties#TCP_SERVER_PORT_RANGE_START
-     * @param host
-     *            the hostname to use to find the next free default TCP server
-     * @return a free server port that can have a server socket bound to it, -1 if there is not a
-     *         free port
+     * @see TransportTechnologyEnum#getNextAvailableServicePort()
      */
-    public static int getNextAvailableServicePort(String host)
+    public static int getNextAvailableServicePort()
     {
-        return ChannelUtils.getNextAvailableServicePort(host,
-            PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_START,
-            PlatformCoreProperties.Values.TCP_SERVER_PORT_RANGE_END);
+        return TransportTechnologyEnum.getDefaultFromSystemProperty().getNextAvailableServicePort();
     }
 
     private static void awaitUpdateLatch(final Object logContext, String recordName, final OneShotLatch updateWaitLatch)

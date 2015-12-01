@@ -15,16 +15,7 @@
  */
 package com.fimtra.channel;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
-
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
-import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
 /**
@@ -36,20 +27,49 @@ import com.fimtra.util.ObjectUtils;
 public enum TransportTechnologyEnum
 {
     // specify the classes used per transport technology
-        TCP("com.fimtra.tcpchannel.TcpChannelBuilderFactory", "com.fimtra.tcpchannel.TcpServerBuilder"),
+        TCP("com.fimtra.tcpchannel.TcpChannelBuilderFactory", "com.fimtra.tcpchannel.TcpServerBuilder", ":"),
 
         SOLACE("com.fimtra.channel.solace.SolaceChannelBuilderFactory",
-            "com.fimtra.channel.solace.SolaceServiceBuilder");
+            "com.fimtra.channel.solace.SolaceServiceBuilder", "/");
 
     public static final String SYSTEM_PROPERTY = "transport";
 
+    /**
+     * @return the {@link TransportTechnologyEnum} defined by the system property
+     *         {@link #SYSTEM_PROPERTY}, defaulting to {@link #TCP} if not defined.
+     */
+    public static TransportTechnologyEnum getDefaultFromSystemProperty()
+    {
+        Object tte = System.getProperties().get(TransportTechnologyEnum.SYSTEM_PROPERTY);
+        if (tte != null)
+        {
+            return valueOf(tte.toString());
+        }
+        else
+        {
+            return TCP;
+        }
+    }
+
     final String endPointServiceBuilderClassName;
     final String transportChannelBuilderFactoryLoaderClassName;
+    final String nodePortDelimiter;
 
-    TransportTechnologyEnum(String transportChannelBuilderFactoryLoaderClassName, String endPointServiceBuilderClassName)
+    TransportTechnologyEnum(String transportChannelBuilderFactoryLoaderClassName,
+        String endPointServiceBuilderClassName, String nodePortDelimiter)
     {
         this.transportChannelBuilderFactoryLoaderClassName = transportChannelBuilderFactoryLoaderClassName;
         this.endPointServiceBuilderClassName = endPointServiceBuilderClassName;
+        this.nodePortDelimiter = nodePortDelimiter;
+    }
+
+    /**
+     * @return the delimiter to separate the node portion from the port portion of a service end
+     *         point description for this transport technology
+     */
+    public String getNodePortDelimiter()
+    {
+        return this.nodePortDelimiter;
     }
 
     public ITransportChannelBuilderFactory constructTransportChannelBuilderFactory(
@@ -105,23 +125,15 @@ public enum TransportTechnologyEnum
     /**
      * For the transport technology, finds an available "service" port to use.
      * <ul>
-     * <li>For {@link TransportTechnologyEnum#TCP} (<code>-Dtransport=TCP</code>) this will perform
-     * proper TCP port scanning to find an available port.
+     * <li>For {@link TransportTechnologyEnum#TCP} (<code>-Dtransport=TCP</code>) this will use an
+     * ephemeral port (0).
      * <li>For {@link TransportTechnologyEnum#SOLACE} (<code>-Dtransport=SOLACE</code>) this method
      * will simply return a unique integer.
      * </ul>
      * 
-     * @param hostName
-     *            (TCP usage only) the hostname to use to find the next free default TCP server
-     * @param startPortRangeInclusive
-     *            (TCP usage only) the start port to use for the free server socket scan
-     * @param endPortRangeExclusive
-     *            (TCP usage only) the end port <b>exclusive</b> to use for the free server socket
-     *            scan
-     * @return the server port to use, -1 if no port is available
+     * @return the service port to use for the transport technology.
      */
-    public synchronized int getNextAvailableServicePort(String hostName, int startPortRangeInclusive,
-        int endPortRangeExclusive)
+    public synchronized int getNextAvailableServicePort()
     {
         switch(this)
         {
@@ -129,47 +141,8 @@ public enum TransportTechnologyEnum
                 // number of millis since ~15:21 on 15-Nov-2015 GMT
                 return System.identityHashCode(SOLACE) + (int) (System.currentTimeMillis() - 1447600859369l);
             case TCP:
-            {
-                String hostAddress = TcpChannelUtils.LOCALHOST_IP;
-                try
-                {
-                    hostAddress = InetAddress.getByName(hostName).getHostAddress();
-                }
-                catch (UnknownHostException e)
-                {
-                }
-                for (int i = startPortRangeInclusive; i < endPortRangeExclusive; i++)
-                {
-                    try
-                    {
-                        Log.log(this, "Trying ", hostAddress, ":", Integer.toString(i));
-                        final ServerSocket serverSocket = new ServerSocket();
-                        serverSocket.bind(new InetSocketAddress(hostAddress, i));
-                        serverSocket.close();
-                        // now ensure the server socket is closed before saying we can use it
-                        try
-                        {
-                            int j = 0;
-                            while (j++ < 10)
-                            {
-                                new Socket(hostAddress, i).close();
-                                Thread.sleep(100);
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                        }
-                        Log.log(this, "Using ", hostAddress, ":", Integer.toString(i));
-                        return i;
-                    }
-                    catch (IOException e)
-                    {
-                        Log.log(this, e.getMessage());
-                    }
-                }
-                throw new RuntimeException("No free TCP port available betwen " + startPortRangeInclusive + " and "
-                    + endPortRangeExclusive);
-            }
+                // use an ephemeral port
+                return 0;
             default :
                 throw new IllegalArgumentException("Unsupported transport technology: " + this);
         }

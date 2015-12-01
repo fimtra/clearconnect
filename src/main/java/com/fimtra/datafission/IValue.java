@@ -62,7 +62,7 @@ public interface IValue extends Comparable<IValue>
                 case LONG:
                     return LongValue.valueOf(Long.parseLong(value));
                 case TEXT:
-                    return new TextValue(value);
+                    return TextValue.valueOf(value);
                 case BLOB:
                     return new BlobValue(value);
             }

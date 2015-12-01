@@ -59,6 +59,7 @@ import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * Tests for the {@link PlatformServiceProxy}
@@ -104,17 +105,25 @@ public class PlatformServiceProxyTest
             new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING, hostName, PORT);
         this.candidate =
             new PlatformServiceProxy(this.agent, "TestPlatformService", new StringProtocolCodec(), hostName, PORT);
+        this.candidate.setReconnectPeriodMillis(200);
+        this.agent.setRegistryReconnectPeriodMillis(200);
     }
 
     @After
     public void tearDown() throws InterruptedException
     {
-        this.registry.destroy();
-        this.agent.destroy();
-        this.service.destroy();
-        this.candidate.destroy();
-        // IO sensitive
-        Thread.sleep(100);
+        ThreadUtils.newThread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                PlatformServiceProxyTest.this.registry.destroy();
+                PlatformServiceProxyTest.this.agent.destroy();
+                PlatformServiceProxyTest.this.service.destroy();
+                PlatformServiceProxyTest.this.candidate.destroy();
+            }
+        }, "tearDown").start();
+        
         ChannelUtils.WATCHDOG.configure(5000);
     }
 
@@ -123,11 +132,11 @@ public class PlatformServiceProxyTest
     {
         IServiceConnectionStatusListener listener = mock(IServiceConnectionStatusListener.class);
         this.candidate.addServiceConnectionStatusListener(listener);
-        verify(listener, timeout(10000)).onConnected(eq(this.service.getPlatformServiceFamily()), anyInt());
+        verify(listener, timeout(1000).atLeastOnce()).onConnected(eq(this.service.getPlatformServiceFamily()), anyInt());
         this.service.destroy();
-        verify(listener, timeout(10000).atLeastOnce()).onReconnecting(eq(this.service.getPlatformServiceFamily()),
+        verify(listener, timeout(1000).atLeastOnce()).onReconnecting(eq(this.service.getPlatformServiceFamily()),
             anyInt());
-        verify(listener, timeout(10000).atLeastOnce()).onDisconnected(eq(this.service.getPlatformServiceFamily()),
+        verify(listener, timeout(1000).atLeastOnce()).onDisconnected(eq(this.service.getPlatformServiceFamily()),
             anyInt());
     }
 
@@ -531,6 +540,7 @@ public class PlatformServiceProxyTest
     @Test
     public void testAddAndRemoveRecordConnectionStatusListener() throws InterruptedException
     {
+
         this.service.createRecord(record1);
 
         final AtomicReference<String> expected = new AtomicReference<String>(record1);
@@ -615,9 +625,7 @@ public class PlatformServiceProxyTest
 
         this.service.destroy();
 
-        assertTrue(disconnected.get().await(5, TimeUnit.SECONDS));
-        assertFalse(disconnected2.get().await(5, TimeUnit.SECONDS));
-        assertTrue(reconnecting.get().await(5, TimeUnit.SECONDS));
-        assertFalse(reconnecting2.get().await(5, TimeUnit.SECONDS));
+        assertTrue(disconnected.get().await(1, TimeUnit.SECONDS));
+        assertTrue(reconnecting.get().await(1, TimeUnit.SECONDS));
     }
 }

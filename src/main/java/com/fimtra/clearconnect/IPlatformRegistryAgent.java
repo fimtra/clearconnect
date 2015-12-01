@@ -17,10 +17,10 @@ package com.fimtra.clearconnect;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.channel.EndPointAddress;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
@@ -183,7 +183,7 @@ public interface IPlatformRegistryAgent
     boolean removeServiceInstanceAvailableListener(IServiceInstanceAvailableListener listener);
 
     /**
-     * Create an {@link IPlatformServiceInstance} instance that uses a default assigned TPC port and
+     * Create an {@link IPlatformServiceInstance} instance that uses a default assigned port and
      * the default event executor. The registry agent will maintain a reference to the created
      * platform service instance by its platform service instance ID, see
      * {@link PlatformUtils#composePlatformServiceInstanceID(String, String)}. Additionally, the
@@ -191,7 +191,38 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, Executor)
+     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      TransportTechnologyEnum)
+     */
+    boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology);
+
+    /**
+     * Create an {@link IPlatformServiceInstance} instance that uses the default event executor. The
+     * registry agent will maintain a reference to the created platform service instance by its
+     * platform service instance ID, see
+     * {@link PlatformUtils#composePlatformServiceInstanceID(String, String)}. Additionally, the
+     * registry agent registers the new platform service instance with the platform registry against
+     * the given platform service.
+     * 
+     * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
+     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      TransportTechnologyEnum)
+     */
+    boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, TransportTechnologyEnum transportTechnology);
+
+    /**
+     * Create an {@link IPlatformServiceInstance} instance that uses a default assigned port and the
+     * default event executor. The registry agent will maintain a reference to the created platform
+     * service instance by its platform service instance ID, see
+     * {@link PlatformUtils#composePlatformServiceInstanceID(String, String)}. Additionally, the
+     * registry agent registers the new platform service instance with the platform registry against
+     * the given platform service.
+     * 
+     * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
+     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode);
@@ -205,7 +236,8 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, Executor)
+     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode);
@@ -242,12 +274,15 @@ public interface IPlatformRegistryAgent
      * @param utilityExecutor
      *            the {@link ScheduledExecutorService} for handling utility tasks and timer tasks
      *            for the service, <code>null</code> to use the default utility executor
+     * @param transportTechnology
+     *            the transport technology that the service instance will use
      * @return <code>true</code> if the platform service instance was created, <code>false</code>
      *         otherwise (the platform service instance ID might be non-unique or may already exist)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host, int port,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, ThimbleExecutor coreExecutor,
-        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor);
+        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
+        TransportTechnologyEnum transportTechnology);
 
     /**
      * Get a local platform service instance by platform service name and platform service member
@@ -340,9 +375,10 @@ public interface IPlatformRegistryAgent
      *         {@link #getPlatformServiceProxy(String)}
      */
     Map<String, IPlatformServiceProxy> getActiveProxies();
-    
+
     /**
-     * @return the {@link EndPointAddress} for the current registry connection, <code>null</code> if not connected 
+     * @return the {@link EndPointAddress} for the current registry connection, <code>null</code> if
+     *         not connected
      */
     EndPointAddress getRegistryEndPoint();
 }

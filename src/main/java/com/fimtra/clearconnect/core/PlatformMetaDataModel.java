@@ -35,6 +35,7 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_NODE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_PORT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.SUBSCRIPTION_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TRANSPORT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
 import java.io.IOException;
@@ -50,7 +51,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.fimtra.channel.ChannelUtils;
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
@@ -170,7 +171,7 @@ public final class PlatformMetaDataModel
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
         Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
-            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin,
+            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin, Transport,
     }
 
     /**
@@ -355,7 +356,7 @@ public final class PlatformMetaDataModel
         ContextUtils.clearNonSystemRecords(context);
     }
 
-    static final IValue BLANK_VALUE = new TextValue("");
+    static final IValue BLANK_VALUE = TextValue.valueOf("");
 
     static IValue safeGetTextValue(IRecord record, String field)
     {
@@ -817,7 +818,7 @@ public final class PlatformMetaDataModel
         TextValue agentTextValue;
         for (String agentName : atomicChange.getSubMapKeys())
         {
-            agentTextValue = new TextValue(agentName);
+            agentTextValue = TextValue.valueOf(agentName);
             for (String serviceInstanceID : atomicChange.getSubMapAtomicChange(agentName).getPutEntries().keySet())
             {
                 this.serviceInstancesContext.getOrCreateRecord(serviceInstanceID).put(
@@ -862,7 +863,7 @@ public final class PlatformMetaDataModel
         TextValue serviceFamilyTextValue;
         for (String serviceFamily : serviceFamilys)
         {
-            serviceFamilyTextValue = new TextValue(serviceFamily);
+            serviceFamilyTextValue = TextValue.valueOf(serviceFamily);
             instances = imageCopy.getOrCreateSubMap(serviceFamily);
 
             // update the instance count per service
@@ -1011,6 +1012,7 @@ public final class PlatformMetaDataModel
         String serviceFamily;
         TextValue proxyEndPoint;
         TextValue codec;
+        TextValue transport;
         LongValue publisherPort;
         TextValue publisherNode;
         LongValue messageCount;
@@ -1057,6 +1059,7 @@ public final class PlatformMetaDataModel
                 kbCount = connectionRecord.get(KB_COUNT);
                 connectionUptime = connectionRecord.get(UPTIME);
                 codec = connectionRecord.get(PROTOCOL);
+                transport = connectionRecord.get(TRANSPORT);
 
                 if (publisherNode == null)
                 {
@@ -1093,6 +1096,7 @@ public final class PlatformMetaDataModel
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Port.toString(),
                                 publisherPort);
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Codec.toString(), codec);
+                            serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Transport.toString(), transport);
                         }
                     }
 
@@ -1110,7 +1114,9 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceInstance.toString(),
                         platformServiceInstanceID);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
-                        publisherNode.textValue() + (ChannelUtils.getNodePortDelimiter()) + publisherPort.textValue());
+                        publisherNode.textValue()
+                            + (TransportTechnologyEnum.valueOf(transport.textValue()).getNodePortDelimiter())
+                            + publisherPort.textValue());
 
                 }
 
