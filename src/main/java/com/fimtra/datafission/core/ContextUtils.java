@@ -70,6 +70,58 @@ import com.fimtra.util.is;
  */
 public class ContextUtils
 {
+    /**
+     * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register
+     * an inner listener to any new records in the context.
+     * <p>
+     * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code
+     * no longer requires the manager.
+     * 
+     * @author Ramon Servadei
+     */
+    public static final class AllRecordsRegistrationManager implements IRecordListener
+    {
+        private final IRecordListener allRecordsListener;
+        private final IObserverContext context;
+        private final Set<String> subscribed = new HashSet<String>();
+
+        AllRecordsRegistrationManager(IRecordListener allRecordsListener, IObserverContext context)
+        {
+            this.allRecordsListener = allRecordsListener;
+            this.context = context;
+            context.addObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
+        }
+
+        public void destroy()
+        {
+            this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
+            for (String recordName : this.subscribed)
+            {
+                this.context.removeObserver(this.allRecordsListener, recordName);
+            }
+            this.subscribed.clear();
+        }
+
+        @Override
+        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        {
+            for (String recordName : atomicChange.getPutEntries().keySet())
+            {
+                if (!ContextUtils.isSystemRecordName(recordName) && this.subscribed.add(recordName))
+                {
+                    this.context.addObserver(this.allRecordsListener, recordName);
+                }
+            }
+            for (String recordName : atomicChange.getRemovedEntries().keySet())
+            {
+                if (this.subscribed.remove(recordName))
+                {
+                    this.context.removeObserver(this.allRecordsListener, recordName);
+                }
+            }
+        }
+    }
+
     static final String FISSION_RPC = "fission-rpc";
     static final String FISSION_CORE = "fission-core";
 
@@ -372,44 +424,20 @@ public class ContextUtils
      * a context. This creates an adapter listener that is registered to the context's
      * {@link ISystemRecordNames#CONTEXT_RECORDS} record; when new records are added the
      * allRecordsListener is added as an observer to the new record. <b>When finished with this, the
-     * observer returned from this method must be de-registered from this context's
-     * {@link ISystemRecordNames#CONTEXT_RECORDS} record</b>
+     * {@link AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a
+     * memory leak. </b>
      * 
      * @param context
      *            the context with the records that will be observed
      * @param allRecordsListener
-     *            the observer that will be attached to every (non-system) record in the context
-     * @return the listener registered to the {@link ISystemRecordNames#CONTEXT_RECORDS} record -
-     *         remove this as an observer to the context records when finished.
+     *            the observer that will be attached to every (non-system) record in the context //
+     * @return the object that will automatically manage registering the allRecordsListener to any
+     *         new records in the context.
      */
-    public static IRecordListener addAllRecordsListener(final IObserverContext context,
+    public static AllRecordsRegistrationManager addAllRecordsListener(final IObserverContext context,
         final IRecordListener allRecordsListener)
     {
-        final IRecordListener observer = new IRecordListener()
-        {
-            final Set<String> subscribed = new HashSet<String>();
-
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                for (String recordName : atomicChange.getPutEntries().keySet())
-                {
-                    if (!ContextUtils.isSystemRecordName(recordName) && this.subscribed.add(recordName))
-                    {
-                        context.addObserver(allRecordsListener, recordName);
-                    }
-                }
-                for (String recordName : atomicChange.getRemovedEntries().keySet())
-                {
-                    if (this.subscribed.remove(recordName))
-                    {
-                        context.removeObserver(allRecordsListener, recordName);
-                    }
-                }
-            }
-        };
-        context.addObserver(observer, ISystemRecordNames.CONTEXT_RECORDS);
-        return observer;
+        return new AllRecordsRegistrationManager(allRecordsListener, context);
     }
 
     /**
