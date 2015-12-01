@@ -149,4 +149,10 @@ public class FileUtilsTest {
 		files = FileUtils.findFiles(dir, Long.MAX_VALUE);
 		assertEquals(0, files.length);
 	}
+
+	@Test
+	public void shouldArchiveAndPurge() {
+		FileUtils.archiveLogs(1);
+		FileUtils.purgeArchiveLogs(1);
+	}
 }
