@@ -37,8 +37,22 @@ public abstract class FileUtils {
 
 	public static final String recordFileExtension = "record";
 	public static final String propertyFileExtension = "properties";
-	private static final File logDir = new File(UtilProperties.Values.LOG_DIR);
-	private static final File archiveDir = new File(UtilProperties.Values.ARCHIVE_DIR);
+	// private static final File logDir = new File(UtilProperties.Values.LOG_DIR);
+	// private static final File archiveDir = new File(UtilProperties.Values.ARCHIVE_DIR);
+	private static File logDirCanonical;
+	private static File archiveDirCanonical;
+	static {
+		try {
+			logDirCanonical = new File(UtilProperties.Values.LOG_DIR).getCanonicalFile();
+		} catch (IOException e) {
+			logDirCanonical = null;
+		}
+		try {
+			archiveDirCanonical = new File(UtilProperties.Values.ARCHIVE_DIR).getCanonicalFile();
+		} catch (IOException e) {
+			archiveDirCanonical = null;
+		}
+	}
 
 	private FileUtils() {
 		// Not for instantiation
@@ -199,9 +213,9 @@ public abstract class FileUtils {
 	 * .gz and put into the archive directory.
 	 */
 	public static void archiveLogs(long olderThanMinutes) {
-		if (logDir.exists() && logDir.isDirectory()) {
-			for (File file : FileUtils.findFiles(logDir, olderThanMinutes)) {
-				boolean isGzipped = FileUtils.gzip(file, archiveDir);
+		if (logDirCanonical != null && logDirCanonical.exists() && logDirCanonical.isDirectory()) {
+			for (File file : FileUtils.findFiles(logDirCanonical, olderThanMinutes)) {
+				boolean isGzipped = FileUtils.gzip(file, archiveDirCanonical);
 				if (isGzipped) {
 					file.delete();
 				}
@@ -213,8 +227,8 @@ public abstract class FileUtils {
 	 * Deletes all archived log files that are olderThanMinutes.
 	 */
 	public static void purgeArchiveLogs(long olderThanMinutes) {
-		if (archiveDir.exists() && archiveDir.isDirectory()) {
-			for (File file : FileUtils.findFiles(archiveDir, olderThanMinutes)) {
+		if (archiveDirCanonical != null && archiveDirCanonical.exists() && archiveDirCanonical.isDirectory()) {
+			for (File file : FileUtils.findFiles(archiveDirCanonical, olderThanMinutes)) {
 				file.delete();
 			}
 		}
