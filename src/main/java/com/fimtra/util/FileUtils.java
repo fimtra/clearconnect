@@ -37,8 +37,6 @@ public abstract class FileUtils {
 
 	public static final String recordFileExtension = "record";
 	public static final String propertyFileExtension = "properties";
-	// private static final File logDir = new File(UtilProperties.Values.LOG_DIR);
-	// private static final File archiveDir = new File(UtilProperties.Values.ARCHIVE_DIR);
 	private static File logDirCanonical;
 	private static File archiveDirCanonical;
 	static {
