@@ -142,6 +142,8 @@ class PlatformDesktop
                 {
                     super.internalFrameClosed(e);
                     AbstractPlatformDesktopView.this.desktop.getViews().remove(AbstractPlatformDesktopView.this);
+                    AbstractPlatformDesktopView.this.frame.removeInternalFrameListener(this);
+                    AbstractPlatformDesktopView.this.frame.getContentPane().removeAll();
                     destroy();
                 }
             });
@@ -288,6 +290,7 @@ class PlatformDesktop
         final String metaDataViewKey;
         final PlatformMetaDataViewEnum metaDataViewType;
         final IObserverContext context;
+        final TableSummaryPanel tableSummaryPanel;
 
         public RecordSubscriptionPlatformDesktopView(PlatformDesktop desktop, String title,
             PlatformMetaDataViewEnum metaDataViewType, String metaDataViewKey)
@@ -323,7 +326,8 @@ class PlatformDesktop
             prepareTablePopupMenu();
 
             this.frame.add(new JScrollPane(this.table));
-            this.frame.add(new TableSummaryPanel(this.table.getModel()), BorderLayout.SOUTH);
+            this.tableSummaryPanel = new TableSummaryPanel(this.table.getModel());
+            this.frame.add(this.tableSummaryPanel, BorderLayout.SOUTH);
 
             synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
             {
@@ -355,7 +359,8 @@ class PlatformDesktop
         @Override
         protected void destroy()
         {
-
+            this.tableSummaryPanel.destroy();
+            this.table.setComponentPopupMenu(null);
             this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
             this.context.removeObserver(this.model,
                 this.subscribedRecords.toArray(new String[this.subscribedRecords.size()]));
@@ -619,6 +624,7 @@ class PlatformDesktop
         final String metaDataViewKey;
         final PlatformMetaDataViewEnum metaDataViewType;
         final IObserverContext context;
+        final TableSummaryPanel tableSummary;
 
         MetaDataPlatformDesktopView(PlatformDesktop platformDesktop, String title,
             PlatformMetaDataViewEnum metaDataViewType, String metaDataViewKey)
@@ -639,7 +645,8 @@ class PlatformDesktop
             prepareTablePopupMenu();
 
             this.frame.add(new JScrollPane(this.table));
-            this.frame.add(new TableSummaryPanel(this.table.getModel()), BorderLayout.SOUTH);
+            this.tableSummary = new TableSummaryPanel(this.table.getModel());
+            this.frame.add(this.tableSummary, BorderLayout.SOUTH);
 
             try
             {
@@ -668,6 +675,9 @@ class PlatformDesktop
         @Override
         protected void destroy()
         {
+            this.tableSummary.destroy();
+            this.metaDataViewType.deregister(this.model);
+            this.table.setComponentPopupMenu(null);
             this.model.removeRecordRemovedListener(this.context);
             PlatformMetaDataViewEnum.deregister(this.context, this.model);
         }
@@ -743,6 +753,7 @@ class PlatformDesktop
         private static final long serialVersionUID = 1L;
         final JLabel rows, columns;
         final TableModel model;
+        final TableModelListener tableModelListener;
 
         TableSummaryPanel(TableModel model)
         {
@@ -758,7 +769,7 @@ class PlatformDesktop
             add(this.rows);
             add(this.columns);
 
-            model.addTableModelListener(new TableModelListener()
+            this.tableModelListener = new TableModelListener()
             {
                 @Override
                 public void tableChanged(TableModelEvent e)
@@ -775,7 +786,14 @@ class PlatformDesktop
                         TableSummaryPanel.this.columns.setText(text);
                     }
                 }
-            });
+            };
+            model.addTableModelListener(this.tableModelListener);
+        }
+
+        void destroy()
+        {
+            removeAll();
+            this.model.removeTableModelListener(this.tableModelListener);
         }
     }
 
@@ -975,6 +993,9 @@ class PlatformDesktop
         /** The key to link with child view's parent key */
         final String childViewKeyField;
         final Class<? extends AbstractPlatformDesktopView> viewClass;
+        /** Ref to the registration manager managing the "all records listener" */
+        final Map<IRecordListener, ContextUtils.AllRecordsRegistrationManager> mappedAllRecordsListeners =
+            new HashMap<IRecordListener, ContextUtils.AllRecordsRegistrationManager>();
 
         PlatformMetaDataViewEnum(Class<? extends AbstractPlatformDesktopView> viewClass, String parentViewKeyField,
             String childViewKeyField, PlatformMetaDataViewEnum... childViews)
@@ -1122,7 +1143,17 @@ class PlatformDesktop
                     }
                 }
             };
-            ContextUtils.addAllRecordsListener(context, listener);
+            this.mappedAllRecordsListeners.put(observer, ContextUtils.addAllRecordsListener(context, listener));
+        }
+
+        void deregister(final IRecordListener observer)
+        {
+            final ContextUtils.AllRecordsRegistrationManager allRecordsRegistrationManager =
+                this.mappedAllRecordsListeners.remove(observer);
+            if (allRecordsRegistrationManager != null)
+            {
+                allRecordsRegistrationManager.destroy();
+            }
         }
 
         IObserverContext getContextForMetaDataViewType(PlatformMetaDataModel model, String contextKey)
