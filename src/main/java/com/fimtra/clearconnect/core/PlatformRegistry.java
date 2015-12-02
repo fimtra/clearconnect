@@ -1137,6 +1137,7 @@ final class EventHandler
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.USER, args[3]);
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.CPU_COUNT, args[4]);
         this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
+        Log.log(this, "Agent connected: ", agentName);
     }
 
     private void handleRpcRuntimeDynamic(final IValue... args)
@@ -1154,6 +1155,10 @@ final class EventHandler
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.EPM, args[7]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.UPTIME_SECS, args[8]);
             this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
+        }
+        else
+        {
+            Log.log(this, "WARNING: RPC call from unregistered agent ", agentName);
         }
     }
 
@@ -1174,6 +1179,7 @@ final class EventHandler
                     agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
                     // purge the runtimeStatus record
                     this.registry.runtimeStatus.removeSubMap(agent);
+                    Log.log(this, "Agent disconnected: ", proxyId.textValue());
                 }
             }
             connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
