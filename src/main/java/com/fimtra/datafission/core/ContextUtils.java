@@ -489,7 +489,7 @@ public class ContextUtils
         return true;
     }
 
-    static void resolveRecordMapFromStream(Reader reader, Map<String, IValue> map) throws IOException
+    public static void resolveRecordMapFromStream(Reader reader, Map<String, IValue> map) throws IOException
     {
         String key;
         IValue value;
@@ -523,7 +523,7 @@ public class ContextUtils
         }
     }
 
-    static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException
+    public static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException
     {
         final StringBuilder sb = new StringBuilder();
         Map.Entry<String, IValue> entry = null;
