@@ -21,9 +21,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
@@ -54,7 +52,9 @@ public class HybridProtocolCodec extends StringProtocolCodec
     private static final byte[] EMPTY_ARRAY = new byte[0];
 
     /**
-     * Produces wire-formats for key-codes. ABNF for wire-format for key-codes:
+     * Produces wire-formats for key-codes. There is <b>ONE</b> producer per record.
+     * <p>
+     * ABNF for wire-format for key-codes:
      * 
      * <pre>
      *  key-codes = 1*key-code-spec ; the integer code for each key
@@ -75,6 +75,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
          * {@link Integer} is used - 32bit <b>signed</b> data type giving 2^32 (~4.2 billion)
          * possible field codes.
          */
+        // todo this can be a memory leak source if record field names are transient
         static final Map<String, Integer> KEY_CODE_DICTIONARY = new HashMap<String, Integer>();
         static final AtomicInteger NEXT_CODE = new AtomicInteger(1);
 
@@ -84,25 +85,49 @@ public class HybridProtocolCodec extends StringProtocolCodec
 
         KeyCodesProducer()
         {
-            this.keyCodes = new ConcurrentHashMap<String, Integer>();
+            this.keyCodes = new ConcurrentHashMap<String, Integer>(2, 0.75f, 2);
         }
 
-        ByteBuffer produceWireFormat(Set<String> names)
+        /**
+         * Produces the wire-format key-codes for any new keys in the set that have not been
+         * assigned a wire format code.
+         * 
+         * @param produceForAllKeys
+         *            if <code>true</code> returns the wire-format for all the keys requested
+         *            (effectively providing the key-codes definition for all the keys)
+         * @return a {@link ByteBuffer} with the wire-format for the key-codes
+         */
+        ByteBuffer produceWireFormat(Set<String> keys, boolean produceForAllKeys)
         {
             ByteBuffer buffer = ByteBuffer.allocate(ByteBufferUtils.BLOCK_SIZE);
-            byte[] keyName;
+            byte[] keyAsBytes;
             Integer keyCode;
             synchronized (KEY_CODE_DICTIONARY)
             {
-                for (String key : names)
+                for (String key : keys)
                 {
-                    if (key == null || this.keyCodes.containsKey(key))
+                    if (key == null)
                     {
                         continue;
                     }
-                    keyName = key.getBytes(UTF8);
-                    buffer = ByteBufferUtils.putChar((char) keyName.length, buffer);
-                    buffer = ByteBufferUtils.copyBytesIntoBuffer(keyName, buffer);
+                    if (this.keyCodes.containsKey(key))
+                    {
+                        if (produceForAllKeys)
+                        {
+                            keyAsBytes = key.getBytes(UTF8);
+                            buffer = ByteBufferUtils.putChar((char) keyAsBytes.length, buffer);
+                            buffer = ByteBufferUtils.copyBytesIntoBuffer(keyAsBytes, buffer);
+                            buffer = ByteBufferUtils.putInt(getCodeFor(key), buffer);
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+
+                    keyAsBytes = key.getBytes(UTF8);
+                    buffer = ByteBufferUtils.putChar((char) keyAsBytes.length, buffer);
+                    buffer = ByteBufferUtils.copyBytesIntoBuffer(keyAsBytes, buffer);
 
                     keyCode = KEY_CODE_DICTIONARY.get(key);
                     if (keyCode == null)
@@ -192,22 +217,13 @@ public class HybridProtocolCodec extends StringProtocolCodec
      * for all records
      */
     final KeyCodesConsumer keyCodeConsumer;
-    /**
-     * For sending there is a producer per record - this ensures we know which keycodes have already
-     * been sent for a key
-     */
-    final ConcurrentMap<String, KeyCodesProducer> keyCodeProducers;
-    /**
-     * Tracks how many messages have been sent - the first message sent needs to include the entire
-     * {@link KeyCodesProducer#KEY_CODE_DICTIONARY}
-     */
-    final AtomicLong messageCount = new AtomicLong();
+    final KeyCodesProducer keyCodeProducer;
 
     public HybridProtocolCodec()
     {
         super();
         this.keyCodeConsumer = new KeyCodesConsumer();
-        this.keyCodeProducers = new ConcurrentHashMap<String, KeyCodesProducer>();
+        this.keyCodeProducer = new KeyCodesProducer();
     }
 
     /**
@@ -260,23 +276,24 @@ public class HybridProtocolCodec extends StringProtocolCodec
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {
-        boolean sendDictionary = this.messageCount.getAndIncrement() == 0;
         final Set<String> subMapKeys = atomicChange.getSubMapKeys();
         ByteBuffer buffer = ByteBuffer.allocate(ByteBufferUtils.BLOCK_SIZE);
-        final KeyCodesProducer keyCodeProducer = getKeyCodeProducer(atomicChange.getName());
 
         // scope char
         buffer = ByteBufferUtils.putChar(atomicChange.getScope(), buffer);
         // sequence number
         buffer = buffer.putLong(atomicChange.getSequence());
 
-        buffer = encodeAtomicChange(keyCodeProducer, atomicChange, buffer, sendDictionary);
+        buffer =
+            encodeAtomicChange(this.keyCodeProducer, atomicChange, buffer,
+                atomicChange.getScope() == IRecordChange.IMAGE_SCOPE.charValue());
 
         if (subMapKeys.size() > 0)
         {
             for (String subMapKey : subMapKeys)
             {
-                buffer = encodeAtomicChange(keyCodeProducer, atomicChange.getSubMapAtomicChange(subMapKey), buffer);
+                buffer =
+                    encodeAtomicChange(this.keyCodeProducer, atomicChange.getSubMapAtomicChange(subMapKey), buffer);
             }
         }
 
@@ -303,11 +320,9 @@ public class HybridProtocolCodec extends StringProtocolCodec
         final byte[] allCodes;
         if (sendCompleteDictionary)
         {
-            synchronized (KeyCodesProducer.KEY_CODE_DICTIONARY)
-            {
-                allCodes =
-                    ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(KeyCodesProducer.KEY_CODE_DICTIONARY.keySet()));
-            }
+            // add all first
+            allCodes =
+                ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(atomicChange.getPutEntries().keySet(), true));
         }
         else
         {
@@ -317,9 +332,9 @@ public class HybridProtocolCodec extends StringProtocolCodec
         // we must always perform this in case we need to add new keys that are currently not in the
         // full dictionary
         final byte[] putKeyCodes =
-            ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(atomicChange.getPutEntries().keySet()));
+            ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(atomicChange.getPutEntries().keySet(), false));
         final byte[] removeKeyCodes =
-            ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(atomicChange.getRemovedEntries().keySet()));
+            ByteBufferUtils.asBytes(keyCodeProducer.produceWireFormat(atomicChange.getRemovedEntries().keySet(), false));
 
         // key-codes-len
         localBuf.putInt((putKeyCodes.length + removeKeyCodes.length + allCodes.length));
@@ -395,17 +410,6 @@ public class HybridProtocolCodec extends StringProtocolCodec
             localBuf.putInt(lenPos, (localBuf.position() - (lenPos + 4)));
         }
         return localBuf;
-    }
-
-    private KeyCodesProducer getKeyCodeProducer(String name)
-    {
-        KeyCodesProducer producer = this.keyCodeProducers.get(name);
-        if (producer == null)
-        {
-            this.keyCodeProducers.putIfAbsent(name, new KeyCodesProducer());
-            return this.keyCodeProducers.get(name);
-        }
-        return producer;
     }
 
     /**
