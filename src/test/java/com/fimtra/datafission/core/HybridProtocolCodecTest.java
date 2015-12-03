@@ -38,6 +38,8 @@ public class HybridProtocolCodecTest extends CodecBaseTest
     @Override
     ICodec<?> constructCandidate()
     {
+        KeyCodesProducer.KEY_CODE_DICTIONARY.clear();
+        KeyCodesProducer.NEXT_CODE.set(1);
         return new HybridProtocolCodec();
     }
 
@@ -45,10 +47,10 @@ public class HybridProtocolCodecTest extends CodecBaseTest
     @Test
     public void testFirstMessageHasFullDictionary()
     {
-        KeyCodesProducer.KEY_CODE_DICTIONARY.put("a key", (char) 900);
-        KeyCodesProducer.KEY_CODE_DICTIONARY.put("a key2", (char) 901);
+        KeyCodesProducer.KEY_CODE_DICTIONARY.put("a key", 900);
+        KeyCodesProducer.KEY_CODE_DICTIONARY.put("a key2", 901);
 
-        final Map<Character, String> reverseKeyCodes =
+        final Map<Integer, String> reverseKeyCodes =
             ((HybridProtocolCodec) this.candidate).keyCodeConsumer.reverseKeyCodes;
         assertEquals(0, reverseKeyCodes.size());
 
@@ -57,12 +59,12 @@ public class HybridProtocolCodecTest extends CodecBaseTest
         this.candidate.getAtomicChangeFromRxMessage(txMessageForAtomicChange);
 
         assertEquals(KeyCodesProducer.KEY_CODE_DICTIONARY.size(), reverseKeyCodes.size());
-        Map<String, Character> codes = new HashMap<String, Character>();
+        Map<String, Integer> codes = new HashMap<String, Integer>();
 
-        Map.Entry<Character, String> entry = null;
-        Character key = null;
+        Map.Entry<Integer, String> entry = null;
+        Integer key = null;
         String value = null;
-        for (Iterator<Map.Entry<Character, String>> it = reverseKeyCodes.entrySet().iterator(); it.hasNext();)
+        for (Iterator<Map.Entry<Integer, String>> it = reverseKeyCodes.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();

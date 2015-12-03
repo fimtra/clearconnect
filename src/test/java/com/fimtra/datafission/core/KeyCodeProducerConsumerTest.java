@@ -84,7 +84,7 @@ public class KeyCodeProducerConsumerTest
             names.add("F" + i);
         }
         producer.produceWireFormat(names);
-        final Map<String, Character> keyCodes = new HashMap<String, Character>(producer.keyCodes);
+        final Map<String, Integer> keyCodes = new HashMap<String, Integer>(producer.keyCodes);
         // try again, we should not add new codes
         producer.produceWireFormat(names);
         assertEquals(keyCodes, producer.keyCodes);
