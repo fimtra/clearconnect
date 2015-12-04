@@ -25,8 +25,11 @@ import com.fimtra.datafission.ICodec;
  */
 public enum WireProtocolEnum
 {
-    STRING("com.fimtra.datafission.core.StringProtocolCodec"), GZIP("com.fimtra.datafission.core.GZipProtocolCodec"),
-        HYBRID("com.fimtra.datafission.core.HybridProtocolCodec");
+    STRING("com.fimtra.datafission.core.StringProtocolCodec"), 
+    GZIP("com.fimtra.datafission.core.GZipProtocolCodec"),
+    HYBRID("com.fimtra.datafission.core.HybridProtocolCodec"), 
+    HYBRID32("com.fimtra.datafission.core.HybridProtocolCodec32"),
+    ;
 
     private final ICodec<?> codec;
 

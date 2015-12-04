@@ -36,17 +36,17 @@ import com.fimtra.util.ByteBufferUtils;
  * hybrid protocol of text and binary; text for action-type messages and a binary for atomic change
  * messages.
  * <p>
- * NOTE: the binary protocol uses an <b>unsigned</b> 16-bit data type for each field code and also
- * for the length of the binary data for the field value. This limits this codec to supporting
- * runtimes that have 2^16 - 1 distinct field names (65535) and also limits the maximum size of any
- * field's data to 65536 bytes. If this is too restrictive, the 32-bit {@link HybridProtocolCodec32}
- * can be used (this will have a bigger wire format though).
+ * NOTE: the binary protocol uses a <b>signed</b> 32-bit data type for each field code and also for
+ * the length of the binary data for the field value. This "limits" this codec to 2^32 distinct
+ * field names (~4,2 billion) and a maximum size of any field's data to 2^31 - 1 bytes
+ * (~2,1Gb)...this should be sufficient for any application.
+ * <p>
+ * NOTE #2: key lengths are limited to 65535 chars.
  * 
- * @see HybridProtocolCodec32
  * @see #getTxMessageForAtomicChange(IRecordChange)
  * @author Ramon Servadei
  */
-public class HybridProtocolCodec extends StringProtocolCodec
+public class HybridProtocolCodec32 extends StringProtocolCodec
 {
     private static final byte NULL_DATA_TYPE = (byte) 127;
     private static final byte[] EMPTY_ARRAY = new byte[0];
@@ -61,7 +61,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
      *  key-code-spec = key-name-len key-name key-code
      *  key-name-len = 2OCTET ; the length of the key-name
      *  key-name = 1*ALPHA; UTF8
-     *  key-code = 2OCTET ; the 16-bit char code for the key
+     *  key-code = 4OCTET ; the integer code for the key
      * </pre>
      * 
      * @author Ramon Servadei
@@ -72,20 +72,20 @@ public class HybridProtocolCodec extends StringProtocolCodec
          * The dictionary of key names and codes - this ensures that the same key across all records
          * will use the same code for the lifetime of the runtime.
          * <p>
-         * {@link Character} is used as it is an unsigned, 16bit data type giving 65535 possible
-         * field codes.
+         * {@link Integer} is used - 32bit <b>signed</b> data type giving 2^32 (~4.2 billion)
+         * possible field codes.
          */
         // todo this can be a memory leak source if record field names are transient
-        static final Map<String, Character> KEY_CODE_DICTIONARY = new HashMap<String, Character>();
+        static final Map<String, Integer> KEY_CODE_DICTIONARY = new HashMap<String, Integer>();
         static final AtomicInteger NEXT_CODE = new AtomicInteger(1);
 
-        static final char NULL_KEY_CODE = 0;
+        static final int NULL_KEY_CODE = 0;
 
-        final Map<String, Character> keyCodes;
+        final Map<String, Integer> keyCodes;
 
         KeyCodesProducer()
         {
-            this.keyCodes = new ConcurrentHashMap<String, Character>(2, 0.75f, 2);
+            this.keyCodes = new ConcurrentHashMap<String, Integer>(2, 0.75f, 2);
         }
 
         /**
@@ -101,7 +101,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
         {
             ByteBuffer buffer = ByteBuffer.allocate(ByteBufferUtils.BLOCK_SIZE);
             byte[] keyAsBytes;
-            Character keyCode;
+            Integer keyCode;
             synchronized (KEY_CODE_DICTIONARY)
             {
                 for (String key : keys)
@@ -117,7 +117,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
                             keyAsBytes = key.getBytes(UTF8);
                             buffer = ByteBufferUtils.putChar((char) keyAsBytes.length, buffer);
                             buffer = ByteBufferUtils.copyBytesIntoBuffer(keyAsBytes, buffer);
-                            buffer = ByteBufferUtils.putChar(getCodeFor(key), buffer);
+                            buffer = ByteBufferUtils.putInt(getCodeFor(key), buffer);
                         }
                         else
                         {
@@ -132,10 +132,10 @@ public class HybridProtocolCodec extends StringProtocolCodec
                     keyCode = KEY_CODE_DICTIONARY.get(key);
                     if (keyCode == null)
                     {
-                        keyCode = Character.valueOf((char) NEXT_CODE.getAndIncrement());
+                        keyCode = Integer.valueOf(NEXT_CODE.getAndIncrement());
                         KEY_CODE_DICTIONARY.put(key, keyCode);
                     }
-                    buffer = ByteBufferUtils.putChar(keyCode.charValue(), buffer);
+                    buffer = ByteBufferUtils.putInt(keyCode.intValue(), buffer);
                     this.keyCodes.put(key, keyCode);
                 }
             }
@@ -143,18 +143,18 @@ public class HybridProtocolCodec extends StringProtocolCodec
             return buffer;
         }
 
-        char getCodeFor(String key)
+        int getCodeFor(String key)
         {
             if (key == null)
             {
                 return NULL_KEY_CODE;
             }
-            final Character code = this.keyCodes.get(key);
+            final Integer code = this.keyCodes.get(key);
             if (code == null)
             {
                 throw new NullPointerException("No keyCode for '" + key + "', codes=" + this.keyCodes);
             }
-            return code.charValue();
+            return code.intValue();
         }
     }
 
@@ -166,18 +166,18 @@ public class HybridProtocolCodec extends StringProtocolCodec
      *  key-code-spec = key-name-len key-name key-code
      *  key-name-len = 2OCTET ; the length of the key-name
      *  key-name = 1*ALPHA; UTF8
-     *  key-code = 2OCTET ; the 16-bit char code for the key
+     *  key-code = 4OCTET ; the integer code for the key
      * </pre>
      * 
      * @author Ramon Servadei
      */
     static class KeyCodesConsumer
     {
-        final Map<Character, String> reverseKeyCodes;
+        final Map<Integer, String> reverseKeyCodes;
 
         KeyCodesConsumer()
         {
-            this.reverseKeyCodes = new ConcurrentHashMap<Character, String>();
+            this.reverseKeyCodes = new ConcurrentHashMap<Integer, String>();
         }
 
         void consumeWireFormat(byte[] messagePart)
@@ -185,29 +185,28 @@ public class HybridProtocolCodec extends StringProtocolCodec
             final ByteBuffer buffer = ByteBuffer.wrap(messagePart);
             byte[] nameBytes;
             String value;
-            Character key;
+            Integer key;
             while (buffer.position() < buffer.limit())
             {
                 nameBytes = new byte[buffer.getChar()];
                 System.arraycopy(messagePart, buffer.position(), nameBytes, 0, nameBytes.length);
                 buffer.position(buffer.position() + nameBytes.length);
                 value = new String(nameBytes, UTF8);
-                key = Character.valueOf(buffer.getChar());
+                key = Integer.valueOf(buffer.getInt());
                 this.reverseKeyCodes.put(key, value);
             }
         }
 
-        String getKeyForCode(char keyCode)
+        String getKeyForCode(int keyCode)
         {
             if (keyCode == KeyCodesProducer.NULL_KEY_CODE)
             {
                 return null;
             }
-            final String key = this.reverseKeyCodes.get(Character.valueOf(keyCode));
+            final String key = this.reverseKeyCodes.get(Integer.valueOf(keyCode));
             if (key == null)
             {
-                throw new NullPointerException("No key found for code: " + keyCode + "(" + (int) keyCode + "), codes="
-                    + this.reverseKeyCodes);
+                throw new NullPointerException("No key found for code: " + keyCode + ", codes=" + this.reverseKeyCodes);
             }
             return key;
         }
@@ -220,7 +219,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
     final KeyCodesConsumer keyCodeConsumer;
     final KeyCodesProducer keyCodeProducer;
 
-    public HybridProtocolCodec()
+    public HybridProtocolCodec32()
     {
         super();
         this.keyCodeConsumer = new KeyCodesConsumer();
@@ -253,14 +252,14 @@ public class HybridProtocolCodec extends StringProtocolCodec
      *  key-code-spec = key-name-len key-name key-code
      *  key-name-len = 2OCTET ; the length of the key-name
      *  key-name = 1*ALPHA; UTF8
-     *  key-code = 2OCTET ; the 16-bit char code for the key
+     *  key-code = 4OCTET ; the integer code for the key
      *  
      *  puts = 0*key-value
      *  
      *  removes = 0*key-value
      * 
      *  key-value = key-code data-type [data-len] data
-     *  key-code = 2OCTET ; the 16-bit char code for the key
+     *  key-code = 4OCTET ; the integer code for the key
      *  data-type = OCTET; the data type
      *  data-len = 4OCTET; the length for the data in bytes, only present for blob and text data type, others are 8 bytes
      *  data = 1*OCTET; the data
@@ -380,7 +379,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
                 value = entry.getValue();
 
                 // key-code
-                localBuf = ByteBufferUtils.putChar(keyCodeProducer.getCodeFor(key), localBuf);
+                localBuf = ByteBufferUtils.putInt(keyCodeProducer.getCodeFor(key), localBuf);
                 if (value == null)
                 {
                     localBuf = ByteBufferUtils.put(NULL_DATA_TYPE, localBuf);
@@ -466,7 +465,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
             keyCodesConsumer.consumeWireFormat(ByteBufferUtils.getBytesFromBuffer(buffer, keyCodesLen));
         }
 
-        char keyCode;
+        int keyCode;
         byte dataType;
         TypeEnum type;
         int dataLen = 0;
@@ -476,7 +475,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
         final int putEnd = buffer.position() + putLen;
         while (buffer.position() < putEnd)
         {
-            keyCode = buffer.getChar();
+            keyCode = buffer.getInt();
             dataType = buffer.get();
             if (dataType == NULL_DATA_TYPE)
             {
@@ -522,7 +521,7 @@ public class HybridProtocolCodec extends StringProtocolCodec
         final int removeEnd = buffer.position() + removeLen;
         while (buffer.position() < removeEnd)
         {
-            keyCode = buffer.getChar();
+            keyCode = buffer.getInt();
             dataType = buffer.get();
             if (dataType == NULL_DATA_TYPE)
             {
@@ -574,6 +573,6 @@ public class HybridProtocolCodec extends StringProtocolCodec
     @Override
     public ICodec<char[]> newInstance()
     {
-        return new HybridProtocolCodec();
+        return new HybridProtocolCodec32();
     }
 }

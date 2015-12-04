@@ -27,15 +27,15 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesConsumer;
-import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesProducer;
+import com.fimtra.datafission.core.HybridProtocolCodec.KeyCodesConsumer;
+import com.fimtra.datafission.core.HybridProtocolCodec.KeyCodesProducer;
 
 /**
  * Tests for a {@link KeyCodesProducer} and {@link KeyCodesConsumer}
  * 
  * @author Ramon Servadei
  */
-public class KeyCodeProducerConsumerTest
+public class KeyCodeProducerConsumer32Test
 {
 
     @Before
@@ -84,7 +84,7 @@ public class KeyCodeProducerConsumerTest
             names.add("F" + i);
         }
         producer.produceWireFormat(names, false);
-        final Map<String, Integer> keyCodes = new HashMap<String, Integer>(producer.keyCodes);
+        final Map<String, Character> keyCodes = new HashMap<String, Character>(producer.keyCodes);
         // try again, we should not add new codes
         producer.produceWireFormat(names, false);
         assertEquals(keyCodes, producer.keyCodes);

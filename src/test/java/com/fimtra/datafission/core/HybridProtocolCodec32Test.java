@@ -22,22 +22,22 @@ import java.util.Map;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.HybridProtocolCodec.KeyCodesProducer;
+import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesProducer;
 import com.fimtra.datafission.field.LongValue;
 
 /**
- * Tests for the {@link HybridProtocolCodec}
+ * Tests for the {@link HybridProtocolCodec32}
  * 
  * @author Ramon Servadei
  */
-public class HybridProtocolCodecTest extends CodecBaseTest
+public class HybridProtocolCodec32Test extends CodecBaseTest
 {
     @Override
     ICodec<?> constructCandidate()
     {
         KeyCodesProducer.KEY_CODE_DICTIONARY.clear();
         KeyCodesProducer.NEXT_CODE.set(1);
-        return new HybridProtocolCodec();
+        return new HybridProtocolCodec32();
     }
 
 //    @Test
@@ -64,4 +64,5 @@ public class HybridProtocolCodecTest extends CodecBaseTest
         System.err.println("hybrid.length=" + hybrid.length + ", string.length=" + string.length);
         assertTrue("hybrid.length=" + hybrid.length + ", string.length=" + string.length, hybrid.length < string.length);
     }
+
 }
