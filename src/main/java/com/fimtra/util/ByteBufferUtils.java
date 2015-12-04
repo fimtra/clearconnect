@@ -46,7 +46,10 @@ public abstract class ByteBufferUtils
     public static final byte[] asBytes(ByteBuffer buffer)
     {
         final byte[] data = new byte[buffer.limit()];
-        System.arraycopy(buffer.array(), 0, data, 0, buffer.limit());
+        if (data.length > 0)
+        {
+            System.arraycopy(buffer.array(), 0, data, 0, buffer.limit());
+        }
         return data;
     }
 
@@ -57,6 +60,11 @@ public abstract class ByteBufferUtils
      */
     public static final ByteBuffer copyBytesIntoBuffer(byte[] data, ByteBuffer buffer)
     {
+        if (data.length == 0)
+        {
+            return buffer;
+        }
+
         ByteBuffer localBuf = buffer;
         try
         {
