@@ -58,6 +58,8 @@ public class ObjectPoolTest
         assertSame(s1_2, candidate.intern(s1_2));
         
         assertSame(s2, candidate.intern(s2));
+        
+        assertNull(candidate.intern(null));
     }
 
 }

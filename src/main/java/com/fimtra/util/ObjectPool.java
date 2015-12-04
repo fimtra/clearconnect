@@ -62,6 +62,10 @@ public final class ObjectPool<T>
      */
     public T intern(T t)
     {
+        if (t == null)
+        {
+            return t;
+        }
         final T putIfAbsent = this.pool.putIfAbsent(t, t);
         if (putIfAbsent == null)
         {
