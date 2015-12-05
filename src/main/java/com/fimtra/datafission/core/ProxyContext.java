@@ -898,6 +898,7 @@ public final class ProxyContext implements IObserverContext
     void onDataReceived(byte[] data)
     {
         final IRecordChange changeToApply =
+        // todo if there is an exception, we may need to re-sync (once)
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
 
         if (changeToApply == null)
@@ -922,8 +923,11 @@ public final class ProxyContext implements IObserverContext
                     ACK_ARGS_DELIMITER);
             final String action = changeName.substring(ACK.length(), startOfRecordNames);
             List<CountDownLatch> latches;
-            for (String recordName : recordNames)
+            String recordName;
+            final int recordNameCount = recordNames.size();
+            for (int i = 0; i < recordNameCount; i++)
             {
+                recordName = recordNames.get(i);
                 latches = this.actionResponseLatches.remove(action + recordName);
                 if (latches != null)
                 {

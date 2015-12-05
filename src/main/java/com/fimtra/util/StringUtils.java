@@ -15,7 +15,7 @@
  */
 package com.fimtra.util;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -80,7 +80,7 @@ public abstract class StringUtils
         String stripped = stripToEmpty(str);
         return stripped.isEmpty();
     }
-
+    
     /**
      * Split a string into tokens identified by a delimiter character. The delimiter character is
      * 'escaped' by a preceeding occurrence of the delimiter character, e.g:<br>
@@ -106,7 +106,7 @@ public abstract class StringUtils
         }
 
         final char[] chars = stringToSplit.toCharArray();
-        List<String> tokens = new LinkedList<String>();
+        List<String> tokens = new ArrayList<String>();
         StringBuilder sb = new StringBuilder();
         char c;
         boolean lastWasDelimiter = false;
