@@ -286,7 +286,7 @@ public class HybridProtocolCodec32 extends StringProtocolCodec
 
         buffer =
             encodeAtomicChange(this.keyCodeProducer, atomicChange, buffer,
-                atomicChange.getScope() == IRecordChange.IMAGE_SCOPE.charValue());
+                atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR);
 
         if (subMapKeys.size() > 0)
         {

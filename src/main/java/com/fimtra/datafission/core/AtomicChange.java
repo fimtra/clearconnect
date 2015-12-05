@@ -113,7 +113,7 @@ public final class AtomicChange implements IRecordChange
         @Override
         public char getScope()
         {
-            return DELTA_SCOPE.charValue();
+            return DELTA_SCOPE_CHAR;
         }
 
         @Override
@@ -270,7 +270,7 @@ public final class AtomicChange implements IRecordChange
 
             if(!isImage)
             {
-                isImage = subsequentChange.getScope() == IRecordChange.IMAGE_SCOPE.charValue();
+                isImage = subsequentChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
             }
             
             newPutEntries = subsequentChange.getPutEntries();
@@ -333,7 +333,7 @@ public final class AtomicChange implements IRecordChange
             lock.unlock();
         }
         
-        setScope(isImage ? IRecordChange.IMAGE_SCOPE.charValue() : IRecordChange.DELTA_SCOPE.charValue());
+        setScope(isImage ? IRecordChange.IMAGE_SCOPE_CHAR : IRecordChange.DELTA_SCOPE_CHAR);
 
         // only need to set the sequence from the last one (they are in order)
         setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());

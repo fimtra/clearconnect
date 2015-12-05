@@ -159,7 +159,7 @@ public class Publisher
                                 atomicChange.getName()).getAndIncrement());
                             if (atomicChange.getSequence() == 0)
                             {
-                                atomicChange.setScope(IRecordChange.IMAGE_SCOPE.charValue());
+                                atomicChange.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
                             }
                             handleRecordChange(atomicChange);
                         }

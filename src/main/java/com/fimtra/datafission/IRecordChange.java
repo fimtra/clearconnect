@@ -43,6 +43,8 @@ public interface IRecordChange
 {
     Character DELTA_SCOPE = Character.valueOf('d');
     Character IMAGE_SCOPE = Character.valueOf('i');
+    char IMAGE_SCOPE_CHAR = IMAGE_SCOPE.charValue();
+    char DELTA_SCOPE_CHAR = DELTA_SCOPE.charValue();
 
     /**
      * @return the name of the record that the change is for
