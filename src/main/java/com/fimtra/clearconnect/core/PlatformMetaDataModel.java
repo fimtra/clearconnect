@@ -441,7 +441,7 @@ public final class PlatformMetaDataModel
                     checkReset();
                     handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
                 }
-            }, SERVICE_INSTANCES_PER_AGENT), SERVICE_INSTANCES_PER_AGENT);
+            }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCES_PER_AGENT);
 
         this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
             new IRecordListener()
@@ -452,7 +452,7 @@ public final class PlatformMetaDataModel
                     checkReset();
                     handleServiceInstanceStatsUpdate(atomicChange);
                 }
-            }, SERVICE_INSTANCE_STATS), SERVICE_INSTANCE_STATS);
+            }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCE_STATS);
 
         this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
             new IRecordListener()
