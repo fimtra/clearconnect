@@ -18,7 +18,6 @@ package com.fimtra.datafission.core;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
@@ -69,21 +68,29 @@ public class CoalescingRecordListener implements IRecordListener
          * Keep the cached image after coalescing - this will provide better performance at the cost
          * of memory allocated
          */
-        KEEP_ON_COALESCE,
+        KEEP_IMAGE_ON_COALESCE,
         /**
          * Remove the cached image after coalescing - saves memory but can incur performance
          * penalties if records are large and update frequently
          */
-        REMOVE_ON_COALESCE;
+        REMOVE_IMAGE_ON_COALESCE,
+        /**
+         * No caching of image needed - only used if the delegate {@link IRecordListener} for the
+         * {@link CoalescingRecordListener} does not need the {@link IRecord} image argument in the
+         * {@link IRecordListener#onChange(IRecord, IRecordChange)}
+         */
+        NO_IMAGE_NEEDED;
 
         IRecord handle(ConcurrentMap<String, IRecord> cachedImages, String name)
         {
             switch(this)
             {
-                case KEEP_ON_COALESCE:
+                case KEEP_IMAGE_ON_COALESCE:
                     return cachedImages.get(name);
-                case REMOVE_ON_COALESCE:
+                case REMOVE_IMAGE_ON_COALESCE:
                     return cachedImages.remove(name);
+                case NO_IMAGE_NEEDED:
+                    return null;
             }
             throw new UnsupportedOperationException("Unhandled policy type " + this);
         }
@@ -111,7 +118,7 @@ public class CoalescingRecordListener implements IRecordListener
         {
             final IRecord image =
                 CoalescingRecordListener.this.cachePolicy.handle(CoalescingRecordListener.this.cachedImages, this.name);
-            if (image != null)
+            if (image != null || CoalescingRecordListener.this.cachePolicy == CachePolicyEnum.NO_IMAGE_NEEDED)
             {
                 final List<IRecordChange> changes;
                 CoalescingRecordListener.this.lock.lock();
@@ -125,14 +132,15 @@ public class CoalescingRecordListener implements IRecordListener
                 }
                 if (changes != null)
                 {
-                    final Map<String, IValue> putEntries = new HashMap<String, IValue>();
-                    final Map<String, IValue> overwrittenEntries = new HashMap<String, IValue>();
-                    final Map<String, IValue> removedEntries = new HashMap<String, IValue>();
                     final AtomicChange mergedAtomicChange =
-                        new AtomicChange(this.name, putEntries, overwrittenEntries, removedEntries);
+                        new AtomicChange(this.name, new HashMap<String, IValue>(), new HashMap<String, IValue>(),
+                            new HashMap<String, IValue>());
 
                     mergedAtomicChange.coalesce(changes);
-                    mergedAtomicChange.applyCompleteAtomicChangeToRecord(image);
+                    if (CoalescingRecordListener.this.cachePolicy != CachePolicyEnum.NO_IMAGE_NEEDED)
+                    {
+                        mergedAtomicChange.applyCompleteAtomicChangeToRecord(image);
+                    }
                     CoalescingRecordListener.this.delegate.onChange(image, mergedAtomicChange);
                 }
             }
@@ -154,7 +162,7 @@ public class CoalescingRecordListener implements IRecordListener
     final ConcurrentMap<String, List<IRecordChange>> cachedAtomicChanges;
 
     /**
-     * Construct an instance with a cache policy of {@link CachePolicyEnum#KEEP_ON_COALESCE}
+     * Construct an instance with a cache policy of {@link CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}
      * 
      * @param coalescingExecutor
      *            the {@link ThimbleExecutor} to use to coalesce updates
@@ -167,7 +175,7 @@ public class CoalescingRecordListener implements IRecordListener
     public CoalescingRecordListener(ThimbleExecutor coalescingExecutor, IRecordListener delegate,
         Object coalescingContext)
     {
-        this(coalescingExecutor, delegate, coalescingContext, CachePolicyEnum.KEEP_ON_COALESCE);
+        this(coalescingExecutor, delegate, coalescingContext, CachePolicyEnum.KEEP_IMAGE_ON_COALESCE);
     }
 
     /**
@@ -179,8 +187,8 @@ public class CoalescingRecordListener implements IRecordListener
      *            the context to coalesce on - this can be the record name but for multi-source
      *            updates, the context should identify the source and record name
      * @param cachePolicy
-     *            the cache policy, see {@link CachePolicyEnum#KEEP_ON_COALESCE} and
-     *            {@link CachePolicyEnum#REMOVE_ON_COALESCE}
+     *            the cache policy, see {@link CachePolicyEnum#KEEP_IMAGE_ON_COALESCE} and
+     *            {@link CachePolicyEnum#REMOVE_IMAGE_ON_COALESCE}
      */
     public CoalescingRecordListener(ThimbleExecutor coalescingExecutor, IRecordListener delegate,
         Object coalescingContext, CachePolicyEnum cachePolicy)
