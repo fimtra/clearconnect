@@ -170,9 +170,10 @@ public interface IObserverContext
             String PUBLISHER_PORT = ___PUBLISHER + " port";
             String PROXY_ID = __PROXY + " ID";
             String PROXY_ENDPOINT = __PROXY + " endpoint";
-            String MSGS_PER_MIN = "Msgs per min";
-            String KB_PER_MIN = "Kb per min";
+            String MSGS_PER_SEC = "Msgs per sec";
+            String KB_PER_SEC = "Kb per sec";
             String MESSAGE_COUNT = "Msgs published";
+            String AVG_MSG_SIZE = "Avg msg size (bytes)";
             String KB_COUNT = "Kb published";
             String SUBSCRIPTION_COUNT = "Subscriptions";
             String UPTIME = "Uptime(sec)";

@@ -36,8 +36,8 @@ import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IFtStatusListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
-import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
+import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
@@ -170,23 +170,28 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         subscriptionCount += it.next().getValue().longValue();
                     }
 
+                    final double inverse_1K = 1 / 1024d;
                     final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
                     final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
-                    final double perMin = 60d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
-                    PlatformServiceInstance.this.stats.put(IContextConnectionsRecordFields.MSGS_PER_MIN,
-                        DoubleValue.valueOf((messagesPublished - this.lastMessagesPublished) * perMin));
-                    PlatformServiceInstance.this.stats.put(IContextConnectionsRecordFields.KB_PER_MIN,
-                        DoubleValue.valueOf(((bytesPublished - this.lastBytesPublished) / 1024) * perMin));
+                    final double perSec = 1d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
 
+                    PlatformServiceInstance.this.stats.put(
+                        IContextConnectionsRecordFields.MSGS_PER_SEC,
+                        DoubleValue.valueOf(((long) (((messagesPublished - this.lastMessagesPublished) * perSec) * 10)) / 10d));
+                    PlatformServiceInstance.this.stats.put(
+                        IContextConnectionsRecordFields.KB_PER_SEC,
+                        DoubleValue.valueOf((((long) (((bytesPublished - this.lastBytesPublished) * inverse_1K * perSec) * 10)) / 10d)));
+                    PlatformServiceInstance.this.stats.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
+                        LongValue.valueOf(bytesPublished / messagesPublished));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(subscriptionCount));
                     PlatformServiceInstance.this.stats.put(
                         IServiceStatsRecordFields.UPTIME,
-                        LongValue.valueOf((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) / 1000));
+                        LongValue.valueOf((long) ((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) * 0.001d)));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
                         LongValue.valueOf(messagesPublished));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
-                        LongValue.valueOf(bytesPublished / 1024));
+                        LongValue.valueOf((long) (bytesPublished * inverse_1K)));
 
                     this.lastMessagesPublished = messagesPublished;
                     this.lastBytesPublished = bytesPublished;

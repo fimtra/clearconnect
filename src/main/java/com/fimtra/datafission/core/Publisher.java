@@ -42,6 +42,7 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
@@ -315,10 +316,10 @@ public class Publisher
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_PORT,
                 LongValue.valueOf(endPointAddress.getPort()));
             submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, TextValue.valueOf(clientSocket));
-            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL, TextValue.valueOf(
-                this.codec.getClass().getSimpleName()));
-            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT, TextValue.valueOf(
-                Publisher.this.getTransportTechnology().toString()));
+            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL,
+                TextValue.valueOf(this.codec.getClass().getSimpleName()));
+            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
+                TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
 
             scheduleStatsUpdateTask();
 
@@ -342,22 +343,29 @@ public class Publisher
                     final Map<String, IValue> submapConnections =
                         Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(ProxyContextPublisher.this.client));
 
-                    final double perMin = 60000d / (Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2);
+                    final double perSec =
+                        1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
+                    final double inverse_1K = 1 / 1024d;
                     submapConnections.put(
-                        IContextConnectionsRecordFields.MSGS_PER_MIN,
-                        LongValue.valueOf((long) ((ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished) * perMin)));
+                        IContextConnectionsRecordFields.MSGS_PER_SEC,
+                        LongValue.valueOf((long) ((ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished) * perSec)));
                     submapConnections.put(
-                        IContextConnectionsRecordFields.KB_PER_MIN,
-                        LongValue.valueOf((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished) / 1024) * perMin)));
-
+                        IContextConnectionsRecordFields.KB_PER_SEC,
+                        DoubleValue.valueOf((((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished)
+                            * inverse_1K * perSec) * 10)) / 10d)));
+                    submapConnections.put(
+                        IContextConnectionsRecordFields.AVG_MSG_SIZE,
+                        LongValue.valueOf(ProxyContextPublisher.this.bytesPublished
+                            / ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
                         LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
-                        LongValue.valueOf(ProxyContextPublisher.this.bytesPublished / 1024));
+                        LongValue.valueOf((long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
                     submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
-                    submapConnections.put(IContextConnectionsRecordFields.UPTIME,
-                        LongValue.valueOf((System.currentTimeMillis() - ProxyContextPublisher.this.start) / 1000));
+                    submapConnections.put(
+                        IContextConnectionsRecordFields.UPTIME,
+                        LongValue.valueOf((long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
 
                     this.lastMessagesPublished = ProxyContextPublisher.this.messagesPublished;
                     this.lastBytesPublished = ProxyContextPublisher.this.bytesPublished;

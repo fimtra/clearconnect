@@ -26,7 +26,7 @@ import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
 import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.*;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MESSAGE_COUNT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROTOCOL;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ENDPOINT;
@@ -70,6 +70,8 @@ import com.fimtra.datafission.core.CoalescingRecordListener;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.ProxyContext;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
+import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ThimbleExecutor;
@@ -149,8 +151,8 @@ public final class PlatformMetaDataModel
      * */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
-        EndPoint, SubscriptionCount, MessagesReceived, DataCountKb, ConnectionUptime, Service, ServiceInstance,
-            ServiceEndPoint
+        EndPoint, SubscriptionCount, MessagesReceived, AvergeMessageSizeBytes, DataCountKb, ConnectionUptime, Service,
+            ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec,
     }
 
     /**
@@ -732,7 +734,7 @@ public final class PlatformMetaDataModel
         {
             return this.agent.registryProxy;
         }
-        
+
         // todo this leaves a connection leak if the proxy is not destroyed when no more components
         // need it from the model
         return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0], family_member[1])).proxyContext;
@@ -1018,6 +1020,9 @@ public final class PlatformMetaDataModel
         LongValue publisherPort;
         TextValue publisherNode;
         LongValue messageCount;
+        LongValue avgMsgSize;
+        LongValue msgPerSec;
+        DoubleValue kbPerSec;
         LongValue subscriptionCount;
         LongValue kbCount;
         LongValue connectionUptime;
@@ -1057,6 +1062,9 @@ public final class PlatformMetaDataModel
                 publisherPort = connectionRecord.get(PUBLISHER_PORT);
                 publisherNode = connectionRecord.get(PUBLISHER_NODE);
                 messageCount = connectionRecord.get(MESSAGE_COUNT);
+                avgMsgSize = connectionRecord.get(AVG_MSG_SIZE);
+                msgPerSec = connectionRecord.get(MSGS_PER_SEC);
+                kbPerSec = connectionRecord.get(KB_PER_SEC);
                 subscriptionCount = connectionRecord.get(SUBSCRIPTION_COUNT);
                 kbCount = connectionRecord.get(KB_COUNT);
                 connectionUptime = connectionRecord.get(UPTIME);
@@ -1098,7 +1106,8 @@ public final class PlatformMetaDataModel
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Port.toString(),
                                 publisherPort);
                             serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Codec.toString(), codec);
-                            serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Transport.toString(), transport);
+                            serviceInstanceRecord.put(ServiceInstanceMetaDataRecordDefinition.Transport.toString(),
+                                transport);
                         }
                     }
 
@@ -1107,6 +1116,12 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.EndPoint.toString(), proxyEndPoint);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MessagesReceived.toString(),
                         messageCount);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvergeMessageSizeBytes.toString(),
+                        avgMsgSize);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(),
+                        msgPerSec);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(),
+                        kbPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.SubscriptionCount.toString(),
                         subscriptionCount);
@@ -1115,7 +1130,8 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.Service.toString(), serviceFamily);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceInstance.toString(),
                         platformServiceInstanceID);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
+                    serviceProxyRecord.put(
+                        ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
                         publisherNode.textValue()
                             + (TransportTechnologyEnum.valueOf(transport.textValue()).getNodePortDelimiter())
                             + publisherPort.textValue());
