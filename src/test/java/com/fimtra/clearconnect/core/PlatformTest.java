@@ -1529,6 +1529,7 @@ public class PlatformTest
 
         Log.log(this, ">>>> end publish");
 
+        // expect FT_RPC1 x2, LB_RPC1 x2, ftServiceInstanceStatus x2
         checkRecordSubmapSize(serviceInstanceRpcs, instanceCount);
         checkRecordSubmapSize(serviceRpcs, serviceCount);
 
