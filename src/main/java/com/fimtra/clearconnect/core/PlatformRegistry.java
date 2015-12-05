@@ -891,11 +891,12 @@ final class EventHandler
     private String selectNextInstance(final String serviceFamily)
     {
         String activeServiceMemberName = null;
-        final IValue redundancyModeValue = this.registry.services.get(serviceFamily);
-        if (redundancyModeValue == null)
+        final IValue iValue = this.registry.services.get(serviceFamily);
+        if (iValue == null)
         {
             return null;
         }
+        RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(iValue.textValue());
         if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
         {
             final Map<String, IValue> serviceInstances =
@@ -921,7 +922,7 @@ final class EventHandler
 
                 final String serviceInstanceId =
                     PlatformUtils.composePlatformServiceInstanceID(serviceFamily, activeServiceMemberName);
-                if (RedundancyModeEnum.valueOf(redundancyModeValue.textValue()) == RedundancyModeEnum.LOAD_BALANCED)
+                if (redundancyModeEnum == RedundancyModeEnum.LOAD_BALANCED)
                 {
                     /*
                      * for LB, the timestamp is updated to be the last selected time so the next
@@ -1222,8 +1223,8 @@ final class EventHandler
         }
         catch (Exception e)
         {
-            throw new RuntimeException("WARNING: Registry could not call RPC to "
-                + (active ? "activate" : "deactivate OLD") + " master service: " + activeServiceInstanceId, e);
+            Log.log(this.registry, "Could not call RPC to " + (active ? "activate" : "deactivate OLD")
+                + " master service: " + activeServiceInstanceId, e);
         }
     }
 
