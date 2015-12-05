@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -51,8 +50,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import com.fimtra.channel.ChannelUtils;
-import com.fimtra.clearconnect.core.PlatformServiceProxyTest;
-import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecord;
@@ -69,13 +66,12 @@ import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
-import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * Tests the {@link ProxyContext} and {@link Publisher}
@@ -693,7 +689,7 @@ public class ProxyContextTest
     public void testContextStatusReflectsMultipleRemoteContexts() throws Exception
     {
         createComponents("testContextStatusReflectsMultipleRemoteContexts");
-        final int fieldCountForSingleConnection = 13;
+        final int fieldCountForSingleConnection = 14;
 
         this.publisher.publishContextConnectionsRecordAtPeriod(20);
         final IRecord connectionsRecord = this.context.getRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
