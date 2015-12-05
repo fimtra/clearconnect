@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -42,10 +44,12 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringUtils;
@@ -97,6 +101,14 @@ public class Publisher
         return channel.getDescription();
     }
 
+    /**
+     * A single-threaded executor that is used exclusively for coalescing and publishing system
+     * record updates.
+     * 
+     * @see ISystemRecordNames
+     */
+    static final ThimbleExecutor SYSTEM_RECORD_PUBLISHER = new ThimbleExecutor("system-record-publisher", 1);
+
     final Lock lock;
 
     /**
@@ -114,6 +126,13 @@ public class Publisher
         final IEndPointService service;
         final AtomicChangeTeleporter teleporter;
         final SubscriptionManager<String, ProxyContextPublisher> subscribers;
+        /**
+         * A {@link CoalescingRecordListener} per system record to ensure more efficient remote
+         * transmission when a context has many single record creates/subscribes etc.
+         */
+        final Map<String, CoalescingRecordListener> systemRecordPublishers;
+        /** Holds the message sequences for the system records that are published */
+        final Map<String, AtomicLong> systemRecordSequences;
 
         ProxyContextMultiplexer(IEndPointService service)
         {
@@ -122,10 +141,46 @@ public class Publisher
             this.teleporter =
                 new AtomicChangeTeleporter(DataFissionProperties.Values.PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE);
             this.service = service;
+
+            this.systemRecordPublishers =
+                new HashMap<String, CoalescingRecordListener>(ContextUtils.SYSTEM_RECORDS.size());
+            this.systemRecordSequences = new HashMap<String, AtomicLong>(ContextUtils.SYSTEM_RECORDS.size());
+
+            for (String systemRecord : ContextUtils.SYSTEM_RECORDS)
+            {
+                this.systemRecordSequences.put(systemRecord, new AtomicLong());
+                this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(SYSTEM_RECORD_PUBLISHER,
+                    new IRecordListener()
+                    {
+                        @Override
+                        public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
+                        {
+                            atomicChange.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
+                                atomicChange.getName()).getAndIncrement());
+                            if (atomicChange.getSequence() == 0)
+                            {
+                                atomicChange.setScope(IRecordChange.IMAGE_SCOPE.charValue());
+                            }
+                            handleRecordChange(atomicChange);
+                        }
+                    }, Publisher.this.context.getName() + "-" + systemRecord, CachePolicyEnum.NO_IMAGE_NEEDED));
+            }
         }
 
         @Override
-        public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        {
+            if (ContextUtils.isSystemRecordName(imageCopy.getName()))
+            {
+                this.systemRecordPublishers.get(imageCopy.getName()).onChange(imageCopy, atomicChange);
+            }
+            else
+            {
+                handleRecordChange(atomicChange);
+            }
+        }
+
+        void handleRecordChange(IRecordChange atomicChange)
         {
             final AtomicChange[] parts = this.teleporter.split((AtomicChange) atomicChange);
             byte[] txMessage;
@@ -165,8 +220,8 @@ public class Publisher
                             {
                                 try
                                 {
-                                    // this will call addDeltaToSubscriptionCount and publish the
-                                    // image
+                                    // NOTE: adding the observer ends up calling
+                                    // addDeltaToSubscriptionCount which publishes the image
                                     if (Publisher.this.context.addObserver(permissionToken,
                                         ProxyContextMultiplexer.this, name).get().get(name).booleanValue())
                                     {
@@ -198,13 +253,29 @@ public class Publisher
                                         final IRecord record = Publisher.this.context.getLastPublishedImage(name);
                                         if (record != null)
                                         {
-                                            final AtomicChange[] parts =
-                                                ProxyContextMultiplexer.this.teleporter.split(new AtomicChange(record));
-                                            for (int i = 0; i < parts.length; i++)
+                                            final AtomicChange change = new AtomicChange(record);
+                                            if (ContextUtils.isSystemRecordName(record.getName()))
                                             {
-                                                publisher.publish(
-                                                    publisher.codec.getTxMessageForAtomicChange(parts[i]), true);
+                                                SYSTEM_RECORD_PUBLISHER.execute(new Runnable()
+                                                {
+                                                    @Override
+                                                    public void run()
+                                                    {
+                                                        // NOTE: sequences increment-then-get, hence
+                                                        // to send the previous image, we need to
+                                                        // subtract 1
+                                                        change.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
+                                                            name).get() - 1);
+                                                        publishImageOnSubscribe(publisher, change);
+                                                    }
+
+                                                });
                                             }
+                                            else
+                                            {
+                                                publishImageOnSubscribe(publisher, change);
+                                            }
+
                                         }
                                         ackSubscribes.add(name);
                                     }
@@ -230,6 +301,15 @@ public class Publisher
                     finally
                     {
                         Publisher.this.lock.unlock();
+                    }
+                }
+
+                void publishImageOnSubscribe(final ProxyContextPublisher publisher, final AtomicChange change)
+                {
+                    final AtomicChange[] parts = ProxyContextMultiplexer.this.teleporter.split(change);
+                    for (int i = 0; i < parts.length; i++)
+                    {
+                        publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true);
                     }
                 }
 
@@ -290,6 +370,11 @@ public class Publisher
         final ITransportChannel client;
         final CopyOnWriteArraySet<String> subscriptions = new CopyOnWriteArraySet<String>();
         final long start;
+        /**
+         * NOTE: this is only used for handling subscribe and RPC commands. The
+         * {@link ProxyContextMultiplexer}'s codec performs the wire-formatting for atomic changes
+         * that are sent to this publisher's {@link #publish(byte[], boolean)} method.
+         */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
         volatile long messagesPublished;
