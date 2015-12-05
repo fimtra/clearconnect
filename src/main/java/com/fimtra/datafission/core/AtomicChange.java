@@ -159,7 +159,7 @@ public final class AtomicChange implements IRecordChange
         this.putEntries = putEntries;
         this.overwrittenEntries = overwrittenEntries;
         this.removedEntries = removedEntries;
-        
+
         this.lock = new ReentrantLock();
     }
 
@@ -256,17 +256,23 @@ public final class AtomicChange implements IRecordChange
         // add self AT THE BEGINNING to the changes so we merge on top of ourself
         subsequentChanges.add(0, this);
 
+        boolean isImage = false;
         // process the changes in order, building up an aggregated atomic change
         IRecordChange subsequentChange;
         for (int i = 0; i < subsequentChanges.size(); i++)
         {
             subsequentChange = subsequentChanges.get(i);
-
+            
             if (subsequentChange == NULL_CHANGE || subsequentChange == null)
             {
                 continue;
             }
 
+            if(!isImage)
+            {
+                isImage = subsequentChange.getScope() == IRecordChange.IMAGE_SCOPE.charValue();
+            }
+            
             newPutEntries = subsequentChange.getPutEntries();
             newOverwrittenEntries = subsequentChange.getOverwrittenEntries();
             newRemovedEntries = subsequentChange.getRemovedEntries();
@@ -326,11 +332,12 @@ public final class AtomicChange implements IRecordChange
         {
             lock.unlock();
         }
+        
+        setScope(isImage ? IRecordChange.IMAGE_SCOPE.charValue() : IRecordChange.DELTA_SCOPE.charValue());
 
-        // only need to set the scope/sequence from the last one (they are in order)
-        final IRecordChange lastChange = subsequentChanges.get(subsequentChanges.size() - 1);
-        setScope(lastChange.getScope());
-        setSequence(lastChange.getSequence());
+        // only need to set the sequence from the last one (they are in order)
+        setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());
+        
 
         // now coalesce the sub-maps in each list per sub-map key
         if (subMapChangesToMerge.size() > 0)
