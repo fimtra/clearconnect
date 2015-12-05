@@ -1101,6 +1101,35 @@ class PlatformDesktop
                                         new RecordSubscriptionPlatformDesktopView(desktop, title,
                                             parentTable.metaDataViewType, nameOfServiceOrServiceInstance);
                                 }
+                                else
+                                {
+                                    view.frame.toFront();
+                                    final Border previousBorder = view.frame.getBorder();
+                                    view.frame.setBorder(BorderFactory.createLineBorder(Color.RED, 4));
+                                    final RecordSubscriptionPlatformDesktopView duplicate = view;
+                                    ThreadUtils.newThread(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            try
+                                            {
+                                                Thread.sleep(500);
+                                            }
+                                            catch (InterruptedException e)
+                                            {
+                                            }
+                                            SwingUtilities.invokeLater(new Runnable()
+                                            {
+                                                @Override
+                                                public void run()
+                                                {
+                                                    duplicate.frame.setBorder(previousBorder);
+                                                }
+                                            });
+                                        }
+                                    }, MetaDataPlatformDesktopView.class.getSimpleName() + "-highlighter").start();
+                                }
                                 view.subscribeFor(parentTable.getSelectedRecord().getName());
                             }
                         }
