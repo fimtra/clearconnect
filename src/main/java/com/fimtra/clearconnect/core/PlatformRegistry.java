@@ -1222,8 +1222,20 @@ final class EventHandler
         }
         catch (Exception e)
         {
-            throw new RuntimeException("WARNING: Registry could not call RPC to "
-                + (active ? "activate" : "deactivate OLD") + " master service: " + activeServiceInstanceId, e);
+            final String message =
+                "Could not call RPC to " + (active ? "activate" : "deactivate OLD") + " master service: "
+                    + activeServiceInstanceId;
+            if (!active)
+            {
+                // if deactivating, we only log (the instance may not be there so we would get an
+                // exception!)
+                Log.log(this.registry, message, e);
+            }
+            else
+            {
+                // if activating, we throw the exception as this means the instance is not there
+                throw new RuntimeException(message, e);
+            }
         }
     }
 
