@@ -129,7 +129,7 @@ public class ContextUtils
     private static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
     private static final double INVERSE_1000000 = 1d / 1000000;
 
-    static final Set<String> SYSTEM_RECORDS;
+    public static final Set<String> SYSTEM_RECORDS;
     static
     {
         Set<String> set = new HashSet<String>();
