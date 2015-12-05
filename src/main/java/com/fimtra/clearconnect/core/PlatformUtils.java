@@ -49,13 +49,16 @@ import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.CoalescingRecordListener;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.IStatusAttribute;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.ClassUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -130,6 +133,7 @@ public class PlatformUtils
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";
+    static final ThimbleExecutor EXECUTOR = new ThimbleExecutor("event-notifier", 1);
 
     /**
      * Used to provide an efficient "one-shot" latch
@@ -174,11 +178,11 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services are discovered.
      */
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
-        final IObserverContext context, String contextRecordsRecordName, final Object logContext)
+        final IObserverContext context, String servicesRecordName, final Object logContext)
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
-            new NotifyingCache<IServiceAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IServiceAvailableListener, String>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -192,7 +196,7 @@ public class PlatformUtils
                     listener.onServiceUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
@@ -223,8 +227,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextRecordsRecordName);
-        awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
+        }, context.getName() + "-" + servicesRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
+            servicesRecordName);
+        awaitUpdateLatch(logContext, servicesRecordName, updateWaitLatch);
         return serviceAvailableListeners;
     }
 
@@ -232,11 +237,11 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services INSTANCES are discovered.
      */
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
-        final IObserverContext context, String contextRecordsRecordName, final Object logContext)
+        final IObserverContext context, String serviceInstancesPerServiceRecordName, final Object logContext)
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
-            new NotifyingCache<IServiceInstanceAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IServiceInstanceAvailableListener, String>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -252,47 +257,50 @@ public class PlatformUtils
                     listener.onServiceInstanceUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        context.addObserver(
+            new CoalescingRecordListener(EXECUTOR, new IRecordListener()
             {
-                /*
-                 * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT the
-                 * service instance ID), value=system time when registered/last used}
-                 */
-                IRecordChange changesForService;
-                String serviceInstanceId;
-                for (String serviceFamily : atomicChange.getSubMapKeys())
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
-                    Set<String> newServices = changesForService.getPutEntries().keySet();
-                    for (String serviceMember : newServices)
+                    /*
+                     * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT
+                     * the service instance ID), value=system time when registered/last used}
+                     */
+                    IRecordChange changesForService;
+                    String serviceInstanceId;
+                    for (String serviceFamily : atomicChange.getSubMapKeys())
                     {
-                        serviceInstanceId =
-                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
-                            serviceInstanceId))
+                        changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
+                        Set<String> newServices = changesForService.getPutEntries().keySet();
+                        for (String serviceMember : newServices)
                         {
-                            Log.log(logContext, "Service instance available (discovered): '", serviceInstanceId, "'");
+                            serviceInstanceId =
+                                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                            if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
+                                serviceInstanceId))
+                            {
+                                Log.log(logContext, "Service instance available (discovered): '", serviceInstanceId,
+                                    "'");
+                            }
+                        }
+                        Set<String> removedServices = changesForService.getRemovedEntries().keySet();
+                        for (String serviceMember : removedServices)
+                        {
+                            serviceInstanceId =
+                                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                            if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId,
+                                serviceInstanceId))
+                            {
+                                Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
+                            }
                         }
                     }
-                    Set<String> removedServices = changesForService.getRemovedEntries().keySet();
-                    for (String serviceMember : removedServices)
-                    {
-                        serviceInstanceId =
-                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId,
-                            serviceInstanceId))
-                        {
-                            Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
-                        }
-                    }
+                    updateWaitLatch.countDown();
                 }
-                updateWaitLatch.countDown();
-            }
-        }, contextRecordsRecordName);
-        awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
+            }, context.getName() + "-" + serviceInstancesPerServiceRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
+            serviceInstancesPerServiceRecordName);
+        awaitUpdateLatch(logContext, serviceInstancesPerServiceRecordName, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
 
@@ -305,7 +313,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
-            new NotifyingCache<IRecordAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IRecordAvailableListener, String>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordAvailableListener listener, String key, String data)
@@ -319,7 +327,7 @@ public class PlatformUtils
                     listener.onRecordUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -336,7 +344,8 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextRecordsRecordName);
+        }, context.getName() + "-" + contextRecordsRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
+            contextRecordsRecordName);
         awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return recordAvailableNotifyingCache;
     }
@@ -350,7 +359,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
-            new NotifyingCache<IRpcAvailableListener, IRpcInstance>(context.getUtilityExecutor())
+            new NotifyingCache<IRpcAvailableListener, IRpcInstance>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataAdded(IRpcAvailableListener listener, String key, IRpcInstance data)
@@ -364,7 +373,7 @@ public class PlatformUtils
                     listener.onRpcUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -403,7 +412,7 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextRpcRecordName);
+        }, context.getName() + "-" + contextRpcRecordName, CachePolicyEnum.NO_IMAGE_NEEDED), contextRpcRecordName);
         awaitUpdateLatch(logContext, contextRpcRecordName, updateWaitLatch);
         return rpcAvailableNotifyingCache;
     }
@@ -417,7 +426,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
-            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(context.getUtilityExecutor())
+            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordSubscriptionListener listener, String key,
@@ -433,7 +442,7 @@ public class PlatformUtils
                     // noop
                 }
             };
-        context.addObserver(new IRecordListener()
+        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -468,7 +477,8 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextSubscriptionsRecordName);
+        }, context.getName() + "-" + contextSubscriptionsRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
+            contextSubscriptionsRecordName);
         awaitUpdateLatch(logContext, contextSubscriptionsRecordName, updateWaitLatch);
         return subscriptionNotifyingCache;
     }
@@ -481,7 +491,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
-            new NotifyingCache<IRecordConnectionStatusListener, IValue>(proxyContext.getUtilityExecutor())
+            new NotifyingCache<IRecordConnectionStatusListener, IValue>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataRemoved(IRecordConnectionStatusListener listener, String key,
@@ -509,24 +519,30 @@ public class PlatformUtils
                     }
                 }
             };
-        proxyContext.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
-            {
-                Map.Entry<String, IValue> entry = null;
-                String key = null;
-                IValue value = null;
-                for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
+        proxyContext.addObserver(
+            new CoalescingRecordListener(
+                EXECUTOR,
+                new IRecordListener()
                 {
-                    entry = it.next();
-                    key = entry.getKey();
-                    value = entry.getValue();
-                    recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
-                }
-                updateWaitLatch.countDown();
-            }
-        }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
+                    @Override
+                    public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+                    {
+                        Map.Entry<String, IValue> entry = null;
+                        String key = null;
+                        IValue value = null;
+                        for (Iterator<Map.Entry<String, IValue>> it =
+                            atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
+                        {
+                            entry = it.next();
+                            key = entry.getKey();
+                            value = entry.getValue();
+                            recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
+                        }
+                        updateWaitLatch.countDown();
+                    }
+                }, proxyContext.getName() + "-" + ProxyContext.RECORD_CONNECTION_STATUS_NAME,
+                CachePolicyEnum.NO_IMAGE_NEEDED),
+            ProxyContext.RECORD_CONNECTION_STATUS_NAME);
         awaitUpdateLatch(logContext, ProxyContext.RECORD_CONNECTION_STATUS_NAME, updateWaitLatch);
         return recordStatusNotifyingCache;
     }
@@ -539,7 +555,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
-            new NotifyingCache<IServiceConnectionStatusListener, Connection>(proxyContext.getUtilityExecutor())
+            new NotifyingCache<IServiceConnectionStatusListener, Connection>(EXECUTOR)
             {
                 @Override
                 protected void notifyListenerDataRemoved(IServiceConnectionStatusListener listener, String key,
