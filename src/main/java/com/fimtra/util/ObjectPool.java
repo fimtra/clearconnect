@@ -15,8 +15,11 @@
  */
 package com.fimtra.util;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A pool for holding canonical versions of objects.
@@ -27,6 +30,26 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class ObjectPool<T>
 {
+    final static ScheduledExecutorService poolLogger = ThreadUtils.newScheduledExecutorService("object-pool-logger", 1);
+    final static List<ObjectPool<?>> pools = new LowGcLinkedList<ObjectPool<?>>();
+    static
+    {
+        poolLogger.scheduleAtFixedRate(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (pools)
+                {
+                    for (ObjectPool<?> pool : pools)
+                    {
+                        Log.log(ObjectPool.class, pool.toString());
+                    }
+                }
+            }
+        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
+    }
+
     private final String name;
     private final ConcurrentMap<T, T> pool;
     private final LowGcLinkedList<T> order;
@@ -50,6 +73,18 @@ public final class ObjectPool<T>
         this.maxSize = maxSize;
         this.pool = new ConcurrentHashMap<T, T>();
         this.order = (maxSize > 0 ? new LowGcLinkedList<T>() : null);
+        synchronized (pools)
+        {
+            pools.add(this);
+        }
+    }
+
+    public void destroy()
+    {
+        synchronized (pools)
+        {
+            pools.remove(this);
+        }
     }
 
     /**
@@ -91,6 +126,6 @@ public final class ObjectPool<T>
     @Override
     public String toString()
     {
-        return "ObjectPool[" + this.name + ", " + this.order.size() + "/" + this.maxSize + "]";
+        return "ObjectPool[" + this.name + ", " + this.pool.size() + "/" + this.maxSize + "]";
     }
 }
