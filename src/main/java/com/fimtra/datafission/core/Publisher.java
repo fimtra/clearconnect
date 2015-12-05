@@ -353,10 +353,9 @@ public class Publisher
                         IContextConnectionsRecordFields.KB_PER_SEC,
                         DoubleValue.valueOf((((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished)
                             * inverse_1K * perSec) * 10)) / 10d)));
-                    submapConnections.put(
-                        IContextConnectionsRecordFields.AVG_MSG_SIZE,
-                        LongValue.valueOf(ProxyContextPublisher.this.bytesPublished
-                            / ProxyContextPublisher.this.messagesPublished));
+                    submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
+                        LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
+                            : ProxyContextPublisher.this.bytesPublished / ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
                         LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,

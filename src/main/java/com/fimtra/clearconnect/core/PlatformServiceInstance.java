@@ -182,7 +182,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         IContextConnectionsRecordFields.KB_PER_SEC,
                         DoubleValue.valueOf((((long) (((bytesPublished - this.lastBytesPublished) * inverse_1K * perSec) * 10)) / 10d)));
                     PlatformServiceInstance.this.stats.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
-                        LongValue.valueOf(bytesPublished / messagesPublished));
+                        LongValue.valueOf(messagesPublished == 0 ? 0 : bytesPublished / messagesPublished));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(subscriptionCount));
                     PlatformServiceInstance.this.stats.put(
