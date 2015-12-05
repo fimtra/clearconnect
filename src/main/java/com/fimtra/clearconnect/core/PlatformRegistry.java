@@ -57,6 +57,7 @@ import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
@@ -473,7 +474,8 @@ public final class PlatformRegistry
             {
                 PlatformRegistry.this.eventHandler.executeHandleConnectionsUpdate(atomicChange);
             }
-        }, ISystemRecordNames.CONTEXT_CONNECTIONS), ISystemRecordNames.CONTEXT_CONNECTIONS);
+        }, ISystemRecordNames.CONTEXT_CONNECTIONS, CachePolicyEnum.NO_IMAGE_NEEDED),
+            ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         createGetServiceInfoRecordNameForServiceRpc();
         createGetHeartbeatConfigRpc();
