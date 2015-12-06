@@ -284,10 +284,14 @@ public abstract class CodecBaseTest
     private IRecordChange performTxRxAndGetChange(String name, Map<String, IValue> putEntries,
         Map<String, IValue> removedEntries)
     {
-        final byte[] txStringForChange =
-            (this.candidate.getTxMessageForAtomicChange(new AtomicChange(name, putEntries,
-                new HashMap<String, IValue>(), removedEntries)));
-        final IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(txStringForChange);
+        IRecordChange changeFromRxData =
+            this.candidate.getAtomicChangeFromRxMessage((this.candidate.getTxMessageForAtomicChange(new AtomicChange(
+                name, putEntries, new HashMap<String, IValue>(), removedEntries))));
+        
+        // do it again to test codecs that send images
+        changeFromRxData =
+            this.candidate.getAtomicChangeFromRxMessage((this.candidate.getTxMessageForAtomicChange(new AtomicChange(
+                name, putEntries, new HashMap<String, IValue>(), removedEntries))));
         return changeFromRxData;
     }
 
