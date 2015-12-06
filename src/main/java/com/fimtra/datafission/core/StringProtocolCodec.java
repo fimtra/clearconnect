@@ -47,8 +47,8 @@ public class StringProtocolCodec implements ICodec<char[]>
 {
     // these are special chars used by TcpChannel TerminatorBasedReaderWriter.TERMINATOR so need
     // escaping
-    private static final char CR = '\r';
-    private static final char LF = '\n';
+    static final char CR = '\r';
+    static final char LF = '\n';
 
     static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -81,7 +81,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     static final String KEY_PREAMBLE = NULL_VALUE;
     static final char[] KEY_PREAMBLE_CHARS = KEY_PREAMBLE.toCharArray();
     static final String DOUBLE_KEY_PREAMBLE = KEY_PREAMBLE + KEY_PREAMBLE;
-    private static final int DOUBLE_KEY_PREAMBLE_LENGTH = DOUBLE_KEY_PREAMBLE.length();
+    static final int DOUBLE_KEY_PREAMBLE_LENGTH = DOUBLE_KEY_PREAMBLE.length();
 
     @Override
     public CommandEnum getCommand(char[] decodedMessage)
@@ -143,9 +143,9 @@ public class StringProtocolCodec implements ICodec<char[]>
      * <pre>
      *  preamble name seq [puts] [removes] [sub-map]
      *  
-     *  preamble = 0*ALPHA "|"
-     *  name = 1*ALPHA ; the name of the notifying record instance
-     *  seq = scope seq_num
+     *  preamble = 0*ALPHA
+     *  name = "|" 1*ALPHA ; the name of the notifying record instance
+     *  seq = "|" scope seq_num
      *  scope = "i" | "d" ; identifies either an image or delta
      *  seq_num = 1*DIGIT ; the sequency number
      *  puts = "|p" 1*key-value-pair
@@ -485,6 +485,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     case '\\':
                     case '|':
                     case '=':
+                    case '~':
                         sb.append(chars, last, i - last);
                         sb.append('\\');
                         sb.append(charAt);
@@ -501,7 +502,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    private static int doUnescape(char[] chars, int start, int end, final char[] unescaped)
+    static int doUnescape(char[] chars, int start, int end, final char[] unescaped)
     {
         int unescapedPtr = 0;
         for (int i = start; i < end; i++)
@@ -528,6 +529,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                                 break;
                             case '=':
                                 unescaped[unescapedPtr++] = '=';
+                                break;
+                            case '~':
+                                unescaped[unescapedPtr++] = '~';
                                 break;
                         }
                     }
@@ -645,7 +649,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     /**
      * @return the tokens as an array <code>char[]</code>, first index is the token index
      */
-    private static char[][] findTokens(final char[] chars)
+    static char[][] findTokens(final char[] chars)
     {
         int tokenIndex = 0;
         char[][] tokens = new char[10][];
