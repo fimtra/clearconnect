@@ -52,7 +52,6 @@ import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.StringUtils;
 import com.fimtra.util.SubscriptionManager;
 
 /**
@@ -871,14 +870,17 @@ public class Publisher
     private static void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
         ProxyContextPublisher proxyContextPublisher, String responseAction)
     {
-        final StringBuilder sb = new StringBuilder(recordNames.size() * 30);
-        sb.append(action).append(responseAction).append(ProxyContext.ACK_ACTION_ARGS_START).append(
-            StringUtils.join(recordNames, ProxyContext.ACK_ARGS_DELIMITER));
+        final Map<String, IValue> puts = new HashMap<String, IValue>(recordNames.size());
+        final LongValue dummy = LongValue.valueOf(1);
+        for (String recordName : recordNames)
+        {
+            puts.put(recordName, dummy);
+        }
         final IRecordChange atomicChange =
-            new AtomicChange(sb.toString(), ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
+            new AtomicChange(action + responseAction, puts, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
         if (log)
         {
-            Log.log(Publisher.class, "(->) ", atomicChange.getName());
+            Log.log(Publisher.class, "(->) ", ObjectUtils.safeToString(atomicChange));
         }
         client.sendAsync(proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange));
     }

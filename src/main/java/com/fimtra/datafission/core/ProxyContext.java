@@ -64,7 +64,6 @@ import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.StringUtils;
 import com.fimtra.util.SubscriptionManager;
 
 /**
@@ -123,8 +122,6 @@ public final class ProxyContext implements IObserverContext
     static final String NOK = "_NOK_";
     static final String SUBSCRIBE = "subscribe";
     static final String UNSUBSCRIBE = "unsubscribe";
-    static final String ACK_ACTION_ARGS_START = "?";
-    static final char ACK_ARGS_DELIMITER = ',';
 
     private static final CountDownLatch DEFAULT_COUNT_DOWN_LATCH = new CountDownLatch(0);
 
@@ -911,17 +908,12 @@ public final class ProxyContext implements IObserverContext
         {
             if (log)
             {
-                Log.log(this, "(<-) ", changeName);
+                Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
             }
 
             final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
-
-            final int startOfRecordNames = changeName.indexOf(ACK_ACTION_ARGS_START);
-            final List<String> recordNames =
-                StringUtils.split(
-                    changeName.substring(startOfRecordNames + ACK_ACTION_ARGS_START.length(), changeName.length()),
-                    ACK_ARGS_DELIMITER);
-            final String action = changeName.substring(ACK.length(), startOfRecordNames);
+            final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
+            final String action = changeName.substring(ACK.length());
             List<CountDownLatch> latches;
             String recordName;
             final int recordNameCount = recordNames.size();
