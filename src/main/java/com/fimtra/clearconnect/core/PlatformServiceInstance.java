@@ -89,9 +89,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         String SUBSCRIPTION_COUNT = "Subscriptions";
         String MESSAGE_COUNT = "Msgs published";
-        String MSGS_PER_MIN = "Msgs per min";
+        String AVG_MSG_SIZE = "Avg msg size (bytes)";
+        String MSGS_PER_SEC = "Msgs per sec";
         String KB_COUNT = "Kb published";
-        String KB_PER_MIN = "Kb per min";
+        String KB_PER_SEC = "Kb per sec";
         String UPTIME = "Uptime(sec)";
         String VERSION = "Version";
     }
@@ -176,12 +177,12 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     final double perSec = 1d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
 
                     PlatformServiceInstance.this.stats.put(
-                        IContextConnectionsRecordFields.MSGS_PER_SEC,
+                        IServiceStatsRecordFields.MSGS_PER_SEC,
                         DoubleValue.valueOf(((long) (((messagesPublished - this.lastMessagesPublished) * perSec) * 10)) / 10d));
                     PlatformServiceInstance.this.stats.put(
-                        IContextConnectionsRecordFields.KB_PER_SEC,
+                        IServiceStatsRecordFields.KB_PER_SEC,
                         DoubleValue.valueOf((((long) (((bytesPublished - this.lastBytesPublished) * inverse_1K * perSec) * 10)) / 10d)));
-                    PlatformServiceInstance.this.stats.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
+                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
                         LongValue.valueOf(messagesPublished == 0 ? 0 : bytesPublished / messagesPublished));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(subscriptionCount));

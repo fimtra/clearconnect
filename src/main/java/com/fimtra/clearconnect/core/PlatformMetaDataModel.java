@@ -173,7 +173,7 @@ public final class PlatformMetaDataModel
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
         Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
-            MessagesSent, DataCountKb, MsgsPerMin, KbPerMin, Transport, Version
+            MessagesSent, AvgMsgSizeBytes, KbSent, MsgsPerSec, KbPerSec, Transport, Version
     }
 
     /**
@@ -847,11 +847,13 @@ public final class PlatformMetaDataModel
             ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MESSAGE_COUNT, statsForServiceInstance,
                 ServiceInstanceMetaDataRecordDefinition.MessagesSent.toString());
             ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.DataCountKb.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MSGS_PER_MIN, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.MsgsPerMin.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_PER_MIN, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.KbPerMin.toString());
+                ServiceInstanceMetaDataRecordDefinition.KbSent.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MSGS_PER_SEC, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.MsgsPerSec.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_PER_SEC, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.KbPerSec.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.AVG_MSG_SIZE, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.AvgMsgSizeBytes.toString());
             ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.VERSION, statsForServiceInstance,
                 ServiceInstanceMetaDataRecordDefinition.Version.toString());
             this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
@@ -1118,10 +1120,8 @@ public final class PlatformMetaDataModel
                         messageCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvergeMessageSizeBytes.toString(),
                         avgMsgSize);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(),
-                        msgPerSec);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(),
-                        kbPerSec);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.SubscriptionCount.toString(),
                         subscriptionCount);
