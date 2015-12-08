@@ -22,6 +22,7 @@ import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointService;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IFtStatusListener;
+import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecord;
@@ -215,4 +216,31 @@ public interface IPlatformServiceInstance extends IPlatformServiceComponent
      *            the filter to set, <code>null</code> to use the default "pass all" filter
      */
     void setPermissionFilter(IPermissionFilter filter);
+
+    /**
+     * Add a listener to receive notifications whenever a new proxy connects to this service
+     * instance. This method can be called to register multiple listeners.
+     * <p>
+     * <b>The listener will receive all updates asynchronously</b>
+     * <p>
+     * Once added the listener receives the existing records asynchronously.
+     * 
+     * @param proxyConnectionListener
+     *            the listener to add to receive notifications when proxy instances connect and
+     *            disconnect to this service.
+     * @return <code>true</code> if the listener was added, <code>false</code> if it was already
+     *         added
+     */
+    boolean addProxyConnectionListener(IProxyConnectionListener proxyConnectionListener);
+
+    /**
+     * Remove the listener from receiving notifications about proxy connections to this service
+     * instance.
+     * 
+     * @param proxyConnectionListener
+     *            the listener to remove
+     * @return <code>true</code> if the listener was removed, <code>false</code> if it was not
+     *         removed because it was not registered
+     */
+    boolean removeProxyConnectionListener(IProxyConnectionListener proxyConnectionListener);
 }

@@ -15,10 +15,25 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.util.TestUtils.waitForEvent;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -34,50 +49,27 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
-import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
-import com.fimtra.clearconnect.core.PlatformRegistry;
-import com.fimtra.clearconnect.core.PlatformRegistryAgent;
-import com.fimtra.clearconnect.core.PlatformServiceInstance;
-import com.fimtra.clearconnect.core.PlatformServiceProxy;
-import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.IFtStatusListener;
+import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
+import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
-import com.fimtra.datafission.field.LongValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
 import com.fimtra.util.ThreadUtils;
-
-import static com.fimtra.util.TestUtils.waitForEvent;
-import static org.mockito.Matchers.eq;
-
-import static org.mockito.Mockito.atMost;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the {@link PlatformRegistry} and {@link PlatformRegistryAgent}
@@ -601,6 +593,43 @@ public class PlatformTest
     }
 
     @Test
+    public void testAddProxyConnectionAvailableListener() throws IOException
+    {
+        final String SERVICE1 = logStart("testAddProxyConnectionAvailableListener");
+        createAgent008();
+        createAgent();
+        assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+
+        final PlatformServiceInstance service =
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
+        IProxyConnectionListener listener = mock(IProxyConnectionListener.class);
+        service.addProxyConnectionListener(listener);
+        service.publisher.publishContextConnectionsRecordAtPeriod(100);
+
+        // this is the registry connection
+        // testAddProxyConnectionAvailableListener[PRIMARY]->PlatformRegistry[PlatformTestJUnit]@169.254.12.201
+        verify(listener, timeout(1000)).onConnected(anyString());
+        reset(listener);
+
+        assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
+        verify(listener, timeout(1000)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        reset(listener);
+        
+        assertNotNull(this.agent008.getPlatformServiceProxy(SERVICE1));
+        verify(listener, timeout(1000)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        reset(listener);
+
+        this.agent008.destroyPlatformServiceProxy(SERVICE1);
+        verify(listener, timeout(1000)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        reset(listener);
+
+        this.agent.destroyPlatformServiceProxy(SERVICE1);
+        verify(listener, timeout(1000)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        reset(listener);
+    }
+
+    @Test
     public void testAddServiceAvailableListenerAfterCreatingService() throws IOException
     {
         final String SERVICE1 = logStart("testAddServiceAvailableListenerAfterCreatingService1");
@@ -732,7 +761,7 @@ public class PlatformTest
         IPlatformServiceProxy proxy =
             this.agent.getPlatformServiceInstanceProxy(familyAndMember[0], familyAndMember[1]);
         proxy.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
-        
+
         assertNotNull(proxy);
 
         // check the RPC for the service appears
