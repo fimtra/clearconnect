@@ -39,7 +39,7 @@ public class TextValueTest
     @Test
     public void testCreating()
     {
-        TextValue textValue = new TextValue(TextValue.NULL);
+        TextValue textValue = TextValue.valueOf(TextValue.NULL);
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -50,13 +50,13 @@ public class TextValueTest
     @Test(expected = IllegalArgumentException.class)
     public void testCreatingWithNull()
     {
-        new TextValue(null);
+        TextValue.valueOf(null);
     }
 
     @Test
     public void testCreatingWithNullString()
     {
-        TextValue textValue = new TextValue("null");
+        TextValue textValue = TextValue.valueOf("null");
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -66,7 +66,7 @@ public class TextValueTest
     @Test
     public void testCreatingWithNewNullString()
     {
-        TextValue textValue = new TextValue(new String("null"));
+        TextValue textValue = TextValue.valueOf(new String("null"));
         assertNotNull(textValue.textValue());
         assertSame(TextValue.NULL, textValue.textValue());
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
@@ -93,7 +93,7 @@ public class TextValueTest
     @Test
     public void testCallingNumericMethods()
     {
-        TextValue textValue = new TextValue("not a number!");
+        TextValue textValue = TextValue.valueOf("not a number!");
         assertEquals(Double.NaN, textValue.doubleValue(), 0.00001);
         try
         {
@@ -112,7 +112,7 @@ public class TextValueTest
         for (int i = 0; i < 1000; i++)
         {
             long nextLong = random.nextLong();
-            TextValue textValue = new TextValue("" + nextLong);
+            TextValue textValue = TextValue.valueOf("" + nextLong);
             assertEquals(nextLong, textValue.longValue());
             assertEquals(nextLong, textValue.doubleValue(), 0.00001);
         }
@@ -125,7 +125,7 @@ public class TextValueTest
         for (int i = 0; i < 1000; i++)
         {
             double nextDouble = random.nextDouble();
-            TextValue textValue = new TextValue("" + nextDouble);
+            TextValue textValue = TextValue.valueOf("" + nextDouble);
             assertEquals(nextDouble, textValue.doubleValue(), 0.00001);
             // Note: pointless testing longValue - it throws a numberFormatException
             try
@@ -142,7 +142,7 @@ public class TextValueTest
     @Test
     public void testGetType()
     {
-        assertEquals(TypeEnum.TEXT, new TextValue("").getType());
+        assertEquals(TypeEnum.TEXT, TextValue.valueOf("").getType());
     }
 
     @Test

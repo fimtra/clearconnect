@@ -190,7 +190,7 @@ public class ContextUtilsTest
     public void testMergeDemergeMaps()
     {
         Map<String, IValue> map = new HashMap<String, IValue>();
-        map.put("KEY1", new TextValue("Value1"));
+        map.put("KEY1", TextValue.valueOf("Value1"));
         map.put("KEY2", new DoubleValue(0.1324d));
         map.put("KEY3", LongValue.valueOf(543285734l));
 
@@ -206,23 +206,23 @@ public class ContextUtilsTest
 
     static void updateRecord(final IRecord record)
     {
-        record.put("KEY1", new TextValue("Value1"));
+        record.put("KEY1", TextValue.valueOf("Value1"));
         record.put("KEY2", new DoubleValue(0.1324d));
         record.put("KEY3", LongValue.valueOf(543285734l));
 
         final Map<String, IValue> subMap = record.getOrCreateSubMap("busmap");
-        subMap.put("KEY!", new TextValue("Value1"));
+        subMap.put("KEY!", TextValue.valueOf("Value1"));
 
         Random rnd = new Random();
         final int limit = rnd.nextInt(200);
         for (int i = 0; i < limit; i++)
         {
-            record.put("KEY" + i, rnd.nextBoolean() ? new TextValue("value" + rnd.nextInt()) : rnd.nextBoolean()
+            record.put("KEY" + i, rnd.nextBoolean() ? TextValue.valueOf("value" + rnd.nextInt()) : rnd.nextBoolean()
                 ? LongValue.valueOf(rnd.nextLong()) : new DoubleValue(rnd.nextDouble()));
 
             if (rnd.nextBoolean())
             {
-                subMap.put("KEY" + i, rnd.nextBoolean() ? new TextValue("value" + rnd.nextInt()) : rnd.nextBoolean()
+                subMap.put("KEY" + i, rnd.nextBoolean() ? TextValue.valueOf("value" + rnd.nextInt()) : rnd.nextBoolean()
                     ? LongValue.valueOf(rnd.nextLong()) : new DoubleValue(rnd.nextDouble()));
             }
         }
@@ -230,7 +230,7 @@ public class ContextUtilsTest
 
     static void updateRecordNoSubmaps(final IRecord record)
     {
-        record.put("KEY1", new TextValue("Value1"));
+        record.put("KEY1", TextValue.valueOf("Value1"));
         record.put("KEY2", new DoubleValue(0.1324d));
         record.put("KEY3", LongValue.valueOf(543285734l));
 
@@ -238,7 +238,7 @@ public class ContextUtilsTest
         final int limit = rnd.nextInt(200);
         for (int i = 0; i < limit; i++)
         {
-            record.put("KEY" + i, rnd.nextBoolean() ? new TextValue("value" + rnd.nextInt()) : rnd.nextBoolean()
+            record.put("KEY" + i, rnd.nextBoolean() ? TextValue.valueOf("value" + rnd.nextInt()) : rnd.nextBoolean()
                 ? LongValue.valueOf(rnd.nextLong()) : new DoubleValue(rnd.nextDouble()));
         }
     }

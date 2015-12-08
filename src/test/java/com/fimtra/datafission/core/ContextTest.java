@@ -91,7 +91,7 @@ public class ContextTest
     {
         final String name = "sdf1";
         final String key = "Kmy1";
-        final TextValue v1 = new TextValue("value1");
+        final TextValue v1 = TextValue.valueOf("value1");
 
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver();
         listener.latch = new CountDownLatch(2);

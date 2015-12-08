@@ -63,7 +63,7 @@ public class AbstractCreateOrUpdateConfigTest {
 		String configRecordName = "service instance";
 		String configKey = "config key";
 		String configValue = "config value";
-		IValue[] args = new IValue[] { new TextValue(configRecordName), new TextValue(configKey), new TextValue(configValue) };
+		IValue[] args = new IValue[] { TextValue.valueOf(configRecordName), TextValue.valueOf(configKey), TextValue.valueOf(configValue) };
 		when(this.platformServiceInstance.getOrCreateRecord(configRecordName)).thenReturn(this.record);
 		String result = this.rpcHandler.execute(args).textValue();
 		assertFalse(result.startsWith("RPC failed:"));

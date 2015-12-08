@@ -20,7 +20,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -281,15 +280,15 @@ public class PlatformServiceTest
         assertTrue(this.candidate.createRecord(record1));
         IRecord record = this.candidate.getRecord(record1);
 
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
 
-        record.put("key2", new TextValue("value1"));
-        record.put("key1", new TextValue("value1"));
+        record.put("key2", TextValue.valueOf("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
 
         // this is not a change
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
         verify(listener, times(3)).onChange(any(IRecord.class), any(IRecordChange.class));
     }

@@ -162,9 +162,9 @@ public class RpcInstanceTest
                 @Override
                 public IValue execute(IValue... args) throws TimeOutException, ExecutionException
                 {
-                    return new TextValue(args[0].textValue() + args[1].textValue() + args[2].textValue());
+                    return TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue());
                 }
-            }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(new TextValue(
+            }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(TextValue.valueOf(
                 "text"), new DoubleValue(Double.NaN), new DoubleValue(3));
         assertEquals("textNaN3.0", result.textValue());
     }
@@ -178,9 +178,9 @@ public class RpcInstanceTest
                 @Override
                 public IValue execute(IValue... args) throws TimeOutException, ExecutionException
                 {
-                    return new TextValue(args[0].textValue() + args[1].textValue() + args[2].textValue());
+                    return TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue());
                 }
             }, TypeEnum.TEXT, "getSomething", ARG_NAMES, TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(
-                new TextValue("text"), new DoubleValue(Double.NaN), LongValue.valueOf(3));
+                TextValue.valueOf("text"), new DoubleValue(Double.NaN), LongValue.valueOf(3));
     }
 }

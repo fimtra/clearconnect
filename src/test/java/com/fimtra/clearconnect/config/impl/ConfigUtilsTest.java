@@ -48,7 +48,7 @@ public class ConfigUtilsTest {
 	@Test
 	public void shouldGetWireProtocol() {
 		String nonExistantProtocol = "choo-choo train";
-		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_WIRE_PROTOCOL)).thenReturn(new TextValue(nonExistantProtocol));
+		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_WIRE_PROTOCOL)).thenReturn(TextValue.valueOf(nonExistantProtocol));
 		try {
 			ConfigUtils.getWireProtocol(this.config);
 			fail("Expect an IllegalArgumentException because the '" + nonExistantProtocol + "' protocol is not supported. Sorry.");
@@ -61,11 +61,11 @@ public class ConfigUtilsTest {
 	public void shouldGetRedundancyMode() {
 		assertEquals(RedundancyModeEnum.FAULT_TOLERANT, ConfigUtils.getRedundancyMode(this.config));
 		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_REDUNDANCY_MODE)).thenReturn(
-				new TextValue(RedundancyModeEnum.LOAD_BALANCED.name()));
+				TextValue.valueOf(RedundancyModeEnum.LOAD_BALANCED.name()));
 		assertEquals(RedundancyModeEnum.LOAD_BALANCED, ConfigUtils.getRedundancyMode(this.config));
 		String nonExistantRedundancyMode = "eat fruit instead";
 		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_REDUNDANCY_MODE)).thenReturn(
-				new TextValue(nonExistantRedundancyMode));
+				TextValue.valueOf(nonExistantRedundancyMode));
 		try {
 			ConfigUtils.getRedundancyMode(this.config);
 			fail("Expect an IllegalArgumentException because the '" + nonExistantRedundancyMode + "' redundancy mode is not supported.");
@@ -80,7 +80,7 @@ public class ConfigUtilsTest {
 		String configPort = "112233";
 		// default port is 0 (use ephemeral port)
 		assertTrue(ConfigUtils.getPort(this.config, host) == 0);
-		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT)).thenReturn(new TextValue(configPort));
+		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT)).thenReturn(TextValue.valueOf(configPort));
 		assertEquals(Integer.parseInt(configPort), ConfigUtils.getPort(this.config, host));
 	}
 
@@ -88,7 +88,7 @@ public class ConfigUtilsTest {
 	public void shouldGetHost() {
 		String host = "hostname";
 		assertFalse(ConfigUtils.getHost(this.config).isEmpty());
-		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_HOST)).thenReturn(new TextValue(host));
+		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_HOST)).thenReturn(TextValue.valueOf(host));
 		assertEquals(host, ConfigUtils.getHost(this.config));
 	}
 
@@ -99,9 +99,9 @@ public class ConfigUtilsTest {
 		long numericConfigValue = 12l;
 		String stringConfigValue = "" + numericConfigValue;
 		assertEquals(defaultValue, ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));
-		when(this.config.getProperty(testPropertyKey)).thenReturn(new TextValue("not an int"));
+		when(this.config.getProperty(testPropertyKey)).thenReturn(TextValue.valueOf("not an int"));
 		assertEquals(defaultValue, ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));
-		when(this.config.getProperty(testPropertyKey)).thenReturn(new TextValue(stringConfigValue));
+		when(this.config.getProperty(testPropertyKey)).thenReturn(TextValue.valueOf(stringConfigValue));
 		assertEquals(Integer.parseInt(stringConfigValue), ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));
 		when(this.config.getProperty(testPropertyKey)).thenReturn(LongValue.valueOf(numericConfigValue));
 		assertEquals((int) numericConfigValue, ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));

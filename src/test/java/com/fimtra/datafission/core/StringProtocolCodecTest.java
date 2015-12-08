@@ -113,7 +113,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     @Test
     public void testEncodeDecodeValueWithTextValueUsingSpecialChar()
     {
-        TextValue value = new TextValue(StringProtocolCodec.NULL_VALUE);
+        TextValue value = TextValue.valueOf(StringProtocolCodec.NULL_VALUE);
         char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
         char[] tempArr = new char[chars.length];
         IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
@@ -123,7 +123,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     @Test
     public void testEncodeDecodeValueWithTextValue()
     {
-        TextValue value = new TextValue("");
+        TextValue value = TextValue.valueOf("");
         char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
         char[] tempArr = new char[chars.length];
         IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
