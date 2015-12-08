@@ -46,7 +46,6 @@ public class TextValueTest
         assertEquals(0, textValue.longValue());
     }
 
-    @SuppressWarnings("unused")
     @Test(expected = IllegalArgumentException.class)
     public void testCreatingWithNull()
     {

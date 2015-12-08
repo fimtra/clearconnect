@@ -97,14 +97,14 @@ public class PlatformServiceTest
     {
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.candidate.getAllSubscriptions().size());
+        assertEquals(4, this.candidate.getAllSubscriptions().size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.candidate.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(4, this.candidate.getAllSubscriptions().size());
+        assertEquals(5, this.candidate.getAllSubscriptions().size());
         assertEquals(1, this.candidate.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.candidate.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -112,7 +112,7 @@ public class PlatformServiceTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.candidate.getAllSubscriptions().size());
+        assertEquals(4, this.candidate.getAllSubscriptions().size());
         assertNull(this.candidate.getAllSubscriptions().get(record1));
     }
 

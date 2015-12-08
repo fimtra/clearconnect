@@ -143,14 +143,14 @@ public class PlatformServiceProxyTest
     @Test
     public void testGetAllSubscriptions() throws InterruptedException
     {
-        assertEquals(3, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(4, this.service.getAllSubscriptions().size());
+        assertEquals(5, this.service.getAllSubscriptions().size());
         assertEquals(1, this.service.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.service.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -158,7 +158,7 @@ public class PlatformServiceProxyTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
         assertNull(this.service.getAllSubscriptions().get(record1));
     }
 

@@ -79,10 +79,11 @@ public class ValueTest
         doConvertTest(new DoubleValue());
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void testBlankTextValueConversion()
     {
-        doConvertTest(TextValue.valueOf(TextValue.NULL));
+        doConvertTest(new TextValue(TextValue.NULL));
     }
 
     public void doConvertTest(IValue v)
