@@ -217,7 +217,7 @@ public class CoalescingRecordListener implements IRecordListener
                 this.cachedAtomicChanges.put(name, list);
             }
             list.add(atomicChange);
-            if (!this.cachedImages.containsKey(name))
+            if (this.cachePolicy != CachePolicyEnum.NO_IMAGE_NEEDED && !this.cachedImages.containsKey(name))
             {
                 this.cachedImages.put(name, Record.snapshot(imageCopy));
             }
