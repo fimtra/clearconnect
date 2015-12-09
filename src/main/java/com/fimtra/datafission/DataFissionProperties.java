@@ -151,6 +151,14 @@ public abstract class DataFissionProperties
          */
         String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
 
+        /**
+         * The coalescing window (in milliseconds) for system record publishing. This helps to
+         * control the number of messages that a publisher will transmit that are changes to system
+         * records, which are generally not processed at the same rate as application records.<br>
+         * E.g. <code>-DdataFission.systemRecordCoalesceWindowMillis=250</code>
+         */
+        String SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = BASE + "systemRecordCoalesceWindowMillis";
+
     }
 
     /**
@@ -294,7 +302,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL
          */
-        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = Integer.parseInt(System.getProperty(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
+        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = Integer.parseInt(System.getProperty(
+            Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
 
         /**
          * The estimated maximum number of concurrent threads that would access an {@link IRecord}.
@@ -306,6 +315,16 @@ public abstract class DataFissionProperties
          * @see Names#MAX_RECORD_CONCURRENCY
          */
         int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, "2"));
+
+        /**
+         * The coalescing window (in milliseconds) for system record publishing.
+         * <p>
+         * Default is 250.
+         * 
+         * @see Names#SYSTEM_RECORD_COALESCE_WINDOW_MILLIS
+         */
+        int SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = Integer.parseInt(System.getProperty(
+            Names.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, "250"));
     }
 
     private DataFissionProperties()

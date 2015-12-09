@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,11 +50,11 @@ import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringUtils;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * A publisher is actually a manager object for multiple {@link ProxyContextPublisher} objects.
@@ -107,7 +108,8 @@ public class Publisher
      * 
      * @see ISystemRecordNames
      */
-    static final ThimbleExecutor SYSTEM_RECORD_PUBLISHER = new ThimbleExecutor("system-record-publisher", 1);
+    static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER = ThreadUtils.newScheduledExecutorService(
+        "system-record-publisher", 1);
 
     final Lock lock;
 
@@ -150,7 +152,7 @@ public class Publisher
             {
                 this.systemRecordSequences.put(systemRecord, new AtomicLong());
                 this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(SYSTEM_RECORD_PUBLISHER,
-                    new IRecordListener()
+                    DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, new IRecordListener()
                     {
                         @Override
                         public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
@@ -163,7 +165,7 @@ public class Publisher
                             }
                             handleRecordChange(atomicChange);
                         }
-                    }, Publisher.this.context.getName() + "-" + systemRecord, CachePolicyEnum.NO_IMAGE_NEEDED));
+                    }, CachePolicyEnum.NO_IMAGE_NEEDED));
             }
         }
 
