@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -76,6 +77,10 @@ import com.fimtra.util.is;
  * <p>
  * The registry maintains a proxy to every service that is registered with it - this allows the
  * registry to keep a live view of what services are available.
+ * <p>
+ * All information in the registry is maintained in internal "registry records" that are published
+ * at timed intervals when there is a change. The timed publishing is an efficiency feature to group
+ * as many changes to each record together in a single update message.
  * <p>
  * The registry service uses a string wire-protocol
  * 
@@ -746,10 +751,12 @@ final class EventHandler
 {
     final PlatformRegistry registry;
     private final ScheduledExecutorService eventExecutor;
+    final Set<String> pendingPublish;
 
     EventHandler(final PlatformRegistry registry)
     {
         this.registry = registry;
+        this.pendingPublish = new HashSet<String>();
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
     }
 
@@ -885,7 +892,7 @@ final class EventHandler
 
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
-        this.registry.context.publishAtomicChange(this.registry.platformSummary);
+        publishTimed(this.registry.platformSummary);
     }
 
     private String selectNextInstance(final String serviceFamily)
@@ -980,7 +987,7 @@ final class EventHandler
                     }
                 }
             }
-            this.registry.context.publishAtomicChange(this.registry.platformConnections);
+            publishTimed(this.registry.platformConnections);
 
             removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
 
@@ -1017,7 +1024,7 @@ final class EventHandler
                 {
                     Log.log(this.registry, "Removing service '", serviceFamily, "' from registry");
                     this.registry.masterInstancePerFtService.remove(serviceFamily);
-                    this.registry.context.publishAtomicChange(this.registry.services);
+                    publishTimed(this.registry.services);
                 }
             }
             else
@@ -1028,8 +1035,8 @@ final class EventHandler
                     selectNextInstance(serviceFamily);
                 }
             }
-            this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerServiceFamily);
-            this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerAgent);
+            publishTimed(this.registry.serviceInstancesPerServiceFamily);
+            publishTimed(this.registry.serviceInstancesPerAgent);
 
             removeServiceStats(serviceInstanceId);
         }
@@ -1137,7 +1144,7 @@ final class EventHandler
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.RUNTIME, args[2]);
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.USER, args[3]);
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.CPU_COUNT, args[4]);
-        this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
+        publishTimed(this.registry.runtimeStatus);
         Log.log(this, "Agent connected: ", agentName);
     }
 
@@ -1155,7 +1162,7 @@ final class EventHandler
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.SYSTEM_LOAD, args[6]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.EPM, args[7]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.UPTIME_SECS, args[8]);
-            this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
+            publishTimed(this.registry.runtimeStatus);
         }
         else
         {
@@ -1191,8 +1198,8 @@ final class EventHandler
                 this.registry.platformConnections.removeSubMap(connectionId);
             }
         }
-        this.registry.context.publishAtomicChange(this.registry.runtimeStatus);
-        this.registry.context.publishAtomicChange(this.registry.platformConnections);
+        publishTimed(this.registry.runtimeStatus);
+        publishTimed(this.registry.platformConnections);
     }
 
     private void verifyMasterInstance(String serviceFamily, String activeServiceInstanceId)
@@ -1286,7 +1293,7 @@ final class EventHandler
             {
                 objectsPerPlatformServiceInstanceRecord.removeSubMap(serviceInstanceId);
             }
-            this.registry.context.publishAtomicChange(objectsPerPlatformServiceInstanceRecord);
+            publishTimed(objectsPerPlatformServiceInstanceRecord);
 
             /*
              * build up an array of the objects for each service instance of this service, we need
@@ -1369,7 +1376,7 @@ final class EventHandler
                 {
                     serviceObjects.putAll(atomicChange.getPutEntries());
                 }
-                this.registry.context.publishAtomicChange(objectsPerPlatformServiceRecord);
+                publishTimed(objectsPerPlatformServiceRecord);
 
                 if (serviceObjects.size() == 0)
                 {
@@ -1384,6 +1391,32 @@ final class EventHandler
         }
     }
 
+    /**
+     * Publishes the record at a point in time in the future (in seconds). If there is a pending
+     * publish for the record, this will do nothing.
+     */
+    private void publishTimed(final IRecord record)
+    {
+        synchronized (this.pendingPublish)
+        {
+            if (this.pendingPublish.add(record.getName()))
+            {
+                this.eventExecutor.schedule(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        synchronized (EventHandler.this.pendingPublish)
+                        {
+                            EventHandler.this.pendingPublish.remove(record.getName());
+                        }
+                        EventHandler.this.registry.context.publishAtomicChange(record);
+                    }
+                }, PlatformCoreProperties.Values.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private boolean serviceInstanceNotRegistered(final String serviceFamily, String serviceMember)
     {
         return !this.registry.services.containsKey(serviceFamily)
@@ -1394,7 +1427,7 @@ final class EventHandler
     private void removeServiceStats(String serviceInstanceId)
     {
         this.registry.serviceInstanceStats.removeSubMap(serviceInstanceId);
-        this.registry.context.publishAtomicChange(this.registry.serviceInstanceStats);
+        publishTimed(this.registry.serviceInstanceStats);
     }
 
     private void removeRecordsAndRpcsPerServiceInstance(String serviceInstanceId, final String serviceFamily)
@@ -1437,18 +1470,18 @@ final class EventHandler
         // register the service member
         this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
             LongValue.valueOf(System.currentTimeMillis()));
-        this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerServiceFamily);
+        publishTimed(this.registry.serviceInstancesPerServiceFamily);
 
         // register the service instance against the agent
         this.registry.serviceInstancesPerAgent.getOrCreateSubMap(agentName).put(serviceInstanceId,
             PlatformRegistry.BLANK_VALUE);
-        this.registry.context.publishAtomicChange(this.registry.serviceInstancesPerAgent);
+        publishTimed(this.registry.serviceInstancesPerAgent);
 
         this.registry.services.put(serviceFamily, redundancyModeEnum.name());
         // todo what if duplicate instances of the same family are registering simultaneously?
         this.registry.pendingPlatformServices.remove(serviceFamily);
 
-        this.registry.context.publishAtomicChange(this.registry.services);
+        publishTimed(this.registry.services);
 
         ProxyContext serviceProxy = this.registry.monitoredServiceInstances.get(serviceInstanceId);
         registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
@@ -1478,7 +1511,7 @@ final class EventHandler
                                 final Map<String, IValue> statsForService =
                                     EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
                                 statsForService.putAll(imageCopy);
-                                EventHandler.this.registry.context.publishAtomicChange(EventHandler.this.registry.serviceInstanceStats);
+                                publishTimed(EventHandler.this.registry.serviceInstanceStats);
                             }
                         }
                     });
@@ -1603,11 +1636,11 @@ final class EventHandler
     void handleRecordsUpdate(final IRecordChange atomicChange)
     {
         atomicChange.applyTo(this.registry.recordsPerServiceFamily.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME));
-        this.registry.context.publishAtomicChange(this.registry.recordsPerServiceFamily);
+        publishTimed(this.registry.recordsPerServiceFamily);
 
         final String registryInstanceName =
             PlatformUtils.composePlatformServiceInstanceID(PlatformRegistry.SERVICE_NAME, this.registry.platformName);
         atomicChange.applyTo(this.registry.recordsPerServiceInstance.getOrCreateSubMap(registryInstanceName));
-        this.registry.context.publishAtomicChange(this.registry.recordsPerServiceInstance);
+        publishTimed(this.registry.recordsPerServiceInstance);
     }
 }

@@ -45,11 +45,11 @@ public abstract class PlatformCoreProperties
         String PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = BASE + "agentInitialisationTimeout";
 
         /**
-		 * The system property name to define the timeout in milliseconds that an agent waits for
-		 * services to become available.<br>
-		 * E.g. <code>-Dplatform.agentServicesAvailableTimeout=10000</code><br>
-		 */
-		String PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = BASE + "agentServicesAvailableTimeout";
+         * The system property name to define the timeout in milliseconds that an agent waits for
+         * services to become available.<br>
+         * E.g. <code>-Dplatform.agentServicesAvailableTimeout=10000</code><br>
+         */
+        String PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = BASE + "agentServicesAvailableTimeout";
 
         /**
          * The system property name to define the TCP server port used by the
@@ -57,6 +57,13 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.registryPort=54321</code><br>
          */
         String REGISTRY_PORT = BASE + "registryPort";
+
+        /**
+         * The system property name to define the period in SECONDS that the registry uses for
+         * publishing changes in its registry records.<br>
+         * E.g. <code>-Dplatform.registryRecordPublishPeriodSecs=2</code><br>
+         */
+        String REGISTRY_RECORD_PUBLISH_PERIOD_SECS = BASE + "registryRecordPublishPeriodSecs";
     }
 
     /**
@@ -89,15 +96,26 @@ public abstract class PlatformCoreProperties
         long PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
             Names.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS, "30000"));
 
-		/**
-		 * The period in milliseconds that an agent will wait for services to become available.
-		 * <p>
-		 * Default is: 60000
-		 * 
-		 * @see Names#PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS
-		 */
-		long PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
-				Names.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS, "60000"));
+        /**
+         * The period in milliseconds that an agent will wait for services to become available.
+         * <p>
+         * Default is: 60000
+         * 
+         * @see Names#PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS
+         */
+        long PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
+            Names.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS, "60000"));
+
+        /**
+         * The period in SECONDS that the registry uses for publishing changes in its registry
+         * records.
+         * <p>
+         * Default is: 2
+         * 
+         * @see Names#REGISTRY_RECORD_PUBLISH_PERIOD_SECS
+         */
+        long REGISTRY_RECORD_PUBLISH_PERIOD_SECS = Long.parseLong(System.getProperty(
+            Names.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, "2"));
     }
 
     private PlatformCoreProperties()
