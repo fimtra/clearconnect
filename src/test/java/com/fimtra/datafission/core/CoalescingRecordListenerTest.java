@@ -73,7 +73,7 @@ public class CoalescingRecordListenerTest
         this.executor.destroy();
     }
 
-    private IRecordListener wrap(TestCachingAtomicChangeObserver observer)
+    protected IRecordListener wrap(TestCachingAtomicChangeObserver observer)
     {
         return new CoalescingRecordListener(this.executor, observer, name);
     }
