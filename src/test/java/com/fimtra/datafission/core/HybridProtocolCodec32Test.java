@@ -20,6 +20,8 @@ import static org.junit.Assert.assertTrue;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.junit.Ignore;
+
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesProducer;
@@ -30,6 +32,7 @@ import com.fimtra.datafission.field.LongValue;
  * 
  * @author Ramon Servadei
  */
+@Ignore
 public class HybridProtocolCodec32Test extends CodecBaseTest
 {
     @Override

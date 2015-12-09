@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesConsumer;
@@ -35,6 +36,7 @@ import com.fimtra.datafission.core.HybridProtocolCodec32.KeyCodesProducer;
  * 
  * @author Ramon Servadei
  */
+@Ignore
 public class KeyCodeProducerConsumerTest
 {
 

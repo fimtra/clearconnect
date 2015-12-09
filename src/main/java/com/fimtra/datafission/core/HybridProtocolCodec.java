@@ -45,7 +45,9 @@ import com.fimtra.util.ByteBufferUtils;
  * @see HybridProtocolCodec32
  * @see #getTxMessageForAtomicChange(IRecordChange)
  * @author Ramon Servadei
+ * @deprecated this will not be supported anylonger and removed in version 4.0.0
  */
+@Deprecated
 public class HybridProtocolCodec extends StringProtocolCodec
 {
     private static final byte NULL_DATA_TYPE = (byte) 127;

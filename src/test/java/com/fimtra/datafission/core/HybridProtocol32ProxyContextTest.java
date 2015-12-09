@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
+import org.junit.Ignore;
+
 import com.fimtra.datafission.core.HybridProtocolCodec32;
 import com.fimtra.datafission.core.StringProtocolCodec;
 
@@ -23,6 +25,7 @@ import com.fimtra.datafission.core.StringProtocolCodec;
  * 
  * @author Ramon Servadei
  */
+@Ignore
 public class HybridProtocol32ProxyContextTest extends ProxyContextTest
 {
     // these port ranges should not clash with any other ProxyContextTests
