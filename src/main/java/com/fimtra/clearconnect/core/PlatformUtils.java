@@ -49,16 +49,13 @@ import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.CoalescingRecordListener;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.IStatusAttribute;
-import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.ClassUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -133,7 +130,6 @@ public class PlatformUtils
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";
-    static final ThimbleExecutor EXECUTOR = new ThimbleExecutor("coalsced-event", 1);
 
     /**
      * Used to provide an efficient "one-shot" latch
@@ -196,7 +192,7 @@ public class PlatformUtils
                     listener.onServiceUnavailable(data);
                 }
             };
-        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
+        context.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
@@ -227,8 +223,7 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, context.getName() + "-" + servicesRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
-            servicesRecordName);
+        }, servicesRecordName);
         awaitUpdateLatch(logContext, servicesRecordName, updateWaitLatch);
         return serviceAvailableListeners;
     }
@@ -257,49 +252,46 @@ public class PlatformUtils
                     listener.onServiceInstanceUnavailable(data);
                 }
             };
-        context.addObserver(
-            new CoalescingRecordListener(EXECUTOR, new IRecordListener()
+        context.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                /*
+                 * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT the
+                 * service instance ID), value=system time when registered/last used}
+                 */
+                IRecordChange changesForService;
+                String serviceInstanceId;
+                for (String serviceFamily : atomicChange.getSubMapKeys())
                 {
-                    /*
-                     * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT
-                     * the service instance ID), value=system time when registered/last used}
-                     */
-                    IRecordChange changesForService;
-                    String serviceInstanceId;
-                    for (String serviceFamily : atomicChange.getSubMapKeys())
+                    changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
+                    Set<String> newServices = changesForService.getPutEntries().keySet();
+                    for (String serviceMember : newServices)
                     {
-                        changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
-                        Set<String> newServices = changesForService.getPutEntries().keySet();
-                        for (String serviceMember : newServices)
+                        serviceInstanceId =
+                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                        if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
+                            serviceInstanceId))
                         {
-                            serviceInstanceId =
-                                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                            if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
-                                serviceInstanceId))
-                            {
-                                Log.log(logContext, "Service instance available (discovered): '", serviceInstanceId,
-                                    "'");
-                            }
-                        }
-                        Set<String> removedServices = changesForService.getRemovedEntries().keySet();
-                        for (String serviceMember : removedServices)
-                        {
-                            serviceInstanceId =
-                                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                            if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId,
-                                serviceInstanceId))
-                            {
-                                Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
-                            }
+                            Log.log(logContext, "Service instance available (discovered): '", serviceInstanceId, "'");
                         }
                     }
-                    updateWaitLatch.countDown();
+                    Set<String> removedServices = changesForService.getRemovedEntries().keySet();
+                    for (String serviceMember : removedServices)
+                    {
+                        serviceInstanceId =
+                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                        if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId,
+                            serviceInstanceId))
+                        {
+                            Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
+                        }
+                    }
                 }
-            }, context.getName() + "-" + serviceInstancesPerServiceRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
-            serviceInstancesPerServiceRecordName);
+                updateWaitLatch.countDown();
+            }
+        }, serviceInstancesPerServiceRecordName);
         awaitUpdateLatch(logContext, serviceInstancesPerServiceRecordName, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
@@ -327,7 +319,7 @@ public class PlatformUtils
                     listener.onRecordUnavailable(data);
                 }
             };
-        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
+        context.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -344,8 +336,7 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, context.getName() + "-" + contextRecordsRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
-            contextRecordsRecordName);
+        }, contextRecordsRecordName);
         awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return recordAvailableNotifyingCache;
     }
@@ -373,7 +364,7 @@ public class PlatformUtils
                     listener.onRpcUnavailable(data);
                 }
             };
-        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
+        context.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -412,7 +403,7 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, context.getName() + "-" + contextRpcRecordName, CachePolicyEnum.NO_IMAGE_NEEDED), contextRpcRecordName);
+        }, contextRpcRecordName);
         awaitUpdateLatch(logContext, contextRpcRecordName, updateWaitLatch);
         return rpcAvailableNotifyingCache;
     }
@@ -442,7 +433,7 @@ public class PlatformUtils
                     // noop
                 }
             };
-        context.addObserver(new CoalescingRecordListener(EXECUTOR, new IRecordListener()
+        context.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -477,8 +468,7 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, context.getName() + "-" + contextSubscriptionsRecordName, CachePolicyEnum.NO_IMAGE_NEEDED),
-            contextSubscriptionsRecordName);
+        }, contextSubscriptionsRecordName);
         awaitUpdateLatch(logContext, contextSubscriptionsRecordName, updateWaitLatch);
         return subscriptionNotifyingCache;
     }
@@ -519,30 +509,24 @@ public class PlatformUtils
                     }
                 }
             };
-        proxyContext.addObserver(
-            new CoalescingRecordListener(
-                EXECUTOR,
-                new IRecordListener()
+        proxyContext.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+            {
+                Map.Entry<String, IValue> entry = null;
+                String key = null;
+                IValue value = null;
+                for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
                 {
-                    @Override
-                    public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
-                    {
-                        Map.Entry<String, IValue> entry = null;
-                        String key = null;
-                        IValue value = null;
-                        for (Iterator<Map.Entry<String, IValue>> it =
-                            atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
-                        {
-                            entry = it.next();
-                            key = entry.getKey();
-                            value = entry.getValue();
-                            recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
-                        }
-                        updateWaitLatch.countDown();
-                    }
-                }, proxyContext.getName() + "-" + ProxyContext.RECORD_CONNECTION_STATUS_NAME,
-                CachePolicyEnum.NO_IMAGE_NEEDED),
-            ProxyContext.RECORD_CONNECTION_STATUS_NAME);
+                    entry = it.next();
+                    key = entry.getKey();
+                    value = entry.getValue();
+                    recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
+                }
+                updateWaitLatch.countDown();
+            }
+        }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
         awaitUpdateLatch(logContext, ProxyContext.RECORD_CONNECTION_STATUS_NAME, updateWaitLatch);
         return recordStatusNotifyingCache;
     }
