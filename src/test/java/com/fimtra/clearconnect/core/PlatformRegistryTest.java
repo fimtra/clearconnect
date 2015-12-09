@@ -98,7 +98,7 @@ public class PlatformRegistryTest
             }
         }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
 
-        assertTrue(allConnections.await(10, TimeUnit.SECONDS));
+        assertTrue(allConnections.await(30, TimeUnit.SECONDS));
 
         // wait for connections to close
         final CountDownLatch noConnections = new CountDownLatch(1);
@@ -119,7 +119,7 @@ public class PlatformRegistryTest
             agents[i].destroy();
         }
 
-        assertTrue(noConnections.await(10, TimeUnit.SECONDS));
+        assertTrue(noConnections.await(30, TimeUnit.SECONDS));
 
         checkEmpty();
     }
