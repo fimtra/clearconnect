@@ -121,18 +121,16 @@ final class AtomicChangeTeleporter
 
     /**
      * Count the number of changes in the {@link AtomicChange}
-     * 
-     * @return
      */
-    static int getFieldChangeCount(IRecordChange change)
+    static int getFieldChangeCount(IRecordChange change, Set<String> subMapKeys)
     {
         int recordLevelChangeCount =
             change.getPutEntries().size() + change.getOverwrittenEntries().size() + change.getRemovedEntries().size();
-        if (change.getSubMapKeys().size() > 0)
+        if (subMapKeys.size() > 0)
         {
-            for (String key : change.getSubMapKeys())
+            for (String key : subMapKeys)
             {
-                recordLevelChangeCount += getFieldChangeCount(change.getSubMapAtomicChange(key));
+                recordLevelChangeCount += getFieldChangeCount(change.getSubMapAtomicChange(key), ContextUtils.EMPTY_STRING_SET);
             }
         }
         return recordLevelChangeCount;
@@ -230,7 +228,8 @@ final class AtomicChangeTeleporter
     {
         final String name = change.getName();
         final AtomicChange[] parts;
-        final int totalChangeCount = getFieldChangeCount(change);
+        final Set<String> subMapKeys = change.getSubMapKeys();
+        final int totalChangeCount = getFieldChangeCount(change, subMapKeys);
         if (totalChangeCount == 0 || totalChangeCount < this.maxChangesPerPart)
         {
             return new AtomicChange[] { change };
@@ -256,7 +255,6 @@ final class AtomicChangeTeleporter
                 null, totalChangeCount);
 
         // now do the submaps
-        final Set<String> subMapKeys = change.getSubMapKeys();
         if (subMapKeys.size() > 0)
         {
             AtomicChange subMapChange;
