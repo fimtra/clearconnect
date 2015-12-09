@@ -53,6 +53,7 @@ public class PlatformRegistryTest
     public void setup()
     {
         this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+        this.candidate.publisher.publishContextConnectionsRecordAtPeriod(100);
     }
 
     @After
