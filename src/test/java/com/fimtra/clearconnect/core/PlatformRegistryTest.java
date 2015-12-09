@@ -91,14 +91,16 @@ public class PlatformRegistryTest
             @Override
             public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 2)
+                System.err.println("GOT: submap-keys.size" + imageValidInCallingThreadOnly.getSubMapKeys().size()
+                    + ", image=" + imageValidInCallingThreadOnly + ", change=" + atomicChange);
+                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
                 {
                     allConnections.countDown();
                 }
             }
         }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
 
-        assertTrue(allConnections.await(30, TimeUnit.SECONDS));
+        assertTrue(allConnections.await(10, TimeUnit.SECONDS));
 
         // wait for connections to close
         final CountDownLatch noConnections = new CountDownLatch(1);
@@ -119,7 +121,7 @@ public class PlatformRegistryTest
             agents[i].destroy();
         }
 
-        assertTrue(noConnections.await(30, TimeUnit.SECONDS));
+        assertTrue(noConnections.await(10, TimeUnit.SECONDS));
 
         checkEmpty();
     }
@@ -131,7 +133,7 @@ public class PlatformRegistryTest
         // the platform registry adds itself as a service instance
         checkSize(0, 1, this.candidate.serviceInstancesPerServiceFamily);
         checkZeroSize(this.candidate.serviceInstanceStats);
-        // the platform registry adds itself as a service 
+        // the platform registry adds itself as a service
         checkSize(1, 0, this.candidate.services);
         checkZeroSize(this.candidate.monitoredServiceInstances);
         checkZeroSize(this.candidate.masterInstancePerFtService);
@@ -139,7 +141,7 @@ public class PlatformRegistryTest
         // the platform registry adds its records as a service instance
         checkSize(0, 1, this.candidate.recordsPerServiceInstance);
         checkZeroSize(this.candidate.rpcsPerServiceInstance);
-        // the platform registry adds its records as a service 
+        // the platform registry adds its records as a service
         checkSize(0, 1, this.candidate.recordsPerServiceFamily);
         checkZeroSize(this.candidate.rpcsPerServiceFamily);
 
@@ -149,6 +151,7 @@ public class PlatformRegistryTest
 
     void publishRecordAndRpc(final String suffix, final IPlatformServiceInstance service)
     {
+        ((PlatformServiceInstance)service).publisher.publishContextConnectionsRecordAtPeriod(100);
         final IRecord record = service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
         record.put("field", System.currentTimeMillis());
         service.publishRecord(record);
