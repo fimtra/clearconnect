@@ -38,6 +38,7 @@ public class ShadowRegistryTest
     private static final int PRIMARY_PORT = 32222;
     ShadowRegistry candidate;
     PlatformRegistry primary;
+    IPlatformRegistryAgent agent;
 
     @Before
     public void setUp() throws Exception
@@ -46,6 +47,10 @@ public class ShadowRegistryTest
         this.candidate =
             new ShadowRegistry("Test", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT),
                 new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, 33333));
+        this.agent =
+            new PlatformRegistryAgent("ShadowKernelTest", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP,
+                PRIMARY_PORT), new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, BACKUP_PORT));
+        this.agent.setRegistryReconnectPeriodMillis(1000);
     }
 
     @After
@@ -53,18 +58,14 @@ public class ShadowRegistryTest
     {
         this.primary.destroy();
         this.candidate.destroy();
+        this.agent.destroy();
     }
 
     @Test
-    public void test() throws RegistryNotAvailableException
+    public void test()
     {
-        IPlatformRegistryAgent agent =
-            new PlatformRegistryAgent("ShadowKernelTest", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT),
-                new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, BACKUP_PORT));
-        agent.setRegistryReconnectPeriodMillis(1000);
-
         IRegistryAvailableListener listener = mock(IRegistryAvailableListener.class);
-        agent.addRegistryAvailableListener(listener);
+        this.agent.addRegistryAvailableListener(listener);
         final int millis = 5000;
         verify(listener, timeout(millis)).onRegistryConnected();
 

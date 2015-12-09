@@ -15,14 +15,16 @@
  */
 package com.fimtra.clearconnect;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.channel.EndPointAddress;
-import com.fimtra.clearconnect.IPlatformRegistryAgent;
-import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.tcpchannel.TcpChannelUtils;
@@ -39,6 +41,7 @@ public class ShadowKernelTest
     private static final int BACKUP_PORT = 33334;
     ShadowKernel candidate;
     PlatformKernel primary;
+    IPlatformRegistryAgent agent;
 
     @Before
     public void setUp() throws Exception
@@ -47,6 +50,10 @@ public class ShadowKernelTest
         this.candidate =
             new ShadowKernel("Test", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT), new EndPointAddress(
                 TcpChannelUtils.LOCALHOST_IP, BACKUP_PORT));
+        this.agent =
+                new PlatformRegistryAgent("ShadowKernelTest", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT),
+                    new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, BACKUP_PORT));
+        this.agent.setRegistryReconnectPeriodMillis(1000);
     }
 
     @After
@@ -54,24 +61,20 @@ public class ShadowKernelTest
     {
         this.primary.destroy();
         this.candidate.destroy();
+        this.agent.destroy();
     }
 
     @Test
-    public void test() throws RegistryNotAvailableException
+    public void test()
     {
-        IPlatformRegistryAgent agent =
-            new PlatformRegistryAgent("ShadowKernelTest", new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT),
-                new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, BACKUP_PORT));
-        agent.setRegistryReconnectPeriodMillis(1000);
-
         IRegistryAvailableListener listener = mock(IRegistryAvailableListener.class);
-        agent.addRegistryAvailableListener(listener);
+        this.agent.addRegistryAvailableListener(listener);
         final int millis = 10000;
         verify(listener, timeout(millis)).onRegistryConnected();
 
         this.primary.destroy();
 
-        Log.log(this, ">>>>> destroyed fucking kernel");
+        Log.log(this, ">>>>> destroyed kernel");
         verify(listener, timeout(millis)).onRegistryDisconnected();
         verify(listener, timeout(millis).times(2)).onRegistryConnected();
 

@@ -151,5 +151,6 @@ public class ShadowKernel
     public void destroy()
     {
         stopShadowKernel();
+        this.primaryRegistryAgent.destroy();
     }
 }

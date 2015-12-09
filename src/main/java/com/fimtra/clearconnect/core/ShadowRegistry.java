@@ -155,5 +155,6 @@ public final class ShadowRegistry
     public void destroy()
     {
         stopShadowRegistry();
+        this.primaryRegistryAgent.destroy();
     }
 }
