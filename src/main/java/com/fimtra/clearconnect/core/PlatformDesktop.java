@@ -296,27 +296,36 @@ class PlatformDesktop
             PlatformMetaDataViewEnum metaDataViewType, String metaDataViewKey)
         {
             super(title + " : " + metaDataViewKey, desktop);
+
+            try
+            {
+                // metaDataViewType will either be RECORDS_PER_SERVICE or RECORDS_PER_INSTANCE and
+                // the metaDataViewKey will then either be the serviceFamily or serviceMember
+                switch(metaDataViewType)
+                {
+                    case RECORDS_PER_INSTANCE:
+                        this.context =
+                            desktop.getMetaDataModel().getProxyContextForPlatformServiceInstance(metaDataViewKey);
+                        break;
+                    case RECORDS_PER_SERVICE:
+                        this.context = desktop.getMetaDataModel().getProxyContextForPlatformService(metaDataViewKey);
+                        break;
+                    default :
+                        throw new IllegalStateException("Unsupported: " + metaDataViewType);
+                }
+            }
+            catch (RuntimeException e)
+            {
+                super.frame.dispose();
+                throw e;
+            }
+
             this.title = title;
             this.metaDataViewKey = metaDataViewKey;
             this.metaDataViewType = metaDataViewType;
 
             this.model = new ColumnOrientedRecordTableModel();
             this.table = new ColumnOrientedRecordTable(this.model);
-
-            // metaDataViewType will either be RECORDS_PER_SERVICE or RECORDS_PER_INSTANCE and the
-            // metaDataViewKey will then either be the serviceFamily or serviceMember
-            switch(metaDataViewType)
-            {
-                case RECORDS_PER_INSTANCE:
-                    this.context =
-                        desktop.getMetaDataModel().getProxyContextForPlatformServiceInstance(metaDataViewKey);
-                    break;
-                case RECORDS_PER_SERVICE:
-                    this.context = desktop.getMetaDataModel().getProxyContextForPlatformService(metaDataViewKey);
-                    break;
-                default :
-                    throw new IllegalStateException("Unsupported: " + metaDataViewType);
-            }
 
             this.subscribedRecords = new CopyOnWriteArrayList<String>();
             this.model.addRecordRemovedListener(this.context);
@@ -359,17 +368,21 @@ class PlatformDesktop
         @Override
         protected void destroy()
         {
-            this.tableSummaryPanel.destroy();
-            this.table.setComponentPopupMenu(null);
-            this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
-            this.context.removeObserver(this.model,
-                this.subscribedRecords.toArray(new String[this.subscribedRecords.size()]));
-            synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
+            // if the constructor throws an exception, this can be null
+            if (this.context != null)
             {
-                PlatformMetaDataViewEnum.recordSubscriptionViews.remove(this.metaDataViewKey);
+                this.tableSummaryPanel.destroy();
+                this.table.setComponentPopupMenu(null);
+                this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
+                this.context.removeObserver(this.model,
+                    this.subscribedRecords.toArray(new String[this.subscribedRecords.size()]));
+                synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
+                {
+                    PlatformMetaDataViewEnum.recordSubscriptionViews.remove(this.metaDataViewKey);
+                }
+                this.model.removeRecordRemovedListener(this.context);
+                PlatformMetaDataViewEnum.deregister(this.context, this.model);
             }
-            this.model.removeRecordRemovedListener(this.context);
-            PlatformMetaDataViewEnum.deregister(this.context, this.model);
         }
 
         void subscribeFor(String recordNameToSubscribe)
@@ -1422,13 +1435,27 @@ class PlatformDesktop
                         line = br.readLine();
                         if (line.startsWith(MetaDataPlatformDesktopView.class.getSimpleName()))
                         {
-                            MetaDataPlatformDesktopView.fromStateString(this, line);
+                            try
+                            {
+                                MetaDataPlatformDesktopView.fromStateString(this, line);
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(this, "Could not load configuration from " + line, e);
+                            }
                         }
                         else
                         {
                             if (line.startsWith(RecordSubscriptionPlatformDesktopView.class.getSimpleName()))
                             {
-                                RecordSubscriptionPlatformDesktopView.fromStateString(this, line);
+                                try
+                                {
+                                    RecordSubscriptionPlatformDesktopView.fromStateString(this, line);
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.log(this, "Could not load configuration from " + line, e);
+                                }
                             }
                         }
                     }
