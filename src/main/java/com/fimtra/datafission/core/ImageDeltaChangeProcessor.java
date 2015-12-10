@@ -15,14 +15,14 @@
  */
 package com.fimtra.datafission.core;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.util.Log;
+import com.fimtra.util.LowGcLinkedList;
 
 /**
  * Handles applying images/delta changes to local records received from remote records.
@@ -35,13 +35,13 @@ final class ImageDeltaChangeProcessor
     final static int PUBLISH = 1;
     final static int RESYNC = 2;
 
-    final Map<String, Map<Long, IRecordChange>> cachedDeltas;
+    final Map<String, LowGcLinkedList<IRecordChange>> cachedDeltas;
     /** Tracks when the image of a record is received (deltas consumed after this) */
     final Map<String, Boolean> imageReceived;
 
     ImageDeltaChangeProcessor()
     {
-        this.cachedDeltas = new ConcurrentHashMap<String, Map<Long, IRecordChange>>();
+        this.cachedDeltas = new ConcurrentHashMap<String, LowGcLinkedList<IRecordChange>>();
         this.imageReceived = new ConcurrentHashMap<String, Boolean>();
     }
 
@@ -85,15 +85,20 @@ final class ImageDeltaChangeProcessor
 
             if (isDelta)
             {
-                Map<Long, IRecordChange> deltas = this.cachedDeltas.get(name);
+                LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.get(name);
                 if (deltas == null)
                 {
-                    deltas = new LinkedHashMap<Long, IRecordChange>();
+                    deltas = new LowGcLinkedList<IRecordChange>();
                     this.cachedDeltas.put(name, deltas);
                 }
-                deltas.put(Long.valueOf(changeToApply.getSequence()), changeToApply);
-                Log.log(this, "Cached delta for ", name, ", delta.seq=", Long.toString(changeToApply.getSequence()),
-                    ", record.seq=", Long.toString(record.getSequence()));
+                deltas.add(changeToApply);
+
+                if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD)
+                {
+                    Log.log(this, "Cached delta count is ", Integer.toString(deltas.size()), " for ", name,
+                        ", delta.seq=", Long.toString(changeToApply.getSequence()), ", record.seq=",
+                        Long.toString(record.getSequence()));
+                }
             }
             else
             {
@@ -101,33 +106,31 @@ final class ImageDeltaChangeProcessor
 
                 changeToApply.applyCompleteAtomicChangeToRecord(record);
                 // apply any subsequent deltas
-                Map<Long, IRecordChange> deltas = this.cachedDeltas.remove(name);
+                LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
                 if (deltas != null)
                 {
-                    Log.log(this, "Processing deltas for image ", name, ", image.seq=",
-                        Long.toString(changeToApply.getSequence()));
-
-                    Map.Entry<Long, IRecordChange> entry = null;
-                    Long deltaSequence = null;
-                    IRecordChange deltaChange = null;
-                    long lastSequence = -1;
-                    for (Iterator<Map.Entry<Long, IRecordChange>> it = deltas.entrySet().iterator(); it.hasNext();)
+                    if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD)
                     {
-                        entry = it.next();
-                        deltaSequence = entry.getKey();
-                        deltaChange = entry.getValue();
-                        if (deltaSequence.longValue() > changeToApply.getSequence())
+                        Log.log(this, "Processing deltas for image ", name, ", image.seq=",
+                            Long.toString(changeToApply.getSequence()), ", delta count is ",
+                            Integer.toString(deltas.size()));
+                    }
+
+                    long deltaSequence = -1;
+                    long lastSequence = -1;
+                    for (IRecordChange deltaChange : deltas)
+                    {
+                        deltaSequence = deltaChange.getSequence();
+                        if (deltaSequence > changeToApply.getSequence())
                         {
-                            if (lastSequence > -1 && lastSequence + 1 != deltaSequence.longValue())
+                            if (lastSequence > -1 && lastSequence + 1 != deltaSequence)
                             {
                                 Log.log(this, "Incorrect sequence for cached delta ", name, ", delta.seq=",
-                                    Long.toString(deltaSequence.longValue()), " last.seq=", Long.toString(lastSequence));
+                                    Long.toString(deltaSequence), " last.seq=", Long.toString(lastSequence));
                                 return RESYNC;
                             }
-                            Log.log(this, "Applying delta for ", name, ", delta.seq=",
-                                Long.toString(deltaSequence.longValue()));
                             deltaChange.applyCompleteAtomicChangeToRecord(record);
-                            lastSequence = deltaSequence.longValue();
+                            lastSequence = deltaSequence;
                         }
                     }
                 }

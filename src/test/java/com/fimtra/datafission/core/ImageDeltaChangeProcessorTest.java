@@ -31,6 +31,7 @@ import org.junit.Test;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
+import com.fimtra.util.LowGcLinkedList;
 
 /**
  * Tests the {@link ImageDeltaChangeProcessor}
@@ -109,15 +110,15 @@ public class ImageDeltaChangeProcessorTest
         // image) BUT the delta sequences are wrong - expect a resync
         
         this.candidate.imageReceived.clear();
-        final LinkedHashMap<Long, IRecordChange> deltas = new LinkedHashMap<Long, IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
         IRecordChange change25 = mock(IRecordChange.class);
-        deltas.put(20l, change20);
+        deltas.add(change20);
         // add 25 before 24
-        deltas.put(25l, change25);
-        deltas.put(24l, change24);
+        deltas.add(change25);
+        deltas.add(change24);
         when(change20.getSequence()).thenReturn(20l);
         when(change24.getSequence()).thenReturn(24l);
         when(change25.getSequence()).thenReturn(25l);
@@ -151,14 +152,14 @@ public class ImageDeltaChangeProcessorTest
         // image)
         
         this.candidate.imageReceived.clear();
-        final LinkedHashMap<Long, IRecordChange> deltas = new LinkedHashMap<Long, IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
         IRecordChange change25 = mock(IRecordChange.class);
-        deltas.put(20l, change20);
-        deltas.put(24l, change24);
-        deltas.put(25l, change25);
+        deltas.add(change20);
+        deltas.add(change24);
+        deltas.add(change25);
         when(change20.getSequence()).thenReturn(20l);
         when(change24.getSequence()).thenReturn(24l);
         when(change25.getSequence()).thenReturn(25l);
@@ -200,7 +201,7 @@ public class ImageDeltaChangeProcessorTest
         // check the delta is cached
         assertEquals(1, this.candidate.cachedDeltas.size());
         assertEquals(1, this.candidate.cachedDeltas.get(this.name).size());
-        assertEquals(this.changeToApply, this.candidate.cachedDeltas.get(this.name).get(changeSeq));
+        assertEquals(this.changeToApply, this.candidate.cachedDeltas.get(this.name).getFirst());
         
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();

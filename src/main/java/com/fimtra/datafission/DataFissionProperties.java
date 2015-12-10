@@ -159,6 +159,12 @@ public abstract class DataFissionProperties
          */
         String SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = BASE + "systemRecordCoalesceWindowMillis";
 
+        /**
+         * The number of deltas pending processing for a record before starting to log them. This
+         * helps to reduce chatty logs when network problems interrupt delta sequences. <br>
+         * E.g. <code>-DdataFission.deltaCountLogThreshold=6</code>
+         */
+        String DELTA_COUNT_LOG_THRESHOLD = BASE + "deltaCountLogThreshold";
     }
 
     /**
@@ -325,6 +331,16 @@ public abstract class DataFissionProperties
          */
         int SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = Integer.parseInt(System.getProperty(
             Names.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, "250"));
+
+        /**
+         * The number of deltas pending processing for a record before starting to log them.
+         * <p>
+         * Default is 6.
+         * 
+         * @see Names#DELTA_COUNT_LOG_THRESHOLD
+         */
+        int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
+
     }
 
     private DataFissionProperties()
