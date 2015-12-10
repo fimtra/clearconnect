@@ -15,31 +15,22 @@
  */
 package com.fimtra.lf;
 
-import java.awt.Color;
 import java.awt.Component;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.awt.Insets;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.io.Serializable;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 
-import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JTable;
 import javax.swing.RowSorter;
+import javax.swing.RowSorter.SortKey;
 import javax.swing.SortOrder;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.border.Border;
+import javax.swing.event.MouseInputListener;
 import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.UIResource;
-import javax.swing.plaf.synth.SynthTableHeaderUI;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.JTableHeader;
+import javax.swing.plaf.basic.BasicTableHeaderUI;
 import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableModel;
 
 
 /**
@@ -47,8 +38,10 @@ import javax.swing.table.TableModel;
  * 
  * @author James
  */
-public class FimtraTableHeaderUI extends SynthTableHeaderUI {
+public class FimtraTableHeaderUI extends BasicTableHeaderUI {
 
+	private int selectedColumn = -1;
+    
 	/**
 	 * Creates a new UI object for the given component.
 	 *
@@ -68,273 +61,104 @@ public class FimtraTableHeaderUI extends SynthTableHeaderUI {
 		}
 		super.installDefaults();
 	}
+	
+	@Override
+    protected MouseInputListener createMouseInputListener() {
+        return new LocalMouseInputHandler();
+    }
 
-	class HeaderRenderer extends FimtraTableCellHeaderRenderer {
-		private static final long serialVersionUID = 1L;
-
-		HeaderRenderer() {
-			setHorizontalAlignment(SwingConstants.LEADING);
-			setName("TableHeader.renderer");
+    /**
+     * @inheritDoc
+     */
+    @Override
+    protected void rolloverColumnUpdated(int oldColumn, int newColumn) {
+        header.repaint(header.getHeaderRect(oldColumn));
+        header.repaint(header.getHeaderRect(newColumn));
+    }
+	
+	private class LocalMouseInputHandler extends MouseInputHandler{
+		
+		@Override
+		public void mousePressed(MouseEvent e) {
+			super.mousePressed(e);
+			int viewCol = header.columnAtPoint(e.getPoint());
+			if(viewCol > -1){
+				int col = header.getTable().convertColumnIndexToModel(viewCol);
+				if(e.isControlDown() && selectedColumn == col){
+					selectedColumn = -1;
+				} else {
+					selectedColumn = col;
+				}
+			}
 		}
+		
+		@Override
+        public void mouseClicked(MouseEvent e) {
+            if (!header.isEnabled()) {
+                return;
+            }
+            if (e.getClickCount() % 2 == 0 &&
+                    SwingUtilities.isLeftMouseButton(e)) {
+                JTable table = header.getTable();
+                RowSorter sorter;
+                if (table != null && (sorter = table.getRowSorter()) != null) {
+                    int columnIndex = header.columnAtPoint(e.getPoint());
+                    if (columnIndex != -1) {
+                    	
+                        columnIndex = table.convertColumnIndexToModel(
+                                columnIndex);
+                            List<SortKey> keys = new ArrayList<SortKey>(sorter.getSortKeys());
+                            SortKey sortKey;
+                            int sortIndex;
+                            for (sortIndex = keys.size() - 1; sortIndex >= 0; sortIndex--) {
+                                if (keys.get(sortIndex).getColumn() == columnIndex) {
+                                    break;
+                                }
+                            }
+                            if (sortIndex == -1) {
+                                // Key doesn't exist
+                                sortKey = new SortKey(columnIndex, SortOrder.ASCENDING);
+                                keys.add(0, sortKey);
+                            }
+                            else if (sortIndex == 0) {
+                                // It's the primary sorting key, toggle it
+                            	SortKey key = keys.get(0);
+                            	if (key.getSortOrder() == SortOrder.ASCENDING) {
+                                    keys.set(0, new SortKey(key.getColumn(), SortOrder.DESCENDING));
+                                } else if (key.getSortOrder() == SortOrder.DESCENDING) {
+                                    keys.set(0, new SortKey(key.getColumn(), SortOrder.UNSORTED));
+                                } else {
+                                	keys.set(0, new SortKey(key.getColumn(), SortOrder.ASCENDING));
+                                }
+                            }
+                            else {
+                                // It's not the first, but was sorted on, remove old
+                                // entry, insert as first with ascending.
+                                keys.remove(sortIndex);
+                                keys.add(0, new SortKey(columnIndex, SortOrder.ASCENDING));
+                            }
+                            sorter.setSortKeys(keys);
+                    }
+                }
+            }
+        }
+	}
+	
+	private class HeaderRenderer extends FimtraTableHeaderRenderer implements UIResource{
+		private static final long serialVersionUID = 1L;
 
 		@Override
 		public Component getTableCellRendererComponent(JTable table,
-				Object value, boolean isSelected, boolean hasFocus, int row,
-				int column) {
-
-			// stuff a variable into the client property of this renderer
-			// indicating the sort order,
-			// so that different rendering can be done for the header based on
-			// sorted state.
-			RowSorter<? extends TableModel> rs = table == null ? null : table.getRowSorter();
-			java.util.List<? extends RowSorter.SortKey> sortKeys = rs == null ? null
-					: rs.getSortKeys();
-			if (sortKeys != null
-					&& sortKeys.size() > 0
-					&& sortKeys.get(0).getColumn() == table
-							.convertColumnIndexToModel(column)) {
-				switch (sortKeys.get(0).getSortOrder()) {
-				case ASCENDING:
-					putClientProperty("Table.sortOrder", "ASCENDING");
-					break;
-				case DESCENDING:
-					putClientProperty("Table.sortOrder", "DESCENDING");
-					break;
-				case UNSORTED:
-					putClientProperty("Table.sortOrder", "UNSORTED");
-					break;
-				default:
-					throw new AssertionError("Cannot happen");
-				}
-			} else {
-				putClientProperty("Table.sortOrder", "UNSORTED");
+				Object value, boolean isSelected, boolean hasFocus,
+				int row, int column) {
+			if(getRolloverColumn() == column){
+				hasFocus = true;
+			} 
+			if(selectedColumn == table.convertColumnIndexToModel(column)){
+				isSelected = true;
 			}
-
-			super.getTableCellRendererComponent(table, value, isSelected,
-					hasFocus, row, column);
-
-			return this;
-		}
-
-		@Override
-		public void setBorder(Border border) {
-			if (border != null && border.getClass().getName().contains("SynthBorder")) {
-				super.setBorder(border);
-			}
-		}
-
-		@Override
-		public String getToolTipText() {
-			return getText();
-		}
-	}
-	
-	@SuppressWarnings("synthetic-access")
-	public class FimtraTableCellHeaderRenderer extends DefaultTableCellRenderer {
-		private static final long serialVersionUID = 1L;
-
-		private boolean horizontalTextPositionSet;
-		private Icon sortArrow;
-		private EmptyIcon emptyIcon = new EmptyIcon();
-
-		public FimtraTableCellHeaderRenderer() {
-			setHorizontalAlignment(SwingConstants.CENTER);
-		}
-
-		@Override
-        public void setHorizontalTextPosition(int textPosition) {
-			this.horizontalTextPositionSet = true;
-			super.setHorizontalTextPosition(textPosition);
-		}
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table,
-				Object value, boolean isSelected, boolean hasFocus, int row,
-				int column) {
-			Icon sortIcon = null;
-
-			boolean isPaintingForPrint = false;
-
-			if (table != null) {
-				JTableHeader header = table.getTableHeader();
-				if (header != null) {
-					Color fgColor = null;
-					Color bgColor = null;
-					if (hasFocus) {
-						fgColor = getUIColor(this,
-								"TableHeader.focusCellForeground");
-						bgColor = getUIColor(this,
-								"TableHeader.focusCellBackground");
-					}
-					if (fgColor == null) {
-						fgColor = header.getForeground();
-					}
-					if (bgColor == null) {
-						bgColor = header.getBackground();
-					}
-					setForeground(fgColor);
-					setBackground(bgColor);
-
-					setFont(header.getFont());
-
-					isPaintingForPrint = header.isPaintingForPrint();
-				}
-
-				if (!isPaintingForPrint && table.getRowSorter() != null) {
-					if (!this.horizontalTextPositionSet) {
-						// There is a row sorter, and the developer hasn't
-						// set a text position, change to leading.
-						setHorizontalTextPosition(SwingConstants.LEADING);
-					}
-					SortOrder sortOrder = getColumnSortOrder(table, column);
-					if (sortOrder != null) {
-						switch (sortOrder) {
-						case ASCENDING:
-							sortIcon = getUIIcon(this,
-									"Table.ascendingSortIcon");
-							break;
-						case DESCENDING:
-							sortIcon = getUIIcon(this,
-									"Table.descendingSortIcon");
-							break;
-						case UNSORTED:
-							sortIcon = getUIIcon(this, "Table.naturalSortIcon");
-							break;
-						}
-					}
-				}
-			}
-
-			setText(value == null ? "" : value.toString());
-			setIcon(sortIcon);
-			this.sortArrow = sortIcon;
-
-			Border border = null;
-			if (hasFocus) {
-				border = getUIBorder(this, "TableHeader.focusCellBorder");
-			}
-			if (border == null) {
-				border = getUIBorder(this, "TableHeader.cellBorder");
-			}
-			setBorder(border);
-
-			return this;
-		}
-
-		@Override
-		public String getToolTipText() {
-			return getText();
-		}
-
-		@Override
-		public void paintComponent(Graphics g) {
-			boolean b = getUIBoolean(this, "TableHeader.rightAlignSortArrow",
-					false);
-			if (b && this.sortArrow != null) {
-				// emptyIcon is used so that if the text in the header is right
-				// aligned, or if the column is too narrow, then the text will
-				// be sized appropriately to make room for the icon that is
-				// about
-				// to be painted manually here.
-				this.emptyIcon.width = this.sortArrow.getIconWidth();
-				this.emptyIcon.height = this.sortArrow.getIconHeight();
-				setIcon(this.emptyIcon);
-				super.paintComponent(g);
-				Point position = computeIconPosition(g);
-				this.sortArrow.paintIcon(this, g, position.x, position.y);
-			} else {
-				super.paintComponent(g);
-			}
-		}
-
-		private Point computeIconPosition(Graphics g) {
-			FontMetrics fontMetrics = g.getFontMetrics();
-			Rectangle viewR = new Rectangle();
-			Rectangle textR = new Rectangle();
-			Rectangle iconR = new Rectangle();
-			Insets i = getInsets();
-			viewR.x = i.left;
-			viewR.y = i.top;
-			viewR.width = getWidth() - (i.left + i.right);
-			viewR.height = getHeight() - (i.top + i.bottom);
-			SwingUtilities.layoutCompoundLabel(this, fontMetrics, getText(),
-					this.sortArrow, getVerticalAlignment(),
-					getHorizontalAlignment(), getVerticalTextPosition(),
-					getHorizontalTextPosition(), viewR, iconR, textR,
-					getIconTextGap());
-			int x = getWidth() - i.right - this.sortArrow.getIconWidth();
-			int y = iconR.y;
-			return new Point(x, y);
-		}
-	}
-
-	private static Color getUIColor(JComponent c, String key) {
-		Object ob = UIManager.get(key, c.getLocale());
-		if (ob == null || !(ob instanceof Color)) {
-			return null;
-		}
-		return (Color) ob;
-	}
-
-	private static Icon getUIIcon(JComponent c, String key) {
-		Object iValue = UIManager.get(key, c.getLocale());
-		if (iValue == null || !(iValue instanceof Icon)) {
-			return null;
-		}
-		return (Icon) iValue;
-	}
-
-	private static Border getUIBorder(JComponent c, String key) {
-		Object iValue = UIManager.get(key, c.getLocale());
-		if (iValue == null || !(iValue instanceof Border)) {
-			return null;
-		}
-		return (Border) iValue;
-	}
-
-	private static boolean getUIBoolean(JComponent c, String key,
-			boolean defaultValue) {
-		Object iValue = UIManager.get(key, c.getLocale());
-
-		if (iValue == null || !(iValue instanceof Boolean)) {
-			return defaultValue;
-		}
-		return ((Boolean) iValue).booleanValue();
-	}
-
-	public static SortOrder getColumnSortOrder(JTable table, int column) {
-		SortOrder rv = null;
-		if (table == null || table.getRowSorter() == null) {
-			return rv;
-		}
-		java.util.List<? extends RowSorter.SortKey> sortKeys = table
-				.getRowSorter().getSortKeys();
-		if (sortKeys.size() > 0
-				&& sortKeys.get(0).getColumn() == table
-						.convertColumnIndexToModel(column)) {
-			rv = sortKeys.get(0).getSortOrder();
-		}
-		return rv;
-	}
-
-	private class EmptyIcon implements Icon, Serializable {
-		private static final long serialVersionUID = 1L;
-
-		int width = 0;
-		int height = 0;
-
-		@Override
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-		}
-
-		@Override
-        public int getIconWidth() {
-			return this.width;
-		}
-
-		@Override
-        public int getIconHeight() {
-			return this.height;
+			return super.getTableCellRendererComponent(table, value, isSelected, hasFocus,
+					row, column);
 		}
 	}
 }

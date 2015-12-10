@@ -1266,10 +1266,7 @@ class PlatformDesktop
         try
         {
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
-            if (!(System.getProperty("java.runtime.version").startsWith("1.6")))
-            {
-                UIManager.put("TableHeaderUI", FimtraTableHeaderUI.class.getName());
-            }
+            UIManager.put("TableHeaderUI", FimtraTableHeaderUI.class.getName());
         }
         catch (Exception e)
         {
