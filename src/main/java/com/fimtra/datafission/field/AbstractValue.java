@@ -89,14 +89,14 @@ public abstract class AbstractValue implements IValue
     }
 
     /**
-     * Construct the correct {@link IValue} object to represent the CharBuffer representation.
-     * <p>
-     * This is more efficient than {@link #constructFromStringValue(String)} as it skips the
-     * internal char[] copying associated with {@link String} operations.
+     * Construct the correct {@link IValue} object to represent the contents of the char[].
      * 
-     * @param cBuf
-     *            the CharBuffer version of the IValue implementation, position=0, limit=char[]
-     *            length
+     * @param chars
+     *            the char[]
+     * @param start
+     *            the start of the value (including the type code)
+     * @param len
+     *            the length of the value (including the type code)
      * @return the correct {@link IValue} type instance initialised to the value in the string
      *         argument
      */
@@ -106,7 +106,7 @@ public abstract class AbstractValue implements IValue
         {
             return null;
         }
-        switch(chars[0])
+        switch(chars[start])
         {
             case IValue.LONG_CODE:
                 return LongValue.valueOf(chars, start + 1, len - 1);
@@ -117,7 +117,8 @@ public abstract class AbstractValue implements IValue
             case IValue.BLOB_CODE:
                 return new BlobValue(chars, start + 1, len - 1);
             default :
-                throw new UnsupportedOperationException("Unhandled type: " + new String(chars, start + 1, len - 1));
+                throw new UnsupportedOperationException("Unhandled type: '" + chars[start] + "' for value "
+                    + new String(chars, start + 1, len - 1));
         }
     }
 
