@@ -93,32 +93,30 @@ public abstract class AbstractValue implements IValue
      * 
      * @param chars
      *            the char[]
-     * @param start
-     *            the start of the value (including the type code)
      * @param len
      *            the length of the value (including the type code)
      * @return the correct {@link IValue} type instance initialised to the value in the string
      *         argument
      */
-    public static IValue constructFromCharValue(char[] chars, int start, int len)
+    public static IValue constructFromCharValue(char[] chars, int len)
     {
         if (chars == null || chars.length == 0 || len == 0)
         {
             return null;
         }
-        switch(chars[start])
+        switch(chars[0])
         {
             case IValue.LONG_CODE:
-                return LongValue.valueOf(chars, start + 1, len - 1);
+                return LongValue.valueOf(chars, 1, len - 1);
             case IValue.DOUBLE_CODE:
-                return new DoubleValue(chars, start + 1, len - 1);
+                return new DoubleValue(chars, 1, len - 1);
             case IValue.TEXT_CODE:
-                return TextValue.valueOf(chars, start + 1, len - 1);
+                return TextValue.valueOf(chars, 1, len - 1);
             case IValue.BLOB_CODE:
-                return new BlobValue(chars, start + 1, len - 1);
+                return new BlobValue(chars, 1, len - 1);
             default :
-                throw new UnsupportedOperationException("Unhandled type: '" + chars[start] + "' for value "
-                    + new String(chars, start + 1, len - 1));
+                throw new UnsupportedOperationException("Unhandled type: '" + chars[0] + "' for value "
+                    + new String(chars, 1, len - 1));
         }
     }
 

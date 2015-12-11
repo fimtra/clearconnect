@@ -596,11 +596,11 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             if (isNull)
             {
-                return AbstractValue.constructFromCharValue(null, 0, 0);
+                return AbstractValue.constructFromCharValue(null, 0);
             }
         }
 
-        return AbstractValue.constructFromCharValue(unescaped, 0, unescapedPtr);
+        return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
     }
 
     static String stringFromCharBuffer(char[] chars)
