@@ -30,66 +30,147 @@ import com.fimtra.util.Log;
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
  * string text protocol with a symbol table for string substitution of record names and keys in
  * atomic changes. This reduces the transmission size of messages once the symbol mapping for a
- * record name or key is sent. Typically a symbol will be between 1-4 chars (but is unlimited).
+ * record name or key is sent. Typically a symbol will be between 1-4 chars (but is unlimited). The
+ * format of the string in ABNF notation:
+ * 
+ * <pre>
+ *  preamble name-symbol seq [puts] [removes] [sub-map]
+ *  
+ *  preamble = 0*ALPHA
+ *  name-symbol = "|" ( name-symbol-definition | name-symbol-instance )
+ *  name-symbol-definition = "n" name name-symbol-instance ; if the symbol for the record has never been sent
+ *  name-symbol-instance = "~" symbol-name
+ *  name = 1*ALPHA ; the name of the notifying record instance
+ *  symbol-name = 1*ALPHA ; the symbol to substitute for the name
+ *  seq = "|" scope seq_num
+ *  scope = "i" | "d" ; identifies either an image or delta
+ *  seq_num = 1*DIGIT ; the sequency number
+ *  puts = "|p" 1*key-value-pair
+ *  removes = "|r" 1*key-value-pair
+ *  sub-map = "|:|" name [puts] [removes]
+ *  key-value-pair = "|" key-symbol "=" value
+ *  key-symbol = ( key-symbol-definition | key-symbol-instance )
+ *  key-symbol-definition =  "n" key key-symbol-instance
+ *  key-symbol-instance = "~" symbol-name
+ *  key = 1*ALPHA ; the symbol for the key
+ *  value = 1*ALPHA
+ *  
+ *  e.g. |nmyrecord~s!|d322234|p|nkey1~#=value1|~df=value2|r|~$=value5|:|~$|p|~ty=value1
+ * </pre>
  * 
  * @author Ramon Servadei
  */
 public final class StringSymbolProtocolCodec extends StringProtocolCodec
 {
-    // private static final char START_SYMBOL = (char) 1;
-    // private static final char END_SYMBOL = (char) 254;
-    private static final char START_SYMBOL = ' ';
-    private static final char END_SYMBOL = 'z';
+    /**
+     * Controls logging of:
+     * <ul>
+     * <li>key-symbol tx and rx mappings
+     * <li>record-symbol tx and rx mappings
+     * </ul>
+     */
+    public static boolean log = Boolean.getBoolean("log." + StringSymbolProtocolCodec.class.getCanonicalName());
+
+    private static final char START_SYMBOL = Character.MIN_VALUE;
+    private static final char END_SYMBOL = Character.MAX_VALUE;
     // todo memory leak in these...
     // todo concurrency...
-    /**
-     * Stores the symbol to key name
-     */
-    final ConcurrentMap<String, String> symbolToKey = new ConcurrentHashMap<String, String>();
-    /**
-     * Stores the key name to symbol
-     */
-    final ConcurrentMap<String, String> keyNameToSymbol = new ConcurrentHashMap<String, String>();
-    /**
-     * Stores the symbol to record name
-     */
-    final ConcurrentMap<String, String> symbolToRecordName = new ConcurrentHashMap<String, String>();
-    /**
-     * Stores the record name to symbol
-     */
-    final ConcurrentMap<String, String> recordNameToSymbol = new ConcurrentHashMap<String, String>();
-
-    static char[] nextNameSymbol = new char[] { START_SYMBOL };
-    static char[] nextKeySymbol = new char[] { START_SYMBOL };
 
     /**
-     * Get the string representing the record changes to transmit to a {@link ProxyContext}. The
-     * format of the string in ABNF notation:
-     * 
-     * <pre>
-     *  preamble name-symbol seq [puts] [removes] [sub-map]
-     *  
-     *  preamble = 0*ALPHA
-     *  name-symbol = "|" ( name-symbol-definition | name-symbol-instance )
-     *  name-symbol-definition = "n" name "~" name-symbol-instance ; if the symbol for the record has never been sent
-     *  name-symbol-instance = "s" symbol-name
-     *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol to substitute for the name
-     *  seq = "|" scope seq_num
-     *  scope = "i" | "d" ; identifies either an image or delta
-     *  seq_num = 1*DIGIT ; the sequency number
-     *  puts = "|p" 1*key-value-pair
-     *  removes = "|r" 1*key-value-pair
-     *  sub-map = "|:|" name [puts] [removes]
-     *  key-value-pair = "|" key-symbol "=" value
-     *  key-symbol = ( key-symbol-definition | key-symbol-instance )
-     *  key-symbol-definition =  "n" key "~" key-symbol-instance
-     *  key-symbol-instance = "s" symbol-name
-     *  key = 1*ALPHA ; the symbol for the key
-     *  value = 1*ALPHA
-     *  
-     *  e.g. |nmyrecord~s!|d322234|p|nkey1~s#=value1|sdf=value2|r|s$=value5|:|s$|p|sty=value1
-     * </pre>
+     * Stores the mappings of all key-name-to-symbol sent from this VM
+     */
+    static final ConcurrentMap<String, String> TX_KEY_NAME_TO_SYMBOL = new ConcurrentHashMap<String, String>();
+    /**
+     * Stores the mappings of all record-name-to-symbol sent from this VM
+     */
+    static final ConcurrentMap<String, String> TX_RECORD_NAME_TO_SYMBOL = new ConcurrentHashMap<String, String>();
+
+    static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
+    static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+
+    private static synchronized String getNextTxKeyNameSymbol()
+    {
+        findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
+
+        if (NEXT_TX_KEY_NAME_SYMBOL[NEXT_TX_KEY_NAME_SYMBOL.length - 1] >= END_SYMBOL)
+        {
+            // resize
+            char[] temp = new char[NEXT_TX_KEY_NAME_SYMBOL.length + 1];
+            System.arraycopy(NEXT_TX_KEY_NAME_SYMBOL, 0, temp, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
+            NEXT_TX_KEY_NAME_SYMBOL = temp;
+            NEXT_TX_KEY_NAME_SYMBOL[NEXT_TX_KEY_NAME_SYMBOL.length - 1] = START_SYMBOL;
+        }
+        return new String(NEXT_TX_KEY_NAME_SYMBOL, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
+    }
+
+    private static synchronized String getNextTxRecordNameSymbol()
+    {
+        findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
+
+        if (NEXT_TX_RECORD_NAME_SYMBOL[NEXT_TX_RECORD_NAME_SYMBOL.length - 1] >= END_SYMBOL)
+        {
+            // resize
+            char[] temp = new char[NEXT_TX_RECORD_NAME_SYMBOL.length + 1];
+            System.arraycopy(NEXT_TX_RECORD_NAME_SYMBOL, 0, temp, 0, NEXT_TX_RECORD_NAME_SYMBOL.length);
+            NEXT_TX_RECORD_NAME_SYMBOL = temp;
+            NEXT_TX_RECORD_NAME_SYMBOL[NEXT_TX_RECORD_NAME_SYMBOL.length - 1] = START_SYMBOL;
+        }
+        return new String(NEXT_TX_RECORD_NAME_SYMBOL, 0, NEXT_TX_RECORD_NAME_SYMBOL.length);
+    }
+
+    /**
+     * Populates the char[] with the next symbol, skipping any special chars (see implementation)
+     */
+    private static void findNextValidSymbol(final char[] symbolArr)
+    {
+        // NOTE: there are "reserved" chars:
+        // \r
+        // \r
+        // |
+        // =
+        // ~
+        // \
+        boolean notOk = false;
+        do
+        {
+            notOk = false;
+            symbolArr[symbolArr.length - 1] = (char) (symbolArr[symbolArr.length - 1] + 1);
+            switch(symbolArr[symbolArr.length - 1])
+            {
+                case '\r':
+                case '\n':
+                case '|':
+                case '=':
+                case '\\':
+                case '~':
+                    notOk = true;
+            }
+        }
+        while (notOk);
+    }
+
+    /**
+     * Stores the key name to symbol for messages sent by this instance - the mappings used are also
+     * stored in the 'master' {@value #TX_KEY_NAME_TO_SYMBOL}
+     */
+    final ConcurrentMap<String, String> txKeyNameToSymbol = new ConcurrentHashMap<String, String>();
+    /**
+     * Stores the record name to symbol for messages sent by this instance - the mappings used are
+     * also stored in the 'master' {@value #TX_RECORD_NAME_TO_SYMBOL}
+     */
+    final ConcurrentMap<String, String> txRecordNameToSymbol = new ConcurrentHashMap<String, String>();
+
+    /**
+     * Stores the symbol to key name for messages received by this instance
+     */
+    final ConcurrentMap<String, String> rxSymbolToKey = new ConcurrentHashMap<String, String>();
+    /**
+     * Stores the symbol to record name for messages received by this instance
+     */
+    final ConcurrentMap<String, String> rxSymbolToRecordName = new ConcurrentHashMap<String, String>();
+
+    /**
+     * Get the string representing the record changes to transmit to a {@link ProxyContext}.
      * 
      * @param subMapName
      *            the name of the record
@@ -131,17 +212,18 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             final String name;
             switch(tokens[1][0])
             {
-                case 's':
+                case '~':
                     // if its just the symbol, no need to unencode
-                    // symbol-instance s<symbol>
-                    name = lookupRecordNameSymbol(new String(tokens[1], 0, tokens[1].length));
+                    // symbol-instance ~<symbol>
+                    name = lookupRecordNameSymbol(new String(tokens[1], 1, tokens[1].length - 1));
                     break;
                 case 'n':
-                    // symbol-definition: n<name>~s<symbol>
+                    // symbol-definition: n<name>~<symbol>
                     name = defineRecordNameSymbol(stringFromCharBuffer(tokens[1], 0));
                     break;
                 default :
-                    throw new IllegalArgumentException("Could not handle " + new String(decodedMessage));
+                    // assume its a full name (no symbol table), e.g. RPC results
+                    name = new String(tokens[1], 0, tokens[1].length);
             }
 
             final AtomicChange atomicChange = new AtomicChange(name);
@@ -172,10 +254,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                 processSubmaps = true;
                                 switch(tokens[++i][0])
                                 {
-                                    case 's':
+                                    case '~':
                                         // if its a symbol, no need to unescape
-                                        // symbol-instance s<symbol>
-                                        subMapName = lookupRecordNameSymbol(new String(tokens[i], 0, tokens[i].length));
+                                        // symbol-instance ~<symbol>
+                                        subMapName =
+                                            lookupRecordNameSymbol(new String(tokens[i], 1, tokens[i].length - 1));
                                         break;
                                     case 'n':
                                         // symbol-definition: n<name>~s<symbol>
@@ -265,7 +348,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     private String lookupRecordNameSymbol(String symbol)
     {
-        final String name = this.symbolToRecordName.get(symbol);
+        final String name = this.rxSymbolToRecordName.get(symbol);
         if (name == null)
         {
             throw new IllegalArgumentException("No record name for symbol '" + symbol + "'");
@@ -275,16 +358,16 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     private String lookupKeySymbol(String symbol)
     {
-        final String name = this.symbolToKey.get(symbol);
+        final String name = this.rxSymbolToKey.get(symbol);
         if (name == null)
         {
-            throw new IllegalArgumentException("No key for symbol '" + symbol + "', symbols:" + symbolToKey);
+            throw new IllegalArgumentException("No key for symbol '" + symbol + "'");
         }
         return name;
     }
 
     /**
-     * Given a symbol-definition format "n{name}~s{symbol}" this populates the {@link #symbolToKey}
+     * Given a symbol-definition format "n{name}~{symbol}" this populates the {@link #rxSymbolToKey}
      * map with the mapping.
      * 
      * @return the name
@@ -298,7 +381,6 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             if (charArray[i] == '~')
             {
-                // todo BUG: symbols are stored as s<symbol>
                 name = sb.toString();
                 sb.setLength(0);
             }
@@ -311,13 +393,18 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             throw new IllegalArgumentException("Incorrect format for key-symbol-definition: " + nameAndSymbol);
         }
-        this.symbolToKey.put(sb.toString(), name);
+        String symbol = sb.toString();
+        if (log)
+        {
+            Log.log(this, "[rx] key-symbol ", symbol, "=", name);
+        }
+        this.rxSymbolToKey.put(symbol, name);
         return name;
     }
 
     /**
      * Given a symbol-definition format "n{name}~s{symbol}" this populates the
-     * {@link #symbolToRecordName} map with the mapping.
+     * {@link #rxSymbolToRecordName} map with the mapping.
      * 
      * @return the name
      */
@@ -342,7 +429,12 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             throw new IllegalArgumentException("Incorrect format for name-symbol-definition: " + nameAndSymbol);
         }
-        this.symbolToRecordName.put(sb.toString(), name);
+        final String symbol = sb.toString();
+        if (log)
+        {
+            Log.log(this, "[rx] record-symbol ", symbol, "=", name);
+        }
+        this.rxSymbolToRecordName.put(symbol, name);
         return name;
     }
 
@@ -354,7 +446,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             new StringBuilder(30 * (putEntries.size() + removedEntries.size() + atomicChange.getSubMapKeys().size()));
         sb.append(preamble);
         final boolean isImage = atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
-        appendSymbolForRecordName(atomicChange.getName(), sb, isImage);
+        final String name = atomicChange.getName();
+        if (name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
+        {
+            sb.append(name);
+        }
+        else
+        {
+            appendSymbolForRecordName(name, sb, isImage);
+        }
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
         addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, isImage);
@@ -428,102 +528,51 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      * 
      * <pre>
      *  name-symbol = ( symbol-definition | symbol-instance )
-     *  symbol-definition = "n" name "~" symbol-instance ; if the symbol for the record has never been sent
-     *  symbol-instance = "s" symbol-name
+     *  symbol-definition = "n" name symbol-instance ; if the symbol for the record has never been sent
+     *  symbol-instance = "~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
      *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
      */
     void appendSymbolForRecordName(String name, StringBuilder sb, boolean isImage)
     {
-        String symbol = this.recordNameToSymbol.get(name);
+        String symbol = this.txRecordNameToSymbol.get(name);
         if (isImage || symbol == null)
         {
-            synchronized (this.recordNameToSymbol)
+            synchronized (this.txRecordNameToSymbol)
             {
-                symbol = this.recordNameToSymbol.get(name);
+                symbol = this.txRecordNameToSymbol.get(name);
                 if (symbol == null)
                 {
-                    // todo must not clash with symbolToREcord for inbound
-                    symbol = getNextRecordNameSymbol();
-                    this.recordNameToSymbol.put(name, symbol);
+                    // check the 'master' mappings
+                    symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
+                    if (symbol == null)
+                    {
+                        synchronized (TX_RECORD_NAME_TO_SYMBOL)
+                        {
+                            symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
+                            if (symbol == null)
+                            {
+                                symbol = getNextTxRecordNameSymbol();
+                                if (log)
+                                {
+                                    Log.log(this, "[MASTER TX] record-symbol ", name, "=", symbol);
+                                }
+                                TX_RECORD_NAME_TO_SYMBOL.put(name, symbol);
+                            }
+                        }
+                    }
+                    if (log)
+                    {
+                        Log.log(this, "[tx] record-symbol ", name, "=", symbol);
+                    }
+                    this.txRecordNameToSymbol.put(name, symbol);
                 }
             }
             sb.append("n");
             escape(name, sb);
-            sb.append("~");
         }
-        sb.append("s").append(symbol);
-    }
-
-    private synchronized String getNextRecordNameSymbol()
-    {
-        // NOTE: there are "reserved" chars:
-        // \r
-        // \r
-        // |
-        // =
-        // ~
-        // \
-
-        findNextValidSymbol(this.nextNameSymbol);
-
-        if (this.nextNameSymbol[this.nextNameSymbol.length - 1] >= END_SYMBOL)
-        {
-            // resize
-            char[] temp = new char[this.nextNameSymbol.length + 1];
-            System.arraycopy(this.nextNameSymbol, 0, temp, 0, this.nextNameSymbol.length);
-            this.nextNameSymbol = temp;
-            this.nextNameSymbol[this.nextNameSymbol.length - 1] = START_SYMBOL;
-        }
-        return new String(this.nextNameSymbol, 0, this.nextNameSymbol.length);
-    }
-
-    private synchronized String getNextKeyNameSymbol()
-    {
-        // NOTE: there are "reserved" chars:
-        // \r
-        // \r
-        // |
-        // =
-        // ~
-        // \
-
-        findNextValidSymbol(this.nextKeySymbol);
-
-        if (this.nextKeySymbol[this.nextKeySymbol.length - 1] >= END_SYMBOL)
-        {
-            // resize
-            char[] temp = new char[this.nextKeySymbol.length + 1];
-            System.arraycopy(this.nextKeySymbol, 0, temp, 0, this.nextKeySymbol.length);
-            this.nextKeySymbol = temp;
-            this.nextKeySymbol[this.nextKeySymbol.length - 1] = START_SYMBOL;
-        }
-        return new String(this.nextKeySymbol, 0, this.nextKeySymbol.length);
-    }
-
-    /**
-     * Populates the char[] with the next symbol, skipping any special chars (see implementation)
-     */
-    static void findNextValidSymbol(final char[] symbolArr)
-    {
-        boolean notOk = false;
-        do
-        {
-            notOk = false;
-            symbolArr[symbolArr.length - 1] = (char) (symbolArr[symbolArr.length - 1] + 1);
-            switch(symbolArr[symbolArr.length - 1])
-            {
-                case '\r':
-                case '\n':
-                case '|':
-                case '=':
-                case '\\':
-                case '~':
-                    notOk = true;
-            }
-        }
-        while (notOk);
+        sb.append("~").append(symbol);
     }
 
     /**
@@ -550,10 +599,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String key = null;
         switch(chars[0])
         {
-            case 's':
+            case '~':
                 // if its a symbol, no need to unencode
-                // symbol-instance s<symbol>
-                key = lookupKeySymbol(new String(chars, start, end));
+                // symbol-instance ~<symbol>
+                key = lookupKeySymbol(new String(chars, start + 1, end - 1));
                 break;
             case 'n':
                 // symbol-definition: n<name>~s<symbol>
@@ -572,7 +621,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      * <pre>
      *  name-symbol = ( symbol-definition | symbol-instance )
      *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
-     *  symbol-instance = "|s" symbol-name
+     *  symbol-instance = "|~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
      *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
@@ -580,23 +629,43 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     void appendSymbolForKey(StringBuilder txString, String key, boolean isImage)
     {
 
-        String symbol = this.keyNameToSymbol.get(key);
+        String symbol = this.txKeyNameToSymbol.get(key);
         if (isImage || symbol == null)
         {
-            synchronized (this.keyNameToSymbol)
+            synchronized (this.txKeyNameToSymbol)
             {
-                symbol = this.keyNameToSymbol.get(key);
+                symbol = this.txKeyNameToSymbol.get(key);
                 if (symbol == null)
                 {
-                    symbol = getNextKeyNameSymbol();
-                    this.keyNameToSymbol.put(key, symbol);
+                    // check the 'master' mappings
+                    symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
+                    if (symbol == null)
+                    {
+                        synchronized (TX_KEY_NAME_TO_SYMBOL)
+                        {
+                            symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
+                            if (symbol == null)
+                            {
+                                symbol = getNextTxKeyNameSymbol();
+                                if (log)
+                                {
+                                    Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
+                                }
+                                TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
+                            }
+                        }
+                    }
+                    if (log)
+                    {
+                        Log.log(this, "[tx] key-symbol ", key, "=", symbol);
+                    }
+                    this.txKeyNameToSymbol.put(key, symbol);
                 }
             }
             txString.append("n");
             escape(key, txString);
-            txString.append("~");
         }
-        txString.append("s").append(symbol);
+        txString.append("~").append(symbol);
     }
 
     static String stringFromCharBuffer(char[] chars, int start)
