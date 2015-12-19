@@ -21,7 +21,8 @@ import java.util.concurrent.CountDownLatch;
 /**
  * A publisher context is the home for records for a specific context. The definition of context is
  * application specific. A publisher context creates records. Changes to the records in a context
- * can be distributed to one or more {@link IRecordListener} instances.
+ * can be distributed to one or more {@link IRecordListener} instances via calls to
+ * {@link #publishAtomicChange(IRecord)}.
  * 
  * @author Ramon Servadei
  */
@@ -67,24 +68,29 @@ public interface IPublisherContext extends IObserverContext
     IRecord removeRecord(String name);
 
     /**
-     * Notify all {@link IRecordListener} objects registered as observers of the named record with
-     * the atomic change that has occurred to the record. The atomic change will contain all changes
-     * to the record that have occurred since the last call to this method for the record.
-     * <p>
-     * <b>This method may be asynchronous.</b>
+     * Convenience mechanism to publish using the record name.
      * 
-     * @return a {@link CountDownLatch} that is triggered when the change has been published to all
-     *         observers. If there is no change to publish or there are no observers, the latch is
-     *         still triggered.
+     * @see #publishAtomicChange(IRecord)
      */
     CountDownLatch publishAtomicChange(String name);
 
     /**
-     * Notify all {@link IRecordListener} objects registered as observers of the record with the
-     * atomic change that has occurred to the record. The atomic change will contain all changes to
-     * the record that have occurred since the last call to this method for the record.
+     * Publish the changes made to the record as a single "atomic change". This is performed in 2
+     * stages:
+     * <ol>
+     * <li><b>synchronously</b> prepares the atomic change for the named record and then
+     * <li><b>asynchronously</b> notifies all {@link IRecordListener} objects registered as
+     * observers of the record with the atomic change.
+     * </ol>
+     * The atomic change will contain all changes to the record that have occurred since the last
+     * call to this method for the record.
      * <p>
-     * <b>This method may be asynchronous.</b>
+     * <h2>Concurrency</h2> In a multi-thread access environment, it is not necessary to perform any
+     * thread co-ordination between updating a record and publishing it. The publishing will lock
+     * the record for writing ( calling {@link IRecord#getWriteLock()} ) which will block any
+     * concurrent writes until the atomic change is prepared for publishing. However, if
+     * deterministic atomic changes are required, then appropriate co-ordination is needed between
+     * threads that alter the record and publish it.
      * 
      * @return a {@link CountDownLatch} that is triggered when the change has been published to all
      *         observers. If there is no change to publish or there are no observers, the latch is

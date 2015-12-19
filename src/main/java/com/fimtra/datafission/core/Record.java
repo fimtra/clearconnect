@@ -35,10 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
-import com.fimtra.datafission.IObserverContext;
-import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
@@ -47,27 +44,8 @@ import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
 /**
- * A {@link Map} implementation that holds <code>String=IValue</code> entries and can (indirectly)
- * notify observers with atomic changes to the record. The record is created by an
- * {@link IPublisherContext} instance.
- * <p>
- * Observers are added using the {@link IObserverContext#addObserver(IRecordListener, String...)}
- * method. The notification is done by calling {@link IPublisherContext#publishAtomicChange(String)}
- * . This will notify the observers with all the changes to the record since the last call to this
- * method. This provides a mechanism to notify with atomic changes.
- * <p>
- * A change in a field only occurs if the value associated with the key changes. Updating a value
- * with an object that is equal to the previous value according to its {@link Object#equals(Object)}
- * method does not count as a change. Therefore the equals method for the value objects must be a
- * correct implementation for changes to be detected.
- * <p>
- * <b>A note on null keys and values;</b> this implementation allows null values to be stored
- * against a key but does not allow null keys.
- * <p>
- * Records are equal by value of their internal data map entries.
- * <p>
- * <b>This is a thread safe implementation BUT the same iteration semantics as per {@link Map} apply
- * for consistent read/writes in a multi-threaded access context.</b>
+ * The standard implementation. This does not allow <code>null</code> keys. Records are equal by
+ * value of their internal data map entries.
  * 
  * @see IRecord The IRecord interface for further behaviour documentation
  * @author Ramon Servadei
