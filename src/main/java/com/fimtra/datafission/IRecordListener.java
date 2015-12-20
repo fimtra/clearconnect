@@ -25,7 +25,7 @@ package com.fimtra.datafission;
 public interface IRecordListener
 {
     /**
-     * Invoked when the {@link IPublisherContext#publishAtomicChange(String)} method is called. All
+     * Invoked when the {@link IPublisherContext#publishAtomicChange(IRecord)} method is called. All
      * changes that have occurred to the named record since the last call to this method are
      * captured in the {@link IRecordChange} argument.
      * <p>
@@ -34,15 +34,13 @@ public interface IRecordListener
      * records that were registered (depends on thread scheduling).
      * <p>
      * The passed in 'image' reflects all atomic changes that have occurred to the source record,
-     * including the current one. <b>Be aware that, due to concurrent application activities, the
-     * image may include changes that are yet to be presented to the listener from a subsequent
-     * atomic change update.</b>
+     * including the current one. It is a 'snapshot' of the state of the record when the publish
+     * occurred. The image <b>must not</b> be cached as the record image is updated by future calls.
      * 
      * @param imageValidInCallingThreadOnly
-     *            an immutable and re-used instance that is an immutable version of the source
-     *            record's image. This image will include the current atomic change. <b>This
-     *            instance must not be cached and it must only be accessed in the thread that calls
-     *            this method.</b>
+     *            an immutable and re-used instance of the source record's image. This image will
+     *            include the current atomic change. <b>This instance must not be cached and it must
+     *            only be accessed in the thread that calls this method.</b>
      * @param atomicChange
      *            the atomic change that has occurred to the record - thread safe.
      */
