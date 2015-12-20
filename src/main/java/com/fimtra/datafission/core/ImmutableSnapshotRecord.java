@@ -19,6 +19,8 @@ import com.fimtra.datafission.IRecord;
 
 /**
  * A snapshot of a record that is also immutable.
+ * <p>
+ * The snapshot will not change and cannot be changed.
  * 
  * @author Ramon Servadei
  */

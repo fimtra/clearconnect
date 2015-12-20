@@ -22,9 +22,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 
 /**
@@ -33,6 +35,12 @@ import com.fimtra.datafission.IValue;
  * Immutable here means the contents of the record cannot be changed by this object. <b>However, the
  * contents of the record can change if the immutable record is created with a LIVE record backing
  * it. Changes made to the live instance will be seen by this immutable instance.</b>
+ * <p>
+ * An immutable record ignores the read-write lock of its backing record and accesses the record's
+ * underlying {@link ConcurrentHashMap} directly. This provides faster access to the fields. This
+ * should perfectly fine for most usecases as the immutable record is (generally) only used in the
+ * {@link IRecordListener#onChange(IRecord, com.fimtra.datafission.IRecordChange)} callback method
+ * as the image argument.
  * 
  * @author Ramon Servadei
  */
@@ -64,77 +72,77 @@ public class ImmutableRecord implements IRecord
     @Override
     public int size()
     {
-        return this.backingRecord.size();
+        return this.backingRecord.data.size();
     }
 
     @Override
     public boolean isEmpty()
     {
-        return this.backingRecord.isEmpty();
+        return this.backingRecord.data.isEmpty();
     }
 
     @Override
     public boolean containsKey(Object key)
     {
-        return this.backingRecord.containsKey(key);
+        return this.backingRecord.data.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        return this.backingRecord.containsValue(value);
+        return this.backingRecord.data.containsValue(value);
     }
 
     @Override
     public IValue get(Object key)
     {
-        return this.backingRecord.get(key);
+        return this.backingRecord.data.get(key);
     }
 
     @Override
     public IValue put(String key, IValue value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue remove(Object key)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public void clear()
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public Set<String> keySet()
     {
-        return Collections.unmodifiableSet(this.backingRecord.keySet());
+        return Collections.unmodifiableSet(this.backingRecord.data.keySet());
     }
 
     @Override
     public Collection<IValue> values()
     {
-        return Collections.unmodifiableCollection(this.backingRecord.values());
+        return Collections.unmodifiableCollection(this.backingRecord.data.values());
     }
 
     @Override
     public Set<java.util.Map.Entry<String, IValue>> entrySet()
     {
-        return Collections.unmodifiableSet(this.backingRecord.entrySet());
+        return Collections.unmodifiableSet(this.backingRecord.data.entrySet());
     }
 
     @Override
@@ -164,36 +172,36 @@ public class ImmutableRecord implements IRecord
     @Override
     public IValue put(String key, long value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue put(String key, double value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue put(String key, String value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public Set<String> getSubMapKeys()
     {
-        return Collections.unmodifiableSet(this.backingRecord.getSubMapKeys());
+        return Collections.unmodifiableSet(this.backingRecord.subMaps.keySet());
     }
 
     @Override
     public Map<String, IValue> getOrCreateSubMap(String subMapKey)
     {
-        if (this.backingRecord.getSubMapKeys().contains(subMapKey))
+        if (this.backingRecord.subMaps.keySet().contains(subMapKey))
         {
-            return Collections.unmodifiableMap(this.backingRecord.getOrCreateSubMap(subMapKey));
+            return new ImmutableSubmap((SubMap) this.backingRecord.subMaps.get(subMapKey));
         }
         return ContextUtils.EMPTY_MAP;
     }
@@ -201,21 +209,21 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> removeSubMap(String subMapKey)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
-            + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record "
+            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
     }
 
     @Override
     public String toString()
     {
-        return "(Immutable)" + this.backingRecord.toString();
+        return "(Immutable)" + this.backingRecord.data.toString();
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T extends IValue> T get(String key)
     {
-        return (T) this.backingRecord.get(key);
+        return (T) this.backingRecord.data.get(key);
     }
 
     @Override
@@ -246,12 +254,119 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> asFlattenedMap()
     {
-        return this.backingRecord.asFlattenedMap();
+        return ContextUtils.mergeMaps(this.backingRecord.data, this.backingRecord.subMaps);
     }
 
     @Override
     public long getSequence()
     {
         return this.backingRecord.getSequence();
+    }
+}
+
+/**
+ * Immutable wrapper for a {@link SubMap}.
+ * <p>
+ * This returns direct versions of {@link #values()}, {@link #keySet()}, {@link #entrySet()} from
+ * the backing {@link SubMap}
+ * 
+ * @author Ramon Servadei
+ */
+class ImmutableSubmap implements Map<String, IValue>
+{
+    final SubMap delegate;
+
+    ImmutableSubmap(SubMap delegate)
+    {
+        super();
+        this.delegate = delegate;
+    }
+
+    @Override
+    public int size()
+    {
+        return this.delegate.subMap.size();
+    }
+
+    @Override
+    public boolean isEmpty()
+    {
+        return this.delegate.subMap.isEmpty();
+    }
+
+    @Override
+    public boolean containsKey(Object key)
+    {
+        return this.delegate.subMap.containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value)
+    {
+        return this.delegate.subMap.containsValue(value);
+    }
+
+    @Override
+    public IValue get(Object key)
+    {
+        return this.delegate.subMap.get(key);
+    }
+
+    @Override
+    public IValue put(String key, IValue value)
+    {
+        throw new UnsupportedOperationException("Cannot call on immutable subMap " + this.delegate.subMapKey + " of "
+            + this.delegate.record.getContextName() + ":" + this.delegate.record.getName());
+    }
+
+    @Override
+    public IValue remove(Object key)
+    {
+        throw new UnsupportedOperationException("Cannot call on immutable subMap " + this.delegate.subMapKey + " of "
+            + this.delegate.record.getContextName() + ":" + this.delegate.record.getName());
+    }
+
+    @Override
+    public void putAll(Map<? extends String, ? extends IValue> m)
+    {
+        throw new UnsupportedOperationException("Cannot call on immutable subMap " + this.delegate.subMapKey + " of "
+            + this.delegate.record.getContextName() + ":" + this.delegate.record.getName());
+    }
+
+    @Override
+    public void clear()
+    {
+        throw new UnsupportedOperationException("Cannot call on immutable subMap " + this.delegate.subMapKey + " of "
+            + this.delegate.record.getContextName() + ":" + this.delegate.record.getName());
+    }
+
+    @Override
+    public Set<String> keySet()
+    {
+        return Collections.unmodifiableSet(this.delegate.subMap.keySet());
+    }
+
+    @Override
+    public Collection<IValue> values()
+    {
+        return Collections.unmodifiableCollection(this.delegate.subMap.values());
+    }
+
+    @Override
+    public Set<java.util.Map.Entry<String, IValue>> entrySet()
+    {
+        return Collections.unmodifiableSet(this.delegate.subMap.entrySet());
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        return this.delegate.equals(o);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return this.delegate.hashCode();
     }
 }

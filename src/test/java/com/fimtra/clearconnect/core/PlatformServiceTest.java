@@ -97,14 +97,14 @@ public class PlatformServiceTest
     {
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.candidate.getAllSubscriptions().size());
+        assertEquals(4, this.candidate.getAllSubscriptions().size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.candidate.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(4, this.candidate.getAllSubscriptions().size());
+        assertEquals(5, this.candidate.getAllSubscriptions().size());
         assertEquals(1, this.candidate.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.candidate.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -112,7 +112,7 @@ public class PlatformServiceTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.candidate.getAllSubscriptions().size());
+        assertEquals(4, this.candidate.getAllSubscriptions().size());
         assertNull(this.candidate.getAllSubscriptions().get(record1));
     }
 
@@ -220,7 +220,7 @@ public class PlatformServiceTest
         assertEquals(2, this.candidate.getAllRpcs().size());
         assertEquals(rpc1, this.candidate.getAllRpcs().get(RPC1));
     }
-
+    
     @Test
     public void testAddRpcAvailableListener()
     {
@@ -280,15 +280,15 @@ public class PlatformServiceTest
         assertTrue(this.candidate.createRecord(record1));
         IRecord record = this.candidate.getRecord(record1);
 
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
 
-        record.put("key2", new TextValue("value1"));
-        record.put("key1", new TextValue("value1"));
+        record.put("key2", TextValue.valueOf("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
 
         // this is not a change
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
         verify(listener, times(3)).onChange(any(IRecord.class), any(IRecordChange.class));
     }

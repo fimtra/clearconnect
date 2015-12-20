@@ -76,7 +76,7 @@ public class AbstractDeleteConfigTest {
 	public void shouldDeleteConfig() throws TimeOutException, ExecutionException {
 		String serviceInstanceName = "service instance";
 		String configKey = "config key";
-		IValue[] args = new IValue[] { new TextValue(serviceInstanceName), new TextValue(configKey) };
+		IValue[] args = new IValue[] { TextValue.valueOf(serviceInstanceName), TextValue.valueOf(configKey) };
 		when(this.platformServiceInstance.getOrCreateRecord(serviceInstanceName)).thenReturn(this.record);
 		String result = this.rpcHandler.execute(args).textValue();
 		assertFalse(result.startsWith("RPC failed:"));

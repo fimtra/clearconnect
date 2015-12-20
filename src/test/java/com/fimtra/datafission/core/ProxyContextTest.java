@@ -225,20 +225,21 @@ public class ProxyContextTest
         {
             observer.verify();
         }
-        
+
         ThreadUtils.newThread(new Runnable()
         {
             @Override
             public void run()
             {
-                Log.log(this, ">>> teardown: " + ProxyContextTest.this.candidate + "  " + ProxyContextTest.this.publisher);
+                Log.log(this, ">>> teardown: " + ProxyContextTest.this.candidate + "  "
+                    + ProxyContextTest.this.publisher);
                 ProxyContextTest.this.executor.shutdownNow();
                 ProxyContextTest.this.publisher.destroy();
                 ProxyContextTest.this.candidate.destroy();
                 ProxyContextTest.this.context.destroy();
             }
         }, "tearDown").start();
-        
+
         ChannelUtils.WATCHDOG.configure(5000);
     }
 
@@ -304,13 +305,13 @@ public class ProxyContextTest
         createComponents("testResubscribe");
         final String name = "sdf1";
         final String key = "Kmy1";
-        final TextValue v1 = new TextValue("value1");
+        final TextValue v1 = TextValue.valueOf("value1");
 
         this.context.createRecord(name);
         this.context.getRecord(name).put(key, v1);
         this.context.publishAtomicChange(name);
 
-        final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver();
+        final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
         final int timeout = TIMEOUT;
         listener.latch = new CountDownLatch(1);
         this.candidate.addObserver(listener, name);
@@ -321,7 +322,7 @@ public class ProxyContextTest
         listener.latch = new CountDownLatch(1);
         this.candidate.resubscribe(name);
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
-        assertEquals(v1, listener.getLatestImage().get(key));
+        assertEquals(v1, listener.getLatestImage().<IValue>get(key));
     }
 
     @Test
@@ -330,8 +331,8 @@ public class ProxyContextTest
         createComponents("testResubscribe");
         final String name = "sdf1";
         final String key = "Kmy1";
-        final TextValue v1 = new TextValue("value1");
-        final TextValue v2 = new TextValue("value2");
+        final TextValue v1 = TextValue.valueOf("value1");
+        final TextValue v2 = TextValue.valueOf("value2");
 
         this.context.createRecord(name);
         this.context.getRecord(name).put(key, v1);
@@ -370,7 +371,7 @@ public class ProxyContextTest
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
 
         listener.latch = new CountDownLatch(1);
-        createRecord.getOrCreateSubMap("submap1").put("K1", new TextValue("lasers"));
+        createRecord.getOrCreateSubMap("submap1").put("K1", TextValue.valueOf("lasers"));
         this.context.publishAtomicChange("subMap1");
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
     }
@@ -1248,8 +1249,8 @@ public class ProxyContextTest
         for (int i = 0; i < UPDATE_COUNT; i++)
         {
             String value = text + i;
-            crlfMap.put(key, new TextValue(value));
-            crlfMap.put("crlf value2", new TextValue(value));
+            crlfMap.put(key, TextValue.valueOf(value));
+            crlfMap.put("crlf value2", TextValue.valueOf(value));
             this.context.publishAtomicChange(crlfMapName).await();
         }
 
@@ -1583,7 +1584,7 @@ public class ProxyContextTest
                 {
                     sb.append(iValue.textValue()).append(",");
                 }
-                return new TextValue(sb.toString());
+                return TextValue.valueOf(sb.toString());
             }
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
@@ -1591,8 +1592,8 @@ public class ProxyContextTest
         waitForRpcToBePublished(rpc);
 
         IValue result =
-            this.candidate.getRpc("concat").execute(new TextValue("someValue1"), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), new TextValue("anotherText value here!"));
+            this.candidate.getRpc("concat").execute(TextValue.valueOf("someValue1"), new DoubleValue(Double.NaN),
+                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
     }
 
@@ -1612,7 +1613,7 @@ public class ProxyContextTest
                 {
                     sb.append(iValue.textValue()).append(",");
                 }
-                return new TextValue(sb.toString());
+                return TextValue.valueOf(sb.toString());
             }
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
@@ -1644,8 +1645,8 @@ public class ProxyContextTest
                     try
                     {
                         IValue result =
-                            concatRpc.execute(new TextValue(random), new DoubleValue(Double.NaN),
-                                LongValue.valueOf(2345), new TextValue("anotherText value here!"));
+                            concatRpc.execute(TextValue.valueOf(random), new DoubleValue(Double.NaN),
+                                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
                         final String expected = random + ",NaN,2345,anotherText value here!,";
                         if (!result.textValue().equals(expected))
                         {
@@ -1680,7 +1681,7 @@ public class ProxyContextTest
                 {
                     sb.append(iValue.textValue()).append(",");
                 }
-                return new TextValue(sb.toString());
+                return TextValue.valueOf(sb.toString());
             }
         }, TypeEnum.TEXT, "concat2", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
@@ -1688,8 +1689,8 @@ public class ProxyContextTest
         waitForRpcToBePublished(rpc);
 
         IValue result =
-            this.candidate.getRpc("concat2").execute(new TextValue("someValue1"), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), new TextValue("anotherText value here!"));
+            this.candidate.getRpc("concat2").execute(TextValue.valueOf("someValue1"), new DoubleValue(Double.NaN),
+                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
         Log.banner(this, "There should be no occurrences of rpc|concat2");
     }
@@ -1712,15 +1713,15 @@ public class ProxyContextTest
                     sb.append(iValue.textValue()).append(",");
                 }
                 latch.countDown();
-                return new TextValue(sb.toString());
+                return TextValue.valueOf(sb.toString());
             }
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
 
-        this.candidate.getRpc("concat").executeNoResponse(new TextValue("someValue1"), new DoubleValue(Double.NaN),
-            LongValue.valueOf(2345), new TextValue("anotherText value here!"));
+        this.candidate.getRpc("concat").executeNoResponse(TextValue.valueOf("someValue1"), new DoubleValue(Double.NaN),
+            LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertTrue(latch.await(10, TimeUnit.SECONDS));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", sb.toString());
     }
@@ -1760,7 +1761,7 @@ public class ProxyContextTest
                 {
                     sb.append(iValue.textValue()).append(",");
                 }
-                return new TextValue(sb.toString());
+                return TextValue.valueOf(sb.toString());
             }
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
@@ -1768,8 +1769,8 @@ public class ProxyContextTest
         waitForRpcToBePublished(rpc);
 
         IValue result =
-            this.candidate.getRpc("concat").execute(new TextValue("textValue1|\\="), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), new TextValue("anotherText value here!|+"));
+            this.candidate.getRpc("concat").execute(TextValue.valueOf("textValue1|\\="), new DoubleValue(Double.NaN),
+                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!|+"));
         assertEquals("textValue1|\\=,NaN,2345,anotherText value here!|+,", result.textValue());
     }
 
@@ -2039,7 +2040,7 @@ public class ProxyContextTest
         createComponents("testSimpleRecordName");
         final String simpleRecord = "sdflasers";
         final IRecord record = this.context.createRecord(simpleRecord);
-        record.put(simpleRecord, new TextValue(simpleRecord));
+        record.put(simpleRecord, TextValue.valueOf(simpleRecord));
         this.context.publishAtomicChange(record);
         final AtomicReference<Map<String, IValue>> result = new AtomicReference<Map<String, IValue>>();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -2068,7 +2069,7 @@ public class ProxyContextTest
         createComponents("testRecordNameWithSpecialChars");
         final String specialChars = "some value \\|| with \r\n | delimiters \\/ |\\ |/ p|sdf|";
         final IRecord record = this.context.createRecord(specialChars);
-        record.put(specialChars, new TextValue(specialChars));
+        record.put(specialChars, TextValue.valueOf(specialChars));
         this.context.publishAtomicChange(record);
         final AtomicReference<Map<String, IValue>> result = new AtomicReference<Map<String, IValue>>();
         final CountDownLatch latch = new CountDownLatch(1);

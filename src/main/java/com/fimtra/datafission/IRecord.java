@@ -26,8 +26,14 @@ import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 
 /**
  * A {@link Map} implementation that holds <code>String=IValue</code> entries. A record can be used
- * just like a map. Calling any <code>get</code> method will be threadsafe for viewing of changes
- * made from calls to the various <code>put</code> methods.
+ * just like a map. Calling any <code>get</code> method will be thread-safe for viewing of changes
+ * made from calls to the various <code>put</code> methods (see "Concurrency" section below for
+ * more).
+ * <p>
+ * Observers are added using the {@link IObserverContext#addObserver(IRecordListener, String...)}
+ * method. The notification is done by calling {@link IPublisherContext#publishAtomicChange(String)}
+ * . This will notify the observers with all the changes to the record since the last call to this
+ * method. This provides a mechanism to notify with "atomic changes".
  * <p>
  * A change in a field only occurs if the value associated with the key changes. Updating a value
  * with an object that is equal to the previous value according to its {@link Object#equals(Object)}
@@ -48,6 +54,12 @@ import com.fimtra.datafission.core.ImmutableSnapshotRecord;
  * a convenience feature of a record to solve the common requirement for having a map-of-maps (more
  * than a depth of 2 for nested maps is uncommon). See {@link #getOrCreateSubMap(String)} and
  * {@link #getSubMapKeys()}.
+ * <p>
+ * <h2>Concurrency</h2>
+ * A record is thread-safe. The "reader" methods use an internal read-lock and the "writer" methods
+ * use an internal write-lock. When iterating over the keys, values, entrySet ({@link #keySet()},
+ * {@link #values()}, {@link #entrySet()}), a <b>snapshot</b> of the appropriate collection is taken
+ * and no thread co-ordination is needed.
  * 
  * @author Ramon Servadei
  */

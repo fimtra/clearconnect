@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
+ * Copyright (c) 2015 Ramon Servadei 
  *  
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,34 +15,27 @@
  */
 package com.fimtra.datafission.core;
 
-import org.junit.Ignore;
-
-import com.fimtra.datafission.core.HybridProtocolCodec;
-import com.fimtra.datafission.core.StringProtocolCodec;
 
 /**
- * Tests using the {@link HybridProtocolCodec}
+ * Tests using the {@link StringSymbolProtocolCodec}
  * 
  * @author Ramon Servadei
  */
-@Ignore
-public class HybridProtocolProxyContextTest extends ProxyContextTest
+public class StringSymbolProtocolProxyContextTest extends ProxyContextTest
 {
     // these port ranges should not clash with any other ProxyContextTests
-    static int START_PORT = 20000;
-    static int END_PORT = 20100;
+    static int START_PORT = 33000;
+    static int END_PORT = 33100;
 
     @Override
     int getNextFreePort()
     {
         return START_PORT++;
-        // port scanning disabled to speed up tests
-        // return TcpChannelUtils.getNextFreeTcpServerPort(null, START_PORT++, END_PORT++);
     }
 
     @Override
-    protected StringProtocolCodec getProtocolCodec()
+    protected StringSymbolProtocolCodec getProtocolCodec()
     {
-        return new HybridProtocolCodec();
+        return new StringSymbolProtocolCodec();
     }
 }

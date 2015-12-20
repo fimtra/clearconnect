@@ -188,14 +188,7 @@ public interface IObserverContext
     String getName();
 
     /**
-     * Get an existing record by its name. <b>The record will NOT be thread safe for reading or
-     * writing.</b>
-     * <p>
-     * <b>WARNING: Using this method to read a record's state can open your code up to concurrency
-     * conditions in a multi-thread environment. Unless all record access is completely controlled,
-     * the proper way to read a record's state is by adding a listener to the record and accessing
-     * the image presented in the {@link IRecordListener#onChange(IRecord, IRecordChange)}
-     * method.</b>
+     * Get an existing record by its name.
      * 
      * @return the record for the name, <code>null</code> if it doesn't exist in this context
      * @see IPublisherContext#createRecord(String, Map)

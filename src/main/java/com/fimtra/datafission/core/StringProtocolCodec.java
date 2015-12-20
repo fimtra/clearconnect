@@ -39,7 +39,25 @@ import com.fimtra.util.ObjectUtils;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
- * string text protocol.
+ * string text protocol. The format of the string in ABNF notation:
+ * 
+ * <pre>
+ *  preamble name seq [puts] [removes] [sub-map]
+ *  
+ *  preamble = 0*ALPHA
+ *  name = "|" 1*ALPHA ; the name of the notifying record instance
+ *  seq = "|" scope seq_num
+ *  scope = "i" | "d" ; identifies either an image or delta
+ *  seq_num = 1*DIGIT ; the sequency number
+ *  puts = "|p" 1*key-value-pair
+ *  removes = "|r" 1*key-value-pair
+ *  sub-map = "|:|" name [puts] [removes]
+ *  key-value-pair = "|" key "=" value
+ *  key = 1*ALPHA
+ *  value = 1*ALPHA
+ *  
+ *  e.g. |record_name|d322234|p|key1=value1|key2=value2|r|key_5=value5|:|subMap1|p|key1=value1
+ * </pre>
  * 
  * @author Ramon Servadei
  */
@@ -137,26 +155,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     /**
-     * Get the string representing the record changes to transmit to a {@link ProxyContext}. The
-     * format of the string in ABNF notation:
-     * 
-     * <pre>
-     *  preamble name seq [puts] [removes] [sub-map]
-     *  
-     *  preamble = 0*ALPHA
-     *  name = "|" 1*ALPHA ; the name of the notifying record instance
-     *  seq = "|" scope seq_num
-     *  scope = "i" | "d" ; identifies either an image or delta
-     *  seq_num = 1*DIGIT ; the sequency number
-     *  puts = "|p" 1*key-value-pair
-     *  removes = "|r" 1*key-value-pair
-     *  sub-map = "|:|" name [puts] [removes]
-     *  key-value-pair = "|" key "=" value
-     *  key = 1*ALPHA
-     *  value = 1*ALPHA
-     *  
-     *  e.g. |record_name|d322234|p|key1=value1|key2=value2|r|key_5=value5|:|subMap1|p|key1=value1
-     * </pre>
+     * Get the string representing the record changes to transmit to a {@link ProxyContext}.
      * 
      * @param subMapName
      *            the name of the record
@@ -596,11 +595,11 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             if (isNull)
             {
-                return AbstractValue.constructFromCharValue(null, 0, 0);
+                return AbstractValue.constructFromCharValue(null, 0);
             }
         }
 
-        return AbstractValue.constructFromCharValue(unescaped, 0, unescapedPtr);
+        return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
     }
 
     static String stringFromCharBuffer(char[] chars)

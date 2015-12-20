@@ -33,6 +33,7 @@ public interface ICodec<T>
 {
     public enum CommandEnum
     {
+        // todo remove SHOW and corresponding Tx methods on codec
         NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY
     }
 

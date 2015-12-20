@@ -110,7 +110,7 @@ public class PlatformServiceProxyTest
     }
 
     @After
-    public void tearDown() throws InterruptedException
+    public void tearDown()
     {
         ThreadUtils.newThread(new Runnable()
         {
@@ -143,14 +143,14 @@ public class PlatformServiceProxyTest
     @Test
     public void testGetAllSubscriptions() throws InterruptedException
     {
-        assertEquals(3, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(4, this.service.getAllSubscriptions().size());
+        assertEquals(5, this.service.getAllSubscriptions().size());
         assertEquals(1, this.service.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.service.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -158,7 +158,7 @@ public class PlatformServiceProxyTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(3, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
         assertNull(this.service.getAllSubscriptions().get(record1));
     }
 
@@ -385,7 +385,7 @@ public class PlatformServiceProxyTest
     public void testInvokeRpc() throws TimeOutException, ExecutionException
     {
         RpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
-        final TextValue textValue = new TextValue("result");
+        final TextValue textValue = TextValue.valueOf("result");
         rpc1.setHandler(new IRpcExecutionHandler()
         {
             @Override
@@ -523,15 +523,15 @@ public class PlatformServiceProxyTest
         latch.set(new CountDownLatch(2));
         IRecord record = this.service.getRecord(record1);
 
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.service.publishRecord(record).await(1, TimeUnit.SECONDS));
 
-        record.put("key2", new TextValue("value1"));
-        record.put("key1", new TextValue("value1"));
+        record.put("key2", TextValue.valueOf("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.service.publishRecord(record).await(1, TimeUnit.SECONDS));
 
         // this is not a change
-        record.put("key1", new TextValue("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.service.publishRecord(record).await(1, TimeUnit.SECONDS));
 
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
