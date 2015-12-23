@@ -221,24 +221,24 @@ public interface IPlatformServiceComponent
         ExecutionException;
 
     /**
-     * This is a convenience method to invoke an RPC without needing to write code that waits for
-     * the RPC to be available.
-     * <p>
-     * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
-     * 
-     * @param rpcName
-     *            the RPC name to invoke
-     * @param rpcArgs
-     *            the RPC arguments
-     * @param discoveryTimeout
-     *            the timeout in millis to wait for the RPC to become available
-     * 
-     * @throws TimeOutException
-     *             if the RPC was not available in the allotted time or it executed but experienced
-     *             a timeout
-     * @throws ExecutionException
-     *             if the arguments are wrong or there was an execution exception
-     */
+	 * This is a convenience method to invoke an RPC without needing to write code that waits for
+	 * the RPC to be available.
+	 * <p>
+	 * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
+	 * 
+	 * @param rpcName
+	 *            the RPC name to invoke
+	 * @param rpcArgs
+	 *            the RPC arguments
+	 * @param discoveryTimeoutMillis
+	 *            the timeout in millis to wait for the RPC to become available
+	 * 
+	 * @throws TimeOutException
+	 *             if the RPC was not available in the allotted time or it executed but experienced
+	 *             a timeout
+	 * @throws ExecutionException
+	 *             if the arguments are wrong or there was an execution exception
+	 */
     void executeRpcNoResponse(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException;
 
