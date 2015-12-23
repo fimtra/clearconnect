@@ -84,21 +84,21 @@ public interface IPlatformRegistryAgent
     String getPlatformName();
 
     /**
-     * This is a convenience method that will block for 60 seconds until the named service becomes
-     * available. If the service is not available, a {@link RuntimeException} is thrown.
-     * <p>
-     * An agent needs to wait for services to be available before it is 'useful'. Typically this can
-     * be done by registering an {@link IServiceAvailableListener} using
-     * {@link #addServiceAvailableListener(IServiceAvailableListener)}. However this can be a bit
-     * tedious if you just want to know when a particular service is available. This method exists
-     * for this.
-     * 
-     * @param serviceFamily
-     *            the name of the platform service being expected, if <code>null</code> then any
-     *            platform service can be expected
-     * @throws RuntimeException
-     *             if the service is not found after 60 seconds
-     */
+	 * This is a convenience method that will block for 60 seconds until the named service becomes
+	 * available. If the service is not available, a {@link RuntimeException} is thrown.
+	 * <p>
+	 * An agent needs to wait for services to be available before it is 'useful'. Typically this can
+	 * be done by registering an {@link IServiceAvailableListener} using
+	 * {@link #addServiceAvailableListener(IServiceAvailableListener)}. However this can be a bit
+	 * tedious if you just want to know when a particular service is available. This method exists
+	 * for this.
+	 * 
+	 * @param serviceFamily
+	 *            the name of the platform service being expected, if <code>null</code> then any
+	 *            platform service can be expected
+	 * @throws RuntimeException
+	 *             if the service is not found after 60 seconds (the timeout is configurable)
+	 */
     void waitForPlatformService(String serviceFamily);
 
     /**
