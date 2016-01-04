@@ -23,8 +23,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
-import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
+import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -198,47 +198,47 @@ public interface IPlatformServiceComponent
     Map<String, SubscriptionInfo> getAllSubscriptions();
 
     /**
-     * This is a convenience method to invoke an RPC without needing to write code that waits for
-     * the RPC to be available. This method will also wait for the RPC result.
-     * <p>
-     * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
-     * 
-     * @param rpcName
-     *            the RPC name to invoke
-     * @param rpcArgs
-     *            the RPC arguments
-     * @param discoveryTimeout
-     *            the timeout in millis to wait for the RPC to become available
-     * 
-     * @return the RPC result
-     * @throws TimeOutException
-     *             if the RPC was not available in the allotted time or it executed but experienced
-     *             a timeout
-     * @throws ExecutionException
-     *             if the arguments are wrong or there was an execution exception
-     */
+	 * This is a convenience method to invoke an RPC without needing to write code that waits for
+	 * the RPC to be available. This method will also wait for the RPC result.
+	 * <p>
+	 * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
+	 * 
+	 * @param rpcName
+	 *            the RPC name to invoke
+	 * @param rpcArgs
+	 *            the RPC arguments
+	 * @param discoveryTimeoutMillis
+	 *            the timeout in millis to wait for the RPC to become available
+	 * 
+	 * @return the RPC result
+	 * @throws TimeOutException
+	 *             if the RPC was not available in the allotted time or it executed but experienced
+	 *             a timeout
+	 * @throws ExecutionException
+	 *             if the arguments are wrong or there was an execution exception
+	 */
     IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException;
 
     /**
-     * This is a convenience method to invoke an RPC without needing to write code that waits for
-     * the RPC to be available.
-     * <p>
-     * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
-     * 
-     * @param rpcName
-     *            the RPC name to invoke
-     * @param rpcArgs
-     *            the RPC arguments
-     * @param discoveryTimeout
-     *            the timeout in millis to wait for the RPC to become available
-     * 
-     * @throws TimeOutException
-     *             if the RPC was not available in the allotted time or it executed but experienced
-     *             a timeout
-     * @throws ExecutionException
-     *             if the arguments are wrong or there was an execution exception
-     */
+	 * This is a convenience method to invoke an RPC without needing to write code that waits for
+	 * the RPC to be available.
+	 * <p>
+	 * <b>THIS WILL BLOCK UNTIL THE RPC BECOMES AVAILABLE AND EXECUTES.</b>
+	 * 
+	 * @param rpcName
+	 *            the RPC name to invoke
+	 * @param rpcArgs
+	 *            the RPC arguments
+	 * @param discoveryTimeoutMillis
+	 *            the timeout in millis to wait for the RPC to become available
+	 * 
+	 * @throws TimeOutException
+	 *             if the RPC was not available in the allotted time or it executed but experienced
+	 *             a timeout
+	 * @throws ExecutionException
+	 *             if the arguments are wrong or there was an execution exception
+	 */
     void executeRpcNoResponse(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException;
 
