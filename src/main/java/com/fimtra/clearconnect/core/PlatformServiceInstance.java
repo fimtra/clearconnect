@@ -119,13 +119,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
     final ScheduledFuture<?> statsUpdateTask;
 
-    PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
-        WireProtocolEnum wireProtocol, String host, int port)
-    {
-        this(platformName, serviceFamily, serviceMember, wireProtocol, RedundancyModeEnum.FAULT_TOLERANT, host, port,
-            null, null, null, TransportTechnologyEnum.getDefaultFromSystemProperty());
-    }
-
     @SuppressWarnings({ "unchecked" })
     PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
         WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode, String host, int port,

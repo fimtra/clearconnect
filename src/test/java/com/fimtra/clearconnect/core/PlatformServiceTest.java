@@ -36,6 +36,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -76,7 +78,9 @@ public class PlatformServiceTest
     {
         PORT += 1;
         this.candidate =
-            new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING, hostName, PORT);
+            new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING,
+                RedundancyModeEnum.FAULT_TOLERANT, hostName, PORT, null, null, null,
+                TransportTechnologyEnum.getDefaultFromSystemProperty());
     }
 
     @After

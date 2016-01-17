@@ -39,6 +39,8 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 
 import com.fimtra.channel.ChannelUtils;
+import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
@@ -102,9 +104,12 @@ public class PlatformServiceProxyTest
         this.agent = new PlatformRegistryAgent("Agent", registryHost, registryPort);
         PORT += 1;
         this.service =
-            new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING, hostName, PORT);
+            new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING,
+                RedundancyModeEnum.FAULT_TOLERANT, hostName, PORT, null, null, null,
+                TransportTechnologyEnum.getDefaultFromSystemProperty());
         this.candidate =
-            new PlatformServiceProxy(this.agent, "TestPlatformService", new StringProtocolCodec(), hostName, PORT);
+            new PlatformServiceProxy(this.agent, "TestPlatformService", new StringProtocolCodec(), hostName, PORT,
+                TransportTechnologyEnum.getDefaultFromSystemProperty());
         this.candidate.setReconnectPeriodMillis(200);
         this.agent.setRegistryReconnectPeriodMillis(200);
     }
@@ -123,7 +128,7 @@ public class PlatformServiceProxyTest
                 PlatformServiceProxyTest.this.candidate.destroy();
             }
         }, "tearDown").start();
-        
+
         ChannelUtils.WATCHDOG.configure(5000);
     }
 

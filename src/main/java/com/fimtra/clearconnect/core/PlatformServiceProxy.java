@@ -67,13 +67,6 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
 
     @SuppressWarnings({ "rawtypes" })
     PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
-        final int port)
-    {
-        this(registryAgent, serviceFamily, codec, host, port, TransportTechnologyEnum.getDefaultFromSystemProperty());
-    }
-
-    @SuppressWarnings({ "rawtypes" })
-    PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
         final int port, TransportTechnologyEnum transportTechnology)
     {
         this.platformName = registryAgent.getPlatformName();
