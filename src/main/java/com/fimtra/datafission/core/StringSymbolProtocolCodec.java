@@ -884,7 +884,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    Charset getCharset()
+    public Charset getCharset()
     {
         return ISO_8859_1;
     }

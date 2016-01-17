@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission;
 
+import java.nio.charset.Charset;
 import java.rmi.Remote;
 import java.util.List;
 import java.util.Set;
@@ -156,4 +157,9 @@ public interface ICodec<T>
      * @return a new instance of this codec
      */
     ICodec<T> newInstance();
+
+    /**
+     * @return the charset used by this code
+     */
+    Charset getCharset();
 }

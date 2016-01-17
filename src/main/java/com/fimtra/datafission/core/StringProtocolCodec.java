@@ -804,7 +804,8 @@ public class StringProtocolCodec implements ICodec<char[]>
         return new StringProtocolCodec();
     }
     
-    Charset getCharset()
+    @Override
+    public Charset getCharset()
     {
         return UTF8;
     }
