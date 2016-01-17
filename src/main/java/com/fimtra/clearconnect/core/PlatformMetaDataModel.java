@@ -1010,7 +1010,7 @@ public final class PlatformMetaDataModel
         final Map<String, AtomicInteger> connectionsPerServiceInstance = new HashMap<String, AtomicInteger>();
         final Set<String> connectionKeys = imageCopy.getSubMapKeys();
 
-        IRecord connectionRecord;
+        IRecord connectionRecord = null;
         String platformServiceInstanceID;
         String remoteId;
         String clientName;
@@ -1148,7 +1148,7 @@ public final class PlatformMetaDataModel
             }
             catch (Exception e)
             {
-                Log.log(this, "Could not process connection: " + connection, e);
+                Log.log(this, "Could not process connection: " + connection + " from " + connectionRecord, e);
             }
         }
 
