@@ -199,7 +199,32 @@ public abstract class CodecBaseTest
     public void testTxAndRxChangeWith1Put()
     {
         Map<String, IValue> addedEntries = new HashMap<String, IValue>();
-        addedEntries.put("k1", LongValue.valueOf(1));
+        addedEntries.put("k1", LongValue.valueOf(1l));
+        Map<String, IValue> removedEntries = new HashMap<String, IValue>();
+        final IRecordChange changeFromRxData = performTxRxAndGetChange(this.name, addedEntries, removedEntries);
+        checkResults(this.name, addedEntries, removedEntries, changeFromRxData);
+    }
+
+    @Test
+    public void testTxAndRxChangeWithSlashes()
+    {
+        Map<String, IValue> addedEntries = new HashMap<String, IValue>();
+        addedEntries.put("k1", TextValue.valueOf("\\"));
+        addedEntries.put("k2", TextValue.valueOf("\\\\"));
+        addedEntries.put("k3", TextValue.valueOf("\\\\\\"));
+        Map<String, IValue> removedEntries = new HashMap<String, IValue>();
+        final IRecordChange changeFromRxData = performTxRxAndGetChange(this.name, addedEntries, removedEntries);
+        checkResults(this.name, addedEntries, removedEntries, changeFromRxData);
+    }
+
+    @Test
+    public void testTxAndRxChangeWith2Puts()
+    {
+        Map<String, IValue> addedEntries = new HashMap<String, IValue>();
+        // addedEntries.put("k1", DoubleValue.valueOf(0.9567168631967422));
+        // addedEntries.put("k2", LongValue.valueOf(-6009208550497218990l));
+        addedEntries.put("k1", DoubleValue.valueOf(0.7105620648679962));
+        addedEntries.put("k2", LongValue.valueOf(2889721482211017439l));
         Map<String, IValue> removedEntries = new HashMap<String, IValue>();
         final IRecordChange changeFromRxData = performTxRxAndGetChange(this.name, addedEntries, removedEntries);
         checkResults(this.name, addedEntries, removedEntries, changeFromRxData);
@@ -287,7 +312,7 @@ public abstract class CodecBaseTest
         IRecordChange changeFromRxData =
             this.candidate.getAtomicChangeFromRxMessage((this.candidate.getTxMessageForAtomicChange(new AtomicChange(
                 name, putEntries, new HashMap<String, IValue>(), removedEntries))));
-        
+
         // do it again to test codecs that send images
         changeFromRxData =
             this.candidate.getAtomicChangeFromRxMessage((this.candidate.getTxMessageForAtomicChange(new AtomicChange(
@@ -313,7 +338,8 @@ public abstract class CodecBaseTest
                 final String subMapKey = "SubMap" + j;
                 atomicChange.mergeSubMapEntryUpdatedChange(subMapKey, "aDouble" + i, new DoubleValue(i + 3.141d), null);
                 atomicChange.mergeSubMapEntryUpdatedChange(subMapKey, "aLong" + i, LongValue.valueOf(i), null);
-                atomicChange.mergeSubMapEntryUpdatedChange(subMapKey, "aText" + i, TextValue.valueOf("This is " + i), null);
+                atomicChange.mergeSubMapEntryUpdatedChange(subMapKey, "aText" + i, TextValue.valueOf("This is " + i),
+                    null);
             }
         }
         final byte[] txStringForChange = (this.candidate.getTxMessageForAtomicChange(atomicChange));

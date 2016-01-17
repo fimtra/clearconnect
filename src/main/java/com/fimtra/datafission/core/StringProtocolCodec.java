@@ -654,12 +654,15 @@ public class StringProtocolCodec implements ICodec<char[]>
         char[][] tokens = new char[10][];
         CharBuffer cbuf = CharBuffer.allocate(CharBufferUtils.BLOCK_SIZE);
         char previous = 0;
+        int slashCount = 0;
         for (int i = 0; i < chars.length; i++)
         {
             switch(chars[i])
             {
                 case '|':
-                    if (previous != '\\')
+                    if (previous != '\\' ||
+                    // the previous was '\' and there was an even number of contiguous slashes
+                        (slashCount % 2 == 0))
                     {
                         // an unescaped "|" is a true delimiter so start a new token
                         if (tokenIndex == tokens.length)
@@ -673,10 +676,19 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                     else
                     {
+                        // this is an escaped "|" so is part of the data (not a delimiter)
                         cbuf = CharBufferUtils.put(chars[i], cbuf);
                     }
+                    slashCount = 0;
+                    break;
+                case '\\':
+                    // we need to count how many "\" we have
+                    // an even number means they are escaped so a "|" is a token
+                    slashCount++;
+                    cbuf = CharBufferUtils.put(chars[i], cbuf);
                     break;
                 default :
+                    slashCount = 0;
                     cbuf = CharBufferUtils.put(chars[i], cbuf);
             }
             previous = chars[i];
