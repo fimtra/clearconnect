@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Test;
 
@@ -41,6 +42,10 @@ public class StringProtocolCodecTest extends CodecBaseTest
 {
     String name = "myName";
 
+    AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringProtocolCodec.CHARRAY_SIZE]);
+    AtomicReference<char[]> escapedChars = new AtomicReference<char[]>(
+        new char[StringProtocolCodec.ESCAPED_CHARRAY_SIZE]);
+
     @Override
     ICodec<?> constructCandidate()
     {
@@ -52,7 +57,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb);
+        StringProtocolCodec.escape(value, sb, chars, escapedChars);
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -62,7 +67,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "||||||||";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb);
+        StringProtocolCodec.escape(value, sb, chars, escapedChars);
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -72,7 +77,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "special char ending \\";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb);
+        StringProtocolCodec.escape(value, sb, chars, escapedChars);
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -82,7 +87,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \r\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb);
+        StringProtocolCodec.escape(value, sb, chars, escapedChars);
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
         assertFalse(escaped.contains("\n"));
@@ -95,7 +100,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb);
+        StringProtocolCodec.escape(value, sb, chars, escapedChars);
         String escaped = sb.toString();
         String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
         assertEquals(value, unescape);
@@ -177,7 +182,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
         final String k4 = "four";
         final LongValue v1 = LongValue.valueOf(1);
         final DoubleValue v2 = DoubleValue.valueOf(2);
-        final BlobValue v3 = BlobValue.valueOf("0123456789-10-0123456789-20-0123456789-30-0123456789-40-0123456789".getBytes());
+        final BlobValue v3 =
+            BlobValue.valueOf("0123456789-10-0123456789-20-0123456789-30-0123456789-40-0123456789".getBytes());
         final TextValue v4 = TextValue.valueOf("0123456789-10-0123456789-20-0123456789-30-0123456789-40-0123456789");
 
         AtomicChange change = new AtomicChange("change");
@@ -191,8 +197,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
         IRecordChange result =
-            StringProtocolCodec.decodeAtomicChange(
-                new String(StringProtocolCodec.encodeAtomicChange(StringProtocolCodec.RPC_COMMAND, change)).toCharArray());
+            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
+                StringProtocolCodec.RPC_COMMAND, change)).toCharArray());
 
         assertEquals(change, result);
     }

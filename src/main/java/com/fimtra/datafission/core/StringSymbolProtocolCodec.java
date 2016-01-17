@@ -15,14 +15,20 @@
  */
 package com.fimtra.datafission.core;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.field.AbstractValue;
+import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.util.Log;
 
@@ -62,6 +68,18 @@ import com.fimtra.util.Log;
  */
 public final class StringSymbolProtocolCodec extends StringProtocolCodec
 {
+    public static final class MissingKeySymbolMappingException extends RuntimeException
+    {
+        private static final long serialVersionUID = 1L;
+        final String recordName;
+
+        public MissingKeySymbolMappingException(String name, RuntimeException runtimeException)
+        {
+            super(runtimeException);
+            this.recordName = name;
+        }
+    }
+
     /**
      * Controls logging of:
      * <ul>
@@ -71,8 +89,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      */
     public static boolean log = Boolean.getBoolean("log." + StringSymbolProtocolCodec.class.getCanonicalName());
 
-    private static final char START_SYMBOL = Character.MIN_VALUE;
-    private static final char END_SYMBOL = Character.MAX_VALUE;
+    private static final char START_SYMBOL = ' ';
+    private static final char END_SYMBOL = 'z';
     // todo memory leak in these...
     // todo concurrency...
 
@@ -83,12 +101,12 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     /**
      * Stores the mappings of all record-name-to-symbol sent from this VM
      */
-    static final ConcurrentMap<String, String> TX_RECORD_NAME_TO_SYMBOL = new ConcurrentHashMap<String, String>();
+    static final Map<String, String> TX_RECORD_NAME_TO_SYMBOL = new HashMap<String, String>();
 
     static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
     static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
 
-    private static synchronized String getNextTxKeyNameSymbol()
+    private final static synchronized String getNextTxKeyNameSymbol()
     {
         findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
 
@@ -103,7 +121,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         return new String(NEXT_TX_KEY_NAME_SYMBOL, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
     }
 
-    private static synchronized String getNextTxRecordNameSymbol()
+    private final static synchronized String getNextTxRecordNameSymbol()
     {
         findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
 
@@ -121,7 +139,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     /**
      * Populates the char[] with the next symbol, skipping any special chars (see implementation)
      */
-    private static void findNextValidSymbol(final char[] symbolArr)
+    private final static void findNextValidSymbol(final char[] symbolArr)
     {
         // NOTE: there are "reserved" chars:
         // \r
@@ -147,6 +165,84 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             }
         }
         while (notOk);
+    }
+
+    private final static int getByteCountForInteger(final int data)
+    {
+        final int bytesToWrite;
+        // 4 bytes or less
+        if ((data & 0x00007fff) == data)
+        {
+            // 2 bytes or less
+            if ((data & 0x000007f) == data)
+            {
+                // 1 byte
+                bytesToWrite = 1;
+            }
+            else
+            {
+                // 2 bytes
+                bytesToWrite = 2;
+            }
+        }
+        else
+        {
+            // more than 2 bytes
+            if ((data & 0x007fffff) == data)
+            {
+                // 3 bytes
+                bytesToWrite = 3;
+            }
+            else
+            {
+                // 4 bytes
+                bytesToWrite = 4;
+            }
+        }
+        return bytesToWrite;
+    }
+
+    private final static int getByteCountForLong(final long data)
+    {
+        final int bytesToWrite;
+        if ((data & 0x000000007fffffffL) == data)
+        {
+            // 4 bytes or less
+            bytesToWrite = getByteCountForInteger((int) data);
+        }
+        else
+        {
+            // more than 4 bytes
+            if ((data & 0x00007fffffffffffL) == data)
+            {
+                // 6 bytes or less
+                if ((data & 0x0000007fffffffffL) == data)
+                {
+                    // 5 bytes
+                    bytesToWrite = 5;
+                }
+                else
+                {
+                    // 6 bytes
+                    bytesToWrite = 6;
+                }
+            }
+            else
+            {
+                // more than 6 bytes
+                if ((data & 0x007fffffffffffffL) == data)
+                {
+                    // 7 bytes
+                    bytesToWrite = 7;
+                }
+                else
+                {
+                    // 8 bytes
+                    bytesToWrite = 8;
+                }
+            }
+        }
+        return bytesToWrite;
     }
 
     /**
@@ -205,11 +301,14 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     IRecordChange decodeAtomicChangeWithSymbols(char[] decodedMessage)
     {
+        String name = null;
         try
         {
+            ByteBuffer buffer = ByteBuffer.allocate(8);
+            byte[] array = buffer.array();
+
             char[] tempArr = new char[50];
             final char[][] tokens = findTokens(decodedMessage);
-            final String name;
             switch(tokens[1][0])
             {
                 case '~':
@@ -300,7 +399,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                                     subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr), null);
+                                                        tempArr, buffer, array), null);
                                             }
                                             else
                                             {
@@ -308,7 +407,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                                     subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr));
+                                                        tempArr, buffer, array));
                                             }
                                         }
                                         else
@@ -318,14 +417,14 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                                 atomicChange.mergeEntryUpdatedChange(
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr), null);
+                                                        tempArr, buffer, array), null);
                                             }
                                             else
                                             {
                                                 atomicChange.mergeEntryRemovedChange(
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr));
+                                                        tempArr, buffer, array));
                                             }
                                         }
                                         j = chars.length;
@@ -342,7 +441,16 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
         catch (Exception e)
         {
-            throw new RuntimeException("Could not decode '" + new String(decodedMessage) + "'", e);
+            final RuntimeException runtimeException =
+                new RuntimeException("Could not decode '" + new String(decodedMessage) + "'", e);
+            if (name != null)
+            {
+                throw new MissingKeySymbolMappingException(name, runtimeException);
+            }
+            else
+            {
+                throw runtimeException;
+            }
         }
     }
 
@@ -440,6 +548,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     byte[] encodeAtomicChangeWithSymbols(String preamble, IRecordChange atomicChange)
     {
+        final AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringProtocolCodec.CHARRAY_SIZE]);
+        final AtomicReference<char[]> escapedChars =
+            new AtomicReference<char[]>(new char[StringProtocolCodec.ESCAPED_CHARRAY_SIZE]);
+        final ByteBuffer buffer = ByteBuffer.allocate(8);
+
         final Map<String, IValue> putEntries = atomicChange.getPutEntries();
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
         final StringBuilder sb =
@@ -453,31 +566,33 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
         else
         {
-            appendSymbolForRecordName(name, sb, isImage);
+            appendSymbolForRecordName(name, sb, chars, escapedChars, isImage);
         }
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-        addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, isImage);
-        addEntriesWithSymbols(DELIMITER_REMOVE_CODE, removedEntries, sb, isImage);
+        addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, chars, escapedChars, buffer, isImage);
+        addEntriesWithSymbols(DELIMITER_REMOVE_CODE, removedEntries, sb, chars, escapedChars, buffer, isImage);
         IRecordChange subMapAtomicChange;
         for (String subMapKey : atomicChange.getSubMapKeys())
         {
             subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
             sb.append(DELIMITER_SUBMAP_CODE);
-            appendSymbolForRecordName(subMapKey, sb, isImage);
-            addEntriesWithSymbols(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, isImage);
-            addEntriesWithSymbols(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, isImage);
+            // todo no - this is a field name...
+            appendSymbolForKey(sb, chars, escapedChars, subMapKey, isImage);
+            addEntriesWithSymbols(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars, escapedChars,
+                buffer, isImage);
+            addEntriesWithSymbols(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars,
+                escapedChars, buffer, isImage);
         }
         return sb.toString().getBytes(UTF8);
     }
 
     private void addEntriesWithSymbols(String changeType, Map<String, IValue> entries, StringBuilder txString,
-        boolean isImage)
+        AtomicReference<char[]> chars, AtomicReference<char[]> escapedChars, ByteBuffer buffer, boolean isImage)
     {
         Map.Entry<String, IValue> entry;
         String key;
         IValue value;
-        String valueAsString;
         if (entries != null && entries.size() > 0)
         {
             txString.append(changeType);
@@ -493,7 +608,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 }
                 else
                 {
-                    appendSymbolForKey(txString, key, isImage);
+                    appendSymbolForKey(txString, chars, escapedChars, key, isImage);
                 }
 
                 txString.append(KEY_VALUE_DELIMITER);
@@ -503,23 +618,100 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 }
                 else
                 {
-                    valueAsString = value.toString();
                     switch(value.getType())
                     {
                         case DOUBLE:
+                            txString.append(value.getType().getCharCode());
+                            // todo want to NOT create a string
+                            escape(new String(AbstractValue.toBytes(value, buffer), UTF8), txString, chars,
+                                escapedChars);
+                            buffer.clear();
+                            break;
                         case LONG:
+                            txString.append(value.getType().getCharCode());
+                            final byte[] bytes = AbstractValue.toBytes(value, buffer);
+                            final int bytesToWrite = getByteCountForLong(value.longValue());
+                            // todo want to NOT create a string
+                            escape(new String(bytes, 8 - bytesToWrite, bytesToWrite, UTF8), txString, chars,
+                                escapedChars);
+                            buffer.clear();
+                            break;
                         case BLOB:
-                            // longs, doubles and blobs do not need escaping
                             // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
-                            txString.append(valueAsString);
+                            // so no chance of any special chars!
+                            txString.append(value.toString());
                             break;
                         case TEXT:
                         default :
-                            escape(valueAsString, txString);
+                            escape(value.toString(), txString, chars, escapedChars);
                             break;
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Performs unescaping and decoding of a value
+     */
+    static IValue decodeValue(char[] chars, int start, int end, char[] unescaped, ByteBuffer buffer, byte[] array)
+    {
+        final int unescapedPtr = doUnescape(chars, start, end, unescaped);
+
+        if (NULL_VALUE_CHARS.length == unescapedPtr)
+        {
+            boolean isNull = true;
+            for (int i = 0; i < unescapedPtr; i++)
+            {
+                if (NULL_VALUE_CHARS[i] != unescaped[i])
+                {
+                    isNull = false;
+                    break;
+                }
+            }
+            if (isNull)
+            {
+                return AbstractValue.constructFromCharValue(null, 0);
+            }
+        }
+
+        int i = 0;
+        int j = 0;
+        buffer.clear();
+        switch(unescaped[0])
+        {
+            case IValue.LONG_CODE:
+                // read in from "compact integral" format
+                // ...clear the array first
+                for (i = 0; i < array.length; i++)
+                {
+                    array[i] = 0x0;
+                }
+                j = 7;
+                // start from the end work to the front
+                for (i = unescapedPtr - 1; i > 0; i--)
+                {
+                    array[j--] = (byte) (unescaped[i]);
+                }
+                return LongValue.valueOf(buffer.getLong());
+            case IValue.DOUBLE_CODE:
+                // start at 1 to skip the value type code (L/D etc)
+                for (i = 1; i < unescapedPtr; i++)
+                {
+                    try
+                    {
+                        array[j++] = (byte) (unescaped[i]);
+                    }
+                    catch (ArrayIndexOutOfBoundsException e)
+                    {
+                        // todo
+                        System.err.println("unescapedPtr=" + unescapedPtr + ", unescaped=" + Arrays.toString(unescaped));
+                        throw e;
+                    }
+                }
+                return new DoubleValue(Double.longBitsToDouble(buffer.getLong()));
+            default :
+                return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
         }
     }
 
@@ -534,7 +726,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
      */
-    void appendSymbolForRecordName(String name, StringBuilder sb, boolean isImage)
+    void appendSymbolForRecordName(String name, StringBuilder sb, AtomicReference<char[]> chars,
+        AtomicReference<char[]> escapedChars, boolean isImage)
     {
         String symbol = this.txRecordNameToSymbol.get(name);
         if (isImage || symbol == null)
@@ -561,18 +754,71 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                 TX_RECORD_NAME_TO_SYMBOL.put(name, symbol);
                             }
                         }
+                        if (log)
+                        {
+                            Log.log(this, "[tx] record-symbol ", name, "=", symbol);
+                        }
+                        this.txRecordNameToSymbol.put(name, symbol);
+                    }
+                }
+                sb.append('n');
+                escape(name, sb, chars, escapedChars);
+            }
+        }
+        sb.append('~').append(symbol);
+    }
+
+    /**
+     * Appends the key-symbol portion for a record:
+     * 
+     * <pre>
+     *  name-symbol = ( symbol-definition | symbol-instance )
+     *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
+     *  symbol-instance = "|~" symbol-name
+     *  name = 1*ALPHA ; the name of the notifying record instance
+     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
+     * </pre>
+     */
+    void appendSymbolForKey(StringBuilder txString, AtomicReference<char[]> chars,
+        AtomicReference<char[]> escapedChars, String key, boolean isImage)
+    {
+        String symbol = this.txKeyNameToSymbol.get(key);
+        if (isImage || symbol == null)
+        {
+            synchronized (this.txKeyNameToSymbol)
+            {
+                symbol = this.txKeyNameToSymbol.get(key);
+                if (symbol == null)
+                {
+                    // check the 'master' mappings
+                    symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
+                    if (symbol == null)
+                    {
+                        synchronized (TX_KEY_NAME_TO_SYMBOL)
+                        {
+                            symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
+                            if (symbol == null)
+                            {
+                                symbol = getNextTxKeyNameSymbol();
+                                if (log)
+                                {
+                                    Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
+                                }
+                                TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
+                            }
+                        }
                     }
                     if (log)
                     {
-                        Log.log(this, "[tx] record-symbol ", name, "=", symbol);
+                        Log.log(this, "[tx] key-symbol ", key, "=", symbol);
                     }
-                    this.txRecordNameToSymbol.put(name, symbol);
+                    this.txKeyNameToSymbol.put(key, symbol);
                 }
             }
-            sb.append("n");
-            escape(name, sb);
+            txString.append("n");
+            escape(key, txString, chars, escapedChars);
         }
-        sb.append("~").append(symbol);
+        txString.append("~").append(symbol);
     }
 
     /**
@@ -613,59 +859,6 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     + stringFromCharBuffer(chars, start, end) + "'");
         }
         return key;
-    }
-
-    /**
-     * Appends the key-symbol portion for a record:
-     * 
-     * <pre>
-     *  name-symbol = ( symbol-definition | symbol-instance )
-     *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
-     *  symbol-instance = "|~" symbol-name
-     *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
-     * </pre>
-     */
-    void appendSymbolForKey(StringBuilder txString, String key, boolean isImage)
-    {
-
-        String symbol = this.txKeyNameToSymbol.get(key);
-        if (isImage || symbol == null)
-        {
-            synchronized (this.txKeyNameToSymbol)
-            {
-                symbol = this.txKeyNameToSymbol.get(key);
-                if (symbol == null)
-                {
-                    // check the 'master' mappings
-                    symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
-                    if (symbol == null)
-                    {
-                        synchronized (TX_KEY_NAME_TO_SYMBOL)
-                        {
-                            symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
-                            if (symbol == null)
-                            {
-                                symbol = getNextTxKeyNameSymbol();
-                                if (log)
-                                {
-                                    Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
-                                }
-                                TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
-                            }
-                        }
-                    }
-                    if (log)
-                    {
-                        Log.log(this, "[tx] key-symbol ", key, "=", symbol);
-                    }
-                    this.txKeyNameToSymbol.put(key, symbol);
-                }
-            }
-            txString.append("n");
-            escape(key, txString);
-        }
-        txString.append("~").append(symbol);
     }
 
     static String stringFromCharBuffer(char[] chars, int start)

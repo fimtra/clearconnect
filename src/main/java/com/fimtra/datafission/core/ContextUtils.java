@@ -529,14 +529,18 @@ public class ContextUtils
         Map.Entry<String, IValue> entry = null;
         String key = null;
         IValue value = null;
+        
+        final AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringProtocolCodec.CHARRAY_SIZE]);
+        final AtomicReference<char[]> escapedChars = new AtomicReference<char[]>(new char[StringProtocolCodec.ESCAPED_CHARRAY_SIZE]);
+        
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
-            StringProtocolCodec.escape(key, sb);
+            StringProtocolCodec.escape(key, sb, chars, escapedChars);
             sb.append('=');
-            StringProtocolCodec.escape(value.toString(), sb);
+            StringProtocolCodec.escape(value.toString(), sb, chars, escapedChars);
             sb.append(ContextUtils.LINE_SEPARATOR);
         }
         writer.write(sb.toString());
