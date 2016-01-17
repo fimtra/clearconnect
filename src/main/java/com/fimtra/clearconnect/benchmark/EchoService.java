@@ -21,7 +21,8 @@ import java.util.UUID;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
-import com.fimtra.clearconnect.PlatformServiceAccess;
+import com.fimtra.clearconnect.RedundancyModeEnum;
+import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IRecord;
@@ -36,72 +37,91 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei
  */
-public class EchoService {
-	@SuppressWarnings("unused")
-	public static void main(String[] args) throws IOException {
-		new EchoService(TcpChannelUtils.LOCALHOST_IP);
-		System.in.read();
-	}
+public class EchoService
+{
+    @SuppressWarnings("unused")
+    public static void main(String[] args) throws IOException
+    {
+        new EchoService(TcpChannelUtils.LOCALHOST_IP);
+        System.in.read();
+    }
 
-	static final String ECHO_SERVICE = "ECHO SERVICE";
+    static final String ECHO_SERVICE = "ECHO SERVICE";
 
-	final PlatformServiceAccess platformAccess;
-	final IPlatformServiceInstance echoService;
-	final IRecordListener echoBackListener;
-	final IRecordAvailableListener recordAvailableListener;
+    final IPlatformRegistryAgent agent;
+    final IPlatformServiceInstance echoService;
+    final IRecordListener echoBackListener;
+    final IRecordAvailableListener recordAvailableListener;
 
-	IPlatformServiceProxy benchmarkServiceProxy;
+    IPlatformServiceProxy benchmarkServiceProxy;
 
-	public EchoService(String registryHost) {
-		// NOTE: each SERVICE FAMILY must be unique as the benchmarking needs to connect to each
-		// individual service instance
-		this.platformAccess = new PlatformServiceAccess(ECHO_SERVICE + "-" + UUID.randomUUID().toString(), "", registryHost);
-		this.echoService = this.platformAccess.getPlatformServiceInstance();
-		final IPlatformRegistryAgent agent = this.platformAccess.getPlatformRegistryAgent();
+    public EchoService(String registryHost) throws IOException
+    {
+        // NOTE: each SERVICE FAMILY must be unique as the benchmarking needs to connect to each
+        // individual service instance
+        this.agent = new PlatformRegistryAgent("echo-agent", registryHost);
+        final String serviceFamily = ECHO_SERVICE + "-" + UUID.randomUUID().toString();
+        this.agent.createPlatformServiceInstance(serviceFamily, "", registryHost, BenchmarkService.WIRE_PROTOCOL,
+            RedundancyModeEnum.FAULT_TOLERANT);
 
-		this.echoBackListener = new IRecordListener() {
-			@Override
-			public void onChange(IRecord imageCopy, IRecordChange atomicChange) {
-				if (imageCopy.getName().startsWith(BenchmarkService.PING_RECORD)) {
-					// Log.log(this, "Received " + atomicChange);
-					// copy and echo back the received record
-					final IRecord localRecord = EchoService.this.echoService.getOrCreateRecord(imageCopy.getName());
-					localRecord.clear();
-					localRecord.putAll(imageCopy);
-					EchoService.this.echoService.publishRecord(localRecord);
-				}
-			}
-		};
-		this.recordAvailableListener = new IRecordAvailableListener() {
-			@Override
-			public void onRecordUnavailable(String recordName) {
-				EchoService.this.benchmarkServiceProxy.removeRecordListener(EchoService.this.echoBackListener, recordName);
-			}
+        this.echoService = this.agent.getPlatformServiceInstance(serviceFamily, "");
 
-			@Override
-			public void onRecordAvailable(String recordName) {
-				EchoService.this.echoService.getOrCreateRecord(recordName);
-				EchoService.this.benchmarkServiceProxy.addRecordListener(EchoService.this.echoBackListener, recordName);
-			}
-		};
+        this.echoBackListener = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                if (imageCopy.getName().startsWith(BenchmarkService.PING_RECORD))
+                {
+                    // Log.log(this, "Received " + atomicChange);
+                    // copy and echo back the received record
+                    final IRecord localRecord = EchoService.this.echoService.getOrCreateRecord(imageCopy.getName());
+                    localRecord.clear();
+                    localRecord.putAll(imageCopy);
+                    EchoService.this.echoService.publishRecord(localRecord);
+                }
+            }
+        };
+        this.recordAvailableListener = new IRecordAvailableListener()
+        {
+            @Override
+            public void onRecordUnavailable(String recordName)
+            {
+                EchoService.this.benchmarkServiceProxy.removeRecordListener(EchoService.this.echoBackListener,
+                    recordName);
+            }
 
-		agent.addServiceAvailableListener(new IServiceAvailableListener() {
-			@Override
-			public void onServiceUnavailable(String serviceFamily) {
-				if (is.eq(BenchmarkService.BENCHMARK_SERVICE, serviceFamily)) {
-					EchoService.this.platformAccess.getPlatformRegistryAgent().destroyPlatformServiceProxy(serviceFamily);
-					EchoService.this.benchmarkServiceProxy = null;
-				}
-			}
+            @Override
+            public void onRecordAvailable(String recordName)
+            {
+                EchoService.this.echoService.getOrCreateRecord(recordName);
+                EchoService.this.benchmarkServiceProxy.addRecordListener(EchoService.this.echoBackListener, recordName);
+            }
+        };
 
-			@Override
-			public void onServiceAvailable(String serviceFamily) {
-				if (is.eq(BenchmarkService.BENCHMARK_SERVICE, serviceFamily)) {
-					Log.log(EchoService.this, "Found " + serviceFamily);
-					EchoService.this.benchmarkServiceProxy = agent.getPlatformServiceProxy(serviceFamily);
-					EchoService.this.benchmarkServiceProxy.addRecordAvailableListener(EchoService.this.recordAvailableListener);
-				}
-			}
-		});
-	}
+        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        {
+            @Override
+            public void onServiceUnavailable(String serviceFamily)
+            {
+                if (is.eq(BenchmarkService.BENCHMARK_SERVICE, serviceFamily))
+                {
+                    EchoService.this.agent.destroyPlatformServiceProxy(serviceFamily);
+                    EchoService.this.benchmarkServiceProxy = null;
+                }
+            }
+
+            @Override
+            public void onServiceAvailable(String serviceFamily)
+            {
+                if (is.eq(BenchmarkService.BENCHMARK_SERVICE, serviceFamily))
+                {
+                    Log.log(EchoService.this, "Found " + serviceFamily);
+                    EchoService.this.benchmarkServiceProxy =
+                        EchoService.this.agent.getPlatformServiceProxy(serviceFamily);
+                    EchoService.this.benchmarkServiceProxy.addRecordAvailableListener(EchoService.this.recordAvailableListener);
+                }
+            }
+        });
+    }
 }
