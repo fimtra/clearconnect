@@ -156,8 +156,22 @@ public class Publisher
                         @Override
                         public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
                         {
-                            atomicChange.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
-                                atomicChange.getName()).getAndIncrement());
+                            final AtomicLong currentSequence =
+                                ProxyContextMultiplexer.this.systemRecordSequences.get(atomicChange.getName());
+
+                            if (atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR && currentSequence.get() != 0)
+                            {
+                                // we get-then-increment the sequences, BUT we need to send the
+                                // previous sequence if its an image (e.g. if we had a
+                                // re-sync for the record), hence we do sequence-1
+                                atomicChange.setSequence(currentSequence.get() - 1);
+                            }
+                            else
+                            {
+                                atomicChange.setSequence(currentSequence.getAndIncrement());
+                            }
+
+                            // the first message that we send is always an image
                             if (atomicChange.getSequence() == 0)
                             {
                                 atomicChange.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
