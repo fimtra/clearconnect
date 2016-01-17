@@ -172,25 +172,25 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {
-        return encodeAtomicChange(DELIMITER, atomicChange);
+        return encodeAtomicChange(DELIMITER, atomicChange, getCharset());
     }
 
     @Override
     public byte[] getTxMessageForSubscribe(String... names)
     {
-        return (getEncodedNamesForCommandMessage(SUBSCRIBE_COMMAND, names)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(SUBSCRIBE_COMMAND, names)).getBytes(getCharset());
     }
 
     @Override
     public byte[] getTxMessageForUnsubscribe(String... names)
     {
-        return (getEncodedNamesForCommandMessage(UNSUBSCRIBE_COMMAND, names)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(UNSUBSCRIBE_COMMAND, names)).getBytes(getCharset());
     }
 
     @Override
     public byte[] getTxMessageForIdentify(String proxyIdentity)
     {
-        return (getEncodedNamesForCommandMessage(IDENTIFY_COMMAND, proxyIdentity)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(IDENTIFY_COMMAND, proxyIdentity)).getBytes(getCharset());
     }
 
     /**
@@ -321,7 +321,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    static byte[] encodeAtomicChange(String preamble, IRecordChange atomicChange)
+    static byte[] encodeAtomicChange(String preamble, IRecordChange atomicChange, Charset charSet)
     {
         final AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[CHARRAY_SIZE]);
         final AtomicReference<char[]> escapedChars = new AtomicReference<char[]>(new char[ESCAPED_CHARRAY_SIZE]);
@@ -345,7 +345,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars, escapedChars);
             addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars, escapedChars);
         }
-        return sb.toString().getBytes(UTF8);
+        return sb.toString().getBytes(charSet);
     }
 
     private static void addEntriesToTxString(String changeType, Map<String, IValue> entries, StringBuilder txString,
@@ -747,7 +747,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
 
         return encodeAtomicChange(RPC_COMMAND, new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP,
-            ContextUtils.EMPTY_MAP));
+            ContextUtils.EMPTY_MAP), getCharset());
     }
 
     @Override
@@ -782,14 +782,14 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             result.append(name).append(StringProtocolCodec.DELIMITER);
         }
-        byte[] bytes = result.toString().getBytes(UTF8);
+        byte[] bytes = result.toString().getBytes(getCharset());
         return bytes;
     }
 
     @Override
     public char[] decode(byte[] data)
     {
-        return UTF8.decode(ByteBuffer.wrap(data)).array();
+        return getCharset().decode(ByteBuffer.wrap(data)).array();
     }
 
     @Override
@@ -802,5 +802,10 @@ public class StringProtocolCodec implements ICodec<char[]>
     public ICodec<char[]> newInstance()
     {
         return new StringProtocolCodec();
-    }    
+    }
+    
+    Charset getCharset()
+    {
+        return UTF8;
+    }
 }

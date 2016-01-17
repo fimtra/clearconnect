@@ -169,7 +169,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
 
         IRecordChange result =
             StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange("|",
-                change)).toCharArray());
+                change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change.toString(), result.toString());
     }
@@ -199,7 +199,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
 
         IRecordChange result =
             StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange(
-                StringSymbolProtocolCodec.RPC_COMMAND, change)).toCharArray());
+                StringSymbolProtocolCodec.RPC_COMMAND, change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change, result);
     }

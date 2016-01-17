@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -89,10 +90,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      */
     public static boolean log = Boolean.getBoolean("log." + StringSymbolProtocolCodec.class.getCanonicalName());
 
+    final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
+
     private static final char START_SYMBOL = ' ';
     private static final char END_SYMBOL = 'z';
-    // todo memory leak in these...
-    // todo concurrency...
 
     /**
      * Stores the mappings of all key-name-to-symbol sent from this VM
@@ -577,14 +578,13 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
             sb.append(DELIMITER_SUBMAP_CODE);
-            // todo no - this is a field name...
-            appendSymbolForKey(sb, chars, escapedChars, subMapKey, isImage);
+            appendSymbolForKey(subMapKey, sb, chars, escapedChars, isImage);
             addEntriesWithSymbols(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars, escapedChars,
                 buffer, isImage);
             addEntriesWithSymbols(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars,
                 escapedChars, buffer, isImage);
         }
-        return sb.toString().getBytes(UTF8);
+        return sb.toString().getBytes(getCharset());
     }
 
     private void addEntriesWithSymbols(String changeType, Map<String, IValue> entries, StringBuilder txString,
@@ -608,7 +608,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 }
                 else
                 {
-                    appendSymbolForKey(txString, chars, escapedChars, key, isImage);
+                    appendSymbolForKey(key, txString, chars, escapedChars, isImage);
                 }
 
                 txString.append(KEY_VALUE_DELIMITER);
@@ -623,7 +623,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                         case DOUBLE:
                             txString.append(value.getType().getCharCode());
                             // todo want to NOT create a string
-                            escape(new String(AbstractValue.toBytes(value, buffer), UTF8), txString, chars,
+                            escape(new String(AbstractValue.toBytes(value, buffer), getCharset()), txString, chars,
                                 escapedChars);
                             buffer.clear();
                             break;
@@ -632,7 +632,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                             final byte[] bytes = AbstractValue.toBytes(value, buffer);
                             final int bytesToWrite = getByteCountForLong(value.longValue());
                             // todo want to NOT create a string
-                            escape(new String(bytes, 8 - bytesToWrite, bytesToWrite, UTF8), txString, chars,
+                            escape(new String(bytes, 8 - bytesToWrite, bytesToWrite, getCharset()), txString, chars,
                                 escapedChars);
                             buffer.clear();
                             break;
@@ -779,8 +779,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
      */
-    void appendSymbolForKey(StringBuilder txString, AtomicReference<char[]> chars,
-        AtomicReference<char[]> escapedChars, String key, boolean isImage)
+    void appendSymbolForKey(String key, StringBuilder txString, AtomicReference<char[]> chars,
+        AtomicReference<char[]> escapedChars, boolean isImage)
     {
         String symbol = this.txKeyNameToSymbol.get(key);
         if (isImage || symbol == null)
@@ -881,5 +881,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     public ICodec<char[]> newInstance()
     {
         return new StringSymbolProtocolCodec();
+    }
+
+    @Override
+    Charset getCharset()
+    {
+        return ISO_8859_1;
     }
 }
