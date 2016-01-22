@@ -168,7 +168,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
         IRecordChange result =
-            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange("|", change, new StringProtocolCodec().getCharset())).toCharArray());
+            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange("|".toCharArray(),
+                change, new StringProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change.toString(), result.toString());
     }
@@ -198,7 +199,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
 
         IRecordChange result =
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
-                StringProtocolCodec.RPC_COMMAND, change, new StringProtocolCodec().getCharset())).toCharArray());
+                StringProtocolCodec.RPC_COMMAND_CHARS, change, new StringProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change, result);
     }

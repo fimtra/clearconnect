@@ -17,7 +17,6 @@ package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -27,13 +26,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.lang.model.element.TypeElement;
+
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.AbstractValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.util.Log;
+import com.fimtra.util.ObjectUtils;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -94,22 +97,23 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
-    private static final char START_SYMBOL = ' ';
-    private static final char END_SYMBOL = 'z';
+    private static final char START_SYMBOL = 0x0;
+    private static final char END_SYMBOL = 0xff;
+    private static final char CHAR_DEFINITION_PREFIX = 'n';
 
     /**
      * Stores the mappings of all key-name-to-symbol sent from this VM
      */
-    static final ConcurrentMap<String, String> TX_KEY_NAME_TO_SYMBOL = new ConcurrentHashMap<String, String>();
+    private static final Map<String, String> TX_KEY_NAME_TO_SYMBOL = new HashMap<String, String>();
     /**
      * Stores the mappings of all record-name-to-symbol sent from this VM
      */
-    static final Map<String, String> TX_RECORD_NAME_TO_SYMBOL = new HashMap<String, String>();
+    private static final Map<String, String> TX_RECORD_NAME_TO_SYMBOL = new HashMap<String, String>();
 
-    static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
-    static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+    private static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
+    private static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
 
-    private final static synchronized String getNextTxKeyNameSymbol()
+    private final static String getNextTxKeyNameSymbol()
     {
         findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
 
@@ -124,7 +128,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         return new String(NEXT_TX_KEY_NAME_SYMBOL, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
     }
 
-    private final static synchronized String getNextTxRecordNameSymbol()
+    private final static String getNextTxRecordNameSymbol()
     {
         findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
 
@@ -158,100 +162,24 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             symbolArr[symbolArr.length - 1] = (char) (symbolArr[symbolArr.length - 1] + 1);
             switch(symbolArr[symbolArr.length - 1])
             {
-                case '\r':
-                case '\n':
-                case '|':
-                case '=':
-                case '\\':
-                case '~':
+                case CR:
+                case LF:
+                case CHAR_TOKEN_DELIM:
+                case CHAR_KEY_VALUE_SEPARATOR:
+                case CHAR_ESCAPE:
+                case CHAR_SYMBOL_PREFIX:
                     notOk = true;
             }
         }
         while (notOk);
     }
 
-    private final static int getByteCountForInteger(final int data)
-    {
-        final int bytesToWrite;
-        // 4 bytes or less
-        if ((data & 0x00007fff) == data)
-        {
-            // 2 bytes or less
-            if ((data & 0x000007f) == data)
-            {
-                // 1 byte
-                bytesToWrite = 1;
-            }
-            else
-            {
-                // 2 bytes
-                bytesToWrite = 2;
-            }
-        }
-        else
-        {
-            // more than 2 bytes
-            if ((data & 0x007fffff) == data)
-            {
-                // 3 bytes
-                bytesToWrite = 3;
-            }
-            else
-            {
-                // 4 bytes
-                bytesToWrite = 4;
-            }
-        }
-        return bytesToWrite;
-    }
-
-    private final static int getByteCountForLong(final long data)
-    {
-        final int bytesToWrite;
-        if ((data & 0x000000007fffffffL) == data)
-        {
-            // 4 bytes or less
-            bytesToWrite = getByteCountForInteger((int) data);
-        }
-        else
-        {
-            // more than 4 bytes
-            if ((data & 0x00007fffffffffffL) == data)
-            {
-                // 6 bytes or less
-                if ((data & 0x0000007fffffffffL) == data)
-                {
-                    // 5 bytes
-                    bytesToWrite = 5;
-                }
-                else
-                {
-                    // 6 bytes
-                    bytesToWrite = 6;
-                }
-            }
-            else
-            {
-                // more than 6 bytes
-                if ((data & 0x007fffffffffffffL) == data)
-                {
-                    // 7 bytes
-                    bytesToWrite = 7;
-                }
-                else
-                {
-                    // 8 bytes
-                    bytesToWrite = 8;
-                }
-            }
-        }
-        return bytesToWrite;
-    }
-
     /**
      * Tracks the records that have had key definitions sent.
      * <p>
      * Key=record-key, value=set of records that have had the key definition sent.
+     * <p>
+     * Synchronize on {@link #txKeyNameToSymbol}
      * <p>
      * TODO this is a memory leak for "temporary" records...
      */
@@ -290,7 +218,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {
-        return encodeAtomicChangeWithSymbols(DELIMITER, atomicChange);
+        return encodeAtomicChangeWithSymbols(DELIMITER_CHARS, atomicChange);
     }
 
     /**
@@ -322,17 +250,19 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             final char[][] tokens = findTokens(decodedMessage);
             switch(tokens[1][0])
             {
-                case '~':
+                case CHAR_SYMBOL_PREFIX:
                     // if its just the symbol, no need to unencode
                     // symbol-instance ~<symbol>
+                    // todo
                     name = lookupRecordNameSymbol(new String(tokens[1], 1, tokens[1].length - 1));
                     break;
-                case 'n':
+                case CHAR_DEFINITION_PREFIX:
                     // symbol-definition: n<name>~<symbol>
                     name = defineRecordNameSymbol(stringFromCharBuffer(tokens[1], 0));
                     break;
                 default :
-                    // assume its a full name (no symbol table), e.g. RPC results
+                    // assume its a full name (no symbol table), e.g. RPC results, teleported record
+                    // change fragment
                     name = new String(tokens[1], 0, tokens[1].length);
             }
 
@@ -341,6 +271,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             // set the scope and sequence
             final char[] sequenceToken = tokens[2];
             atomicChange.setScope(sequenceToken[0]);
+            // todo compact
             atomicChange.setSequence(LongValue.valueOf(sequenceToken, 1, sequenceToken.length - 1).longValue());
 
             boolean put = true;
@@ -364,15 +295,14 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                 processSubmaps = true;
                                 switch(tokens[++i][0])
                                 {
-                                    case '~':
+                                    case CHAR_SYMBOL_PREFIX:
                                         // if its a symbol, no need to unescape
                                         // symbol-instance ~<symbol>
-                                        subMapName =
-                                            lookupRecordNameSymbol(new String(tokens[i], 1, tokens[i].length - 1));
+                                        subMapName = lookupKeySymbol(new String(tokens[i], 1, tokens[i].length - 1));
                                         break;
-                                    case 'n':
+                                    case CHAR_DEFINITION_PREFIX:
                                         // symbol-definition: n<name>~s<symbol>
-                                        subMapName = defineRecordNameSymbol(stringFromCharBuffer(tokens[i], 0));
+                                        subMapName = defineKeySymbol(stringFromCharBuffer(tokens[i], 0));
                                         break;
                                     default :
                                         throw new IllegalArgumentException("Could not decode submap name from "
@@ -393,9 +323,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                         {
                             switch(chars[j])
                             {
-                                case '=':
+                                case CHAR_KEY_VALUE_SEPARATOR:
                                     // find where the first non-escaped "=" is
-                                    if (previous != '\\')
+                                    if (previous != CHAR_ESCAPE)
                                     {
                                         currentTokenChars = tokens[i];
                                         if (tempArr.length < currentTokenChars.length)
@@ -498,7 +428,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String name = null;
         for (int i = 1; i < charArray.length; i++)
         {
-            if (charArray[i] == '~')
+            if (charArray[i] == CHAR_SYMBOL_PREFIX)
             {
                 name = sb.toString();
                 sb.setLength(0);
@@ -534,7 +464,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String name = null;
         for (int i = 1; i < charArray.length; i++)
         {
-            if (charArray[i] == '~')
+            if (charArray[i] == CHAR_SYMBOL_PREFIX)
             {
                 name = sb.toString();
                 sb.setLength(0);
@@ -557,7 +487,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         return name;
     }
 
-    byte[] encodeAtomicChangeWithSymbols(String preamble, IRecordChange atomicChange)
+    byte[] encodeAtomicChangeWithSymbols(char[] preamble, IRecordChange atomicChange)
     {
         final AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringProtocolCodec.CHARRAY_SIZE]);
         final AtomicReference<char[]> escapedChars =
@@ -571,7 +501,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         sb.append(preamble);
         final boolean isImage = atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
         final String name = atomicChange.getName();
-        if (name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
+        if (name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0)
+        // todo this is for teleported changes
+        // || name.contains(":")
+        )
         {
             sb.append(name);
         }
@@ -580,7 +513,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             appendSymbolForRecordName(name, sb, chars, escapedChars, isImage);
         }
         // add the sequence
-        sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
+        sb.append(DELIMITER).append(atomicChange.getScope())
+        // todo compact
+        .append(atomicChange.getSequence());
         addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, chars, escapedChars, buffer, isImage, name);
         addEntriesWithSymbols(DELIMITER_REMOVE_CODE, removedEntries, sb, chars, escapedChars, buffer, isImage, name);
         IRecordChange subMapAtomicChange;
@@ -601,11 +536,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         AtomicReference<char[]> chars, AtomicReference<char[]> escapedChars, ByteBuffer buffer, boolean isImage,
         String recordName)
     {
-        Map.Entry<String, IValue> entry;
-        String key;
-        IValue value;
         if (entries != null && entries.size() > 0)
         {
+            Map.Entry<String, IValue> entry;
+            String key;
+            IValue value;
+            byte[] bytes;
+            int bytesToWrite;
+            final Charset charset = getCharset();
+            int i;
             txString.append(changeType);
             for (Iterator<Map.Entry<String, IValue>> it = entries.entrySet().iterator(); it.hasNext();)
             {
@@ -622,7 +561,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     appendSymbolForKey(key, txString, chars, escapedChars, isImage, recordName);
                 }
 
-                txString.append(KEY_VALUE_DELIMITER);
+                txString.append(CHAR_KEY_VALUE_SEPARATOR);
                 if (value == null)
                 {
                     txString.append(NULL_VALUE);
@@ -632,33 +571,90 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     switch(value.getType())
                     {
                         case DOUBLE:
-                            txString.append(value.getType().getCharCode());
-                            // todo want to NOT create a string
-                            escape(new String(AbstractValue.toBytes(value, buffer), getCharset()), txString, chars,
+                            txString.append(IValue.DOUBLE_CODE);
+                            escape(new String(AbstractValue.toBytes(value, buffer), 0, 8, charset), txString, chars,
                                 escapedChars);
                             buffer.clear();
                             break;
                         case LONG:
-                            txString.append(value.getType().getCharCode());
-                            final byte[] bytes = AbstractValue.toBytes(value, buffer);
-                            final int bytesToWrite = getByteCountForLong(value.longValue());
-                            // todo want to NOT create a string
-                            escape(new String(bytes, 8 - bytesToWrite, bytesToWrite, getCharset()), txString, chars,
+                            txString.append(IValue.LONG_CODE);
+                            bytes = AbstractValue.toBytes(value, buffer);
+                            bytesToWrite = 8;
+                            i = 0;
+                            while ((--bytesToWrite > -1) && bytes[i++] == 0x0)
+                                ;
+                            bytesToWrite++;
+                            escape(new String(bytes, 8 - bytesToWrite, bytesToWrite, charset), txString, chars,
                                 escapedChars);
                             buffer.clear();
                             break;
                         case BLOB:
                             // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
                             // so no chance of any special chars!
+                            // todo do we need the charset?
                             txString.append(value.toString());
                             break;
                         case TEXT:
                         default :
+                            // todo do we need the charset?
                             escape(value.toString(), txString, chars, escapedChars);
                             break;
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Escape special chars in the value-to-send, ultimately adding the escaped value into the
+     * destination StringBuilder
+     */
+    static void escapeRaw(byte[] valueToSend, int start, int len, StringBuilder dest, AtomicReference<char[]> charsRef,
+        AtomicReference<char[]> escapedCharsRef)
+    {
+        try
+        {
+            if (charsRef.get().length < len)
+            {
+                // resize
+                charsRef.set(new char[len]);
+                escapedCharsRef.set(new char[len * 3]);
+            }
+
+            final char[] escapedChars = escapedCharsRef.get();
+
+            char charAt;
+            int escapeIndex = 0;
+            for (int i = start; i < start + len; i++)
+            {
+                charAt = (char) valueToSend[i];
+                System.out.println(valueToSend[i] + ", char='" + charAt + "' as byte=" + (byte) charAt);
+                switch(charAt)
+                {
+                    case CR:
+                        escapedChars[escapeIndex++] = CHAR_ESCAPE;
+                        escapedChars[escapeIndex++] = CHAR_r;
+                        break;
+                    case LF:
+                        escapedChars[escapeIndex++] = CHAR_ESCAPE;
+                        escapedChars[escapeIndex++] = CHAR_n;
+                        break;
+                    case CHAR_ESCAPE:
+                    case CHAR_TOKEN_DELIM:
+                    case CHAR_KEY_VALUE_SEPARATOR:
+                    case CHAR_SYMBOL_PREFIX:
+                        escapedChars[escapeIndex++] = CHAR_ESCAPE;
+                        escapedChars[escapeIndex++] = charAt;
+                        break;
+                    default :
+                        escapedChars[escapeIndex++] = charAt;
+                }
+            }
+            dest.append(escapedChars, 0, escapeIndex);
+        }
+        catch (Exception e)
+        {
+            Log.log(StringProtocolCodec.class, "Could not append for " + ObjectUtils.safeToString(valueToSend), e);
         }
     }
 
@@ -693,10 +689,12 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             case IValue.LONG_CODE:
                 // read in from "compact integral" format
-                // ...clear the array first
-                for (i = 0; i < array.length; i++)
+                // note: unescapedPtr includes the code, hence 9 not 8
+                j = 9 - unescapedPtr;
+                for (i = 0; i < j; i++)
                 {
-                    array[i] = 0x0;
+                    // ...ensure the unused bytes are reset
+                    array[i] = (byte) 0x0;
                 }
                 j = 7;
                 // start from the end work to the front
@@ -709,16 +707,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 // start at 1 to skip the value type code (L/D etc)
                 for (i = 1; i < unescapedPtr; i++)
                 {
-                    try
-                    {
-                        array[j++] = (byte) (unescaped[i]);
-                    }
-                    catch (ArrayIndexOutOfBoundsException e)
-                    {
-                        // todo
-                        System.err.println("unescapedPtr=" + unescapedPtr + ", unescaped=" + Arrays.toString(unescaped));
-                        throw e;
-                    }
+                    array[j++] = (byte) (unescaped[i]);
                 }
                 return new DoubleValue(Double.longBitsToDouble(buffer.getLong()));
             default :
@@ -772,11 +761,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                         this.txRecordNameToSymbol.put(name, symbol);
                     }
                 }
-                sb.append('n');
+                sb.append(CHAR_DEFINITION_PREFIX);
                 escape(name, sb, chars, escapedChars);
             }
         }
-        sb.append('~').append(symbol);
+        sb.append(CHAR_SYMBOL_PREFIX).append(symbol);
     }
 
     /**
@@ -826,10 +815,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     this.txKeyNameToSymbol.put(key, symbol);
                 }
             }
-            txString.append("n");
+            txString.append(CHAR_DEFINITION_PREFIX);
             escape(key, txString, chars, escapedChars);
         }
-        txString.append("~").append(symbol);
+        txString.append(CHAR_SYMBOL_PREFIX).append(symbol);
     }
 
     /**
@@ -842,13 +831,24 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             return true;
         }
 
-        synchronized (this.keyDefinitionsSent)
+        Set<String> records = this.keyDefinitionsSent.get(key);
+        if (records == null)
         {
-            Set<String> records = this.keyDefinitionsSent.get(key);
-            if (records == null)
+            synchronized (this.keyDefinitionsSent)
             {
-                records = new HashSet<String>();
-                this.keyDefinitionsSent.put(key, records);
+                records = this.keyDefinitionsSent.get(key);
+                if (records == null)
+                {
+                    records = new HashSet<String>();
+                    this.keyDefinitionsSent.put(key, records);
+                }
+            }
+        }
+        synchronized (records)
+        {
+            if (records.contains(recordName))
+            {
+                return false;
             }
             return records.add(recordName);
         }
@@ -878,12 +878,13 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String key = null;
         switch(chars[0])
         {
-            case '~':
+            case CHAR_SYMBOL_PREFIX:
                 // if its a symbol, no need to unencode
                 // symbol-instance ~<symbol>
+                // todo
                 key = lookupKeySymbol(new String(chars, start + 1, end - 1));
                 break;
-            case 'n':
+            case CHAR_DEFINITION_PREFIX:
                 // symbol-definition: n<name>~s<symbol>
                 key = defineKeySymbol(stringFromCharBuffer(chars, start, end));
                 break;
