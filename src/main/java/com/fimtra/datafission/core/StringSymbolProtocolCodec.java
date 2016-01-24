@@ -38,8 +38,13 @@ import com.fimtra.util.ObjectUtils;
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
  * string text protocol with a symbol table for string substitution of record names and keys in
  * atomic changes. This reduces the transmission size of messages once the symbol mapping for a
- * record name or key is sent. Typically a symbol will be between 1-4 chars (but is unlimited). The
- * format of the string in ABNF notation:
+ * record name or key is sent.
+ * <p>
+ * Typically a symbol will be between 1-4 chars. There is a separate symbol table for record names
+ * and keys. <b>Note:</b> there is a limit of 2^64 symbols for a symbol table, but this should never
+ * become a problem. Also note that this codec uses ISO-8859-1 encoding for strings.
+ * <p>
+ * The format of the string in ABNF notation:
  * 
  * <pre>
  *  preamble name-symbol seq [puts] [removes] [sub-map]
@@ -49,7 +54,7 @@ import com.fimtra.util.ObjectUtils;
  *  name-symbol-definition = "n" name name-symbol-instance ; if the symbol for the record has never been sent
  *  name-symbol-instance = "~" symbol-name
  *  name = 1*ALPHA ; the name of the notifying record instance
- *  symbol-name = 1*ALPHA ; the symbol to substitute for the name
+ *  symbol-name = 1*OCTET ; the symbol to substitute for the name
  *  seq = "|" scope seq_num
  *  scope = "i" | "d" ; identifies either an image or delta
  *  seq_num = 1*DIGIT ; the sequency number
@@ -774,7 +779,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-definition = "n" name symbol-instance ; if the symbol for the record has never been sent
      *  symbol-instance = "~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
+     *  symbol-name = 1*OCTET ; the symbol for the notifying record instance name
      * </pre>
      */
     void appendSymbolForRecordName(String name, StringBuilder sb, CharArrayReference chars, boolean isImage)
@@ -826,7 +831,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
      *  symbol-instance = "|~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
+     *  symbol-name = 1*OCTET ; the symbol for the notifying record instance name
      * </pre>
      */
     void appendSymbolForKey(String key, StringBuilder txString, CharArrayReference chars, boolean sendDefinition)
