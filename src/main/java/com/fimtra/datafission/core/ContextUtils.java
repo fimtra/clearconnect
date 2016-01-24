@@ -530,17 +530,16 @@ public class ContextUtils
         String key = null;
         IValue value = null;
         
-        final AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringProtocolCodec.CHARRAY_SIZE]);
-        final AtomicReference<char[]> escapedChars = new AtomicReference<char[]>(new char[StringProtocolCodec.ESCAPED_CHARRAY_SIZE]);
+        final CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
         
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
-            StringProtocolCodec.escape(key, sb, chars, escapedChars);
+            StringProtocolCodec.escape(key, sb, chars);
             sb.append('=');
-            StringProtocolCodec.escape(value.toString(), sb, chars, escapedChars);
+            StringProtocolCodec.escape(value.toString(), sb, chars);
             sb.append(ContextUtils.LINE_SEPARATOR);
         }
         writer.write(sb.toString());

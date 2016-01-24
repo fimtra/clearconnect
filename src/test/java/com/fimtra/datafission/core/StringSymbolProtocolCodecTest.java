@@ -48,16 +48,35 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
 
     String name = "myName";
 
-    AtomicReference<char[]> chars = new AtomicReference<char[]>(new char[StringSymbolProtocolCodec.CHARRAY_SIZE]);
-    AtomicReference<char[]> escapedChars = new AtomicReference<char[]>(
-        new char[StringSymbolProtocolCodec.ESCAPED_CHARRAY_SIZE]);
+    CharArrayReference chars = new CharArrayReference(new char[StringSymbolProtocolCodec.CHARRAY_SIZE]);
+
+    @Test
+    public void testGetSymbolCode()
+    {
+        char[] c;
+        String expected;
+        // NOTE: this technique can only work for 4 chars (8 bytes - the max for a long)
+        for (int i = 1; i < 5; i++)
+        {
+            expected = "";
+            c = new char[i];
+            for (int j = 0; j < i; j++)
+            {
+                c[j] = 'a';
+                expected += "61";
+            }
+            assertEquals("For i=" + i, expected,
+                Long.toHexString(StringSymbolProtocolCodec.getSymbolCode(c, 0, c.length).longValue()));
+        }
+
+    }
 
     @Test
     public void testEscapeUnescape()
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringSymbolProtocolCodec.escape(value, sb, chars, escapedChars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -67,7 +86,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     {
         String value = "||||||||";
         StringBuilder sb = new StringBuilder();
-        StringSymbolProtocolCodec.escape(value, sb, chars, escapedChars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -77,7 +96,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     {
         String value = "special char ending \\";
         StringBuilder sb = new StringBuilder();
-        StringSymbolProtocolCodec.escape(value, sb, chars, escapedChars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
@@ -87,7 +106,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \r\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringSymbolProtocolCodec.escape(value, sb, chars, escapedChars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
         assertFalse(escaped.contains("\n"));
@@ -100,7 +119,7 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringSymbolProtocolCodec.escape(value, sb, chars, escapedChars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String escaped = sb.toString();
         String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
         assertEquals(value, unescape);
