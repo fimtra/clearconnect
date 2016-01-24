@@ -27,7 +27,12 @@ public enum WireProtocolEnum
 {
     STRING("com.fimtra.datafission.core.StringProtocolCodec"), 
     GZIP("com.fimtra.datafission.core.GZipProtocolCodec"),
-    // HYBRID("com.fimtra.datafission.core.StringSymbolProtocolCodec"),
+    /**
+     * @deprecated this will not be supported anylonger and removed in version 4.0.0
+     */
+    @Deprecated
+    HYBRID("com.fimtra.datafission.core.HybridProtocolCodec"),    
+    SYMBOL("com.fimtra.datafission.core.StringSymbolProtocolCodec"),
     ;
 
     private final ICodec<?> codec;
