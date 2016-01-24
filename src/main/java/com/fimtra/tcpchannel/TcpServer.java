@@ -115,7 +115,8 @@ public class TcpServer implements IEndPointService
         try
         {
             final String acl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
-            this.aclPatterns = Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(acl, ";")));
+            this.aclPatterns =
+                Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(acl, ";")));
             Log.log(this, "ACL is: ", this.aclPatterns.toString());
             this.serverSocketChannel = ServerSocketChannel.open();
             this.serverSocketChannel.configureBlocking(false);
@@ -232,7 +233,7 @@ public class TcpServer implements IEndPointService
         {
             Log.log(TcpChannelUtils.class, "Could not close " + ObjectUtils.safeToString(this.serverSocketChannel), e);
         }
-        
+
         TcpChannelUtils.ACCEPT_PROCESSOR.cancel(this.serverSocketChannel);
 
         for (ITransportChannel client : this.clients)
@@ -240,6 +241,47 @@ public class TcpServer implements IEndPointService
             client.destroy("TcpServer shutting down");
         }
         this.clients.clear();
+
+        // kick off a thread to try a connection to ensure no connection exists
+        try
+        {
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    Socket socket = null;
+                    try
+                    {
+                        socket =
+                            new Socket(TcpServer.this.localSocketAddress.getAddress(),
+                                TcpServer.this.localSocketAddress.getPort());
+                    }
+                    catch (Exception e)
+                    {
+                        // don't care
+                    }
+                    finally
+                    {
+                        if (socket != null)
+                        {
+                            try
+                            {
+                                socket.close();
+                            }
+                            catch (IOException e)
+                            {
+                                // don't care
+                            }
+                        }
+                    }
+                }
+            }, "socket-destroy-" + this.localSocketAddress.getAddress() + ":" + this.localSocketAddress.getPort()).start();
+        }
+        catch (Exception e)
+        {
+            // do we care about this...
+        }
     }
 
     @Override
