@@ -39,6 +39,7 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IPlatformSummaryRecordFields;
+import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.datafission.DataFissionProperties;
@@ -1397,22 +1398,32 @@ final class EventHandler
      */
     private void publishTimed(final IRecord record)
     {
-        synchronized (this.pendingPublish)
+        // only time publish records that are not "service" oriented - this prevents service
+        // detection issues occurring due to "anti-aliasing"
+        if (record.getName().startsWith(IRegistryRecordNames.SERVICES, 0)
+            || record.getName().startsWith(IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, 0))
         {
-            if (this.pendingPublish.add(record.getName()))
+            this.registry.context.publishAtomicChange(record);
+        }
+        else
+        {
+            synchronized (this.pendingPublish)
             {
-                this.eventExecutor.schedule(new Runnable()
+                if (this.pendingPublish.add(record.getName()))
                 {
-                    @Override
-                    public void run()
+                    this.eventExecutor.schedule(new Runnable()
                     {
-                        synchronized (EventHandler.this.pendingPublish)
+                        @Override
+                        public void run()
                         {
-                            EventHandler.this.pendingPublish.remove(record.getName());
+                            synchronized (EventHandler.this.pendingPublish)
+                            {
+                                EventHandler.this.pendingPublish.remove(record.getName());
+                            }
+                            EventHandler.this.registry.context.publishAtomicChange(record);
                         }
-                        EventHandler.this.registry.context.publishAtomicChange(record);
-                    }
-                }, PlatformCoreProperties.Values.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+                    }, PlatformCoreProperties.Values.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+                }
             }
         }
     }

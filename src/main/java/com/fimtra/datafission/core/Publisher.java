@@ -182,10 +182,18 @@ public class Publisher
             }
         }
 
+        final boolean isSystemRecordUpdateCoalesced(String name)
+        {
+            return ContextUtils.isSystemRecordName(name) &&
+            // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
+            // CONNECTED/DISCONNECTED
+                !ISystemRecordNames.CONTEXT_STATUS.equals(name);
+        }
+
         @Override
         public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
         {
-            if (ContextUtils.isSystemRecordName(imageCopy.getName()))
+            if (isSystemRecordUpdateCoalesced(imageCopy.getName()))
             {
                 this.systemRecordPublishers.get(imageCopy.getName()).onChange(imageCopy, atomicChange);
             }
@@ -269,7 +277,7 @@ public class Publisher
                                         if (record != null)
                                         {
                                             final AtomicChange change = new AtomicChange(record);
-                                            if (ContextUtils.isSystemRecordName(record.getName()))
+                                            if (isSystemRecordUpdateCoalesced(record.getName()))
                                             {
                                                 SYSTEM_RECORD_PUBLISHER.execute(new Runnable()
                                                 {
