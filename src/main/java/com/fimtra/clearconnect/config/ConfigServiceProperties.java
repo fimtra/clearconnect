@@ -17,6 +17,7 @@ package com.fimtra.clearconnect.config;
 
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.config.impl.ConfigService;
+import com.fimtra.clearconnect.config.impl.IConfigPersist;
 import com.fimtra.datafission.DataFissionProperties;
 
 /**
@@ -31,6 +32,7 @@ public abstract class ConfigServiceProperties {
 	 * The names of config service properties
 	 * 
 	 * @author Ramon Servadei
+	 * @author Paul Mackinlay
 	 */
 	public static interface Names {
 		/**
@@ -62,12 +64,20 @@ public abstract class ConfigServiceProperties {
 		 * E.g. <code>-Dplatform.configService.configRpcTimeoutMillis=3000</code>
 		 */
 		String CONFIG_RPC_TIMEOUT_MILLIS = BASE + "configRpcTimeoutMillis";
+
+		/**
+		 * The system property name to define the fully qualified class that contains the implementation of
+		 * {@link IConfigPersist}<br>
+		 * E.g. <code>-Dplatform.configService.configPersistClass=com.fimtra.cleaconnect.config.impl.JdbcConfigPersist</code>
+		 */
+		String CONFIG_PERSIST_CLASS = BASE + "configPersistClass";
 	}
 
 	/**
 	 * The values of config service properties described in {@link Names}
 	 * 
 	 * @author Ramon Servadei
+	 * @author Paul Mackinlay
 	 */
 	public static interface Values {
 		/**
@@ -109,6 +119,16 @@ public abstract class ConfigServiceProperties {
 		 */
 		public static final long DEFAULT_CONFIG_RPC_TIMEOUT_MILLIS = Integer.parseInt(System.getProperty(Names.CONFIG_RPC_TIMEOUT_MILLIS,
 				"" + (2 * DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS)));
+
+		/**
+		 * The fully qualified class that contains a custom implementation of {@link IConfigPersist}. The defined class will be used for the
+		 * persistence of config. It has to have a public, no argument constructor.
+		 * <p>
+		 * By default this is null and the default persistence mechanism will be used.
+		 * 
+		 * @see Names#CONFIG_PERSIST_CLASS
+		 */
+		public String CONFIG_PERSIST_CLASS = System.getProperty(Names.CONFIG_PERSIST_CLASS, null);
 	}
 
 	private ConfigServiceProperties() {

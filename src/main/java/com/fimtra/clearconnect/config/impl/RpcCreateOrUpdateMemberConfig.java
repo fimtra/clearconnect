@@ -33,9 +33,9 @@ final class RpcCreateOrUpdateMemberConfig extends AbstractCreateOrUpdateConfig {
 
 	static final String rpcName = "createOrUpdateMemberConfig";
 
-	RpcCreateOrUpdateMemberConfig(ConfigService configService, ConfigDirReader configDirReader,
+	RpcCreateOrUpdateMemberConfig(ConfigService configService, IConfigPersist configPersist,
 			IPlatformServiceInstance platformServiceInstance) {
-		super(configService, configDirReader, platformServiceInstance);
+		super(configService, configPersist, platformServiceInstance);
 
 		IRpcInstance createOrUpdateConfigRpc = new RpcInstance(this, TypeEnum.TEXT, rpcName, new String[] { "service instance id",
 				"config key", "config value" }, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);

@@ -15,16 +15,13 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
+import static org.mockito.Matchers.any;
+
 import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.clearconnect.config.impl.ConfigDirReader;
-import com.fimtra.clearconnect.config.impl.ConfigService;
-import com.fimtra.clearconnect.config.impl.RpcCreateOrUpdateMemberConfig;
 import com.fimtra.datafission.IRpcInstance;
-
-import static org.mockito.Matchers.any;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -36,20 +33,20 @@ import static org.mockito.Mockito.verify;
 public class RpcCreateOrUpdateMemberConfigTest {
 
 	private ConfigService configService;
-	private ConfigDirReader configDirReader;
+	private IConfigPersist configPersist;
 	private IPlatformServiceInstance platformServiceInstance;
 
 	@Before
 	public void setUp() {
 		this.configService = mock(ConfigService.class);
-		this.configDirReader = mock(ConfigDirReader.class);
+		this.configPersist = mock(IConfigPersist.class);
 		this.platformServiceInstance = mock(IPlatformServiceInstance.class);
 	}
 
 	@SuppressWarnings("unused")
     @Test
 	public void shouldPublishRpc() {
-		new RpcCreateOrUpdateMemberConfig(this.configService, this.configDirReader, this.platformServiceInstance);
+		new RpcCreateOrUpdateMemberConfig(this.configService, this.configPersist, this.platformServiceInstance);
 		verify(this.platformServiceInstance, times(1)).publishRPC(any(IRpcInstance.class));
 	}
 

@@ -38,19 +38,22 @@ import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
- * The config service manages configuration records for platform services. The configuration
- * mechanics are discussed in the documentation of the {@link IConfig}. The config service is
- * accessed by client {@link IConfigServiceProxy} instances that create relevent {@link IConfig} objects.
+ * The config service manages configuration records for platform services. The configuration mechanics are discussed in the documentation of
+ * the {@link IConfig}. The config service is accessed by client {@link IConfigServiceProxy} instances that create relevent {@link IConfig}
+ * objects.
  * <p>
  * <h3>Internals</h3>
- * The config service reads the config directory and publishes all config records it finds. The config records are simply the serialised
+ * The config service reads existing config from a persistent store and publishes all config records it finds. The config record store is
+ * accessed using {@link IConfigPersist} which has a default implementation where records are simply the serialised
  * form of an {@link IRecord} as performed by {@link ContextUtils#serializeRecordToFile(IRecord, File)}. The config directory is the
- * 'config' directory that is in the working directory of the process. This can be changed by setting the system property
- * 'platform.configService.configDir' to the full path of the config directory (a 'config' directory will NOT be created in this user
- * specified directory location).
+ * 'config' directory that is in the working directory of the process. This can be changed by setting the system property for
+ * {@link ConfigServiceProperties.Values#CONFIG_DIR} to the full path of the config directory (a 'config' directory will NOT be created in
+ * this user specified directory location).
  * <p>
- * The config service will poll the config directory every 60 seconds to check for config changes. Any changes to the files in the directory
- * are published. The changes that are detected are: file modified timestamp, file size change, new files and deleted files;
+ * The config service will poll the config store every 60 seconds to check for config changes. By default any changes to the files in the
+ * directory are published. The changes that are detected are: file modified timestamp, file size change, new files and deleted files.
+ * <p>
+ * A custom implementation of {@link IConfigPersist} can be defined using {@link ConfigServiceProperties.Values#CONFIG_PERSIST_CLASS}.
  *
  * @author Ramon Servadei
  * @author Paul Mackinlay
@@ -103,15 +106,15 @@ public class ConfigService {
 			if (!configDir.exists()) {
 				configDir.mkdir();
 			}
-			ConfigDirReader configDirReader = new ConfigDirReader(configDir);
+			IConfigPersist configPersist = ConfigPersistFactory.getInstance(configDir).getIConfigPersist();
 
 			this.platformRegistryAgent = new PlatformRegistryAgent(IConfigServiceProxy.CONFIG_SERVICE, registryEndpoint);
 
 			this.platformServiceInstance = constructConfigServiceInstance(configDir, this.platformRegistryAgent, registryEndpoint.getNode());
 
-			this.configPublisher = new ConfigPublisher(configDirReader, this.platformServiceInstance);
+			this.configPublisher = new ConfigPublisher(configPersist, this.platformServiceInstance);
 			publishConfigRecords(ConfigServiceProperties.Values.POLLING_PERIOD_SECS);
-			publishRpcs(this.platformServiceInstance, configDirReader);
+			publishRpcs(this.platformServiceInstance, configPersist);
 		} catch (Exception e) {
 			throw new RuntimeException("Could not construct config service", e);
 		}
@@ -122,6 +125,7 @@ public class ConfigService {
 	}
 
 	public void destroy() {
+		ConfigPersistFactory.reset();
 		this.scheduledExecutor.shutdownNow();
 		this.platformRegistryAgent.destroy();
 	}
@@ -143,11 +147,11 @@ public class ConfigService {
 	}
 
 	@SuppressWarnings("unused")
-	private void publishRpcs(IPlatformServiceInstance platformServiceInstance, ConfigDirReader configDirReader) {
-		new RpcCreateOrUpdateMemberConfig(this, configDirReader, platformServiceInstance);
-		new RpcDeleteMemberConfig(this, configDirReader, platformServiceInstance);
-		new RpcCreateOrUpdateFamilyConfig(this, configDirReader, platformServiceInstance);
-		new RpcDeleteFamilyConfig(this, configDirReader, platformServiceInstance);
+	private void publishRpcs(IPlatformServiceInstance platformServiceInstance, IConfigPersist configPersist) {
+		new RpcCreateOrUpdateMemberConfig(this, configPersist, platformServiceInstance);
+		new RpcDeleteMemberConfig(this, configPersist, platformServiceInstance);
+		new RpcCreateOrUpdateFamilyConfig(this, configPersist, platformServiceInstance);
+		new RpcDeleteFamilyConfig(this, configPersist, platformServiceInstance);
 	}
 
 }

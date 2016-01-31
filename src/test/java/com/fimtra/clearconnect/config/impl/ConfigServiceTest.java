@@ -15,14 +15,7 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,7 +25,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
@@ -48,7 +43,17 @@ import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.tcpchannel.TcpChannelProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for the {@link ConfigService}
@@ -57,6 +62,7 @@ import com.fimtra.tcpchannel.TcpChannelUtils;
  * @author Paul Mackinlay
  */
 public class ConfigServiceTest {
+
 	private final static String LOCALHOST_IP = TcpChannelUtils.LOCALHOST_IP;
 	private static final String MEMBER = "firing";
 	private static final String SERVICE = "lasers";
@@ -66,6 +72,16 @@ public class ConfigServiceTest {
 	PlatformRegistry registry;
 	ConfigServiceProxy proxy;
 	IPlatformRegistryAgent agent;
+
+	@BeforeClass
+	public static void classSetUp() {
+		System.setProperty(TcpChannelProperties.Names.SERVER_SOCKET_REUSE_ADDR, "true");
+	}
+
+	@AfterClass
+	public static void classTearDown() {
+		System.getProperties().remove(TcpChannelProperties.Names.SERVER_SOCKET_REUSE_ADDR);
+	}
 
 	static ConfigService createConfigService() {
 		return new ConfigService(LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
@@ -164,7 +180,7 @@ public class ConfigServiceTest {
 		this.registry.destroy();
 		
         // give time for IO to settle
-        Thread.sleep(1000);
+		Thread.sleep(1000);
         
         // verify the socket is gone for us to proceed
         try

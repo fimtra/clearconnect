@@ -22,9 +22,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.clearconnect.config.impl.AbstractCreateOrUpdateConfig;
-import com.fimtra.clearconnect.config.impl.ConfigDirReader;
-import com.fimtra.clearconnect.config.impl.ConfigService;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
@@ -45,17 +42,17 @@ public class AbstractCreateOrUpdateConfigTest {
 
 	private TestCreateOrUpdateConfig rpcHandler;
 	private ConfigService configService;
-	private ConfigDirReader configDirReader;
+	private IConfigPersist configPersist;
 	private IPlatformServiceInstance platformServiceInstance;
 	private IRecord record;
 
 	@Before
 	public void setUp() {
 		this.configService = mock(ConfigService.class);
-		this.configDirReader = mock(ConfigDirReader.class);
+		this.configPersist = mock(IConfigPersist.class);
 		this.platformServiceInstance = mock(IPlatformServiceInstance.class);
 		this.record = mock(IRecord.class);
-		this.rpcHandler = new TestCreateOrUpdateConfig(this.configService, this.configDirReader, this.platformServiceInstance);
+		this.rpcHandler = new TestCreateOrUpdateConfig(this.configService, this.configPersist, this.platformServiceInstance);
 	}
 
 	@Test
@@ -81,9 +78,9 @@ public class AbstractCreateOrUpdateConfigTest {
 
 	private class TestCreateOrUpdateConfig extends AbstractCreateOrUpdateConfig {
 
-		TestCreateOrUpdateConfig(ConfigService configService, ConfigDirReader configDirReader,
+		TestCreateOrUpdateConfig(ConfigService configService, IConfigPersist configPersist,
 				IPlatformServiceInstance platformServiceInstance) {
-			super(configService, configDirReader, platformServiceInstance);
+			super(configService, configPersist, platformServiceInstance);
 		}
 
 		@Override

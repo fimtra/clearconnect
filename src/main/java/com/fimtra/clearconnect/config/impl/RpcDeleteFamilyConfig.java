@@ -32,8 +32,8 @@ final class RpcDeleteFamilyConfig extends AbstractDeleteConfig {
 
 	static final String rpcName = "deleteFamilyConfig";
 
-	RpcDeleteFamilyConfig(ConfigService configService, ConfigDirReader configDirReader, IPlatformServiceInstance platformServiceInstance) {
-		super(configService, configDirReader, platformServiceInstance);
+	RpcDeleteFamilyConfig(ConfigService configService, IConfigPersist configPersist, IPlatformServiceInstance platformServiceInstance) {
+		super(configService, configPersist, platformServiceInstance);
 
 		IRpcInstance deleteConfigRpc = new RpcInstance(this, TypeEnum.TEXT, rpcName, new String[] { "service family", "config key" },
 				TypeEnum.TEXT, TypeEnum.TEXT);

@@ -24,9 +24,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.clearconnect.config.impl.AbstractDeleteConfig;
-import com.fimtra.clearconnect.config.impl.ConfigDirReader;
-import com.fimtra.clearconnect.config.impl.ConfigService;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
@@ -48,7 +45,7 @@ public class AbstractDeleteConfigTest {
 	private static File nullRecord;
 	private TestDeleteConfig rpcHandler;
 	private ConfigService configService;
-	private ConfigDirReader configDirReader;
+	private IConfigPersist configPersist;
 	private IPlatformServiceInstance platformServiceInstance;
 	private IRecord record;
 
@@ -66,10 +63,10 @@ public class AbstractDeleteConfigTest {
 	@Before
 	public void setUp() {
 		this.configService = mock(ConfigService.class);
-		this.configDirReader = mock(ConfigDirReader.class);
+		this.configPersist = mock(IConfigPersist.class);
 		this.platformServiceInstance = mock(IPlatformServiceInstance.class);
 		this.record = mock(IRecord.class);
-		this.rpcHandler = new TestDeleteConfig(this.configService, this.configDirReader, this.platformServiceInstance);
+		this.rpcHandler = new TestDeleteConfig(this.configService, this.configPersist, this.platformServiceInstance);
 	}
 
 	@Test
@@ -86,8 +83,8 @@ public class AbstractDeleteConfigTest {
 
 	private class TestDeleteConfig extends AbstractDeleteConfig {
 
-		TestDeleteConfig(ConfigService configService, ConfigDirReader configDirReader, IPlatformServiceInstance platformServiceInstance) {
-			super(configService, configDirReader, platformServiceInstance);
+		TestDeleteConfig(ConfigService configService, IConfigPersist configPersist, IPlatformServiceInstance platformServiceInstance) {
+			super(configService, configPersist, platformServiceInstance);
 		}
 
 		@Override

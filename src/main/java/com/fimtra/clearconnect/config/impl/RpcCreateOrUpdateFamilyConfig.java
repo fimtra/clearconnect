@@ -32,9 +32,9 @@ final class RpcCreateOrUpdateFamilyConfig extends AbstractCreateOrUpdateConfig {
 
 	static final String rpcName = "createOrUpdateFamilyConfig";
 
-	RpcCreateOrUpdateFamilyConfig(ConfigService configService, ConfigDirReader configDirReader,
+	RpcCreateOrUpdateFamilyConfig(ConfigService configService, IConfigPersist configPersist,
 			IPlatformServiceInstance platformServiceInstance) {
-		super(configService, configDirReader, platformServiceInstance);
+		super(configService, configPersist, platformServiceInstance);
 
 		IRpcInstance createOrUpdateServiceConfigRpc = new RpcInstance(this, TypeEnum.TEXT, rpcName, new String[] { "service family",
 				"config key", "config value" }, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);

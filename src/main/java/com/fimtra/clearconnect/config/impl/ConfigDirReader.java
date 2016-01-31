@@ -102,17 +102,17 @@ class ConfigDirReader {
 	 * changed.
 	 */
 	List<File> updateRecordFileCache() {
-		final File[] propertyFiles = FileUtils.readFiles(this.configDir, recordFileFilter);
-		final List<File> changedFiles = emptyChangedFiles(propertyFiles);
-		final List<File> allFiles = emptyAllFiles(propertyFiles);
+		final File[] recordFiles = FileUtils.readFiles(this.configDir, recordFileFilter);
+		final List<File> changedFiles = emptyChangedFiles(recordFiles);
+		final List<File> allFiles = emptyAllFiles(recordFiles);
 		FileMetaData fileMetaData;
-		for (File propertyFile : propertyFiles) {
-			allFiles.add(propertyFile);
-			fileMetaData = new FileMetaData(FileUtils.getRecordNameFromFile(propertyFile), propertyFile.canRead(),
-					propertyFile.lastModified(), propertyFile.length());
-			if (!(this.fileCache.containsKey(propertyFile)) || !(this.fileCache.get(propertyFile).equals(fileMetaData))) {
-				this.fileCache.put(propertyFile, fileMetaData);
-				changedFiles.add(propertyFile);
+		for (File recordFile : recordFiles) {
+			allFiles.add(recordFile);
+			fileMetaData = new FileMetaData(FileUtils.getRecordNameFromFile(recordFile), recordFile.canRead(),
+					recordFile.lastModified(), recordFile.length());
+			if (!(this.fileCache.containsKey(recordFile)) || !(this.fileCache.get(recordFile).equals(fileMetaData))) {
+				this.fileCache.put(recordFile, fileMetaData);
+				changedFiles.add(recordFile);
 			}
 		}
 		final Set<File> deletedFiles = setWithCachedFiles();

@@ -15,13 +15,9 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.Log;
@@ -34,31 +30,30 @@ import com.fimtra.util.Log;
 abstract class AbstractCreateOrUpdateConfig implements IRpcExecutionHandler {
 
 	private final ConfigService configService;
-	private final ConfigDirReader configDirReader;
 	private final StringBuilder responseBuilder;
+	private final IConfigPersist configPersist;
 	final IPlatformServiceInstance platformServiceInstance;
 
-	AbstractCreateOrUpdateConfig(ConfigService configService, ConfigDirReader configDirReader,
+	AbstractCreateOrUpdateConfig(ConfigService configService, IConfigPersist configPersist,
 			IPlatformServiceInstance platformServiceInstance) {
 		this.configService = configService;
-		this.configDirReader = configDirReader;
+		this.configPersist = configPersist;
 		this.responseBuilder = new StringBuilder();
 		this.platformServiceInstance = platformServiceInstance;
 	}
 
 	final IValue createOrUpdateConfig(String configRecordName, String configKey, String configValue) {
 		this.responseBuilder.setLength(0);
-		File configDir = this.configDirReader.getConfigDir();
 		IRecord record = this.platformServiceInstance.getOrCreateRecord(configRecordName);
 		try {
-			ContextUtils.resolveRecordFromFile(record, configDir);
-		} catch (IOException e) {
+			this.configPersist.populate(record);
+		} catch (Exception e) {
 			this.responseBuilder.append("A new record file for ").append(configRecordName).append(" will be created. ");
 		}
 		record.put(configKey, configValue);
 		try {
-			ContextUtils.serializeRecordToFile(record, configDir);
-		} catch (IOException e) {
+			this.configPersist.save(record);
+		} catch (Exception e) {
 			this.responseBuilder.append("RPC failed: unable to save config record file.");
 			String message = this.responseBuilder.toString();
 			Log.log(this, message, e);
