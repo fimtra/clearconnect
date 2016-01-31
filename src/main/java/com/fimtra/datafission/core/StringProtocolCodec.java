@@ -39,12 +39,39 @@ import com.fimtra.util.ObjectUtils;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
- * string text protocol.
+ * string text protocol. The format of the string in ABNF notation:
+ * 
+ * <pre>
+ *  preamble name seq [puts] [removes] [sub-map]
+ *  
+ *  preamble = 0*ALPHA
+ *  name = "|" 1*ALPHA ; the name of the notifying record instance
+ *  seq = "|" scope seq_num
+ *  scope = "i" | "d" ; identifies either an image or delta
+ *  seq_num = 1*DIGIT ; the sequency number
+ *  puts = "|p" 1*key-value-pair
+ *  removes = "|r" 1*key-value-pair
+ *  sub-map = "|:|" name [puts] [removes]
+ *  key-value-pair = "|" key "=" value
+ *  key = 1*ALPHA
+ *  value = 1*ALPHA
+ *  
+ *  e.g. |record_name|d322234|p|key1=value1|key2=value2|r|key_5=value5|:|subMap1|p|key1=value1
+ * </pre>
  * 
  * @author Ramon Servadei
  */
 public class StringProtocolCodec implements ICodec<char[]>
 {
+    public static final int CHARRAY_SIZE = 32;
+
+    static final char CHAR_TOKEN_DELIM = '|';
+    static final char CHAR_KEY_VALUE_SEPARATOR = '=';
+    static final char CHAR_ESCAPE = '\\';
+    static final char CHAR_SYMBOL_PREFIX = '~';
+    static final char CHAR_n = 'n';
+    static final char CHAR_r = 'r';
+
     // these are special chars used by TcpChannel TerminatorBasedReaderWriter.TERMINATOR so need
     // escaping
     static final char CR = '\r';
@@ -52,14 +79,14 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static final String KEY_VALUE_DELIMITER = "=";
-    static final String DELIMITER = "|";
+    static final char DELIMITER = '|';
+    static final char[] DELIMITER_CHARS = new char[] { DELIMITER };
     static final char PUT_CODE = 'p';
     static final char REMOVE_CODE = 'r';
     static final char SUBMAP_CODE = ':';
-    static final String DELIMITER_REMOVE_CODE = DELIMITER + REMOVE_CODE;
-    static final String DELIMITER_PUT_CODE = DELIMITER + PUT_CODE;
-    static final String DELIMITER_SUBMAP_CODE = DELIMITER + SUBMAP_CODE + DELIMITER;
+    static final char[] DELIMITER_REMOVE_CODE = new char[] { DELIMITER, REMOVE_CODE };
+    static final char[] DELIMITER_PUT_CODE = new char[] { DELIMITER, PUT_CODE };
+    static final char[] DELIMITER_SUBMAP_CODE = new char[] { DELIMITER, SUBMAP_CODE, DELIMITER };
 
     static final String RPC_COMMAND = "rpc" + DELIMITER;
     static final char[] RPC_COMMAND_CHARS = RPC_COMMAND.toCharArray();
@@ -76,6 +103,7 @@ public class StringProtocolCodec implements ICodec<char[]>
      * This is the ASCII code for STX (0x2). This allows cut-n-paste of text using editors as using
      * the ASCII code for NULL=0x0 causes problems.
      */
+    // todo use chars
     static final String NULL_VALUE = new String(new char[] { 0x2 });
     static final char[] NULL_VALUE_CHARS = NULL_VALUE.toCharArray();
     static final String KEY_PREAMBLE = NULL_VALUE;
@@ -137,26 +165,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     /**
-     * Get the string representing the record changes to transmit to a {@link ProxyContext}. The
-     * format of the string in ABNF notation:
-     * 
-     * <pre>
-     *  preamble name seq [puts] [removes] [sub-map]
-     *  
-     *  preamble = 0*ALPHA
-     *  name = "|" 1*ALPHA ; the name of the notifying record instance
-     *  seq = "|" scope seq_num
-     *  scope = "i" | "d" ; identifies either an image or delta
-     *  seq_num = 1*DIGIT ; the sequency number
-     *  puts = "|p" 1*key-value-pair
-     *  removes = "|r" 1*key-value-pair
-     *  sub-map = "|:|" name [puts] [removes]
-     *  key-value-pair = "|" key "=" value
-     *  key = 1*ALPHA
-     *  value = 1*ALPHA
-     *  
-     *  e.g. |record_name|d322234|p|key1=value1|key2=value2|r|key_5=value5|:|subMap1|p|key1=value1
-     * </pre>
+     * Get the string representing the record changes to transmit to a {@link ProxyContext}.
      * 
      * @param subMapName
      *            the name of the record
@@ -169,25 +178,25 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {
-        return encodeAtomicChange(DELIMITER, atomicChange);
+        return encodeAtomicChange(DELIMITER_CHARS, atomicChange, getCharset());
     }
 
     @Override
     public byte[] getTxMessageForSubscribe(String... names)
     {
-        return (getEncodedNamesForCommandMessage(SUBSCRIBE_COMMAND, names)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(SUBSCRIBE_COMMAND, names)).getBytes(getCharset());
     }
 
     @Override
     public byte[] getTxMessageForUnsubscribe(String... names)
     {
-        return (getEncodedNamesForCommandMessage(UNSUBSCRIBE_COMMAND, names)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(UNSUBSCRIBE_COMMAND, names)).getBytes(getCharset());
     }
 
     @Override
     public byte[] getTxMessageForIdentify(String proxyIdentity)
     {
-        return (getEncodedNamesForCommandMessage(IDENTIFY_COMMAND, proxyIdentity)).getBytes(UTF8);
+        return (getEncodedNamesForCommandMessage(IDENTIFY_COMMAND, proxyIdentity)).getBytes(getCharset());
     }
 
     /**
@@ -226,6 +235,10 @@ public class StringProtocolCodec implements ICodec<char[]>
             String subMapName = null;
             if (tokens.length > 2)
             {
+                char[] chars;
+                char previous;
+                char[] currentTokenChars;
+                int j;
                 for (int i = 3; i < tokens.length; i++)
                 {
                     if (tokens[i].length == 1)
@@ -248,16 +261,15 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                     else
                     {
-                        char[] chars = tokens[i];
-                        char previous = 0;
-                        char[] currentTokenChars;
-                        for (int j = 0; j < chars.length; j++)
+                        chars = tokens[i];
+                        previous = 0;
+                        for (j = 0; j < chars.length; j++)
                         {
                             switch(chars[j])
                             {
-                                case '=':
+                                case CHAR_KEY_VALUE_SEPARATOR:
                                     // find where the first non-escaped "=" is
-                                    if (previous != '\\')
+                                    if (previous != CHAR_ESCAPE)
                                     {
                                         currentTokenChars = tokens[i];
                                         if (tempArr.length < currentTokenChars.length)
@@ -318,31 +330,34 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    static byte[] encodeAtomicChange(String preamble, IRecordChange atomicChange)
+    static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
     {
+        final CharArrayReference chars = new CharArrayReference(new char[CHARRAY_SIZE]);
+
         final Map<String, IValue> putEntries = atomicChange.getPutEntries();
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
         final StringBuilder sb =
             new StringBuilder(30 * (putEntries.size() + removedEntries.size() + atomicChange.getSubMapKeys().size()));
         sb.append(preamble);
-        escape(atomicChange.getName(), sb);
+        escape(atomicChange.getName(), sb, chars);
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-        addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb);
-        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb);
+        addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, chars);
+        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, chars);
         IRecordChange subMapAtomicChange;
         for (String subMapKey : atomicChange.getSubMapKeys())
         {
             subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
             sb.append(DELIMITER_SUBMAP_CODE);
-            escape(subMapKey, sb);
-            addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb);
-            addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb);
+            escape(subMapKey, sb, chars);
+            addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars);
+            addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars);
         }
-        return sb.toString().getBytes(UTF8);
+        return sb.toString().getBytes(charSet);
     }
 
-    private static void addEntriesToTxString(String changeType, Map<String, IValue> entries, StringBuilder txString)
+    private static void addEntriesToTxString(char[] changeType, Map<String, IValue> entries, StringBuilder txString,
+        CharArrayReference chars)
     {
         Map.Entry<String, IValue> entry;
         String key;
@@ -352,6 +367,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         int length;
         char charAt;
         char[] cbuf;
+        char[] escapedChars = new char[2];
         boolean needToEscape;
         String valueAsString;
         if (entries != null && entries.size() > 0)
@@ -365,7 +381,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                 txString.append(DELIMITER);
                 if (key == null)
                 {
-                    txString.append(KEY_PREAMBLE);
+                    txString.append(KEY_PREAMBLE_CHARS);
                 }
                 else
                 {
@@ -384,9 +400,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                         {
                             case CR:
                             case LF:
-                            case '\\':
-                            case '|':
-                            case '=':
+                            case CHAR_ESCAPE:
+                            case CHAR_TOKEN_DELIM:
+                            case CHAR_KEY_VALUE_SEPARATOR:
                                 needToEscape = true;
                                 i = length;
                         }
@@ -401,22 +417,25 @@ public class StringProtocolCodec implements ICodec<char[]>
                             {
                                 case CR:
                                     txString.append(cbuf, last, i - last);
-                                    txString.append('\\');
-                                    txString.append('r');
+                                    escapedChars[0] = CHAR_ESCAPE;
+                                    escapedChars[1] = CHAR_r;
+                                    txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
                                 case LF:
                                     txString.append(cbuf, last, i - last);
-                                    txString.append('\\');
-                                    txString.append('n');
+                                    escapedChars[0] = CHAR_ESCAPE;
+                                    escapedChars[1] = CHAR_n;
+                                    txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
-                                case '\\':
-                                case '|':
-                                case '=':
+                                case CHAR_ESCAPE:
+                                case CHAR_TOKEN_DELIM:
+                                case CHAR_KEY_VALUE_SEPARATOR:
                                     txString.append(cbuf, last, i - last);
-                                    txString.append('\\');
-                                    txString.append(charAt);
+                                    escapedChars[0] = CHAR_ESCAPE;
+                                    escapedChars[1] = charAt;
+                                    txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
                                 default :
@@ -430,7 +449,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                 }
 
-                txString.append(KEY_VALUE_DELIMITER);
+                txString.append(CHAR_KEY_VALUE_SEPARATOR);
                 if (value == null)
                 {
                     txString.append(NULL_VALUE);
@@ -449,7 +468,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                             break;
                         case TEXT:
                         default :
-                            escape(valueAsString, txString);
+                            escape(valueAsString, txString, chars);
                             break;
                     }
                 }
@@ -457,12 +476,26 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    static void escape(String valueToSend, StringBuilder sb)
+    /**
+     * Escape special chars in the value-to-send, ultimately adding the escaped value into the
+     * destination StringBuilder
+     */
+    static void escape(String valueToSend, StringBuilder dest, CharArrayReference charsRef)
     {
         try
         {
-            final char[] chars = valueToSend.toCharArray();
-            final int length = chars.length;
+            final int length = valueToSend.length();
+            if (charsRef.ref.length < length)
+            {
+                // resize
+                charsRef.ref = (new char[length]);
+            }
+
+            final char[] chars = charsRef.ref;
+            final char[] escapedChars = new char[2];
+
+            valueToSend.getChars(0, valueToSend.length(), chars, 0);
+
             char charAt;
             int last = 0;
             for (int i = 0; i < length; i++)
@@ -471,30 +504,33 @@ public class StringProtocolCodec implements ICodec<char[]>
                 switch(charAt)
                 {
                     case CR:
-                        sb.append(chars, last, i - last);
-                        sb.append('\\');
-                        sb.append('r');
+                        dest.append(chars, last, i - last);
+                        escapedChars[0] = CHAR_ESCAPE;
+                        escapedChars[1] = CHAR_r;
+                        dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     case LF:
-                        sb.append(chars, last, i - last);
-                        sb.append('\\');
-                        sb.append('n');
+                        dest.append(chars, last, i - last);
+                        escapedChars[0] = CHAR_ESCAPE;
+                        escapedChars[1] = CHAR_n;
+                        dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
-                    case '\\':
-                    case '|':
-                    case '=':
-                    case '~':
-                        sb.append(chars, last, i - last);
-                        sb.append('\\');
-                        sb.append(charAt);
+                    case CHAR_ESCAPE:
+                    case CHAR_TOKEN_DELIM:
+                    case CHAR_KEY_VALUE_SEPARATOR:
+                    case CHAR_SYMBOL_PREFIX:
+                        dest.append(chars, last, i - last);
+                        escapedChars[0] = CHAR_ESCAPE;
+                        escapedChars[1] = charAt;
+                        dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     default :
                 }
             }
-            sb.append(chars, last, length - last);
+            dest.append(chars, last, length - last);
         }
         catch (Exception e)
         {
@@ -502,42 +538,49 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    static int doUnescape(char[] chars, int start, int end, final char[] unescaped)
+    /**
+     * Parse the chars and performs unescaping copying into the destination char[]
+     * <p>
+     * This assumes the destination has sufficient space to accept the chars between start and end.
+     * 
+     * @return the index in the destination where the unescaped sequence ends
+     */
+    static int doUnescape(char[] chars, int start, int end, final char[] dest)
     {
         int unescapedPtr = 0;
         for (int i = start; i < end; i++)
         {
             switch(chars[i])
             {
-                case '\\':
+                case CHAR_ESCAPE:
                     i++;
                     if (i < chars.length)
                     {
                         switch(chars[i])
                         {
-                            case 'r':
-                                unescaped[unescapedPtr++] = CR;
+                            case CHAR_r:
+                                dest[unescapedPtr++] = CR;
                                 break;
-                            case 'n':
-                                unescaped[unescapedPtr++] = LF;
+                            case CHAR_n:
+                                dest[unescapedPtr++] = LF;
                                 break;
-                            case '\\':
-                                unescaped[unescapedPtr++] = '\\';
+                            case CHAR_ESCAPE:
+                                dest[unescapedPtr++] = CHAR_ESCAPE;
                                 break;
-                            case '|':
-                                unescaped[unescapedPtr++] = '|';
+                            case CHAR_TOKEN_DELIM:
+                                dest[unescapedPtr++] = CHAR_TOKEN_DELIM;
                                 break;
-                            case '=':
-                                unescaped[unescapedPtr++] = '=';
+                            case CHAR_KEY_VALUE_SEPARATOR:
+                                dest[unescapedPtr++] = CHAR_KEY_VALUE_SEPARATOR;
                                 break;
-                            case '~':
-                                unescaped[unescapedPtr++] = '~';
+                            case CHAR_SYMBOL_PREFIX:
+                                dest[unescapedPtr++] = CHAR_SYMBOL_PREFIX;
                                 break;
                         }
                     }
                     break;
                 default :
-                    unescaped[unescapedPtr++] = chars[i];
+                    dest[unescapedPtr++] = chars[i];
             }
         }
         return unescapedPtr;
@@ -596,11 +639,11 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             if (isNull)
             {
-                return AbstractValue.constructFromCharValue(null, 0, 0);
+                return AbstractValue.constructFromCharValue(null, 0);
             }
         }
 
-        return AbstractValue.constructFromCharValue(unescaped, 0, unescapedPtr);
+        return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
     }
 
     static String stringFromCharBuffer(char[] chars)
@@ -628,6 +671,8 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static String getEncodedNamesForCommandMessage(String commandWithDelimiter, String... recordNames)
     {
+        final CharArrayReference chars = new CharArrayReference(new char[CHARRAY_SIZE]);
+
         if (recordNames.length == 0)
         {
             return commandWithDelimiter;
@@ -636,11 +681,11 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             StringBuilder sb = new StringBuilder(recordNames.length * 20);
             sb.append(commandWithDelimiter);
-            escape(recordNames[0], sb);
+            escape(recordNames[0], sb, chars);
             for (int i = 1; i < recordNames.length; i++)
             {
                 sb.append(DELIMITER);
-                escape(recordNames[i], sb);
+                escape(recordNames[i], sb, chars);
             }
             return sb.toString();
         }
@@ -655,12 +700,15 @@ public class StringProtocolCodec implements ICodec<char[]>
         char[][] tokens = new char[10][];
         CharBuffer cbuf = CharBuffer.allocate(CharBufferUtils.BLOCK_SIZE);
         char previous = 0;
+        int slashCount = 0;
         for (int i = 0; i < chars.length; i++)
         {
             switch(chars[i])
             {
-                case '|':
-                    if (previous != '\\')
+                case CHAR_TOKEN_DELIM:
+                    if (previous != CHAR_ESCAPE ||
+                    // the previous was '\' and there was an even number of contiguous slashes
+                        (slashCount % 2 == 0))
                     {
                         // an unescaped "|" is a true delimiter so start a new token
                         if (tokenIndex == tokens.length)
@@ -674,10 +722,19 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                     else
                     {
+                        // this is an escaped "|" so is part of the data (not a delimiter)
                         cbuf = CharBufferUtils.put(chars[i], cbuf);
                     }
+                    slashCount = 0;
+                    break;
+                case CHAR_ESCAPE:
+                    // we need to count how many "\" we have
+                    // an even number means they are escaped so a "|" is a token
+                    slashCount++;
+                    cbuf = CharBufferUtils.put(chars[i], cbuf);
                     break;
                 default :
+                    slashCount = 0;
                     cbuf = CharBufferUtils.put(chars[i], cbuf);
             }
             previous = chars[i];
@@ -700,8 +757,8 @@ public class StringProtocolCodec implements ICodec<char[]>
             callDetails.put(Remote.ARG_ + i, args[i]);
         }
 
-        return encodeAtomicChange(RPC_COMMAND, new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP,
-            ContextUtils.EMPTY_MAP));
+        return encodeAtomicChange(RPC_COMMAND_CHARS, new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP,
+            ContextUtils.EMPTY_MAP), getCharset());
     }
 
     @Override
@@ -736,14 +793,14 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             result.append(name).append(StringProtocolCodec.DELIMITER);
         }
-        byte[] bytes = result.toString().getBytes(UTF8);
+        byte[] bytes = result.toString().getBytes(getCharset());
         return bytes;
     }
 
     @Override
     public char[] decode(byte[] data)
     {
-        return UTF8.decode(ByteBuffer.wrap(data)).array();
+        return getCharset().decode(ByteBuffer.wrap(data)).array();
     }
 
     @Override
@@ -756,5 +813,26 @@ public class StringProtocolCodec implements ICodec<char[]>
     public ICodec<char[]> newInstance()
     {
         return new StringProtocolCodec();
+    }
+
+    @Override
+    public Charset getCharset()
+    {
+        return UTF8;
+    }
+}
+
+/**
+ * Utility to hold a char[] ref
+ * 
+ * @author Ramon Servadei
+ */
+final class CharArrayReference
+{
+    char[] ref;
+
+    CharArrayReference(char[] carray)
+    {
+        this.ref = carray;
     }
 }

@@ -15,39 +15,26 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.util.ArrayList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import com.fimtra.channel.ChannelUtils;
-import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceComponent;
-import com.fimtra.clearconnect.PlatformCoreProperties;
-import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.TextValue;
-
-import static org.mockito.Matchers.any;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link PlatformUtils}
@@ -70,7 +57,7 @@ public class PlatformUtilsTest
     {
         IPlatformServiceComponent component = mock(IPlatformServiceComponent.class);
         Map<String, IRpcInstance> rpcs = new HashMap<String, IRpcInstance>();
-        final TextValue result = new TextValue("result!");
+        final TextValue result = TextValue.valueOf("result!");
         IRpcInstance rpc = mock(IRpcInstance.class);
         when(rpc.execute()).thenReturn(result);
 
@@ -89,7 +76,7 @@ public class PlatformUtilsTest
         final IRpcInstance rpc = mock(IRpcInstance.class);
         when(rpc.getName()).thenReturn("rpc1");
         when(rpc.getArgTypes()).thenReturn(new TypeEnum[0]);
-        final TextValue result = new TextValue("result!");
+        final TextValue result = TextValue.valueOf("result!");
         when(rpc.execute()).thenReturn(result);
 
         when(component.addRpcAvailableListener(any(IRpcAvailableListener.class))).then(new Answer<Boolean>()

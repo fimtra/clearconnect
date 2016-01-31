@@ -34,6 +34,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IFtStatusListener;
+import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
@@ -113,16 +114,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache;
     final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache;
     final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache;
+    final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionListenerCache;
     final IRecord stats;
 
     final ScheduledFuture<?> statsUpdateTask;
-
-    PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
-        WireProtocolEnum wireProtocol, String host, int port)
-    {
-        this(platformName, serviceFamily, serviceMember, wireProtocol, RedundancyModeEnum.FAULT_TOLERANT, host, port,
-            null, null, null, TransportTechnologyEnum.getDefaultFromSystemProperty());
-    }
 
     @SuppressWarnings({ "unchecked" })
     PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
@@ -209,6 +204,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             PlatformUtils.createRpcAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RPCS, this);
         this.subscriptionNotifyingCache =
             PlatformUtils.createSubscriptionNotifyingCache(this.context, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, this);
+        this.proxyConnectionListenerCache = PlatformUtils.createProxyConnectionNotifyingCache(this.context, this);
         this.active = true;
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
@@ -348,6 +344,18 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     }
 
     @Override
+    public boolean addProxyConnectionListener(IProxyConnectionListener proxyConnectionListener)
+    {
+        return this.proxyConnectionListenerCache.addListener(proxyConnectionListener);
+    }
+
+    @Override
+    public boolean removeProxyConnectionListener(IProxyConnectionListener proxyConnectionListener)
+    {
+        return this.proxyConnectionListenerCache.removeListener(proxyConnectionListener);
+    }
+
+    @Override
     public boolean createRecord(String name)
     {
         if (this.context.getRecord(name) != null)
@@ -409,6 +417,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.recordAvailableNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.subscriptionNotifyingCache.destroy();
+        this.proxyConnectionListenerCache.destroy();
 
         this.active = false;
     }

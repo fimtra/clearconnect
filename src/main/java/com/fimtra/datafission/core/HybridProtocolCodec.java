@@ -42,7 +42,6 @@ import com.fimtra.util.ByteBufferUtils;
  * field's data to 65536 bytes. If this is too restrictive, the 32-bit {@link HybridProtocolCodec32}
  * can be used (this will have a bigger wire format though).
  * 
- * @see HybridProtocolCodec32
  * @see #getTxMessageForAtomicChange(IRecordChange)
  * @author Ramon Servadei
  * @deprecated this will not be supported anylonger and removed in version 4.0.0

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
+ * Copyright (c) 2015 Ramon Servadei 
  *  
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,20 +34,41 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 
 /**
- * Tests for the {@link StringProtocolCodec}
+ * Tests for the {@link StringSymbolProtocolCodec}
  * 
  * @author Ramon Servadei
  */
-public class StringProtocolCodecTest extends CodecBaseTest
+public class StringSymbolProtocolCodecTest extends CodecBaseTest
 {
-    String name = "myName";
-
-    CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
-
     @Override
     ICodec<?> constructCandidate()
     {
-        return new StringProtocolCodec();
+        return new StringSymbolProtocolCodec();
+    }
+
+    String name = "myName";
+
+    CharArrayReference chars = new CharArrayReference(new char[StringSymbolProtocolCodec.CHARRAY_SIZE]);
+
+    @Test
+    public void testGetSymbolCode()
+    {
+        char[] c;
+        String expected;
+        // NOTE: this technique can only work for 4 chars (8 bytes - the max for a long)
+        for (int i = 1; i < 5; i++)
+        {
+            expected = "";
+            c = new char[i];
+            for (int j = 0; j < i; j++)
+            {
+                c[j] = 'a';
+                expected += "61";
+            }
+            assertEquals("For i=" + i, expected,
+                Long.toHexString(StringSymbolProtocolCodec.getSymbolCode(c, 0, c.length).longValue()));
+        }
+
     }
 
     @Test
@@ -55,8 +76,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringSymbolProtocolCodec.escape(value, sb, chars);
+        String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
 
@@ -65,8 +86,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "||||||||";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringSymbolProtocolCodec.escape(value, sb, chars);
+        String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
 
@@ -75,8 +96,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "special char ending \\";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringSymbolProtocolCodec.escape(value, sb, chars);
+        String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
         assertEquals(value, unescape);
     }
 
@@ -85,11 +106,11 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \r\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
         assertFalse(escaped.contains("\n"));
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
+        String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
         assertEquals(value, unescape);
     }
 
@@ -98,28 +119,28 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
+        StringSymbolProtocolCodec.escape(value, sb, chars);
         String escaped = sb.toString();
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
+        String unescape = StringSymbolProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
         assertEquals(value, unescape);
     }
 
     @Test
     public void testEncodeDecodeValue()
     {
-        char[] chars = StringProtocolCodec.encodeValue(null).toString().toCharArray();
+        char[] chars = StringSymbolProtocolCodec.encodeValue(null).toString().toCharArray();
         char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
+        IValue decodeValue = StringSymbolProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertNull("got: " + decodeValue, decodeValue);
     }
 
     @Test
     public void testEncodeDecodeValueWithTextValueUsingSpecialChar()
     {
-        TextValue value = TextValue.valueOf(StringProtocolCodec.NULL_VALUE);
-        char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
+        TextValue value = TextValue.valueOf(StringSymbolProtocolCodec.NULL_VALUE);
+        char[] chars = StringSymbolProtocolCodec.encodeValue(value).toString().toCharArray();
         char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
+        IValue decodeValue = StringSymbolProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertEquals(value, decodeValue);
     }
 
@@ -127,9 +148,9 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEncodeDecodeValueWithTextValue()
     {
         TextValue value = TextValue.valueOf("");
-        char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
+        char[] chars = StringSymbolProtocolCodec.encodeValue(value).toString().toCharArray();
         char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
+        IValue decodeValue = StringSymbolProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
         assertEquals(value, decodeValue);
     }
 
@@ -138,8 +159,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String[] args = new String[] { "one", "two", "three", "|\\|\\||special" };
         List<String> result =
-            StringProtocolCodec.getNamesFromCommandMessage(StringProtocolCodec.getEncodedNamesForCommandMessage(
-                StringProtocolCodec.SUBSCRIBE_COMMAND, args).toCharArray());
+            StringSymbolProtocolCodec.getNamesFromCommandMessage(StringSymbolProtocolCodec.getEncodedNamesForCommandMessage(
+                StringSymbolProtocolCodec.SUBSCRIBE_COMMAND, args).toCharArray());
         assertEquals(Arrays.toString(args), Arrays.toString(result.toArray(new String[result.size()])));
     }
 
@@ -166,8 +187,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
         IRecordChange result =
-            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange("|".toCharArray(),
-                change, new StringProtocolCodec().getCharset())).toCharArray());
+            StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange(
+                "|".toCharArray(), change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change.toString(), result.toString());
     }
@@ -196,22 +217,10 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
         IRecordChange result =
-            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
-                StringProtocolCodec.RPC_COMMAND_CHARS, change, new StringProtocolCodec().getCharset())).toCharArray());
+            StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange(
+                StringSymbolProtocolCodec.RPC_COMMAND_CHARS, change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change, result);
-    }
-
-    @Test
-    public void testEncodeDecodeAtomicChange_preamble_noArgs()
-    {
-        byte[] txMessageForRpc =
-            this.candidate.getTxMessageForRpc("rpcException", new IValue[0],
-                "_RPC_rpcException:304189752:1405541086282:1");
-        IRecordChange atomicChangeFromRxMessage = this.candidate.getAtomicChangeFromRxMessage(txMessageForRpc);
-        System.err.println(atomicChangeFromRxMessage);
-        assertEquals("_RPC_rpcException:304189752:1405541086282:1",
-            atomicChangeFromRxMessage.getPutEntries().get(RpcInstance.Remote.RESULT_RECORD_NAME).textValue());
     }
 
     @Test
@@ -309,4 +318,5 @@ public class StringProtocolCodecTest extends CodecBaseTest
             return;
         }
     }
+
 }

@@ -50,7 +50,7 @@ final class ImageDeltaChangeProcessor
         final boolean imageAlreadyReceived = this.imageReceived.containsKey(name);
         if (record.getSequence() + 1 != changeToApply.getSequence())
         {
-            final boolean isDelta = changeToApply.getScope() == IRecordChange.DELTA_SCOPE.charValue();
+            final boolean isDelta = changeToApply.getScope() == IRecordChange.DELTA_SCOPE_CHAR;
             if (imageAlreadyReceived)
             {
                 if (isDelta)

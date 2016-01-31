@@ -52,7 +52,6 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.StringUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -157,8 +156,22 @@ public class Publisher
                         @Override
                         public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
                         {
-                            atomicChange.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
-                                atomicChange.getName()).getAndIncrement());
+                            final AtomicLong currentSequence =
+                                ProxyContextMultiplexer.this.systemRecordSequences.get(atomicChange.getName());
+
+                            if (atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR && currentSequence.get() != 0)
+                            {
+                                // we get-then-increment the sequences, BUT we need to send the
+                                // previous sequence if its an image (e.g. if we had a
+                                // re-sync for the record), hence we do sequence-1
+                                atomicChange.setSequence(currentSequence.get() - 1);
+                            }
+                            else
+                            {
+                                atomicChange.setSequence(currentSequence.getAndIncrement());
+                            }
+
+                            // the first message that we send is always an image
                             if (atomicChange.getSequence() == 0)
                             {
                                 atomicChange.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
@@ -873,14 +886,17 @@ public class Publisher
     private static void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
         ProxyContextPublisher proxyContextPublisher, String responseAction)
     {
-        final StringBuilder sb = new StringBuilder(recordNames.size() * 30);
-        sb.append(action).append(responseAction).append(ProxyContext.ACK_ACTION_ARGS_START).append(
-            StringUtils.join(recordNames, ProxyContext.ACK_ARGS_DELIMITER));
+        final Map<String, IValue> puts = new HashMap<String, IValue>(recordNames.size());
+        final LongValue dummy = LongValue.valueOf(1);
+        for (String recordName : recordNames)
+        {
+            puts.put(recordName, dummy);
+        }
         final IRecordChange atomicChange =
-            new AtomicChange(sb.toString(), ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
+            new AtomicChange(action + responseAction, puts, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
         if (log)
         {
-            Log.log(Publisher.class, "(->) ", atomicChange.getName());
+            Log.log(Publisher.class, "(->) ", ObjectUtils.safeToString(atomicChange));
         }
         client.sendAsync(proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange));
     }

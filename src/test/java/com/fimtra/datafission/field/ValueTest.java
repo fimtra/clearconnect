@@ -63,7 +63,7 @@ public class ValueTest
             doConvertTest(new DoubleValue((random.nextBoolean() ? -random.nextDouble() : random.nextDouble())));
             // note that we do a LONG so that we can test doubleValue and longValue methods
             // with no numberFormatException
-            doConvertTest(new TextValue("" + random.nextLong()));
+            doConvertTest(TextValue.valueOf("" + random.nextLong()));
         }
     }
 
@@ -79,6 +79,7 @@ public class ValueTest
         doConvertTest(new DoubleValue());
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void testBlankTextValueConversion()
     {
@@ -88,7 +89,7 @@ public class ValueTest
     public void doConvertTest(IValue v)
     {
         final char[] chars = v.toString().toCharArray();
-        final IValue result = AbstractValue.constructFromCharValue(chars, 0, chars.length);
+        final IValue result = AbstractValue.constructFromCharValue(chars, chars.length);
         assertEquals(v, result);
         assertNotSame(v, result);
         assertEquals(v.doubleValue(), result.doubleValue(), 0.0001);
@@ -100,7 +101,7 @@ public class ValueTest
     public void testEquals()
     {
         LongValue l1 = LongValue.valueOf(1), l2 = LongValue.valueOf(2), l3 = LongValue.valueOf(1);
-        TextValue t1 = new TextValue("1"), t2 = new TextValue("2"), t3 = new TextValue("1");
+        TextValue t1 = TextValue.valueOf("1"), t2 = TextValue.valueOf("2"), t3 = TextValue.valueOf("1");
         DoubleValue d1 = new DoubleValue(1.1d), d2 = new DoubleValue(1.2d), d3 = new DoubleValue(1.1d);
         assertEquals(l1, l3);
         assertEquals(l1, l1);
@@ -128,13 +129,13 @@ public class ValueTest
     @Test
     public void testCompare()
     {
-        assertEquals(1, new TextValue("1").compareTo(null));
+        assertEquals(1, TextValue.valueOf("1").compareTo(null));
         assertEquals(1, LongValue.valueOf(1).compareTo(null));
         assertEquals(1, new DoubleValue(1).compareTo(null));
 
-        assertEquals(0, new TextValue("1").compareTo(new TextValue("1")));
-        assertTrue(new TextValue("-1").compareTo(new TextValue("1")) < 0);
-        assertTrue(new TextValue("1").compareTo(new TextValue("-1")) > 0);
+        assertEquals(0, TextValue.valueOf("1").compareTo(TextValue.valueOf("1")));
+        assertTrue(TextValue.valueOf("-1").compareTo(TextValue.valueOf("1")) < 0);
+        assertTrue(TextValue.valueOf("1").compareTo(TextValue.valueOf("-1")) > 0);
 
         assertEquals(0, LongValue.valueOf(1).compareTo(LongValue.valueOf(1)));
         assertTrue(LongValue.valueOf(-1).compareTo(LongValue.valueOf(1)) < 0);
@@ -155,12 +156,12 @@ public class ValueTest
         assertEquals(0, LongValue.valueOf(1).compareTo(new DoubleValue(1)));
         assertTrue(LongValue.valueOf(-1).compareTo(new DoubleValue(1)) < 0);
         assertTrue(LongValue.valueOf(1).compareTo(new DoubleValue(-1)) > 0);
-        assertTrue(LongValue.valueOf(21).compareTo(new TextValue("20")) > 0);
+        assertTrue(LongValue.valueOf(21).compareTo(TextValue.valueOf("20")) > 0);
 
-        assertEquals(0, new DoubleValue(1).compareTo(new TextValue("1.0")));
-        assertTrue(new DoubleValue(-1).compareTo(new TextValue("1.0")) < 0);
-        assertTrue(new DoubleValue(1).compareTo(new TextValue("-1.0")) > 0);
-        assertTrue(new DoubleValue(1).compareTo(new TextValue("")) > 0);
+        assertEquals(0, new DoubleValue(1).compareTo(TextValue.valueOf("1.0")));
+        assertTrue(new DoubleValue(-1).compareTo(TextValue.valueOf("1.0")) < 0);
+        assertTrue(new DoubleValue(1).compareTo(TextValue.valueOf("-1.0")) > 0);
+        assertTrue(new DoubleValue(1).compareTo(TextValue.valueOf("")) > 0);
     }
 
     @Test
@@ -199,7 +200,7 @@ public class ValueTest
         TextValue val;
         ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
         byte[] bytes;
-        val = new TextValue("" + System.currentTimeMillis() + "-" + new Random().nextDouble());
+        val = TextValue.valueOf("" + System.currentTimeMillis() + "-" + new Random().nextDouble());
         bytes = AbstractValue.toBytes(val, reuse8ByteBuffer);
         assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
         reuse8ByteBuffer.clear();

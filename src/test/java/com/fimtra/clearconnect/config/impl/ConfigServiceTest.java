@@ -137,7 +137,7 @@ public class ConfigServiceTest {
 		final IConfigChangeListener listener = mock(IConfigChangeListener.class);
 		config.addConfigChangeListener(listener);
 
-		final TextValue v1 = new TextValue("value1");
+		final TextValue v1 = TextValue.valueOf("value1");
 		final String k1 = "key1";
 		final String k2 = "key2";
 

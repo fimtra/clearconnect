@@ -17,6 +17,8 @@ package com.fimtra.clearconnect.core;
 
 import java.net.URL;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -30,6 +32,7 @@ import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceComponent;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
+import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -42,6 +45,7 @@ import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
@@ -54,6 +58,7 @@ import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.RpcInstance;
+import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
@@ -477,7 +482,7 @@ public class PlatformUtils
      * Construct the {@link NotifyingCache} that handles record connection status changes
      */
     static NotifyingCache<IRecordConnectionStatusListener, IValue> createRecordConnectionStatusNotifyingCache(
-        final ProxyContext proxyContext, final Object logContext)
+        final IObserverContext proxyContext, final Object logContext)
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
@@ -532,10 +537,81 @@ public class PlatformUtils
     }
 
     /**
+     * Construct the {@link NotifyingCache} that handles proxy connection status changes
+     */
+    static NotifyingCache<IProxyConnectionListener, IValue> createProxyConnectionNotifyingCache(
+        final IObserverContext proxyContext, final Object logContext)
+    {
+        final OneShotLatch updateWaitLatch = new OneShotLatch();
+        final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionNotifyingCache =
+            new NotifyingCache<IProxyConnectionListener, IValue>(proxyContext.getUtilityExecutor())
+            {
+                @Override
+                protected void notifyListenerDataRemoved(IProxyConnectionListener listener, String key, IValue data)
+                {
+                    listener.onDisconnected(key);
+                }
+
+                @Override
+                protected void notifyListenerDataAdded(IProxyConnectionListener listener, String key, IValue data)
+                {
+                    listener.onConnected(key);
+                }
+            };
+        proxyContext.addObserver(new IRecordListener()
+        {
+            final Map<String, String> current = new HashMap<String, String>();
+
+            @Override
+            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+            {
+                final Set<String> subMapKeys = atomicChange.getSubMapKeys();
+
+                final Set<String> added = new HashSet<String>();
+                final Set<String> removed = new HashSet<String>();
+                IRecordChange subMapAtomicChange;
+                for (String connectionId : subMapKeys)
+                {
+                    subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
+                    if (subMapAtomicChange.getOverwrittenEntries().isEmpty())
+                    {
+                        // if removed is empty, then put must NOT be empty
+                        if (subMapAtomicChange.getRemovedEntries().isEmpty())
+                        {
+                            added.add(connectionId);
+                            this.current.put(
+                                connectionId,
+                                subMapAtomicChange.getPutEntries().get(IContextConnectionsRecordFields.PROXY_ID).textValue());
+                        }
+                        else
+                        {
+                            removed.add(connectionId);
+                        }
+                    }
+                }
+
+                for (String connectionId : removed)
+                {
+                    proxyConnectionNotifyingCache.notifyListenersDataRemoved(this.current.remove(connectionId), null);
+                }
+
+                for (String connectionId : added)
+                {
+                    proxyConnectionNotifyingCache.notifyListenersDataAdded(this.current.get(connectionId),
+                        LongValue.valueOf(1));
+                }
+                updateWaitLatch.countDown();
+            }
+        }, ISystemRecordNames.CONTEXT_CONNECTIONS);
+        awaitUpdateLatch(logContext, ISystemRecordNames.CONTEXT_CONNECTIONS, updateWaitLatch);
+        return proxyConnectionNotifyingCache;
+    }
+
+    /**
      * Construct the {@link NotifyingCache} that handles service connection status changes
      */
     static NotifyingCache<IServiceConnectionStatusListener, Connection> createServiceConnectionStatusNotifyingCache(
-        final ProxyContext proxyContext, final Object logContext)
+        final IObserverContext proxyContext, final Object logContext)
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =

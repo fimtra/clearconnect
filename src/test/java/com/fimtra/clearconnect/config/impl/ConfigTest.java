@@ -104,7 +104,7 @@ public class ConfigTest {
 		IConfigChangeListener listener = mock(IConfigChangeListener.class);
 		this.config.addConfigChangeListener(listener);
 		Map<String, IValue> removedEntries = new HashMap<String, IValue>();
-		final TextValue v9 = new TextValue("config 1 removed");
+		final TextValue v9 = TextValue.valueOf("config 1 removed");
 		String removeKey = "rkey1";
 		removedEntries.put(removeKey, v9);
 		when(memberRecord.containsKey(removeKey)).thenReturn(Boolean.TRUE);
@@ -114,11 +114,11 @@ public class ConfigTest {
 		String key2 = "key2";
 		String value1 = "config 1";
 		String value2 = "config 2";
-		final TextValue config1 = new TextValue(value1);
+		final TextValue config1 = TextValue.valueOf(value1);
 		when(memberRecord.containsKey(key1)).thenReturn(Boolean.FALSE);
 		when(memberRecord.containsKey(key2)).thenReturn(Boolean.TRUE);
 		putEntries.put(key1, config1);
-		final TextValue config2 = new TextValue(value2);
+		final TextValue config2 = TextValue.valueOf(value2);
 		putEntries.put(key2, config2);
 		IRecordChange atomicChange = new AtomicChange(this.serviceName, putEntries, null, removedEntries);
 		this.config.masterConfigChangeListener.onChange(configRecord, atomicChange);
@@ -135,12 +135,12 @@ public class ConfigTest {
 
 		// trigger an update
 		Map<String, IValue> removedEntries = new HashMap<String, IValue>();
-		final TextValue v9 = new TextValue("v9");
+		final TextValue v9 = TextValue.valueOf("v9");
 		removedEntries.put("key1", v9);
 		Map<String, IValue> putEntries = new HashMap<String, IValue>();
-		final TextValue v1 = new TextValue("v1");
+		final TextValue v1 = TextValue.valueOf("v1");
 		putEntries.put("k1", v1);
-		final TextValue v2 = new TextValue("v2");
+		final TextValue v2 = TextValue.valueOf("v2");
 		putEntries.put("k2", v2);
 		IRecordChange atomicChange = new AtomicChange("sdf1", putEntries, null, removedEntries);
 		this.config.masterConfigChangeListener.onChange(null, atomicChange);
@@ -153,7 +153,7 @@ public class ConfigTest {
 		removedEntries.put("key2", v9);
 		putEntries = new HashMap<String, IValue>();
 		putEntries.put("k1", v1);
-		final TextValue v22 = new TextValue("v2.2");
+		final TextValue v22 = TextValue.valueOf("v2.2");
 		putEntries.put("k2", v22);
 		atomicChange = new AtomicChange("sdf1", putEntries, null, removedEntries);
 		this.config.masterConfigChangeListener.onChange(null, atomicChange);

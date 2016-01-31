@@ -31,7 +31,8 @@ public enum WireProtocolEnum
      * @deprecated this will not be supported anylonger and removed in version 4.0.0
      */
     @Deprecated
-    HYBRID("com.fimtra.datafission.core.HybridProtocolCodec"), 
+    HYBRID("com.fimtra.datafission.core.HybridProtocolCodec"),    
+    SYMBOL("com.fimtra.datafission.core.StringSymbolProtocolCodec"),
     ;
 
     private final ICodec<?> codec;
@@ -51,6 +52,7 @@ public enum WireProtocolEnum
     @SuppressWarnings("unchecked")
     public <T> ICodec<T> getCodec()
     {
-        return (ICodec<T>) this.codec;
+        // note: codecs are not necessarily stateless so return a new instance each time
+        return (ICodec<T>) this.codec.newInstance();
     }
 }
