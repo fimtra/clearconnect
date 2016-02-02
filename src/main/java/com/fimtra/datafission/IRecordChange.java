@@ -52,22 +52,23 @@ public interface IRecordChange
     String getName();
 
     /**
-     * @return the entries that were added or updated in this atomic change. If the field is added
-     *         (i.e. it is new), the value appears in this map and it will <b>NOT</b> have an entry
-     *         in the {@link #getOverwrittenEntries()} map.<br>
+     * @return an <b>unmodifiable</b> map of the entries that were added or updated in this atomic
+     *         change. If the field is added (i.e. it is new), the value appears in this map and it
+     *         will <b>NOT</b> have an entry in the {@link #getOverwrittenEntries()} map.<br>
      *         If the field is updated, the new value for the field appears in this map and the
      *         previous value appears in the {@link #getOverwrittenEntries()} map.
      */
     Map<String, IValue> getPutEntries();
 
     /**
-     * @return the entries that were overwritten in this atomic change.
+     * @return an <b>unmodifiable</b> map of the entries that were overwritten in this atomic
+     *         change.
      * @see #getPutEntries
      */
     Map<String, IValue> getOverwrittenEntries();
 
     /**
-     * @return the entries that were removed in this atomic change
+     * @return an <b>unmodifiable</b> map of the entries that were removed in this atomic change
      */
     Map<String, IValue> getRemovedEntries();
 
