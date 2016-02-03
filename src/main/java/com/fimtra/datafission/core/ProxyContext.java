@@ -297,7 +297,7 @@ public final class ProxyContext implements IObserverContext
     volatile boolean active;
     volatile boolean connected;
     final Context context;
-    final ICodec codec;
+    ICodec codec;
     final ImageDeltaChangeProcessor imageDeltaProcessor;
     ITransportChannel channel;
     ITransportChannelBuilderFactory channelBuilderFactory;
@@ -797,6 +797,10 @@ public final class ProxyContext implements IObserverContext
                     // single-threaded dispatching)
                     ContextUtils.clearNonSystemRecords(ProxyContext.this.context);
 
+                    // when connecting, initialise a new codec instance to reset any state held by
+                    // the previous codec
+                    ProxyContext.this.codec = ProxyContext.this.codec.newInstance();
+
                     ProxyContext.this.onChannelConnected();
                 }
             }
@@ -810,7 +814,21 @@ public final class ProxyContext implements IObserverContext
                 // thread
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
-                    ProxyContext.this.onDataReceived(data);
+                    try
+                    {
+                        ProxyContext.this.onDataReceived(data);
+                    }
+                    catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
+                    {
+                        // todo count times?
+                        Log.log(this, "Resubscribing for " + e.recordName
+                            + " due to error processing received message: "
+                            + new String(data, ProxyContext.this.codec.getCharset()), e);
+                       
+                        // if the data was a fragment of a teleported change, we need to extract the
+                        // record name, e.g. ":p1:ContextRecords"
+//                        resubscribe(AtomicChangeTeleporter.getRecordName(e.recordName));
+                    }
                 }
             }
 
@@ -895,9 +913,8 @@ public final class ProxyContext implements IObserverContext
     void onDataReceived(byte[] data)
     {
         final IRecordChange changeToApply =
-        // todo if there is an exception, we may need to re-sync (once)
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
-
+        
         if (changeToApply == null)
         {
             return;
