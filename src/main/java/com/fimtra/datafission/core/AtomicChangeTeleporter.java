@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
@@ -33,6 +34,42 @@ import com.fimtra.datafission.IValue;
  */
 final class AtomicChangeTeleporter
 {
+    private static final String PART_INDEX_PREFIX = new String(new char[] { 0xa, 0xb });
+    private static final char PART_INDEX_DELIM = 0xc;
+
+    static String getRecordName(String recordName)
+    {
+        final AtomicReference<String> name = new AtomicReference<String>();
+        getNameAndPart(recordName, name, new AtomicInteger());
+        if (name.get() == null)
+        {
+            return recordName;
+        }
+        return name.get();
+    }
+
+    private static void getNameAndPart(String chars, AtomicReference<String> name, AtomicInteger part)
+    {
+        if (chars.startsWith(PART_INDEX_PREFIX, 0))
+        {
+            final int index = chars.indexOf(PART_INDEX_DELIM, 2);
+            if (index > -1)
+            {
+                name.set(chars.substring(index + 1));
+                try
+                {
+                    part.set(Integer.parseInt(chars.substring(2, index)));
+                }
+                catch (NumberFormatException e)
+                {
+                    // this is not a parsable number, it must be a genuine record name that "looks"
+                    // like a part
+                    name.set(null);
+                }
+            }
+        }
+    }
+
     /**
      * Enum to help read/write entries from one {@link AtomicChange} to another.
      * 
@@ -40,7 +77,7 @@ final class AtomicChangeTeleporter
      */
     private static enum EntryEnum
     {
-        PUT, OVERWRITTEN, REMOVED;
+            PUT, OVERWRITTEN, REMOVED;
 
         Map<String, IValue> getEntriesToRead(AtomicChange atomicChange)
         {
@@ -130,7 +167,8 @@ final class AtomicChangeTeleporter
         {
             for (String key : subMapKeys)
             {
-                recordLevelChangeCount += getFieldChangeCount(change.getSubMapAtomicChange(key), ContextUtils.EMPTY_STRING_SET);
+                recordLevelChangeCount +=
+                    getFieldChangeCount(change.getSubMapAtomicChange(key), ContextUtils.EMPTY_STRING_SET);
             }
         }
         return recordLevelChangeCount;
@@ -180,7 +218,8 @@ final class AtomicChangeTeleporter
         }
 
         Map.Entry<String, IValue> entry = null;
-        for (Iterator<Map.Entry<String, IValue>> it = type.getEntriesToRead(source).entrySet().iterator(); it.hasNext();)
+        for (Iterator<Map.Entry<String, IValue>> it =
+            type.getEntriesToRead(source).entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             targetEntries.put(entry.getKey(), entry.getValue());
@@ -191,7 +230,8 @@ final class AtomicChangeTeleporter
             {
                 loopCount = 0;
                 partsIndex++;
-                parts[partsIndex] = new AtomicChange((parts.length - partsIndex) + ":" + name);
+                parts[partsIndex] =
+                    new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
                 parts[partsIndex].scope = source.scope;
                 parts[partsIndex].sequence = source.sequence;
 
@@ -226,8 +266,6 @@ final class AtomicChangeTeleporter
      */
     AtomicChange[] split(AtomicChange change)
     {
-        final String name = change.getName();
-        final AtomicChange[] parts;
         final Set<String> subMapKeys = change.getSubMapKeys();
         final int totalChangeCount = getFieldChangeCount(change, subMapKeys);
         if (totalChangeCount == 0 || totalChangeCount < this.maxChangesPerPart)
@@ -235,24 +273,23 @@ final class AtomicChangeTeleporter
             return new AtomicChange[] { change };
         }
 
-        parts = new AtomicChange[(int) Math.ceil((double) totalChangeCount / this.maxChangesPerPart)];
+        final String name = change.getName();
+        final AtomicChange[] parts =
+            new AtomicChange[(int) Math.ceil((double) totalChangeCount / this.maxChangesPerPart)];
         int partsIndex = 0;
         final AtomicInteger changeCounter = new AtomicInteger();
 
         // populate the first element
-        parts[partsIndex] = new AtomicChange((parts.length - partsIndex) + ":" + name);
+        parts[partsIndex] = new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
         parts[partsIndex].scope = change.scope;
         parts[partsIndex].sequence = change.sequence;
 
-        partsIndex =
-            writeEntries(EntryEnum.PUT, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart, null,
-                totalChangeCount);
-        partsIndex =
-            writeEntries(EntryEnum.OVERWRITTEN, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
-                null, totalChangeCount);
-        partsIndex =
-            writeEntries(EntryEnum.REMOVED, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
-                null, totalChangeCount);
+        partsIndex = writeEntries(EntryEnum.PUT, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
+            null, totalChangeCount);
+        partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, change, parts, partsIndex, changeCounter,
+            this.maxChangesPerPart, null, totalChangeCount);
+        partsIndex = writeEntries(EntryEnum.REMOVED, name, change, parts, partsIndex, changeCounter,
+            this.maxChangesPerPart, null, totalChangeCount);
 
         // now do the submaps
         if (subMapKeys.size() > 0)
@@ -261,15 +298,12 @@ final class AtomicChangeTeleporter
             for (String key : subMapKeys)
             {
                 subMapChange = change.internalGetSubMapAtomicChange(key);
-                partsIndex =
-                    writeEntries(EntryEnum.PUT, name, subMapChange, parts, partsIndex, changeCounter,
-                        this.maxChangesPerPart, key, totalChangeCount);
-                partsIndex =
-                    writeEntries(EntryEnum.OVERWRITTEN, name, subMapChange, parts, partsIndex, changeCounter,
-                        this.maxChangesPerPart, key, totalChangeCount);
-                partsIndex =
-                    writeEntries(EntryEnum.REMOVED, name, subMapChange, parts, partsIndex, changeCounter,
-                        this.maxChangesPerPart, key, totalChangeCount);
+                partsIndex = writeEntries(EntryEnum.PUT, name, subMapChange, parts, partsIndex, changeCounter,
+                    this.maxChangesPerPart, key, totalChangeCount);
+                partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, subMapChange, parts, partsIndex, changeCounter,
+                    this.maxChangesPerPart, key, totalChangeCount);
+                partsIndex = writeEntries(EntryEnum.REMOVED, name, subMapChange, parts, partsIndex, changeCounter,
+                    this.maxChangesPerPart, key, totalChangeCount);
             }
         }
         return parts;
@@ -283,31 +317,15 @@ final class AtomicChangeTeleporter
      */
     AtomicChange combine(AtomicChange receivedPart)
     {
-        String name = null;
-        int part = Integer.MAX_VALUE;
-        final char[] chars = receivedPart.getName().toCharArray();
-        final StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < chars.length; i++)
-        {
-            if (chars[i] == ':')
-            {
-                name = new String(chars, i + 1, chars.length - i - 1);
-                part = Integer.parseInt(sb.toString());
-                break;
-            }
-            else
-            {
-                if (Character.isDigit(chars[i]))
-                {
-                    sb.append(chars[i]);
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }
-        // there was no ":" or it did not start with a number so assume its a whole change
+        System.err.println(receivedPart.getName());
+        // todo we need a "sequence" number to match all the parts with - if 2 atomic changes are
+        // split into parts and are interleaved, we cannot recombine properly..
+        final AtomicReference<String> nameRef = new AtomicReference<String>();
+        final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
+        getNameAndPart(receivedPart.getName(), nameRef, part);
+
+        final String name = nameRef.get();
+        // there was no part so assume its a whole change
         if (name == null)
         {
             return receivedPart;
@@ -321,7 +339,7 @@ final class AtomicChangeTeleporter
         }
         merge(atomicChange, receivedPart);
 
-        if (part == 1)
+        if (part.get() == 1)
         {
             this.receivedParts.remove(name);
             return atomicChange;

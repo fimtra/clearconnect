@@ -24,8 +24,6 @@ import org.junit.Test;
 
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.AtomicChange;
-import com.fimtra.datafission.core.AtomicChangeTeleporter;
 import com.fimtra.datafission.field.TextValue;
 
 /**
