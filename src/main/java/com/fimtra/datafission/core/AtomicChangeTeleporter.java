@@ -29,6 +29,8 @@ import com.fimtra.datafission.IValue;
 /**
  * Splits a single {@link AtomicChange} into parts for sending and rebuilds the {@link AtomicChange}
  * from the parts at the other end.
+ * <p>
+ * <b>This is NOT thread safe.</b>
  * 
  * @author Ramon Servadei
  */
@@ -250,6 +252,8 @@ final class AtomicChangeTeleporter
 
     final int maxChangesPerPart;
     final ConcurrentMap<String, AtomicChange> receivedParts;
+    final AtomicReference<String> nameRef = new AtomicReference<String>();
+    final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
 
     AtomicChangeTeleporter(int maxChangesPerPart)
     {
@@ -317,13 +321,12 @@ final class AtomicChangeTeleporter
      */
     AtomicChange combine(AtomicChange receivedPart)
     {
+        this.nameRef.set(null);
         // todo we need a "sequence" number to match all the parts with - if 2 atomic changes are
         // split into parts and are interleaved, we cannot recombine properly..
-        final AtomicReference<String> nameRef = new AtomicReference<String>();
-        final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
-        getNameAndPart(receivedPart.getName(), nameRef, part);
+        getNameAndPart(receivedPart.getName(), this.nameRef, this.part);
 
-        final String name = nameRef.get();
+        final String name = this.nameRef.get();
         // there was no part so assume its a whole change
         if (name == null)
         {
@@ -338,7 +341,7 @@ final class AtomicChangeTeleporter
         }
         merge(atomicChange, receivedPart);
 
-        if (part.get() == 1)
+        if (this.part.get() == 1)
         {
             this.receivedParts.remove(name);
             return atomicChange;

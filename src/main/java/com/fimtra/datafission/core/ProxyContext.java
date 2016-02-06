@@ -820,14 +820,11 @@ public final class ProxyContext implements IObserverContext
                     }
                     catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
                     {
-                        // todo count times?
                         Log.log(this, "Resubscribing for " + e.recordName
                             + " due to error processing received message: "
                             + new String(data, ProxyContext.this.codec.getCharset()), e);
                        
-                        // if the data was a fragment of a teleported change, we need to extract the
-                        // record name, e.g. ":p1:ContextRecords"
-//                        resubscribe(AtomicChangeTeleporter.getRecordName(e.recordName));
+                        resubscribe(AtomicChangeTeleporter.getRecordName(e.recordName));
                     }
                 }
             }
