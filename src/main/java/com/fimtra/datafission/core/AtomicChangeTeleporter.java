@@ -317,7 +317,6 @@ final class AtomicChangeTeleporter
      */
     AtomicChange combine(AtomicChange receivedPart)
     {
-        System.err.println(receivedPart.getName());
         // todo we need a "sequence" number to match all the parts with - if 2 atomic changes are
         // split into parts and are interleaved, we cannot recombine properly..
         final AtomicReference<String> nameRef = new AtomicReference<String>();
