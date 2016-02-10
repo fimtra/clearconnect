@@ -74,6 +74,8 @@ import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceInstanceMetaDat
 import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceInstanceRpcMetaDataRecordDefinition;
 import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceProxyMetaDataRecordDefinition;
 import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceRpcMetaDataRecordDefinition;
+import com.fimtra.clearconnect.core.PlatformRegistry.IPlatformSummaryRecordFields;
+import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -95,6 +97,7 @@ import com.fimtra.datafission.ui.RowOrientedRecordTable;
 import com.fimtra.datafission.ui.RowOrientedRecordTableModel;
 import com.fimtra.lf.FimtraTableHeaderUI;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
@@ -182,7 +185,7 @@ class PlatformDesktop
             title = "null".equals(title.toLowerCase()) ? null : title;
             RecordSubscriptionPlatformDesktopView view =
                 new RecordSubscriptionPlatformDesktopView(desktop, title,
-                    PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), tokens[indexViewKey]);
+                PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), tokens[indexViewKey]);
             try
             {
                 view.getFrame().setLocation(
@@ -424,7 +427,7 @@ class PlatformDesktop
                     instance =
                         RpcInstance.constructInstanceFromDefinition(
                             rpcName,
-                            rpcRecordDefinition.get(ServiceRpcMetaDataRecordDefinition.Definition.toString()).textValue());
+                        rpcRecordDefinition.get(ServiceRpcMetaDataRecordDefinition.Definition.toString()).textValue());
                     break;
                 default :
                     throw new IllegalStateException("Unsupported: " + parentMetaDataViewType);
@@ -589,7 +592,7 @@ class PlatformDesktop
             viewKey = "null".equals(viewKey.toLowerCase()) ? null : viewKey;
             MetaDataPlatformDesktopView view =
                 new MetaDataPlatformDesktopView(desktop, title,
-                    PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), viewKey);
+                PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), viewKey);
             try
             {
                 view.getFrame().setLocation(
@@ -715,9 +718,9 @@ class PlatformDesktop
         final JLabel version;
         final JLabel memory;
 
-        RuntimeSummaryPanel()
+        RuntimeSummaryPanel(String platformVersion)
         {
-            this.version = new JLabel("Version: " + PlatformUtils.VERSION);
+            this.version = new JLabel("Registry Version: " + platformVersion);
             this.memory = new JLabel();
             final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
             layout.setHgap(0);
@@ -1109,8 +1112,8 @@ class PlatformDesktop
                                 if (view == null)
                                 {
                                     view =
-                                    // NOTE: the constructor registers with the
-                                    // recordSubscriptionViews
+                                        // NOTE: the constructor registers with the
+                                        // recordSubscriptionViews
                                         new RecordSubscriptionPlatformDesktopView(desktop, title,
                                             parentTable.metaDataViewType, nameOfServiceOrServiceInstance);
                                 }
@@ -1292,7 +1295,18 @@ class PlatformDesktop
                 PlatformDesktop.this.desktopWindow = new JFrame();
                 PlatformDesktop.this.desktopWindow.setIconImage(createIcon());
 
-                PlatformDesktop.this.desktopWindow.add(new RuntimeSummaryPanel(), BorderLayout.SOUTH);
+                String platformVersion = "?.?.?";
+                final IRecord platformSummary = platformMetaDataModel.agent.registryProxy.getRemoteRecordImage(
+                    IRegistryRecordNames.PLATFORM_SUMMARY, 5000);
+                if (platformSummary != null)
+                {
+                    final IValue iValue = platformSummary.get(IPlatformSummaryRecordFields.VERSION);
+                    if (iValue != null)
+                    {
+                        platformVersion = iValue.textValue();
+                    }
+                }
+                PlatformDesktop.this.desktopWindow.add(new RuntimeSummaryPanel(platformVersion), BorderLayout.SOUTH);
 
                 platformMetaDataModel.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
                 {
@@ -1417,12 +1431,13 @@ class PlatformDesktop
 
     void loadDesktopPlatformViewState()
     {
+        BufferedReader br = null;
         try
         {
             File stateFile = new File(getStateFileName());
             if (stateFile.exists())
             {
-                BufferedReader br = new BufferedReader(new FileReader(stateFile));
+                br = new BufferedReader(new FileReader(stateFile));
                 if (br.ready())
                 {
                     fromStateString(this, br.readLine());
@@ -1463,27 +1478,31 @@ class PlatformDesktop
         {
             Log.log(this, "Could not read state", e);
         }
+        finally
+        {
+            FileUtils.safeClose(br);
+        }
     }
 
     static Image createIcon()
     {
         BlobValue hexIcon =
             new BlobValue(
-                "89504E470D0A1A0A0000000D4948445200000020000000200806000000737A7AF400000006624B474400FF00FF00FFA0BDA793000000097048597300000B1300000B1301009A9C180000000774494D4507D"
-                    + "F061D140E0C8E9514B10000001974455874436F6D6D656E74004372656174656420776974682047494D5057810E17000004464944415458C3ED576D4C5B65147EEEBDED6D3BCA5A4A296360658389B5930F2D68DC1"
-                    + "7CA20B0397F8C4432974516232386A4C60F66A624334A66430C81B14D162251C130A2811FD3CCC9624686B0216ECE31661719DD1C2B6C6BF9680BEDED7DAF3F26464A5B6881F867E7DF3DEF79CF79EE39CF39EFFB0"
-                    + "20F254C51676D57669AAEFCF2F4C78396559BCB92C3F54385BBD150D9F7131391910D005E97DDFB5BE53AA9D769E343F5C384133CB5BC658B449D7B70E69B16CB680AE4F6B8F94C5FA8BEE87000C8566DFC5610845"
-                    + "9BAD52FBC57AF36EC512C3B80F40F7E2C031D1FEDAB1728203AE3E5A3CB5D82156B8A8E9F1388FF6DD2D8942769B1AC65C2DC717F593260A8BC5C473869600341802A6DE7A9252F41DCF34588CF2DD08956EAF7024"
-                    + "2707EC4AE4B8CDDB02F71C9DB30ABEA662F254E30CCE7CE71E7AAA5DFA44F5CD20CE8DEA829A4A58F040F4E5118F9A3ABB75C77FE5A5373737F6969E9530BF12D5A88912265EF31810F9C7A8AA63076F5878EBA6DD"
-                    + "3295EA2CA040083C1D00E40BBE82EC83878CA24923D9117CCC6F6EB89DA8A2DE372312BCD9CD14546462A9292921C9D9D9DDD8B2901CB2AB38DBE43E75FD2F31C86DADE7CFDFA17BB8C77ACA3F6FFAEF13C0F9D4E7"
-                    + "70800AB52A9420320962B1F10EFD3FED38044E2CF86789C9E4B1F253F3372B6B60100BABBBB5B286A36A7E572B9B8BABABAD166B3850680738C8166104F31299BFDB59DD77977A2B73C32C66DBF796146D7D6D6769"
-                    + "6E7671345100468B5DA5700248404808D5251CF1EB65F0268CAB7CDA64606FEEC7B3F560960C2E78F5D8410D71C92310C1A1B1B4F860440AE7D0EBC5BAEF065FAC4F58EEF2E1FD22723C034621866D29F3E2A2A2A2"
-                    + "D2F2F6FC7BC0018B90C001053B6FEB57BE4DD7AFBC5933F5314054A44E1DE85A6CA8123B92FEEBC12B81DAD56EBEF81D68A8B8B3F9FB70D058F178F35BC531E919558CBAE89CE1265D9341E4597DD6E3E513758B3F"
-                    + "F00000C1CFD302000BD5EAFD06AB5DBFC125B2C5E11171727EDE9E939E377140B8200EDFEDDCA9857B3EDC4C3CD1934C4EDF51237D7E3E8351FBBF156FDD7013024B4B7B7DF0A0490E7796F6161A104009953028AA"
-                    + "2B07283EE886F70001088004ACC8818B974A3726B7A73DAF91ACFFA8E4FDAD656EFDBEE63FA17C771D301A71EC388AAAAAA4EFBCDC0A3157B52A2776DBA46DC5C0867290DE29C9AF2DE9F6C9A32DFFEF2C6DBC7CFB"
-                    + "5B6B6DE62593621D836A3D19868B1582CB300A476565FA423D9F4B0AFC9340DDE36396A1C525BD551AAD460A6A3A3A3C325252509111111020D008F7F756007A394841F1C000801A3926B7AAD8363BE13D157341AC"
-                    + "DEAA2A2A2AD4EA7F30107D8B5EA8660A7DDC24108E81A360F33F4FCA77C4141C1F700281A00BC132EC792BC56286048E2EE9F9E9E9F482E976BF29FBB2CC0C647C7682B767FC3AC946916139FBB3B6E19347EF6524"
-                    + "E4ECEA6FCFCFCC3344D8B04412084109E104200F00008C7712E93C954E07038261FBE31FF77F91B46228F9FE19DE6B40000000049454E44AE426082");
+            "89504E470D0A1A0A0000000D4948445200000020000000200806000000737A7AF400000006624B474400FF00FF00FFA0BDA793000000097048597300000B1300000B1301009A9C180000000774494D4507D"
+                + "F061D140E0C8E9514B10000001974455874436F6D6D656E74004372656174656420776974682047494D5057810E17000004464944415458C3ED576D4C5B65147EEEBDED6D3BCA5A4A296360658389B5930F2D68DC1"
+                + "7CA20B0397F8C4432974516232386A4C60F66A624334A66430C81B14D162251C130A2811FD3CCC9624686B0216ECE31661719DD1C2B6C6BF9680BEDED7DAF3F26464A5B6881F867E7DF3DEF79CF79EE39CF39EFFB0"
+                + "20F254C51676D57669AAEFCF2F4C78396559BCB92C3F54385BBD150D9F7131391910D005E97DDFB5BE53AA9D769E343F5C384133CB5BC658B449D7B70E69B16CB680AE4F6B8F94C5FA8BEE87000C8566DFC5610845"
+                + "9BAD52FBC57AF36EC512C3B80F40F7E2C031D1FEDAB1728203AE3E5A3CB5D82156B8A8E9F1388FF6DD2D8942769B1AC65C2DC717F593260A8BC5C473869600341802A6DE7A9252F41DCF34588CF2DD08956EAF7024"
+                + "2707EC4AE4B8CDDB02F71C9DB30ABEA662F254E30CCE7CE71E7AAA5DFA44F5CD20CE8DEA829A4A58F040F4E5118F9A3ABB75C77FE5A5373737F6969E9530BF12D5A88912265EF31810F9C7A8AA63076F5878EBA6DD"
+                + "3295EA2CA040083C1D00E40BBE82EC83878CA24923D9117CCC6F6EB89DA8A2DE372312BCD9CD14546462A9292921C9D9D9DDD8B2901CB2AB38DBE43E75FD2F31C86DADE7CFDFA17BB8C77ACA3F6FFAEF13C0F9D4E7"
+                + "70800AB52A9420320962B1F10EFD3FED38044E2CF86789C9E4B1F253F3372B6B60100BABBBB5B286A36A7E572B9B8BABABAD166B3850680738C8166104F31299BFDB59DD77977A2B73C32C66DBF796146D7D6D6769"
+                + "6E7671345100468B5DA5700248404808D5251CF1EB65F0268CAB7CDA64606FEEC7B3F560960C2E78F5D8410D71C92310C1A1B1B4F860440AE7D0EBC5BAEF065FAC4F58EEF2E1FD22723C034621866D29F3E2A2A2A2"
+                + "D2F2F6FC7BC0018B90C001053B6FEB57BE4DD7AFBC5933F5314054A44E1DE85A6CA8123B92FEEBC12B81DAD56EBEF81D68A8B8B3F9FB70D058F178F35BC531E919558CBAE89CE1265D9341E4597DD6E3E513758B3F"
+                + "F00000C1CFD302000BD5EAFD06AB5DBFC125B2C5E11171727EDE9E939E377140B8200EDFEDDCA9857B3EDC4C3CD1934C4EDF51237D7E3E8351FBBF156FDD7013024B4B7B7DF0A0490E7796F6161A104009953028AA"
+                + "2B07283EE886F70001088004ACC8818B974A3726B7A73DAF91ACFFA8E4FDAD656EFDBEE63FA17C771D301A71EC388AAAAAA4EFBCDC0A3157B52A2776DBA46DC5C0867290DE29C9AF2DE9F6C9A32DFFEF2C6DBC7CFB"
+                + "5B6B6DE62593621D836A3D19868B1582CB300A476565FA423D9F4B0AFC9340DDE36396A1C525BD551AAD460A6A3A3A3C325252509111111020D008F7F756007A394841F1C000801A3926B7AAD8363BE13D157341AC"
+                + "DEAA2A2A2AD4EA7F30107D8B5EA8660A7DDC24108E81A360F33F4FCA77C4141C1F700281A00BC132EC792BC56286048E2EE9F9E9E9F482E976BF29FBB2CC0C647C7682B767FC3AC946916139FBB3B6E19347EF6524"
+                + "E4ECEA6FCFCFCC3344D8B04412084109E104200F00008C7712E93C954E07038261FBE31FF77F91B46228F9FE19DE6B40000000049454E44AE426082");
 
         return new ImageIcon(hexIcon.byteValue()).getImage();
     }
