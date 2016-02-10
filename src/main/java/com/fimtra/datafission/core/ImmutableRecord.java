@@ -216,7 +216,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public String toString()
     {
-        return "(Immutable)" + this.backingRecord.data.toString();
+        return "(Immutable)" + this.backingRecord.toString();
     }
 
     @SuppressWarnings("unchecked")
