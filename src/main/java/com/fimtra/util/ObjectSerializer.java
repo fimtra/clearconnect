@@ -39,6 +39,8 @@ import com.fimtra.util.FieldTemplate.FieldTypeEnum;
  * frequently, using the {@link ObjectSerializer} will mean that only changing fields are sent (as
  * opposed to the full serialized version of the object using standard java serialization).
  * <p>
+ * <b>Classes must be public, non-inner types and have public no-arg constructors.<b/>
+ * <p>
  * Internally this keeps a {@link ClassTemplate} per object class that is read/written. The
  * {@link ClassTemplate} instances (one per class) held internally by each instance are never
  * removed (except when an {@link ObjectSerializer} instance is garbage collected).
@@ -114,6 +116,7 @@ public final class ObjectSerializer
                 object = this.refs.get(name);
                 if (object == null)
                 {
+                    // todo on an empty update image there will be no submap, so we get an NPE
                     final String className = record.getOrCreateSubMap(CLASS_TEMPLATE).get(CLASS_NAME).textValue();
                     object = Class.forName(className).newInstance();
                     this.refs.put(name, object);
