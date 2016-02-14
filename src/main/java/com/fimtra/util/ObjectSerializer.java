@@ -144,7 +144,10 @@ final class ClassTemplate
         for (Field field : declaredFields)
         {
             type = field.getType();
-            if (!Modifier.isTransient(field.getModifiers()))
+            if (!Modifier.isTransient(field.getModifiers()) 
+                    && !Modifier.isStatic(field.getModifiers())
+                    && !Modifier.isFinal(field.getModifiers())
+                    )
             {
                 field.setAccessible(true);
                 result.add(new FieldTemplate(field, FieldTypeEnum.from(type), (field.getName() + "." + level)));
