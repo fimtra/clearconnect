@@ -819,7 +819,22 @@ public class PlatformUtils
         getRpc(component, discoveryTimeoutMillis, rpcName, rpcArgs).executeNoResponse(rpcArgs);
     }
 
-    private static IRpcInstance getRpc(IPlatformServiceComponent component, long discoveryTimeoutMillis,
+    /**
+     * Convenience method for getting an RPC instance from a platform service component.
+     * 
+     * @param component
+     *            the service component hosting the RPC
+     * @param discoveryTimeoutMillis
+     *            the timeout to wait for the RPC to be available
+     * @param rpcName
+     *            the RPC name
+     * @param rpcArgs
+     *            the arguments for the RPC
+     * @return the RPC instance
+     * @throws TimeOutException
+     *             if no RPC is found
+     */
+    public static IRpcInstance getRpc(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException
     {
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
