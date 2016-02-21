@@ -48,6 +48,7 @@ import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnec
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
@@ -1109,6 +1110,33 @@ final class EventHandler
             @Override
             protected void onPlatformServiceConnected()
             {
+                if (redundancyModeEnum == RedundancyModeEnum.FAULT_TOLERANT)
+                {
+                    // this will get the RPC available so that we don't have to block in the
+                    // event-executor thread to get it
+                    try
+                    {
+                        ContextUtils.getRpc(this.proxyContext, this.proxyContext.getReconnectPeriodMillis(),
+                            PlatformServiceInstance.RPC_FT_SERVICE_STATUS);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(EventHandler.this.registry,
+                            "Error registering service " + this.serviceInstanceId + ", could not get RPC "
+                                + PlatformServiceInstance.RPC_FT_SERVICE_STATUS + ". Will now deregister service.",
+                            e);
+                        try
+                        {
+                            deregisterPlatformServiceInstance(this.serviceInstanceId);
+                        }
+                        catch (Exception e2)
+                        {
+                            Log.log(EventHandler.this.registry, "Error deregistering service " + this.serviceInstanceId,
+                                e2);
+                        }
+                    }
+                }
+
                 EventHandler.this.eventExecutor.execute(new Runnable()
                 {
                     @SuppressWarnings("unqualified-field-access")
@@ -1237,12 +1265,25 @@ final class EventHandler
      */
     private void callFtServiceStatusRpc(String activeServiceInstanceId, boolean active) throws RuntimeException
     {
+        Log.log(this, "Signalling ", (active ? "MASTER" : "STANDBY"), " FT service ", activeServiceInstanceId);
         try
         {
             final ProxyContext proxyContext = this.registry.monitoredServiceInstances.get(activeServiceInstanceId);
-            ContextUtils.getRpc(proxyContext, proxyContext.getReconnectPeriodMillis(),
-                PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
-                    TextValue.valueOf(Boolean.valueOf(active).toString()));
+            if (proxyContext.isConnected())
+            {
+                final IRpcInstance rpc = proxyContext.getRpc(PlatformServiceInstance.RPC_FT_SERVICE_STATUS);
+                // if this happens then the proxy has *probably* disconnected
+                if (rpc == null)
+                {
+                    throw new NullPointerException("RPC " + PlatformServiceInstance.RPC_FT_SERVICE_STATUS
+                        + " not found for " + activeServiceInstanceId);
+                }
+                rpc.executeNoResponse(TextValue.valueOf(Boolean.valueOf(active).toString()));
+            }
+            else
+            {
+                throw new NullPointerException("Proxy is not connected for " + activeServiceInstanceId);
+            }
         }
         catch (Exception e)
         {
