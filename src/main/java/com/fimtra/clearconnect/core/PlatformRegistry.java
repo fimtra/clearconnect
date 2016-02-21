@@ -1048,6 +1048,16 @@ final class EventHandler
         {
             throw new IllegalStateException("Already registered: " + serviceInstanceId);
         }
+
+        // check if there is a conflict in service redundancy type for a pending registration
+        final IValue pendingType = this.registry.pendingPlatformServices.get(serviceFamily);
+        if (pendingType != null && RedundancyModeEnum.valueOf(pendingType.textValue()) != redundancyModeEnum)
+        {
+            throw new IllegalStateException("Platform service '" + serviceFamily + "' is currently being registered as "
+                + RedundancyModeEnum.valueOf(pendingType.textValue()) + " so cannot be also registered as "
+                + redundancyMode + " for " + serviceInstanceId);
+        }
+
         switch(redundancyModeEnum)
         {
             case FAULT_TOLERANT:
@@ -1233,7 +1243,7 @@ final class EventHandler
             ContextUtils.getRpc(proxyContext, proxyContext.getReconnectPeriodMillis(),
                 PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
                     TextValue.valueOf(Boolean.valueOf(active).toString()));
-            }
+        }
         catch (Exception e)
         {
             final String message = "Could not call RPC to " + (active ? "activate" : "deactivate OLD")
