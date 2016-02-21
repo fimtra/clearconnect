@@ -754,6 +754,7 @@ final class EventHandler
 
     EventHandler(final PlatformRegistry registry)
     {
+        // todo all members of the registry should be moved into this class
         this.registry = registry;
         this.pendingPublish = new HashSet<String>();
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
@@ -1024,7 +1025,7 @@ final class EventHandler
             }
             else
             {
-                if (isFaultTolerantPlatformService(serviceFamily))
+                if (checkServiceType(serviceFamily, RedundancyModeEnum.FAULT_TOLERANT))
                 {
                     // this will verify the current master of the FT service
                     selectNextInstance(serviceFamily);
@@ -1050,29 +1051,32 @@ final class EventHandler
         switch(redundancyModeEnum)
         {
             case FAULT_TOLERANT:
-                if (isLoadBalancedPlatformService(serviceFamily))
+                if (checkServiceType(serviceFamily, RedundancyModeEnum.LOAD_BALANCED))
                 {
-                    throw new IllegalArgumentException(
-                        "Platform service '" + serviceFamily + "' is already registered as load-balanced.");
+                    throw new IllegalArgumentException("Platform service '" + serviceFamily
+                        + "' is already registered as " + RedundancyModeEnum.LOAD_BALANCED);
                 }
                 break;
             case LOAD_BALANCED:
-                if (isFaultTolerantPlatformService(serviceFamily))
+                if (checkServiceType(serviceFamily, RedundancyModeEnum.FAULT_TOLERANT))
                 {
-                    throw new IllegalArgumentException(
-                        "Platform service '" + serviceFamily + "' is already registered as fault-tolerant.");
+                    throw new IllegalArgumentException("Platform service '" + serviceFamily
+                        + "' is already registered as " + RedundancyModeEnum.FAULT_TOLERANT);
                 }
                 break;
             default :
                 throw new IllegalArgumentException(
                     "Unhandled mode '" + redundancyMode + "' for service '" + serviceFamily + "'");
         }
+
+        // NOTE: this is (minor) IO for the TCP construction - non-blocking...
         // connect to the service using the service's transport technology
         final ProxyContext serviceProxy =
             new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId, this.registry.context.getName()),
                 PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
                 PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
                 PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology);
+
         this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
         this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
         serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
@@ -1113,7 +1117,8 @@ final class EventHandler
                         }
                         catch (Exception e)
                         {
-                            Log.log(EventHandler.this.registry, "Error registering service " + serviceInstanceId, e);
+                            Log.log(EventHandler.this.registry,
+                                "Error registering service " + serviceInstanceId + ". Will now deregister service.", e);
                             try
                             {
                                 deregisterPlatformServiceInstance(serviceInstanceId);
@@ -1213,7 +1218,14 @@ final class EventHandler
         }
     }
 
-    private void callFtServiceStatusRpc(String activeServiceInstanceId, boolean active)
+    /**
+     * Call the RPC to activate/deactivate the master instance of an FT service
+     * 
+     * @throws RuntimeException
+     *             if the service RPC could not be called to activate a <b>master</b> instance, this
+     *             indicates that the active service is no longer available
+     */
+    private void callFtServiceStatusRpc(String activeServiceInstanceId, boolean active) throws RuntimeException
     {
         try
         {
@@ -1221,11 +1233,12 @@ final class EventHandler
             ContextUtils.getRpc(proxyContext, proxyContext.getReconnectPeriodMillis(),
                 PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
                     TextValue.valueOf(Boolean.valueOf(active).toString()));
-        }
+            }
         catch (Exception e)
         {
             final String message = "Could not call RPC to " + (active ? "activate" : "deactivate OLD")
-                + " master service: " + activeServiceInstanceId;
+                + " master service: " + activeServiceInstanceId
+                + (active ? "" : ". This is OK as there should be another active instance to take over.");
             if (!active)
             {
                 // if deactivating, we only log (the instance may not be there so we would get an
@@ -1240,12 +1253,13 @@ final class EventHandler
         }
     }
 
-    private boolean isLoadBalancedPlatformService(final String serviceFamily)
+    boolean checkServiceType(final String serviceFamily, final RedundancyModeEnum type)
     {
+        // check pending services first
         IValue iValue = this.registry.pendingPlatformServices.get(serviceFamily);
         if (iValue != null)
         {
-            return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.LOAD_BALANCED;
+            return RedundancyModeEnum.valueOf(iValue.textValue()) == type;
         }
         // check registered services
         iValue = this.registry.services.get(serviceFamily);
@@ -1253,23 +1267,7 @@ final class EventHandler
         {
             return false;
         }
-        return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.LOAD_BALANCED;
-    }
-
-    private boolean isFaultTolerantPlatformService(final String serviceFamily)
-    {
-        IValue iValue = this.registry.pendingPlatformServices.get(serviceFamily);
-        if (iValue != null)
-        {
-            return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.FAULT_TOLERANT;
-        }
-        // check registered services
-        iValue = this.registry.services.get(serviceFamily);
-        if (iValue == null)
-        {
-            return false;
-        }
-        return RedundancyModeEnum.valueOf(iValue.textValue()) == RedundancyModeEnum.FAULT_TOLERANT;
+        return RedundancyModeEnum.valueOf(iValue.textValue()) == type;
     }
 
     private void handleChangeForObjectsPerServiceAndInstance(final String serviceFamily, final String serviceInstanceId,
@@ -1485,7 +1483,8 @@ final class EventHandler
         publishTimed(this.registry.serviceInstancesPerAgent);
 
         this.registry.services.put(serviceFamily, redundancyModeEnum.name());
-        // todo what if duplicate instances of the same family are registering simultaneously?
+        // as the service has now been declared to be of a specific redundancy type, it does not
+        // matter if duplicate instances of the same family are registering simultaneously
         this.registry.pendingPlatformServices.remove(serviceFamily);
 
         publishTimed(this.registry.services);
