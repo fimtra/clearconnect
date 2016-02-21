@@ -71,6 +71,17 @@ public final class ObjectSerializer
         this.classTemplates = new ConcurrentHashMap<Class<?>, ClassTemplate>();
     }
 
+    /**
+     * Write the object member variables into the fields of the record. The same record for the
+     * object should be used to ensure that a proper delta is created for subsequent writes of the
+     * same object.
+     * 
+     * @param o
+     *            the object to write
+     * @param record
+     *            the record to store the member attributes of the object
+     * @throws Exception
+     */
     public void writeObject(Object o, IRecord record) throws Exception
     {
         if (!record.getSubMapKeys().contains(CLASS_TEMPLATE))
@@ -81,6 +92,14 @@ public final class ObjectSerializer
         getClassTemplate(o).writeToRecord(o, record);
     }
 
+    /**
+     * Read an object whose member attributes are stored in the fields of the record.
+     * 
+     * @param record
+     *            the record holding the state of the object
+     * @return the resolved object from the record
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public <T> T readObject(IRecord record) throws Exception
     {
@@ -144,10 +163,8 @@ final class ClassTemplate
         for (Field field : declaredFields)
         {
             type = field.getType();
-            if (!Modifier.isTransient(field.getModifiers()) 
-                    && !Modifier.isStatic(field.getModifiers())
-                    && !Modifier.isFinal(field.getModifiers())
-                    )
+            if (!Modifier.isTransient(field.getModifiers()) && !Modifier.isStatic(field.getModifiers())
+                && !Modifier.isFinal(field.getModifiers()))
             {
                 field.setAccessible(true);
                 result.add(new FieldTemplate(field, FieldTypeEnum.from(type), (field.getName() + "." + level)));
@@ -209,7 +226,7 @@ final class FieldTemplate
     enum FieldTypeEnum
     {
             BOOLEAN(Boolean.TYPE), LONG(Long.TYPE), INT(Integer.TYPE), SHORT(Short.TYPE), BYTE(Byte.TYPE),
-            CHAR(Character.TYPE), DOUBLE(Double.TYPE), FLOAT(Float.TYPE), OBJECT(Object.class);
+            CHAR(Character.TYPE), DOUBLE(Double.TYPE), FLOAT(Float.TYPE), OBJECT(Object.class), TEXT(String.class);
 
         final Class<?> type;
 
@@ -235,75 +252,106 @@ final class FieldTemplate
         {
             final String name = recFieldName;
 
-            switch(this)
+            try
             {
-                case BOOLEAN:
-                    field.setBoolean(o, record.get(name).longValue() == 1l);
-                    break;
-                case BYTE:
-                    field.setByte(o, (byte) record.get(name).longValue());
-                    break;
-                case SHORT:
-                    field.setShort(o, (short) record.get(name).longValue());
-                    break;
-                case CHAR:
-                    field.setChar(o, (char) record.get(name).longValue());
-                    break;
-                case INT:
-                    field.setInt(o, (int) record.get(name).longValue());
-                    break;
-                case LONG:
-                    field.setLong(o, record.get(name).longValue());
-                    break;
-                case DOUBLE:
-                    field.setDouble(o, record.get(name).doubleValue());
-                    break;
-                case FLOAT:
-                    field.setFloat(o, (float) record.get(name).doubleValue());
-                    break;
-                case OBJECT:
-                    field.set(o, SerializationUtils.fromByteArray(record.get(name).byteValue()));
-                    break;
-                default :
-                    break;
+                final IValue iValue = record.get(name);
+                if (iValue == null)
+                {
+                    return;
+                }
+
+                switch(this)
+                {
+                    case TEXT:
+                        field.set(o, iValue.textValue());
+                        break;
+                    case BOOLEAN:
+                        field.setBoolean(o, iValue.longValue() == 1l);
+                        break;
+                    case BYTE:
+                        field.setByte(o, (byte) iValue.longValue());
+                        break;
+                    case SHORT:
+                        field.setShort(o, (short) iValue.longValue());
+                        break;
+                    case CHAR:
+                        field.setChar(o, (char) iValue.longValue());
+                        break;
+                    case INT:
+                        field.setInt(o, (int) iValue.longValue());
+                        break;
+                    case LONG:
+                        field.setLong(o, iValue.longValue());
+                        break;
+                    case DOUBLE:
+                        field.setDouble(o, iValue.doubleValue());
+                        break;
+                    case FLOAT:
+                        field.setFloat(o, (float) iValue.doubleValue());
+                        break;
+                    case OBJECT:
+                        field.set(o, SerializationUtils.fromByteArray(iValue.byteValue()));
+                        break;
+                    default :
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                throw new RuntimeException(field + ", record field=" + name, e);
             }
         }
 
         void writeToRecord(Object o, IRecord record, Field field, String recFieldName) throws Exception
         {
             final String name = recFieldName;
-
-            switch(this)
+            try
             {
-                case BOOLEAN:
-                    record.put(name, field.getBoolean(o) ? 1l : 0l);
-                    break;
-                case BYTE:
-                    record.put(name, field.getByte(o));
-                    break;
-                case SHORT:
-                    record.put(name, field.getShort(o));
-                    break;
-                case CHAR:
-                    record.put(name, field.getChar(o));
-                    break;
-                case INT:
-                    record.put(name, field.getInt(o));
-                    break;
-                case LONG:
-                    record.put(name, field.getLong(o));
-                    break;
-                case FLOAT:
-                    record.put(name, field.getFloat(o));
-                    break;
-                case DOUBLE:
-                    record.put(name, field.getDouble(o));
-                    break;
-                case OBJECT:
-                    record.put(name, BlobValue.toBlob((Serializable) field.get(o)));
-                    break;
-                default :
-                    break;
+                final Object fieldObject = field.get(o);
+                if (fieldObject == null)
+                {
+                    return;
+                }
+
+                switch(this)
+                {
+                    case TEXT:
+                        record.put(name, String.valueOf(fieldObject));
+                        break;
+                    case BOOLEAN:
+                        record.put(name, field.getBoolean(o) ? 1l : 0l);
+                        break;
+                    case BYTE:
+                        record.put(name, field.getByte(o));
+                        break;
+                    case SHORT:
+                        record.put(name, field.getShort(o));
+                        break;
+                    case CHAR:
+                        record.put(name, field.getChar(o));
+                        break;
+                    case INT:
+                        record.put(name, field.getInt(o));
+                        break;
+                    case LONG:
+                        record.put(name, field.getLong(o));
+                        break;
+                    case FLOAT:
+                        record.put(name, field.getFloat(o));
+                        break;
+                    case DOUBLE:
+                        record.put(name, field.getDouble(o));
+                        break;
+                    case OBJECT:
+                        record.put(name, BlobValue.toBlob((Serializable) fieldObject));
+                        break;
+                    default :
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                throw new RuntimeException(field + ", record field=" + name, e);
             }
         }
 
