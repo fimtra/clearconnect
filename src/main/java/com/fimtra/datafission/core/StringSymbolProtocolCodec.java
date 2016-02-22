@@ -119,6 +119,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      * integral to access the 2nd byte.
      */
     private static long[] bitShiftForByteOrdinal = new long[9];
+
     static
     {
         int i = 0;
@@ -353,9 +354,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                         subMapName = defineKeySymbol(stringFromCharBuffer(tokens[i], 0));
                                         break;
                                     default :
-                                        throw new IllegalArgumentException("Could not decode submap name from "
-                                            + new String(decodedMessage) + ", submap portion: "
-                                            + new String(tokens[++i]));
+                                        throw new IllegalArgumentException(
+                                            "Could not decode submap name from " + new String(decodedMessage)
+                                                + ", submap portion: " + new String(tokens[++i]));
                                 }
                                 break;
                             default :
@@ -383,16 +384,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeSubMapEntryUpdatedChange(
-                                                    subMapName,
+                                                atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr, buffer, array), null);
+                                                        tempArr, buffer, array),
+                                                    null);
                                             }
                                             else
                                             {
-                                                atomicChange.mergeSubMapEntryRemovedChange(
-                                                    subMapName,
+                                                atomicChange.mergeSubMapEntryRemovedChange(subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array));
@@ -405,7 +405,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                                 atomicChange.mergeEntryUpdatedChange(
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr, buffer, array), null);
+                                                        tempArr, buffer, array),
+                                                    null);
                                             }
                                             else
                                             {
@@ -448,8 +449,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         final String name = this.rxSymbolToRecordName.get(symbolCode);
         if (name == null)
         {
-            throw new IllegalArgumentException("No key for symbol '" + new String(chars, start, len) + "' code:"
-                + symbolCode);
+            throw new IllegalArgumentException(
+                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
         }
         return name;
     }
@@ -460,8 +461,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         final String name = this.rxSymbolToKey.get(symbolCode);
         if (name == null)
         {
-            throw new IllegalArgumentException("No key for symbol '" + new String(chars, start, len) + "' code:"
-                + symbolCode);
+            throw new IllegalArgumentException(
+                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
         }
         return name;
     }
@@ -909,8 +910,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 key = defineKeySymbol(stringFromCharBuffer(chars, start, end));
                 break;
             default :
-                throw new IllegalArgumentException("Could not decode key from symbol '"
-                    + stringFromCharBuffer(chars, start, end) + "'");
+                throw new IllegalArgumentException(
+                    "Could not decode key from symbol '" + stringFromCharBuffer(chars, start, end) + "'");
         }
         return key;
     }
