@@ -15,13 +15,18 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.END_SYMBOL;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.NEXT_TX_KEY_NAME_SYMBOL;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.NEXT_TX_RECORD_NAME_SYMBOL;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.START_SYMBOL;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.getNextTxKeyNameSymbol;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.getNextTxRecordNameSymbol;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Test;
 
@@ -51,22 +56,92 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     CharArrayReference chars = new CharArrayReference(new char[StringSymbolProtocolCodec.CHARRAY_SIZE]);
 
     @Test
+    public void testRanges_getNextTxRecordNameSymbol()
+    {
+        // test for 8 loops which test 8 bytes
+        for (int i = 0; i < 8; i++)
+        {
+            // simulate cycling all combinations for the current byte count so that we increment the
+            // bytes by 1 and it starts at 1
+            for (int j = 0; j <= i; j++)
+            {
+                NEXT_TX_RECORD_NAME_SYMBOL[j] = END_SYMBOL;
+            }
+            getNextTxRecordNameSymbol();
+            assertEquals(i + 2, NEXT_TX_RECORD_NAME_SYMBOL.length);
+            for (int j = 0; j <= i; j++)
+            {
+                assertEquals("At j=" + j, START_SYMBOL, NEXT_TX_RECORD_NAME_SYMBOL[j]);
+            }
+            assertEquals(START_SYMBOL + 1, NEXT_TX_RECORD_NAME_SYMBOL[i + 1]);
+
+            // check cycling the least significant bytes again
+            for (int j = 0; j <= i; j++)
+            {
+                NEXT_TX_RECORD_NAME_SYMBOL[j] = END_SYMBOL;
+            }
+            getNextTxRecordNameSymbol();
+            assertEquals(START_SYMBOL, NEXT_TX_RECORD_NAME_SYMBOL[0]);
+            assertEquals(START_SYMBOL + 2, NEXT_TX_RECORD_NAME_SYMBOL[i + 1]);
+        }
+        NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
+    }
+
+    @Test
+    public void testRanges_getNextTxKeyNameSymbol()
+    {
+        // test for 8 loops which test 8 bytes
+        for (int i = 0; i < 8; i++)
+        {
+            // simulate cycling all combinations for the current byte count so that we increment the
+            // bytes by 1 and it starts at 1
+            for (int j = 0; j <= i; j++)
+            {
+                NEXT_TX_KEY_NAME_SYMBOL[j] = END_SYMBOL;
+            }
+            getNextTxKeyNameSymbol();
+            assertEquals(i + 2, NEXT_TX_KEY_NAME_SYMBOL.length);
+            for (int j = 0; j <= i; j++)
+            {
+                assertEquals("At j=" + j, START_SYMBOL, NEXT_TX_KEY_NAME_SYMBOL[j]);
+            }
+            assertEquals(START_SYMBOL + 1, NEXT_TX_KEY_NAME_SYMBOL[i + 1]);
+
+            // check cycling the least significant bytes again
+            for (int j = 0; j <= i; j++)
+            {
+                NEXT_TX_KEY_NAME_SYMBOL[j] = END_SYMBOL;
+            }
+            getNextTxKeyNameSymbol();
+            assertEquals(START_SYMBOL, NEXT_TX_KEY_NAME_SYMBOL[0]);
+            assertEquals(START_SYMBOL + 2, NEXT_TX_KEY_NAME_SYMBOL[i + 1]);
+        }
+        NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+    }
+
+    @Test
     public void testGetSymbolCode()
     {
         char[] c;
         String expected;
-        // NOTE: this technique can only work for 4 chars (8 bytes - the max for a long)
-        for (int i = 1; i < 5; i++)
+
+        // NOTE: this technique can only work for 8 ISO-8859-1 chars (8 bytes - the max for a long)
+        for (int i = 1; i < 9; i++)
         {
+            char start = 'a';
+            int expectHexCode = 61;
             expected = "";
             c = new char[i];
             for (int j = 0; j < i; j++)
             {
-                c[j] = 'a';
-                expected += "61";
+                c[j] = start;
+                expected += "" + expectHexCode;
+                start++;
+                expectHexCode++;
             }
-            assertEquals("For i=" + i, expected,
-                Long.toHexString(StringSymbolProtocolCodec.getSymbolCode(c, 0, c.length).longValue()));
+            final Long symbolCode = StringSymbolProtocolCodec.getSymbolCode(c, 0, c.length);
+            System.err.println(symbolCode.longValue() + " expected=" + expected + " from " + new String(c));
+            assertEquals("For i=" + i, expected, Long.toHexString(symbolCode.longValue()));
         }
 
     }
@@ -158,9 +233,9 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     public void testGetCommandMessageForRecordNames()
     {
         String[] args = new String[] { "one", "two", "three", "|\\|\\||special" };
-        List<String> result =
-            StringSymbolProtocolCodec.getNamesFromCommandMessage(StringSymbolProtocolCodec.getEncodedNamesForCommandMessage(
-                StringSymbolProtocolCodec.SUBSCRIBE_COMMAND, args).toCharArray());
+        List<String> result = StringSymbolProtocolCodec.getNamesFromCommandMessage(
+            StringSymbolProtocolCodec.getEncodedNamesForCommandMessage(StringSymbolProtocolCodec.SUBSCRIBE_COMMAND,
+                args).toCharArray());
         assertEquals(Arrays.toString(args), Arrays.toString(result.toArray(new String[result.size()])));
     }
 
@@ -186,9 +261,9 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
-        IRecordChange result =
-            StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange(
-                "|".toCharArray(), change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
+        IRecordChange result = StringSymbolProtocolCodec.decodeAtomicChange(
+            new String(StringSymbolProtocolCodec.encodeAtomicChange("|".toCharArray(), change,
+                new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change.toString(), result.toString());
     }
@@ -216,9 +291,9 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
-        IRecordChange result =
-            StringSymbolProtocolCodec.decodeAtomicChange(new String(StringSymbolProtocolCodec.encodeAtomicChange(
-                StringSymbolProtocolCodec.RPC_COMMAND_CHARS, change, new StringSymbolProtocolCodec().getCharset())).toCharArray());
+        IRecordChange result = StringSymbolProtocolCodec.decodeAtomicChange(
+            new String(StringSymbolProtocolCodec.encodeAtomicChange(StringSymbolProtocolCodec.RPC_COMMAND_CHARS, change,
+                new StringSymbolProtocolCodec().getCharset())).toCharArray());
 
         assertEquals(change, result);
     }
