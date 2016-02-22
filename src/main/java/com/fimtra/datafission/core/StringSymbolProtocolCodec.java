@@ -40,9 +40,9 @@ import com.fimtra.util.ObjectUtils;
  * atomic changes. This reduces the transmission size of messages once the symbol mapping for a
  * record name or key is sent.
  * <p>
- * Typically a symbol will be between 1-4 chars. There is a separate symbol table for record names
- * and keys. <b>Note:</b> there is a limit of 2^64 symbols for a symbol table, but this should never
- * become a problem. Also note that this codec uses ISO-8859-1 encoding for strings.
+ * Typically a symbol will be between 1-8 chars. There is a separate symbol table for record names
+ * and keys. <b>Note:</b> there is a limit of just under 2^64 symbols for a symbol table, but this
+ * should never become a problem. Also note that this codec uses ISO-8859-1 encoding for strings.
  * <p>
  * The format of the string in ABNF notation:
  * 
@@ -98,8 +98,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
-    private static final char START_SYMBOL = 0x0;
-    private static final char END_SYMBOL = 0xff;
+    static final char START_SYMBOL = 0x0;
+    static final char END_SYMBOL = 0xff;
     private static final char CHAR_DEFINITION_PREFIX = 'n';
 
     /**
@@ -111,14 +111,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      */
     private static final Map<String, String> TX_RECORD_NAME_TO_SYMBOL = new HashMap<String, String>();
 
-    private static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
-    private static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+    static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
+    static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
     /**
      * Bit shifts to access the byte ordinal that the index represents. E.g.
      * bitShiftForByteOrdinal[2] has a value of 8 which is the number of bits to right shift an
      * integral to access the 2nd byte.
      */
     private static long[] bitShiftForByteOrdinal = new long[9];
+
     static
     {
         int i = 0;
@@ -136,81 +137,80 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     static Long getSymbolCode(char[] chars, int start, int len)
     {
-        if (len > 4)
+        // 8 chars in ISO-8859-1 is 8 bytes
+        if (len > 8)
         {
-            // todo we have a problem here
+            // todo we have a problem here, we have exceeded ~2^64 symbols...
             throw new IllegalStateException("Symbol is too big: " + new String(chars, start, len));
         }
         long result = 0;
         int j = len;
         for (int i = start; j > 0; i++)
         {
-            result = result | (chars[i] << bitShiftForByteOrdinal[j--]);
+            result = result | ((long) chars[i] << bitShiftForByteOrdinal[j--]);
         }
         return Long.valueOf(result);
     }
 
-    private final static String getNextTxKeyNameSymbol()
+    final static String getNextTxKeyNameSymbol()
     {
-        findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
-
-        if (NEXT_TX_KEY_NAME_SYMBOL[NEXT_TX_KEY_NAME_SYMBOL.length - 1] >= END_SYMBOL)
-        {
-            // resize
-            char[] temp = new char[NEXT_TX_KEY_NAME_SYMBOL.length + 1];
-            System.arraycopy(NEXT_TX_KEY_NAME_SYMBOL, 0, temp, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
-            NEXT_TX_KEY_NAME_SYMBOL = temp;
-            NEXT_TX_KEY_NAME_SYMBOL[NEXT_TX_KEY_NAME_SYMBOL.length - 1] = START_SYMBOL;
-        }
+        NEXT_TX_KEY_NAME_SYMBOL = findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
         return new String(NEXT_TX_KEY_NAME_SYMBOL, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
     }
 
-    private final static String getNextTxRecordNameSymbol()
+    final static String getNextTxRecordNameSymbol()
     {
-        findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
-
-        if (NEXT_TX_RECORD_NAME_SYMBOL[NEXT_TX_RECORD_NAME_SYMBOL.length - 1] >= END_SYMBOL)
-        {
-            // resize
-            char[] temp = new char[NEXT_TX_RECORD_NAME_SYMBOL.length + 1];
-            System.arraycopy(NEXT_TX_RECORD_NAME_SYMBOL, 0, temp, 0, NEXT_TX_RECORD_NAME_SYMBOL.length);
-            NEXT_TX_RECORD_NAME_SYMBOL = temp;
-            NEXT_TX_RECORD_NAME_SYMBOL[NEXT_TX_RECORD_NAME_SYMBOL.length - 1] = START_SYMBOL;
-        }
+        NEXT_TX_RECORD_NAME_SYMBOL = findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
         return new String(NEXT_TX_RECORD_NAME_SYMBOL, 0, NEXT_TX_RECORD_NAME_SYMBOL.length);
     }
 
     /**
      * Populates the char[] with the next symbol, skipping any special chars (see implementation)
      */
-    private final static void findNextValidSymbol(final char[] symbolArr)
+    private final static char[] findNextValidSymbol(final char[] symbolArr)
     {
-        // NOTE: there are "reserved" chars:
-        // \r
-        // \r
-        // |
-        // =
-        // ~
-        // \
-        boolean notOk = false;
-        int i;
-        do
+        int i = 0;
+        char[] target = symbolArr;
+        
+        while (target[i] == END_SYMBOL)
         {
-            notOk = false;
-            i = symbolArr.length - 1;
-            symbolArr[i] = (char) (symbolArr[i] + 1);
-            switch(symbolArr[i])
+            target[i] = START_SYMBOL;
+            if (target.length == i + 1)
             {
+                // need to resize
+                char[] temp = new char[target.length + 1];
+                System.arraycopy(target, 0, temp, 0, target.length);
+                target = temp;
+                target[target.length - 1] = START_SYMBOL;
+            }
+            i++;
+        }
+
+        outer: while (true)
+        {
+            target[i] = (char) (target[i] + 1);
+            switch(target[i])
+            {
+                // NOTE: there are "reserved" chars:
+                // \r
+                // \r
+                // |
+                // =
+                // ~
+                // \
                 case CR:
                 case LF:
                 case CHAR_TOKEN_DELIM:
                 case CHAR_KEY_VALUE_SEPARATOR:
                 case CHAR_ESCAPE:
                 case CHAR_SYMBOL_PREFIX:
-                    notOk = true;
+                    continue;
+                default :
+                    break outer;
             }
         }
-        while (notOk);
+
+        return target;
     }
 
     /**
@@ -353,9 +353,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                         subMapName = defineKeySymbol(stringFromCharBuffer(tokens[i], 0));
                                         break;
                                     default :
-                                        throw new IllegalArgumentException("Could not decode submap name from "
-                                            + new String(decodedMessage) + ", submap portion: "
-                                            + new String(tokens[++i]));
+                                        throw new IllegalArgumentException(
+                                            "Could not decode submap name from " + new String(decodedMessage)
+                                                + ", submap portion: " + new String(tokens[++i]));
                                 }
                                 break;
                             default :
@@ -383,16 +383,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeSubMapEntryUpdatedChange(
-                                                    subMapName,
+                                                atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr, buffer, array), null);
+                                                        tempArr, buffer, array),
+                                                    null);
                                             }
                                             else
                                             {
-                                                atomicChange.mergeSubMapEntryRemovedChange(
-                                                    subMapName,
+                                                atomicChange.mergeSubMapEntryRemovedChange(subMapName,
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array));
@@ -405,7 +404,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                                 atomicChange.mergeEntryUpdatedChange(
                                                     decodeKeyFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr, buffer, array), null);
+                                                        tempArr, buffer, array),
+                                                    null);
                                             }
                                             else
                                             {
@@ -448,8 +448,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         final String name = this.rxSymbolToRecordName.get(symbolCode);
         if (name == null)
         {
-            throw new IllegalArgumentException("No key for symbol '" + new String(chars, start, len) + "' code:"
-                + symbolCode);
+            throw new IllegalArgumentException(
+                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
         }
         return name;
     }
@@ -460,8 +460,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         final String name = this.rxSymbolToKey.get(symbolCode);
         if (name == null)
         {
-            throw new IllegalArgumentException("No key for symbol '" + new String(chars, start, len) + "' code:"
-                + symbolCode);
+            throw new IllegalArgumentException(
+                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
         }
         return name;
     }
@@ -651,7 +651,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                             bytesToWrite = 8;
                             i = 0;
                             while ((--bytesToWrite > -1) && bytes[i++] == 0x0)
-                                ;
+                            {
+                                // nothing
+                            }
                             bytesToWrite++;
                             escapeRaw(bytes, 8 - bytesToWrite, bytesToWrite, txString, escapedCharsRef.ref);
                             buffer.clear();
@@ -909,8 +911,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 key = defineKeySymbol(stringFromCharBuffer(chars, start, end));
                 break;
             default :
-                throw new IllegalArgumentException("Could not decode key from symbol '"
-                    + stringFromCharBuffer(chars, start, end) + "'");
+                throw new IllegalArgumentException(
+                    "Could not decode key from symbol '" + stringFromCharBuffer(chars, start, end) + "'");
         }
         return key;
     }

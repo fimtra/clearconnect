@@ -44,6 +44,23 @@ public class ObjectSerializerTest
     }
 
     @Test
+    public void testWithNulls() throws Exception
+    {
+        Context c = new Context("test");
+        IRecord record = c.getOrCreateRecord("sdf-string");
+
+        SDF sdf = prepareSDF();
+        sdf.o = null;
+        sdf.s = null;
+        sdf.i_transient = 12345;
+
+        this.candidate.writeObject(sdf, record);
+        final SDF got = this.candidate.readObject(record);
+        System.err.println(sdf + "->" + got + " from " + record);
+        assertEquals("sdf=" + sdf + ", got=" + got, sdf, got);
+    }
+
+    @Test
     public void testSimple() throws Exception
     {
         Context c = new Context("test");
@@ -52,7 +69,7 @@ public class ObjectSerializerTest
         SDF sdf = prepareSDF();
         sdf.o = "a string!";
         sdf.i_transient = 12345;
-        
+
         this.candidate.writeObject(sdf, record);
         final SDF got = this.candidate.readObject(record);
         System.err.println(sdf + "->" + got + " from " + record);
@@ -75,7 +92,7 @@ public class ObjectSerializerTest
         assertEquals("sdf=" + sdf + ", got=" + got, sdf, got);
     }
 
-    @Test(expected = ClassCastException.class)
+    @Test(expected = RuntimeException.class)
     public void testWithNonSerializable() throws Exception
     {
         Context c = new Context("test");
