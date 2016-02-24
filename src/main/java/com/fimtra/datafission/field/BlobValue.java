@@ -48,7 +48,7 @@ public final class BlobValue extends AbstractValue
         }
         catch (Exception e)
         {
-            Log.log(BlobValue.class, "Could not construct object from ", ObjectUtils.safeToString(value));
+            Log.log(BlobValue.class, "Could not construct object from " + ObjectUtils.safeToString(value), e);
             return null;
         }
     }
@@ -66,7 +66,7 @@ public final class BlobValue extends AbstractValue
         }
         catch (Exception e)
         {
-            Log.log(BlobValue.class, "Could not construct object from ", ObjectUtils.safeToString(value));
+            Log.log(BlobValue.class, "Could not construct object from " + ObjectUtils.safeToString(value), e);
             return null;
         }
     }
@@ -88,7 +88,7 @@ public final class BlobValue extends AbstractValue
         }
         catch (Exception e)
         {
-            Log.log(BlobValue.class, "Could not construct BlobValue from ", ObjectUtils.safeToString(object));
+            Log.log(BlobValue.class, "Could not construct BlobValue from " + ObjectUtils.safeToString(object), e);
             return null;
         }
     }
