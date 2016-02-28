@@ -827,13 +827,14 @@ public final class ProxyContext implements IObserverContext
                     }
                     catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
                     {
-                        // todo use resync
-                        Log.log(this,
-                            "Resubscribing for " + e.recordName + " due to error processing received message: "
-                                + new String(data, ProxyContext.this.codec.getCharset()),
-                            e);
+                        final String recordName = AtomicChangeTeleporter.getRecordName(e.recordName);
+                        if (!ProxyContext.this.resyncs.contains(recordName))
+                        {
+                            Log.log(this, "Re-syncing " + recordName + " due to error processing received message: "
+                                + new String(data, ProxyContext.this.codec.getCharset()), e);
 
-                        resubscribe(AtomicChangeTeleporter.getRecordName(e.recordName));
+                            resync(recordName);
+                        }
                     }
                 }
             }
