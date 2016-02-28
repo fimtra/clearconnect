@@ -928,8 +928,8 @@ public final class ProxyContext implements IObserverContext
         }
 
         final String changeName = changeToApply.getName();
-
-        if (changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR)
+        final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
+        if (isImage)
         {
             ProxyContext.this.resyncs.remove(changeName);
         }
@@ -1065,8 +1065,10 @@ public final class ProxyContext implements IObserverContext
                         switch(ProxyContext.this.imageDeltaProcessor.processRxChange(changeToApply, name, record))
                         {
                             case ImageDeltaChangeProcessor.PUBLISH:
-                                // todo we only really need to do this for image scope...
-                                if (ProxyContext.this.remoteConnectionStatusRecord.put(changeName,
+                                
+                                // only images determine connection status - don't need to do this
+                                // put for every delta that is received!
+                                if (isImage && ProxyContext.this.remoteConnectionStatusRecord.put(changeName,
                                     RECORD_CONNECTED) != RECORD_CONNECTED)
                                 {
                                     ProxyContext.this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
