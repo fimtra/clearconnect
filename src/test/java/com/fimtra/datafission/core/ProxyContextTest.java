@@ -231,8 +231,8 @@ public class ProxyContextTest
             @Override
             public void run()
             {
-                Log.log(this, ">>> teardown: " + ProxyContextTest.this.candidate + "  "
-                    + ProxyContextTest.this.publisher);
+                Log.log(this,
+                    ">>> teardown: " + ProxyContextTest.this.candidate + "  " + ProxyContextTest.this.publisher);
                 ProxyContextTest.this.executor.shutdownNow();
                 ProxyContextTest.this.publisher.destroy();
                 ProxyContextTest.this.candidate.destroy();
@@ -246,9 +246,8 @@ public class ProxyContextTest
     @Test
     public void testAddObserverCountDownLatchIsTriggeredWhenAddingListenerDuringDisconnect() throws Exception
     {
-        this.contextName =
-            getClass().getSimpleName() + "-"
-                + "testAddObserverCountDownLatchIsTriggeredWhenAddingListenerDuringDisconnect";
+        this.contextName = getClass().getSimpleName() + "-"
+            + "testAddObserverCountDownLatchIsTriggeredWhenAddingListenerDuringDisconnect";
         System.err.println(this.contextName);
 
         this.context = new Context(this.contextName);
@@ -323,6 +322,50 @@ public class ProxyContextTest
         this.candidate.resubscribe(name);
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
         assertEquals(v1, listener.getLatestImage().<IValue>get(key));
+    }
+
+    @Test
+    public void testResync() throws Exception
+    {
+        createComponents("testResync");
+        final String name = "sdf1";
+        final String key = "Kmy1";
+        final TextValue v1 = TextValue.valueOf("value1");
+
+        this.context.createRecord(name);
+        this.context.getRecord(name).put(key, v1);
+        this.context.publishAtomicChange(name);
+
+        final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
+        final int timeout = TIMEOUT;
+        listener.latch = new CountDownLatch(1);
+        this.candidate.addObserver(listener, name);
+
+        assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
+        assertEquals(v1, listener.getLatestImage().get(key));
+
+        listener.latch = new CountDownLatch(1);
+        synchronized (this.candidate.resyncs)
+        {
+            this.candidate.resync(name);
+            assertTrue(this.candidate.resyncs.contains(name));
+        }
+        // we spin until we have detected the resync has completed - NOTE: a resync may not generate
+        // a record update as the image will be identical
+        TestUtils.waitForEvent(new EventChecker()
+        {
+            @Override
+            public Object got()
+            {
+                return ProxyContextTest.this.candidate.resyncs.contains(name);
+            }
+
+            @Override
+            public Object expect()
+            {
+                return false;
+            }
+        });
     }
 
     @Test
@@ -497,9 +540,8 @@ public class ProxyContextTest
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(true);
         observer.latch = new CountDownLatch(3);
         this.candidate.addObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
-        final Set<String> expected =
-            new HashSet<String>(Arrays.asList("ContextSubscriptions", "ContextRecords", "record3", "ContextRpcs",
-                "record2", "record1", "ContextStatus", "ContextConnections"));
+        final Set<String> expected = new HashSet<String>(Arrays.asList("ContextSubscriptions", "ContextRecords",
+            "record3", "ContextRpcs", "record2", "record1", "ContextStatus", "ContextConnections"));
 
         TestUtils.waitForEvent(new EventChecker()
         {
@@ -566,8 +608,8 @@ public class ProxyContextTest
         observer1.verify();
     }
 
-    void checkRecordConnectedStatus(final String recordName, final Boolean status) throws InterruptedException,
-        EventFailedException
+    void checkRecordConnectedStatus(final String recordName, final Boolean status)
+        throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventChecker()
         {
@@ -629,8 +671,8 @@ public class ProxyContextTest
     }
 
     @Test
-    public void testMultipleRemoteContextsAndSubscribeForRemoteContextSubscriptions() throws IOException,
-        InterruptedException
+    public void testMultipleRemoteContextsAndSubscribeForRemoteContextSubscriptions()
+        throws IOException, InterruptedException
     {
         createComponents("testMultipleRemoteContextsAndSubscribeForRemoteContextSubscriptions");
         ProxyContext candidate2 = new ProxyContext("testRemote2", getProtocolCodec(), LOCALHOST, this.PORT);
@@ -1447,8 +1489,8 @@ public class ProxyContextTest
     }
 
     @Test
-    public void testSubscribeForRpcAfterRpcIsCreatedAndDestroyed() throws TimeOutException, ExecutionException,
-        InterruptedException, IOException
+    public void testSubscribeForRpcAfterRpcIsCreatedAndDestroyed()
+        throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testSubscribeForRpcAfterRpcIsCreatedAndDestroyed");
         assertNull(this.candidate.getRpc("getTime"));
@@ -1546,8 +1588,7 @@ public class ProxyContextTest
     }
 
     @Test
-    public void testRpcNoArgsNoResponse() throws TimeOutException, ExecutionException, InterruptedException,
-        IOException
+    public void testRpcNoArgsNoResponse() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testRpcNoArgs");
         final CountDownLatch latch = new CountDownLatch(1);
@@ -1591,15 +1632,14 @@ public class ProxyContextTest
 
         waitForRpcToBePublished(rpc);
 
-        IValue result =
-            this.candidate.getRpc("concat").execute(TextValue.valueOf("someValue1"), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
+        IValue result = this.candidate.getRpc("concat").execute(TextValue.valueOf("someValue1"),
+            new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
     }
 
     @Test
-    public void testMultithreadRpcWithSimpleArgs() throws TimeOutException, ExecutionException, InterruptedException,
-        IOException
+    public void testMultithreadRpcWithSimpleArgs()
+        throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testMultithreadRpcWithSimpleArgs");
         this.executor.shutdownNow();
@@ -1644,9 +1684,8 @@ public class ProxyContextTest
                     }
                     try
                     {
-                        IValue result =
-                            concatRpc.execute(TextValue.valueOf(random), new DoubleValue(Double.NaN),
-                                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
+                        IValue result = concatRpc.execute(TextValue.valueOf(random), new DoubleValue(Double.NaN),
+                            LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
                         final String expected = random + ",NaN,2345,anotherText value here!,";
                         if (!result.textValue().equals(expected))
                         {
@@ -1666,8 +1705,8 @@ public class ProxyContextTest
     }
 
     @Test
-    public void testRpcWithSimpleArgsNoLogging() throws TimeOutException, ExecutionException, InterruptedException,
-        IOException
+    public void testRpcWithSimpleArgsNoLogging()
+        throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testRpcWithSimpleArgsNoLogging");
         this.executor.shutdownNow();
@@ -1688,16 +1727,15 @@ public class ProxyContextTest
 
         waitForRpcToBePublished(rpc);
 
-        IValue result =
-            this.candidate.getRpc("concat2").execute(TextValue.valueOf("someValue1"), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
+        IValue result = this.candidate.getRpc("concat2").execute(TextValue.valueOf("someValue1"),
+            new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
         Log.banner(this, "There should be no occurrences of rpc|concat2");
     }
 
     @Test
-    public void testRpcWithSimpleArgs_noResponse() throws TimeOutException, ExecutionException, InterruptedException,
-        IOException
+    public void testRpcWithSimpleArgs_noResponse()
+        throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testRpcWithSimpleArgs");
         this.executor.shutdownNow();
@@ -1747,8 +1785,8 @@ public class ProxyContextTest
     }
 
     @Test
-    public void testRpcWithSpecialCharsInArgs() throws TimeOutException, ExecutionException, InterruptedException,
-        IOException
+    public void testRpcWithSpecialCharsInArgs()
+        throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents("testRpcWithSpecialCharsInArgs");
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
@@ -1768,9 +1806,8 @@ public class ProxyContextTest
 
         waitForRpcToBePublished(rpc);
 
-        IValue result =
-            this.candidate.getRpc("concat").execute(TextValue.valueOf("textValue1|\\="), new DoubleValue(Double.NaN),
-                LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!|+"));
+        IValue result = this.candidate.getRpc("concat").execute(TextValue.valueOf("textValue1|\\="),
+            new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!|+"));
         assertEquals("textValue1|\\=,NaN,2345,anotherText value here!|+,", result.textValue());
     }
 

@@ -340,6 +340,9 @@ public final class ProxyContext implements IObserverContext
     final Map<String, String> tokenPerRecord;
     EndPointAddress currentEndPoint;
 
+    /** Tracks records that have a re-sync operation pending */
+    final Set<String> resyncs;
+
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
      * and port.
@@ -399,6 +402,8 @@ public final class ProxyContext implements IObserverContext
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<String, String>();
+        this.resyncs = Collections.synchronizedSet(new HashSet<String>());
+
         // add default permissions for system records
         for (String recordName : ContextUtils.SYSTEM_RECORDS)
         {
@@ -822,6 +827,7 @@ public final class ProxyContext implements IObserverContext
                     }
                     catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
                     {
+                        // todo use resync
                         Log.log(this,
                             "Resubscribing for " + e.recordName + " due to error processing received message: "
                                 + new String(data, ProxyContext.this.codec.getCharset()),
@@ -921,6 +927,12 @@ public final class ProxyContext implements IObserverContext
         }
 
         final String changeName = changeToApply.getName();
+
+        if (changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR)
+        {
+            ProxyContext.this.resyncs.remove(changeName);
+        }
+
         if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
         {
             if (log)
@@ -1052,7 +1064,7 @@ public final class ProxyContext implements IObserverContext
                         switch(ProxyContext.this.imageDeltaProcessor.processRxChange(changeToApply, name, record))
                         {
                             case ImageDeltaChangeProcessor.PUBLISH:
-
+                                // todo we only really need to do this for image scope...
                                 if (ProxyContext.this.remoteConnectionStatusRecord.put(changeName,
                                     RECORD_CONNECTED) != RECORD_CONNECTED)
                                 {
@@ -1090,29 +1102,49 @@ public final class ProxyContext implements IObserverContext
         });
     }
 
+    /**
+     * Performs a data re-sync of the named record. A re-sync operation differs from a
+     * {@link #resubscribe(String...)} in that a re-sync may not trigger a notification to observing
+     * {@link IRecordListener} instances when the re-sync receives its image. A re-subscribe, on the
+     * other hand, will always trigger a notification as it does a complete tear-down then
+     * re-subscribe.
+     * 
+     * @param name
+     *            the record to re-sync.
+     */
     void resync(String name)
     {
-        Log.log(this, "Re-syncing ", name);
-
-        // mark the record as disconnected, then reconnecting
-        Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
-        lock.lock();
-        try
+        if (this.resyncs.add(name))
         {
-            this.remoteConnectionStatusRecord.put(name, RECORD_DISCONNECTED);
-            this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
-            this.remoteConnectionStatusRecord.put(name, RECORD_CONNECTING);
-            this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
-        }
-        finally
-        {
-            lock.unlock();
-        }
+            Log.log(this, "Re-syncing ", name);
 
-        final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
-        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
-        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
-            insertPermissionToken(this.tokenPerRecord.get(name), recordNames)));
+            // mark the record as disconnected, then reconnecting
+            Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
+            lock.lock();
+            try
+            {
+                this.remoteConnectionStatusRecord.put(name, RECORD_DISCONNECTED);
+                this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
+                this.remoteConnectionStatusRecord.put(name, RECORD_CONNECTING);
+                this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
+            }
+            finally
+            {
+                lock.unlock();
+            }
+
+            final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
+            ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
+            ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
+                insertPermissionToken(this.tokenPerRecord.get(name), recordNames)));
+        }
+        else
+        {
+            if (log)
+            {
+                Log.log(this, "Ignoring duplicate re-sync for ", name);
+            }
+        }
     }
 
     void onChannelClosed()
