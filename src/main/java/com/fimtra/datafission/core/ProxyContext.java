@@ -223,6 +223,7 @@ public final class ProxyContext implements IObserverContext
     // constructs to handle mapping of local system record names to remote names
     static final Map<String, String> remoteToLocalSystemRecordNameConversions;
     static final Map<String, String> localToRemoteSystemRecordNameConversions;
+
     static
     {
         Map<String, String> mapping = null;
@@ -450,9 +451,8 @@ public final class ProxyContext implements IObserverContext
      */
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
     {
-        this.reconnectPeriodMillis =
-            reconnectPeriodMillis < MINIMUM_RECONNECT_PERIOD_MILLIS ? MINIMUM_RECONNECT_PERIOD_MILLIS
-                : reconnectPeriodMillis;
+        this.reconnectPeriodMillis = reconnectPeriodMillis < MINIMUM_RECONNECT_PERIOD_MILLIS
+            ? MINIMUM_RECONNECT_PERIOD_MILLIS : reconnectPeriodMillis;
     }
 
     /**
@@ -467,8 +467,8 @@ public final class ProxyContext implements IObserverContext
      */
     public void reconnect(final String node, final int port)
     {
-        setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
-            this.codec.getFrameEncodingFormat(), new EndPointAddress(node, port)));
+        setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(this.codec.getFrameEncodingFormat(),
+            new EndPointAddress(node, port)));
 
         // force a reconnect
         this.channel.destroy("Forced reconnect");
@@ -676,10 +676,12 @@ public final class ProxyContext implements IObserverContext
                             {
                                 for (i = 0; i < recordsToUnsubscribe.length; i++)
                                 {
-                                    ((ISubscribingChannel) ProxyContext.this.channel).contextUnsubscribed(recordsToUnsubscribe[i]);
+                                    ((ISubscribingChannel) ProxyContext.this.channel).contextUnsubscribed(
+                                        recordsToUnsubscribe[i]);
                                 }
                             }
-                            ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
+                            ProxyContext.this.channel.sendAsync(
+                                ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 
                             for (i = 0; i < recordsToUnsubscribe.length; i++)
                             {
@@ -820,10 +822,11 @@ public final class ProxyContext implements IObserverContext
                     }
                     catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
                     {
-                        Log.log(this, "Resubscribing for " + e.recordName
-                            + " due to error processing received message: "
-                            + new String(data, ProxyContext.this.codec.getCharset()), e);
-                       
+                        Log.log(this,
+                            "Resubscribing for " + e.recordName + " due to error processing received message: "
+                                + new String(data, ProxyContext.this.codec.getCharset()),
+                            e);
+
                         resubscribe(AtomicChangeTeleporter.getRecordName(e.recordName));
                     }
                 }
@@ -911,7 +914,7 @@ public final class ProxyContext implements IObserverContext
     {
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
-        
+
         if (changeToApply == null)
         {
             return;
@@ -993,8 +996,8 @@ public final class ProxyContext implements IObserverContext
                         }
                         catch (Exception e)
                         {
-                            Log.log(ProxyContext.this, "Could not notify " + iAtomicChangeObserver + " with "
-                                + changeToApply, e);
+                            Log.log(ProxyContext.this,
+                                "Could not notify " + iAtomicChangeObserver + " with " + changeToApply, e);
                         }
                     }
                 }
@@ -1050,7 +1053,8 @@ public final class ProxyContext implements IObserverContext
                         {
                             case ImageDeltaChangeProcessor.PUBLISH:
 
-                                if (ProxyContext.this.remoteConnectionStatusRecord.put(changeName, RECORD_CONNECTED) != RECORD_CONNECTED)
+                                if (ProxyContext.this.remoteConnectionStatusRecord.put(changeName,
+                                    RECORD_CONNECTED) != RECORD_CONNECTED)
                                 {
                                     ProxyContext.this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
                                 }
@@ -1107,8 +1111,8 @@ public final class ProxyContext implements IObserverContext
 
         final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
         ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
-        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(insertPermissionToken(
-            this.tokenPerRecord.get(name), recordNames)));
+        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
+            insertPermissionToken(this.tokenPerRecord.get(name), recordNames)));
     }
 
     void onChannelClosed()
@@ -1392,8 +1396,8 @@ public final class ProxyContext implements IObserverContext
                 ((ISubscribingChannel) ProxyContext.this.channel).contextSubscribed(recordsToSubscribeFor[i]);
             }
         }
-        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(insertPermissionToken(
-            permissionToken, recordsToSubscribeFor)));
+        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
+            insertPermissionToken(permissionToken, recordsToSubscribeFor)));
     }
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
