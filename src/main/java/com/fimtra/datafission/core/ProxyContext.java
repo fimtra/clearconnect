@@ -827,7 +827,8 @@ public final class ProxyContext implements IObserverContext
                     }
                     catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
                     {
-                        final String recordName = AtomicChangeTeleporter.getRecordName(e.recordName);
+                        final String recordName =
+                            substituteLocalNameWithRemoteName(AtomicChangeTeleporter.getRecordName(e.recordName));
                         if (!ProxyContext.this.resyncs.contains(recordName))
                         {
                             Log.log(this, "Re-syncing " + recordName + " due to error processing received message: "
@@ -928,12 +929,8 @@ public final class ProxyContext implements IObserverContext
         }
 
         final String changeName = changeToApply.getName();
-        final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
-        if (isImage)
-        {
-            ProxyContext.this.resyncs.remove(changeName);
-        }
 
+        // todo need to put in logic to ensure records don't start with _ACK_, _NOK_ or _RPC_
         if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
         {
             if (log)
@@ -1033,6 +1030,12 @@ public final class ProxyContext implements IObserverContext
                 {
                     final String name = substituteLocalNameWithRemoteName(changeName);
 
+                    final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
+                    if (isImage)
+                    {
+                        ProxyContext.this.resyncs.remove(name);
+                    }
+
                     final boolean recordIsSubscribed =
                         ProxyContext.this.context.recordObservers.getSubscribersFor(name).length > 0;
                     if (!recordIsSubscribed)
@@ -1065,7 +1068,7 @@ public final class ProxyContext implements IObserverContext
                         switch(ProxyContext.this.imageDeltaProcessor.processRxChange(changeToApply, name, record))
                         {
                             case ImageDeltaChangeProcessor.PUBLISH:
-                                
+
                                 // only images determine connection status - don't need to do this
                                 // put for every delta that is received!
                                 if (isImage && ProxyContext.this.remoteConnectionStatusRecord.put(changeName,
