@@ -98,6 +98,11 @@ final class ImageDeltaChangeProcessor
                     Log.log(this, "Cached delta count is ", Integer.toString(deltas.size()), " for ", name,
                         ", delta.seq=", Long.toString(changeToApply.getSequence()), ", record.seq=",
                         Long.toString(record.getSequence()));
+                    
+                    if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD * 2)
+                    {
+                        return RESYNC;
+                    }
                 }
             }
             else
