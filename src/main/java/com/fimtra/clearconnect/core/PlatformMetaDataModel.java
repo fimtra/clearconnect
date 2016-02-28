@@ -151,8 +151,8 @@ public final class PlatformMetaDataModel
      * */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
-        EndPoint, SubscriptionCount, MessagesReceived, AvergeMessageSizeBytes, DataCountKb, ConnectionUptime, Service,
-            ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec,
+        EndPoint, SubscriptionCount, MessagesReceived, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
+            ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
     }
 
     /**
@@ -1115,10 +1115,11 @@ public final class PlatformMetaDataModel
 
                     serviceProxiesUpdated.add(remoteId);
                     IRecord serviceProxyRecord = this.serviceProxiesContext.getOrCreateRecord(remoteId);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ClientName.toString(), clientName);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.EndPoint.toString(), proxyEndPoint);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MessagesReceived.toString(),
                         messageCount);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvergeMessageSizeBytes.toString(),
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvgMsgSizeBytes.toString(),
                         avgMsgSize);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
