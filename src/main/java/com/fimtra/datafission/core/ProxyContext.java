@@ -933,14 +933,14 @@ public final class ProxyContext implements IObserverContext
 
         if(changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
         {
-            if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
+            final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
+            if (subscribeResult.booleanValue() || changeName.startsWith(NOK, 0))
             {
                 if (log)
                 {
                     Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
                 }
 
-                final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
                 final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
                 final String action = changeName.substring(ACK.length());
                 List<CountDownLatch> latches;
