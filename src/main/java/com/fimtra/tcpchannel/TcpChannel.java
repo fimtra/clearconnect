@@ -302,6 +302,7 @@ public class TcpChannel implements ITransportChannel
         ChannelUtils.WATCHDOG.addChannel(this);
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
+
     }
 
     @Override
@@ -314,6 +315,7 @@ public class TcpChannel implements ITransportChannel
 
             synchronized (this)
             {
+                // todo need some queue monitoring at the TCP sending level
                 for (int i = 0; i < byteFragmentsToSend.length; i++)
                 {
                     this.txFrames.add(byteFragmentsToSend[i]);
@@ -462,26 +464,26 @@ public class TcpChannel implements ITransportChannel
                         i--;
                         size--;
                     }
-                    else
+                }
+                if (data != null)
+                {
+                    try
                     {
-                        try
-                        {
-                            ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data);
-                        }
-                        catch (IOException e)
-                        {
-                            channelsWithTxFrames.remove(i);
-                            i--;
-                            size--;
-                            channel.destroy("Could not write frames (" + e.toString() + ")");
-                        }
-                        catch (Exception e)
-                        {
-                            channelsWithTxFrames.remove(i);
-                            i--;
-                            size--;
-                            channel.destroy("Could not write frames", e);
-                        }
+                        ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data);
+                    }
+                    catch (IOException e)
+                    {
+                        channelsWithTxFrames.remove(i);
+                        i--;
+                        size--;
+                        channel.destroy("Could not write frames (" + e.toString() + ")");
+                    }
+                    catch (Exception e)
+                    {
+                        channelsWithTxFrames.remove(i);
+                        i--;
+                        size--;
+                        channel.destroy("Could not write frames", e);
                     }
                 }
             }
@@ -606,6 +608,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
      */
     void writeBuffersToSocket() throws IOException
     {
+        // todo loop to service other channels if bytes written is not completed
         while (this.bytesWritten != this.txLength)
         {
             this.bytesWritten += this.tcpChannel.socketChannel.write(this.buffers);
