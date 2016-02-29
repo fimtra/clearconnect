@@ -172,8 +172,8 @@ public class TcpChannel implements ITransportChannel
      * @see TcpChannelProperties#RX_BUFFER_SIZE
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
-    public TcpChannel(String serverHost, int serverPort, IReceiver receiver, FrameEncodingFormatEnum frameEncodingFormat)
-        throws ConnectException
+    public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
+        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException
     {
         this(serverHost, serverPort, receiver, TcpChannelProperties.Values.RX_BUFFER_SIZE, frameEncodingFormat);
     }
@@ -344,8 +344,9 @@ public class TcpChannel implements ITransportChannel
     @Override
     public String toString()
     {
-        return (this.onChannelConnectedCalled ? (this.onChannelClosedCalled.get() ? TCP_CHANNEL_CLOSED
-            : TCP_CHANNEL_CONNECTED) : TCP_CHANNEL_PENDING) + getDescription() + "]";
+        return (this.onChannelConnectedCalled
+            ? (this.onChannelClosedCalled.get() ? TCP_CHANNEL_CLOSED : TCP_CHANNEL_CONNECTED) : TCP_CHANNEL_PENDING)
+            + getDescription() + "]";
     }
 
     @Override
@@ -383,9 +384,8 @@ public class TcpChannel implements ITransportChannel
                 }
                 catch (Exception e)
                 {
-                    Log.log(this,
-                        ObjectUtils.safeToString(this) + " receiver " + ObjectUtils.safeToString(this.receiver)
-                            + " threw exception during onChannelConnected", e);
+                    Log.log(this, ObjectUtils.safeToString(this) + " receiver "
+                        + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected", e);
                 }
             }
 
@@ -423,9 +423,9 @@ public class TcpChannel implements ITransportChannel
                         }
                         catch (Exception e)
                         {
-                            Log.log(this,
-                                ObjectUtils.safeToString(this) + " receiver " + ObjectUtils.safeToString(this.receiver)
-                                    + " threw exception during onDataReceived", e);
+                            Log.log(this, ObjectUtils.safeToString(this) + " receiver "
+                                + ObjectUtils.safeToString(this.receiver) + " threw exception during onDataReceived",
+                                e);
                         }
                 }
             }
