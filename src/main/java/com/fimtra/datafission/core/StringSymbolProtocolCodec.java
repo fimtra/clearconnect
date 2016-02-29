@@ -499,7 +499,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         {
             Log.log(this, "[rx] key-symbol ", symbol, "(", symbolCode.toString(), ")=", name);
         }
-        // todo periodically log?
+        // todo periodically log?        
         this.rxSymbolToKey.put(symbolCode, name);
         return name;
     }
@@ -554,9 +554,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         sb.append(preamble);
         final boolean isImage = atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
         final String name = atomicChange.getName();
-        final boolean isRpcResult = name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
-        // todo or if its a teleported fragment....
-        if (isRpcResult)
+        final boolean isProtocolMessage = ContextUtils.isProtocolPrefixed(name);
+        // todo or if its a teleported fragment
+        if (isProtocolMessage)
         {
             sb.append(name);
         }
@@ -568,9 +568,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         sb.append(DELIMITER).append(atomicChange.getScope())
         // todo compact?
         .append(atomicChange.getSequence());
-        addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, escapedCharsRef, buffer, isImage, name, isRpcResult);
+        addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, escapedCharsRef, buffer, isImage, name, isProtocolMessage);
         addEntriesWithSymbols(DELIMITER_REMOVE_CODE, removedEntries, sb, escapedCharsRef, buffer, isImage, name,
-            isRpcResult);
+            isProtocolMessage);
         IRecordChange subMapAtomicChange;
         if(subMapKeys.size() > 0)
         {
@@ -580,16 +580,16 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 sb.append(DELIMITER_SUBMAP_CODE);
                 appendSymbolForKey(subMapKey, sb, escapedCharsRef, isImage);
                 addEntriesWithSymbols(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, escapedCharsRef,
-                    buffer, isImage, name, isRpcResult);
+                    buffer, isImage, name, isProtocolMessage);
                 addEntriesWithSymbols(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb,
-                    escapedCharsRef, buffer, isImage, name, isRpcResult);
+                    escapedCharsRef, buffer, isImage, name, isProtocolMessage);
             }
         }
         return sb.toString().getBytes(ISO_8859_1);
     }
 
     private void addEntriesWithSymbols(char[] changeType, Map<String, IValue> entries, StringBuilder txString,
-        CharArrayReference escapedCharsRef, ByteBuffer buffer, boolean isImage, String recordName, boolean isRpcResult)
+        CharArrayReference escapedCharsRef, ByteBuffer buffer, boolean isImage, String recordName, boolean isProtocolMessage)
     {
         if (entries != null && entries.size() > 0)
         {
@@ -603,7 +603,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
             final Set<String> definitionNeeded = new HashSet<String>(entries.keySet());
 
-            if (!isRpcResult)
+            if (!isProtocolMessage)
             {
                 synchronized (this.keyDefinitionsSent)
                 {
