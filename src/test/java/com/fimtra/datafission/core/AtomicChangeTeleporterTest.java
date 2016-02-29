@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.field.TextValue;
 
 /**
@@ -80,7 +81,7 @@ public class AtomicChangeTeleporterTest
     }
 
     @Test
-    public void testEmptyChange()
+    public void testEmptyChange() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -90,7 +91,7 @@ public class AtomicChangeTeleporterTest
     }
 
     @Test
-    public void testSinglePart_underLimit()
+    public void testSinglePart_underLimit() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -103,7 +104,7 @@ public class AtomicChangeTeleporterTest
     }
 
     @Test
-    public void testSinglePart_atLimit()
+    public void testSinglePart_atLimit() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -117,7 +118,7 @@ public class AtomicChangeTeleporterTest
     }
 
     @Test
-    public void test2Parts()
+    public void test2Parts() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -132,7 +133,7 @@ public class AtomicChangeTeleporterTest
     }
     
     @Test
-    public void test2Parts_exact()
+    public void test2Parts_exact() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -147,9 +148,9 @@ public class AtomicChangeTeleporterTest
 
         doPartsTest(expected);
     }
-
+    
     @Test
-    public void testMultipleParts()
+    public void testMultipleParts() throws IncorrectSequenceException
     {
         AtomicChange expected = new AtomicChange("c1");
         expected.setScope(IRecordChange.IMAGE_SCOPE);
@@ -158,11 +159,48 @@ public class AtomicChangeTeleporterTest
         populateChange(expected.internalGetSubMapAtomicChange("subMap1"));
         populateChange(expected.internalGetSubMapAtomicChange("subMap2"));
         populateChange(expected.internalGetSubMapAtomicChange("subMap3"));
-
+        
         doPartsTest(expected);
     }
 
-    void doPartsTest(AtomicChange expected)
+    @Test(expected=IncorrectSequenceException.class)
+    public void testMultiplePartsWrongSequence() throws Exception
+    {
+        AtomicChange expected = new AtomicChange("c1");
+        expected.setScope(IRecordChange.IMAGE_SCOPE);
+        expected.setSequence(System.currentTimeMillis());
+        populateChange(expected);
+        populateChange(expected.internalGetSubMapAtomicChange("subMap1"));
+        populateChange(expected.internalGetSubMapAtomicChange("subMap2"));
+        populateChange(expected.internalGetSubMapAtomicChange("subMap3"));
+       
+        AtomicChange[] parts = this.candidate.split(expected);
+
+        // prepare the next sequence
+        expected = new AtomicChange("c1");
+        expected.setScope(IRecordChange.IMAGE_SCOPE);
+        expected.setSequence(System.currentTimeMillis() + 314);
+        populateChange(expected);
+        populateChange(expected.internalGetSubMapAtomicChange("subMap1"));
+        populateChange(expected.internalGetSubMapAtomicChange("subMap2"));
+        populateChange(expected.internalGetSubMapAtomicChange("subMap3"));
+        AtomicChange[] parts_next = this.candidate.split(expected);
+        
+        for (int i = 0; i < parts.length; i++)
+        {
+            if (i == 1)
+            {
+                // simulate an interleaved change read
+                this.candidate.combine(parts_next[i]);
+            }
+            else
+            {
+                this.candidate.combine(parts[i]);
+            }
+        }
+    }
+
+    void doPartsTest(AtomicChange expected) throws IncorrectSequenceException
     {
         AtomicChange[] parts = this.candidate.split(expected);
         AtomicChange result = null;

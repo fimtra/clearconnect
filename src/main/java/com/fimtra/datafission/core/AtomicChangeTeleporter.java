@@ -36,6 +36,24 @@ import com.fimtra.datafission.IValue;
  */
 final class AtomicChangeTeleporter
 {
+    /**
+     * Represents the situation when a fragment being combined has the wrong sequence number - this
+     * indicates that two different sequences have become interleaved (a resync is required)
+     * 
+     * @author Ramon Servadei
+     */
+    static class IncorrectSequenceException extends Exception
+    {
+        private static final long serialVersionUID = 1L;
+        final String recordName;
+
+        IncorrectSequenceException(String name, String message)
+        {
+            super(message);
+            this.recordName = name;
+        }
+    }
+    
     private static final String PART_INDEX_PREFIX = new String(new char[] { 0xa, 0xb });
     private static final char PART_INDEX_DELIM = 0xc;
 
@@ -113,8 +131,16 @@ final class AtomicChangeTeleporter
     /**
      * Merge the received part into the source
      */
-    private static void merge(AtomicChange source, AtomicChange receivedPart)
+    private static void merge(AtomicChange source, AtomicChange receivedPart) throws IncorrectSequenceException
     {
+        if (source.sequence.get().longValue() != -1
+            && source.sequence.get().longValue() != receivedPart.sequence.get().longValue())
+        {
+            throw new IncorrectSequenceException(source.getName(),
+                source.getName() + " expected fragment with sequence: " + source.sequence.get().longValue()
+                    + " but got: " + receivedPart.sequence.get().longValue());
+        }
+        
         source.scope = receivedPart.scope;
         source.sequence = receivedPart.sequence;
 
@@ -318,12 +344,11 @@ final class AtomicChangeTeleporter
      *            a received part of an {@link AtomicChange}
      * @return <code>null</code> if the received part was not the final part otherwise the completed
      *         {@link AtomicChange} from all its received parts
+     * @throws IncorrectSequenceException 
      */
-    AtomicChange combine(AtomicChange receivedPart)
+    AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException 
     {
         this.nameRef.set(null);
-        // todo we need a "sequence" number to match all the parts with - if 2 atomic changes are
-        // split into parts and are interleaved, we cannot recombine properly..
         getNameAndPart(receivedPart.getName(), this.nameRef, this.part);
 
         final String name = this.nameRef.get();
@@ -339,7 +364,15 @@ final class AtomicChangeTeleporter
         {
             atomicChange = putIfAbsent;
         }
-        merge(atomicChange, receivedPart);
+        try
+        {
+            merge(atomicChange, receivedPart);
+        }
+        catch (IncorrectSequenceException e)
+        {
+            this.receivedParts.remove(name);
+            throw e;
+        }
 
         if (this.part.get() == 1)
         {

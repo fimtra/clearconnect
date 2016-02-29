@@ -58,7 +58,9 @@ import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
+import com.fimtra.datafission.core.StringSymbolProtocolCodec.MissingKeySymbolMappingException;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
@@ -826,18 +828,26 @@ public final class ProxyContext implements IObserverContext
                     {
                         ProxyContext.this.onDataReceived(data);
                     }
-                    catch (StringSymbolProtocolCodec.MissingKeySymbolMappingException e)
+                    catch (IncorrectSequenceException e)
                     {
-                        final String recordName =
-                            substituteLocalNameWithRemoteName(AtomicChangeTeleporter.getRecordName(e.recordName));
-                        if (!ProxyContext.this.resyncs.contains(recordName))
-                        {
-                            Log.log(this, "Re-syncing " + recordName + " due to error processing received message: "
-                                + new String(data, ProxyContext.this.codec.getCharset()), e);
-
-                            resync(recordName);
-                        }
+                        handleException(e.recordName, e);
                     }
+                    catch (MissingKeySymbolMappingException e)
+                    {
+                        handleException(e.recordName, e);
+                    }
+                }
+            }
+
+            private void handleException(String _recName, Exception e)
+            {
+                final String recordName =
+                    substituteLocalNameWithRemoteName(AtomicChangeTeleporter.getRecordName(_recName));
+                if (!ProxyContext.this.resyncs.contains(recordName))
+                {
+                    Log.log(this, "Error processing received change for " + recordName, e);
+
+                    resync(recordName);
                 }
             }
 
@@ -919,7 +929,7 @@ public final class ProxyContext implements IObserverContext
         });
     }
 
-    void onDataReceived(byte[] data)
+    void onDataReceived(byte[] data) throws IncorrectSequenceException
     {
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
