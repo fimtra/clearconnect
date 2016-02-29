@@ -336,8 +336,9 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         final Map<String, IValue> putEntries = atomicChange.getPutEntries();
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
+        final Set<String> subMapKeys = atomicChange.getSubMapKeys();
         final StringBuilder sb =
-            new StringBuilder(30 * (putEntries.size() + removedEntries.size() + atomicChange.getSubMapKeys().size()));
+            new StringBuilder(30 * (putEntries.size() + removedEntries.size() + subMapKeys.size()));
         sb.append(preamble);
         escape(atomicChange.getName(), sb, chars);
         // add the sequence
@@ -345,13 +346,16 @@ public class StringProtocolCodec implements ICodec<char[]>
         addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, chars);
         addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, chars);
         IRecordChange subMapAtomicChange;
-        for (String subMapKey : atomicChange.getSubMapKeys())
+        if (subMapKeys.size() > 0)
         {
-            subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
-            sb.append(DELIMITER_SUBMAP_CODE);
-            escape(subMapKey, sb, chars);
-            addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars);
-            addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars);
+            for (String subMapKey : subMapKeys)
+            {
+                subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
+                sb.append(DELIMITER_SUBMAP_CODE);
+                escape(subMapKey, sb, chars);
+                addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars);
+                addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars);
+            }
         }
         return sb.toString().getBytes(charSet);
     }
