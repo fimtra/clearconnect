@@ -117,9 +117,10 @@ public final class ProxyContext implements IObserverContext
     public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
 
     /** Acknowledges the successful completion of a subscription */
-    static final String ACK = "_ACK_";
+    static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
-    static final String NOK = "_NOK_";
+    static final String NOK = ContextUtils.PROTOCOL_PREFIX + "NOK_";
+
     static final String SUBSCRIBE = "subscribe";
     static final String UNSUBSCRIBE = "unsubscribe";
 
@@ -930,97 +931,101 @@ public final class ProxyContext implements IObserverContext
 
         final String changeName = changeToApply.getName();
 
-        // todo need to put in logic to ensure records don't start with _ACK_, _NOK_ or _RPC_
-        if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
+        if(changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
         {
-            if (log)
+            if (changeName.startsWith(ACK, 0) || changeName.startsWith(NOK, 0))
             {
-                Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
-            }
-
-            final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
-            final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
-            final String action = changeName.substring(ACK.length());
-            List<CountDownLatch> latches;
-            String recordName;
-            final int recordNameCount = recordNames.size();
-            for (int i = 0; i < recordNameCount; i++)
-            {
-                recordName = recordNames.get(i);
-                latches = this.actionResponseLatches.remove(action + recordName);
-                if (latches != null)
+                if (log)
                 {
-                    for (CountDownLatch latch : latches)
+                    Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                }
+
+                final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
+                final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
+                final String action = changeName.substring(ACK.length());
+                List<CountDownLatch> latches;
+                String recordName;
+                final int recordNameCount = recordNames.size();
+                for (int i = 0; i < recordNameCount; i++)
+                {
+                    recordName = recordNames.get(i);
+                    latches = this.actionResponseLatches.remove(action + recordName);
+                    if (latches != null)
                     {
-                        if (latch != null)
+                        for (CountDownLatch latch : latches)
                         {
-                            latch.countDown();
-                            if (action.equals(SUBSCRIBE))
+                            if (latch != null)
                             {
-                                this.actionSubscribeResults.get(latch).put(recordName, subscribeResult);
-                                // if all responses have been received...
-                                if (latch.getCount() == 0)
+                                latch.countDown();
+                                if (action.equals(SUBSCRIBE))
                                 {
-                                    this.actionSubscribeResults.remove(latch);
-                                    this.actionSubscribeFutures.remove(latch).run();
+                                    this.actionSubscribeResults.get(latch).put(recordName, subscribeResult);
+                                    // if all responses have been received...
+                                    if (latch.getCount() == 0)
+                                    {
+                                        this.actionSubscribeResults.remove(latch);
+                                        this.actionSubscribeFutures.remove(latch).run();
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                return;
             }
-
-            return;
-        }
-
-        if (changeName.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
-        {
-            // RPC results must be handled by a dedicated thread
-            this.context.executeRpcTask(new ISequentialRunnable()
+            else
             {
-                @Override
-                public void run()
+                if (changeName.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
                 {
-                    if (log)
+                    // RPC results must be handled by a dedicated thread
+                    this.context.executeRpcTask(new ISequentialRunnable()
                     {
-                        Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
-                    }
-                    final IRecordListener[] subscribersFor =
-                        ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
-                    IRecordListener iAtomicChangeObserver = null;
-                    long start;
-                    final int size = subscribersFor.length;
-                    if (size == 0)
-                    {
-                        Log.log(ProxyContext.this, "No RPC result expected");
-                    }
-                    for (int i = 0; i < size; i++)
-                    {
-                        try
+                        @Override
+                        public void run()
                         {
-                            iAtomicChangeObserver = subscribersFor[i];
-                            start = System.nanoTime();
-                            iAtomicChangeObserver.onChange(null, changeToApply);
-                            ContextUtils.measureTask(changeName, "remote record update", iAtomicChangeObserver,
-                                (System.nanoTime() - start));
+                            if (log)
+                            {
+                                Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
+                            }
+                            final IRecordListener[] subscribersFor =
+                                ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
+                            IRecordListener iAtomicChangeObserver = null;
+                            long start;
+                            final int size = subscribersFor.length;
+                            if (size == 0)
+                            {
+                                Log.log(ProxyContext.this, "No RPC result expected");
+                            }
+                            for (int i = 0; i < size; i++)
+                            {
+                                try
+                                {
+                                    iAtomicChangeObserver = subscribersFor[i];
+                                    start = System.nanoTime();
+                                    iAtomicChangeObserver.onChange(null, changeToApply);
+                                    ContextUtils.measureTask(changeName, "remote record update", iAtomicChangeObserver,
+                                        (System.nanoTime() - start));
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.log(ProxyContext.this,
+                                        "Could not notify " + iAtomicChangeObserver + " with " + changeToApply, e);
+                                }
+                            }
                         }
-                        catch (Exception e)
-                        {
-                            Log.log(ProxyContext.this,
-                                "Could not notify " + iAtomicChangeObserver + " with " + changeToApply, e);
-                        }
-                    }
-                }
 
-                @Override
-                public Object context()
-                {
-                    return changeName;
+                        @Override
+                        public Object context()
+                        {
+                            return changeName;
+                        }
+                    });
+                    return;
                 }
-            });
-            return;
+            }
         }
-
+        
         executeSequentialCoreTask(new ISequentialRunnable()
         {
             @Override

@@ -237,6 +237,7 @@ public class ContextUtils
     public final static Map<String, IValue> EMPTY_MAP = Collections.emptyMap();
 
     static final Set<String> EMPTY_STRING_SET = Collections.emptySet();
+    static final String PROTOCOL_PREFIX = "_";
 
     /**
      * @return a long[] for the sequential tasks statistics, format {queue-overflow,
@@ -860,5 +861,19 @@ public class ContextUtils
     {
         removeRecords(context);
         context.destroy();
+    }
+
+    /**
+     * @return <code>true</code> if the name includes a pattern used by the protocol between a
+     *         Context and a ProxyContext
+     */
+    static boolean isProtocolPrefixed(String name)
+    {
+        if (name.startsWith(PROTOCOL_PREFIX, 0))
+        {
+            return name.startsWith(ProxyContext.ACK, 0) || name.startsWith(ProxyContext.NOK, 0)
+                || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
+        }
+        return false;
     }
 }

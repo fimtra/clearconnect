@@ -434,7 +434,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public IRecord createRecord(final String name, Map<String, IValue> initialData)
     {
-        if (ContextUtils.isSystemRecordName(name) && !ContextUtils.checkLegalCharacters(name))
+        if (ContextUtils.isSystemRecordName(name) && !ContextUtils.checkLegalCharacters(name)
+            && !ContextUtils.isProtocolPrefixed(name))
         {
             throw new IllegalArgumentException("The name '" + name + "' is reserved");
         }
@@ -579,6 +580,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // NOTE: do not remove subscribers - they are INDEPENDENT of record existence
                 // this.recordObservers.removeSubscribersFor(name);
 
+                // todo  this can actually cause an NPE if there is a concurrent preparation of an update happening at this time 
                 this.pendingAtomicChanges.remove(name);
                 this.sequences.remove(name);
                 this.imageCache.remove(name);
@@ -730,6 +732,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // update the sequence (version) of the record when publishing
             ((Record) record).setSequence(atomicChange.getSequence());
 
+            // todo the notify task does not lock the record write lock...
             final ISequentialRunnable notifyTask = new ISequentialRunnable()
             {
                 @Override
@@ -737,6 +740,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     try
                     {
+                        // todo should this be done whilst holding the write lock?
                         // update the image with the atomic changes in the runnable
                         final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
 

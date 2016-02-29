@@ -64,7 +64,7 @@ public final class RpcInstance implements IRpcInstance
      */
     public static boolean log = Boolean.getBoolean("log." + RpcInstance.class.getCanonicalName());
     
-    static final String RPC_RECORD_RESULT_PREFIX = "_RPC_";
+    static final String RPC_RECORD_RESULT_PREFIX = ContextUtils.PROTOCOL_PREFIX + "RPC_";
     static final TextValue NO_ACK = TextValue.valueOf(RPC_RECORD_RESULT_PREFIX);
 
     /**
