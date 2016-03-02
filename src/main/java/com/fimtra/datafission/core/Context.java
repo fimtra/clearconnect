@@ -626,21 +626,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         {
                             contextRecords.getWriteLock().unlock();
                         }
-                        final IRecord contextSubscriptions =
-                            Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-                        contextSubscriptions.getWriteLock().lock();
-                        try
-                        {
-                            for (String name : recordsToProcess)
-                            {
-                                contextSubscriptions.remove(name);
-                            }
-                            publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-                        }
-                        finally
-                        {
-                            contextSubscriptions.getWriteLock().unlock();
-                        }
                     }
 
                     @Override

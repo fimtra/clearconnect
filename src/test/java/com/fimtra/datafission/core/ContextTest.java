@@ -528,9 +528,7 @@ public class ContextTest
             "test=L1");
 
         // remove the instance
-        subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.removeRecord(name);
-        assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
     }
 
