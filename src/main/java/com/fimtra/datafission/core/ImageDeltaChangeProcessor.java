@@ -45,6 +45,16 @@ final class ImageDeltaChangeProcessor
         this.imageReceived = new ConcurrentHashMap<String, Boolean>();
     }
 
+    /**
+     * Called when a {@link ProxyContext} re-connects. This clearc the caches of the processor so
+     * everything starts "fresh".
+     */
+    void reset()
+    {
+        this.cachedDeltas.clear();
+        this.imageReceived.clear();
+    }
+    
     int processRxChange(final IRecordChange changeToApply, final String name, IRecord record)
     {
         final boolean imageAlreadyReceived = this.imageReceived.containsKey(name);
