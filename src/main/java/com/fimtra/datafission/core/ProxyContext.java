@@ -272,7 +272,7 @@ public final class ProxyContext implements IObserverContext
     static String[] getEligibleRecords(SubscriptionManager<String, IRecordListener> subscriptionManager, int count,
         String... recordNames)
     {
-        List<String> records = new ArrayList<String>(recordNames.length);
+        final List<String> records = new ArrayList<String>(recordNames.length);
         for (int i = 0; i < recordNames.length; i++)
         {
             if (!ContextUtils.isSystemRecordName(recordNames[i])
@@ -290,7 +290,7 @@ public final class ProxyContext implements IObserverContext
     static String[] insertPermissionToken(final String permissionToken, final String[] recordsToSubscribeFor)
     {
         // insert the permission token
-        String[] permissionAndRecords = new String[recordsToSubscribeFor.length + 1];
+        final String[] permissionAndRecords = new String[recordsToSubscribeFor.length + 1];
         System.arraycopy(recordsToSubscribeFor, 0, permissionAndRecords, 1, recordsToSubscribeFor.length);
         permissionAndRecords[0] =
             (permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN : permissionToken);
@@ -941,7 +941,7 @@ public final class ProxyContext implements IObserverContext
 
         final String changeName = changeToApply.getName();
 
-        if(changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
+        if (changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
         {
             final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
             if (subscribeResult.booleanValue() || changeName.startsWith(NOK, 0))
@@ -1035,7 +1035,7 @@ public final class ProxyContext implements IObserverContext
                 }
             }
         }
-        
+
         executeSequentialCoreTask(new ISequentialRunnable()
         {
             @Override
@@ -1050,6 +1050,7 @@ public final class ProxyContext implements IObserverContext
                     {
                         ProxyContext.this.resyncs.remove(name);
                     }
+                    // todo else check if its in resyncs - then ignore the update
 
                     final boolean recordIsSubscribed =
                         ProxyContext.this.context.recordObservers.getSubscribersFor(name).length > 0;
@@ -1133,14 +1134,14 @@ public final class ProxyContext implements IObserverContext
      * @param name
      *            the record to re-sync.
      */
-    void resync(String name)
+    void resync(final String name)
     {
         if (this.resyncs.add(name))
         {
-            Log.log(this, "Re-syncing ", name);
+            Log.log(this, "Scheduling re-sync ", name);
 
             // mark the record as disconnected, then reconnecting
-            Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
+            final Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
             lock.lock();
             try
             {
@@ -1154,10 +1155,28 @@ public final class ProxyContext implements IObserverContext
                 lock.unlock();
             }
 
-            final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
-            ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
-            ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
-                insertPermissionToken(this.tokenPerRecord.get(name), recordNames)));
+            ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    // todo when there is a re-sync command, we may not need to check if we are
+                    // subscribed as the receive will know if there is a subscription to re-sync...
+                    if (ProxyContext.this.context.recordObservers.getSubscribersFor(name).length == 0)
+                    {
+                        Log.log(this, "No-longer subscribed, CANCELLING re-sync ", name);
+                        return;
+                    }
+
+                    // todo need an actual resync command AND batch up pending commands into a single send
+                    Log.log(this, "Sending re-sync ", name);
+                    final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
+                    ProxyContext.this.channel.sendAsync(
+                        ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
+                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
+                        insertPermissionToken(ProxyContext.this.tokenPerRecord.get(name), recordNames)));
+                }
+            }, this.resyncs.size() * DataFissionProperties.Values.RESYNC_DELAY_MILLIS, TimeUnit.MILLISECONDS);
         }
         else
         {
@@ -1201,12 +1220,12 @@ public final class ProxyContext implements IObserverContext
     @Override
     public IRpcInstance getRpc(final String name)
     {
-        IValue definition = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).get(name);
+        final IValue definition = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).get(name);
         if (definition == null)
         {
             return null;
         }
-        RpcInstance instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
+        final RpcInstance instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
         instance.setHandler(new RpcInstance.Remote.Caller(name, this.codec, this.channel, this.context,
             instance.remoteExecutionStartTimeoutMillis, instance.remoteExecutionDurationTimeoutMillis));
         return instance;

@@ -42,7 +42,8 @@ public abstract class DataFissionProperties
 
         /**
          * The system property name to define the number of threads used in the core
-         * {@link ThimbleExecutor} used by all DataFission {@link Context} instances in the runtime.<br>
+         * {@link ThimbleExecutor} used by all DataFission {@link Context} instances in the runtime.
+         * <br>
          * E.g. <code>-DdataFission.coreThreadCount=8</code>
          */
         String CORE_THREAD_COUNT = BASE + "coreThreadCount";
@@ -64,7 +65,8 @@ public abstract class DataFissionProperties
 
         /**
          * The system property name to define the timeout in milliseconds to wait for the execution
-         * duration of an RPC. The duration timeout begins <b>after</b> the RPC execution starts.<br>
+         * duration of an RPC. The duration timeout begins <b>after</b> the RPC execution starts.
+         * <br>
          * E.g. <code>-DdataFission.rpcExecutionDurationTimeoutMillis=5000</code>
          */
         String RPC_EXECUTION_DURATION_TIMEOUT_MILLIS = BASE + "rpcExecutionDurationTimeoutMillis";
@@ -165,6 +167,13 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.deltaCountLogThreshold=6</code>
          */
         String DELTA_COUNT_LOG_THRESHOLD = BASE + "deltaCountLogThreshold";
+
+        /**
+         * The number of milliseconds to delay each re-sync message. This reduces re-sync flooding
+         * when a {@link ProxyContext} reconnects to a bounced {@link Context}. <br>
+         * E.g. <code>-DdataFission.resyncDelayMillis=10</code>
+         */
+        String RESYNC_DELAY_MILLIS = BASE + "resyncDelayMillis";
     }
 
     /**
@@ -182,8 +191,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#CORE_THREAD_COUNT
          */
-        int CORE_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.CORE_THREAD_COUNT, ""
-            + (Runtime.getRuntime().availableProcessors() + 1)));
+        int CORE_THREAD_COUNT = Integer.parseInt(
+            System.getProperty(Names.CORE_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors() + 1)));
 
         /**
          * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all
@@ -193,8 +202,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#RPC_THREAD_COUNT
          */
-        int RPC_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RPC_THREAD_COUNT,
-            "" + (Runtime.getRuntime().availableProcessors())));
+        int RPC_THREAD_COUNT = Integer.parseInt(
+            System.getProperty(Names.RPC_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors())));
 
         /**
          * The timeout to wait for an RPC to start.
@@ -203,8 +212,8 @@ public abstract class DataFissionProperties
          * 
          * @See Names#RPC_EXECUTION_START_TIMEOUT_MILLIS
          */
-        Long RPC_EXECUTION_START_TIMEOUT_MILLIS = Long.valueOf(System.getProperty(
-            Names.RPC_EXECUTION_START_TIMEOUT_MILLIS, "5000"));
+        Long RPC_EXECUTION_START_TIMEOUT_MILLIS =
+            Long.valueOf(System.getProperty(Names.RPC_EXECUTION_START_TIMEOUT_MILLIS, "5000"));
 
         /**
          * The duration to wait for an RPC to complete after it has started.
@@ -213,8 +222,8 @@ public abstract class DataFissionProperties
          * 
          * @See Names#RPC_EXECUTION_DURATION_TIMEOUT_MILLIS
          */
-        Long RPC_EXECUTION_DURATION_TIMEOUT_MILLIS = Long.valueOf(System.getProperty(
-            Names.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, "5000"));
+        Long RPC_EXECUTION_DURATION_TIMEOUT_MILLIS =
+            Long.valueOf(System.getProperty(Names.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, "5000"));
 
         /**
          * The default period in milliseconds that a {@link ProxyContext} waits before reconnecting
@@ -224,8 +233,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS
          */
-        int PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS = Integer.parseInt(System.getProperty(
-            Names.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, "5000"));
+        int PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS =
+            Integer.parseInt(System.getProperty(Names.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, "5000"));
 
         /**
          * The default maximum number of changes per message a {@link Publisher} can send.
@@ -234,8 +243,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE
          */
-        int PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE = Integer.parseInt(System.getProperty(
-            Names.PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE, "20"));
+        int PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE =
+            Integer.parseInt(System.getProperty(Names.PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE, "20"));
 
         /**
          * The period, in seconds, for context core executors statistics logging.
@@ -308,8 +317,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL
          */
-        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = Integer.parseInt(System.getProperty(
-            Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
+        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL =
+            Integer.parseInt(System.getProperty(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
 
         /**
          * The estimated maximum number of concurrent threads that would access an {@link IRecord}.
@@ -329,8 +338,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#SYSTEM_RECORD_COALESCE_WINDOW_MILLIS
          */
-        int SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = Integer.parseInt(System.getProperty(
-            Names.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, "250"));
+        int SYSTEM_RECORD_COALESCE_WINDOW_MILLIS =
+            Integer.parseInt(System.getProperty(Names.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, "250"));
 
         /**
          * The number of deltas pending processing for a record before starting to log them.
@@ -341,6 +350,14 @@ public abstract class DataFissionProperties
          */
         int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
 
+        /**
+         * The delay between sending subsequent resync messages.
+         * <p>
+         * Default is 10.
+         * 
+         * @see Names#RESYNC_DELAY_MILLIS
+         */
+        int RESYNC_DELAY_MILLIS = Integer.parseInt(System.getProperty(Names.RESYNC_DELAY_MILLIS, "10"));
     }
 
     private DataFissionProperties()
