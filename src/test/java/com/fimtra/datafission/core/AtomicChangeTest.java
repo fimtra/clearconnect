@@ -31,10 +31,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.AtomicChange;
-import com.fimtra.datafission.core.ContextUtils;
-import com.fimtra.datafission.core.IAtomicChangeManager;
-import com.fimtra.datafission.core.Record;
 import com.fimtra.datafission.field.DoubleValue;
 
 /**
@@ -269,7 +265,23 @@ public class AtomicChangeTest
         assertEquals(V1, target.get(K1));
         assertNull(target.get(K2));
     }
-
+    
+    @Test
+    public void testGetSize()
+    {
+        assertEquals(0, candidate.getSize());
+        this.candidate.mergeEntryUpdatedChange(K1, V1, null);
+        assertEquals(1, candidate.getSize());
+        this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
+        assertEquals(2, candidate.getSize());
+        this.candidate.mergeEntryRemovedChange(K2, V1);
+        assertEquals(3, candidate.getSize());
+        this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, null);
+        assertEquals(4, candidate.getSize());
+        this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
+        assertEquals(5, candidate.getSize());
+    }
+    
     @Test
     public void testApplyCompleteAtomicChangeToRecord()
     {

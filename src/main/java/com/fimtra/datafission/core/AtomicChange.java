@@ -121,6 +121,12 @@ public final class AtomicChange implements IRecordChange
         {
             return -1;
         }
+
+        @Override
+        public int getSize()
+        {
+            return 0;
+        }
     };
 
     final String name;
@@ -220,6 +226,28 @@ public final class AtomicChange implements IRecordChange
     }
 
     @Override
+    public int getSize()
+    {
+        int size = this.putEntries == null ? 0 : this.putEntries.size();
+        size += this.overwrittenEntries == null ? 0 : this.overwrittenEntries.size();
+        size += this.removedEntries == null ? 0 : this.removedEntries.size();
+
+        if (this.subMapAtomicChanges != null)
+        {
+            AtomicChange value = null;
+            for (Iterator<Map.Entry<String, AtomicChange>> it =
+                this.subMapAtomicChanges.entrySet().iterator(); it.hasNext();)
+            {
+                value = it.next().getValue();
+                size += value.putEntries == null ? 0 : value.putEntries.size();
+                size += value.overwrittenEntries == null ? 0 : value.overwrittenEntries.size();
+                size += value.removedEntries == null ? 0 : value.removedEntries.size();
+            }
+        }
+        return size;
+    }
+
+    @Override
     public String toString()
     {
         return "AtomicChange [name="
@@ -262,17 +290,17 @@ public final class AtomicChange implements IRecordChange
         for (int i = 0; i < subsequentChanges.size(); i++)
         {
             subsequentChange = subsequentChanges.get(i);
-            
+
             if (subsequentChange == NULL_CHANGE || subsequentChange == null)
             {
                 continue;
             }
 
-            if(!isImage)
+            if (!isImage)
             {
                 isImage = subsequentChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
             }
-            
+
             newPutEntries = subsequentChange.getPutEntries();
             newOverwrittenEntries = subsequentChange.getOverwrittenEntries();
             newRemovedEntries = subsequentChange.getRemovedEntries();
@@ -332,12 +360,11 @@ public final class AtomicChange implements IRecordChange
         {
             lock.unlock();
         }
-        
+
         setScope(isImage ? IRecordChange.IMAGE_SCOPE_CHAR : IRecordChange.DELTA_SCOPE_CHAR);
 
         // only need to set the sequence from the last one (they are in order)
         setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());
-        
 
         // now coalesce the sub-maps in each list per sub-map key
         if (subMapChangesToMerge.size() > 0)
