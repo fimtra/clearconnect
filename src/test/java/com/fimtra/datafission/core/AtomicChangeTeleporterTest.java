@@ -208,8 +208,6 @@ public class AtomicChangeTeleporterTest
         {
             result = this.candidate.combine(parts[i]);
         }
-        assertEquals(AtomicChangeTeleporter.getFieldChangeCount(expected, expected.getSubMapKeys()),
-            AtomicChangeTeleporter.getFieldChangeCount(result, result.getSubMapKeys()));
         assertEquals(expected, result);
     }
 

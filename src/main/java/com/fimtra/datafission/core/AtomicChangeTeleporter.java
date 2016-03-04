@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 
 /**
@@ -185,24 +184,6 @@ final class AtomicChangeTeleporter
     }
 
     /**
-     * Count the number of changes in the {@link AtomicChange}
-     */
-    static int getFieldChangeCount(IRecordChange change, Set<String> subMapKeys)
-    {
-        int recordLevelChangeCount =
-            change.getPutEntries().size() + change.getOverwrittenEntries().size() + change.getRemovedEntries().size();
-        if (subMapKeys.size() > 0)
-        {
-            for (String key : subMapKeys)
-            {
-                recordLevelChangeCount +=
-                    getFieldChangeCount(change.getSubMapAtomicChange(key), ContextUtils.EMPTY_STRING_SET);
-            }
-        }
-        return recordLevelChangeCount;
-    }
-
-    /**
      * Write all the entries of the specific type from the source into one of the parts. Effectively
      * splitting the source entries across the parts.
      * 
@@ -296,8 +277,7 @@ final class AtomicChangeTeleporter
      */
     AtomicChange[] split(AtomicChange change)
     {
-        final Set<String> subMapKeys = change.getSubMapKeys();
-        final int totalChangeCount = getFieldChangeCount(change, subMapKeys);
+        final int totalChangeCount = change.getSize();
         if (totalChangeCount == 0 || totalChangeCount < this.maxChangesPerPart)
         {
             return new AtomicChange[] { change };
@@ -322,6 +302,7 @@ final class AtomicChangeTeleporter
             this.maxChangesPerPart, null, totalChangeCount);
 
         // now do the submaps
+        final Set<String> subMapKeys = change.getSubMapKeys();
         if (subMapKeys.size() > 0)
         {
             AtomicChange subMapChange;
