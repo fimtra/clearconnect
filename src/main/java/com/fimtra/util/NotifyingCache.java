@@ -16,10 +16,12 @@
 package com.fimtra.util;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -74,7 +76,59 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.readLock = reentrantReadWriteLock.readLock();
         this.writeLock = reentrantReadWriteLock.writeLock();
     }
+    
+    /**
+     * @param key
+     *            the key for the data to retrieve
+     * @return the data held in the cache for the key, may be null
+     */
+    public DATA get(String key)
+    {
+        this.readLock.lock();
+        try
+        {
+            return this.cache.get(key);
+        }
+        finally
+        {
+            this.readLock.unlock();
+        } 
+    }
 
+    /**
+     * @return a <b>copy</b> of the set of keys within the cache
+     */
+    public Set<String> keySet()
+    {
+        this.readLock.lock();
+        try
+        {
+            return new HashSet<String>(this.cache.keySet());
+        }
+        finally
+        {
+            this.readLock.unlock();
+        } 
+    }
+
+    /**
+     * @param key
+     *            the key to look for
+     * @return <code>true</code> if the cache contains an entry for the key
+     */
+    public boolean containsKey(String key)
+    {
+        this.readLock.lock();
+        try
+        {
+            return this.cache.containsKey(key);
+        }
+        finally
+        {
+            this.readLock.unlock();
+        } 
+    }
+    
     /**
      * @return a <b>cloned</b> version of the data
      */

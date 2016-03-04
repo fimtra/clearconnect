@@ -17,13 +17,16 @@ package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -211,6 +214,22 @@ public class NotifyingCacheTest
                 + fails);
         }
     }
+    
+    @Test
+    public void testContainsKeyAndKeySet()
+    {
+        assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
+        assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
+        assertTrue(candidate.containsKey("1"));
+        assertEquals("1", candidate.get("1"));
+        assertNull(candidate.get("11"));
+        assertFalse(candidate.containsKey("11"));
+        Set<String> expected = new HashSet<String>();
+        expected.add("2");
+        expected.add("1");
+        assertEquals(expected, candidate.keySet());
+    }
+    
 
     @Test
     public void testgetCacheSnapshot()
