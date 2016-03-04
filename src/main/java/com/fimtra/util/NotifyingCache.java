@@ -82,7 +82,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      *            the key for the data to retrieve
      * @return the data held in the cache for the key, may be null
      */
-    public DATA get(String key)
+    public final DATA get(String key)
     {
         this.readLock.lock();
         try
@@ -98,7 +98,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * @return a <b>copy</b> of the set of keys within the cache
      */
-    public Set<String> keySet()
+    public final Set<String> keySet()
     {
         this.readLock.lock();
         try
@@ -116,7 +116,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      *            the key to look for
      * @return <code>true</code> if the cache contains an entry for the key
      */
-    public boolean containsKey(String key)
+    public final boolean containsKey(String key)
     {
         this.readLock.lock();
         try
@@ -132,7 +132,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * @return a <b>cloned</b> version of the data
      */
-    public Map<String, DATA> getCacheSnapshot()
+    public final Map<String, DATA> getCacheSnapshot()
     {
         this.readLock.lock();
         try
@@ -150,7 +150,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * 
      * @return <code>true</code> if the listener was added, <code>false</code> otherwise
      */
-    public boolean addListener(final LISTENER_CLASS listener)
+    public final boolean addListener(final LISTENER_CLASS listener)
     {
         this.writeLock.lock();
         try
@@ -198,7 +198,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    public boolean removeListener(LISTENER_CLASS listener)
+    public final boolean removeListener(LISTENER_CLASS listener)
     {
         this.writeLock.lock();
         try
@@ -229,7 +229,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      *         <code>false</code> if it was already in the cache (no listeners are notified in this
      *         case).
      */
-    public boolean notifyListenersDataAdded(final String key, final DATA data)
+    public final boolean notifyListenersDataAdded(final String key, final DATA data)
     {
         this.writeLock.lock();
         try
@@ -272,7 +272,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
      *         found (no listeners are notified in this case)
      */
-    public boolean notifyListenersDataRemoved(final String key, final DATA data)
+    public final boolean notifyListenersDataRemoved(final String key, final DATA data)
     {
         this.writeLock.lock();
         try
@@ -309,14 +309,14 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    public void destroy()
+    public final void destroy()
     {
         this.listeners.clear();
         this.cache.clear();
     }
 
     @Override
-    public String toString()
+    public final String toString()
     {
         return "ListenerNotifier [data.size=" + this.cache.size() + ", listener.size=" + this.listeners.size() + "]";
     }
