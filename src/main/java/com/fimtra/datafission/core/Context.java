@@ -703,7 +703,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return latch;
         }
 
-        record.getWriteLock().lock();
+        final Lock writeLock = record.getWriteLock();
+        writeLock.lock();
         try
         {
             final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
@@ -777,7 +778,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
         finally
         {
-            record.getWriteLock().unlock();
+            writeLock.unlock();
         }
     }
 
