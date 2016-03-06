@@ -87,6 +87,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
+        verify(this.record).clear();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 
@@ -134,7 +135,7 @@ public class ImageDeltaChangeProcessorTest
         assertEquals(0, this.candidate.cachedDeltas.size());
         
         verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
-        verify(change25).applyCompleteAtomicChangeToRecord(eq(this.record));
+        verify(change25, never()).applyCompleteAtomicChangeToRecord(eq(this.record));
 
         // change 24 is not applied as it is found AFTER 25 and we then resync
         verify(change24, never()).applyCompleteAtomicChangeToRecord(eq(this.record));
@@ -142,6 +143,7 @@ public class ImageDeltaChangeProcessorTest
         verify(change20, never()).applyCompleteAtomicChangeToRecord(eq(this.record));
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
+        verify(this.record).clear();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 
@@ -182,6 +184,7 @@ public class ImageDeltaChangeProcessorTest
         verify(change20, never()).applyCompleteAtomicChangeToRecord(eq(this.record));
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
+        verify(this.record).clear();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 

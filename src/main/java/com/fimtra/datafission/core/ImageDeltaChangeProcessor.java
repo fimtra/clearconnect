@@ -114,14 +114,16 @@ final class ImageDeltaChangeProcessor
                     if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD * 2)
                     {
                         Log.log(this, "Scheduling resync, too many cached deltas for ", name);
+                        
+						this.imageReceived.remove(name);
                         return RESYNC;
                     }
                 }
             }
             else
             {
-                // its an image
-
+                // its an image and it forms the base-line definition for the record
+                record.clear();                
                 changeToApply.applyCompleteAtomicChangeToRecord(record);
                 
                 // apply any subsequent deltas (this only occurs over multicast topology)
@@ -133,17 +135,19 @@ final class ImageDeltaChangeProcessor
                         Integer.toString(deltas.size()));
 
                     long deltaSequence = -1;
-                    long lastSequence = -1;
+                    long lastSequence = changeToApply.getSequence();
                     for (IRecordChange deltaChange : deltas)
                     {
                         deltaSequence = deltaChange.getSequence();
                         // this allows us to skip deltas that are earlier than the received image
-                        if (deltaSequence > changeToApply.getSequence())
+                        if (deltaSequence > lastSequence)
                         {
-                            if (lastSequence > -1 && lastSequence + 1 != deltaSequence)
+                            if (lastSequence + 1 != deltaSequence)
                             {
                                 Log.log(this, "Incorrect sequence for cached delta ", name, ", delta.seq=",
                                     Long.toString(deltaSequence), " last.seq=", Long.toString(lastSequence));
+                                
+                                this.imageReceived.remove(name);
                                 return RESYNC;
                             }
                             deltaChange.applyCompleteAtomicChangeToRecord(record);
