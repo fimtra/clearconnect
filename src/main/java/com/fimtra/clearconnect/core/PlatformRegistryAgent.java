@@ -403,13 +403,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             if (this.platformName != null)
             {
                 Log.log(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
-                for (String serviceFamily : this.serviceAvailableListeners.getCacheSnapshot().keySet())
+                for (String serviceFamily : this.serviceAvailableListeners.keySet())
                 {
                     if (this.serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily, serviceFamily))
                     {
                         Log.log(PlatformRegistryAgent.this, "Dropped service: '", serviceFamily, "'");
                     }
                 }
+                // todo notify serviceInstanceAvailableListeners
                 this.registryAvailableListeners.notifyListenersDataRemoved(this.platformName, this.platformName);
                 this.platformName = null;
             }
@@ -468,8 +469,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             removeServiceAvailableListener(listener);
         }
-        Log.log(this, "Service available '",
-            ObjectUtils.safeToString(this.serviceAvailableListeners.getCacheSnapshot()), "'");
+        Log.log(this, "Service available '", serviceFamily, "'");
     }
 
     @Override
@@ -622,7 +622,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             PlatformServiceProxy proxy = this.serviceProxies.get(serviceFamily);
             if (proxy == null || !proxy.isActive())
             {
-                if (!this.serviceAvailableListeners.getCacheSnapshot().keySet().contains(serviceFamily))
+                if (!this.serviceAvailableListeners.keySet().contains(serviceFamily))
                 {
                     Log.log(PlatformRegistryAgent.this, "No service available for ", serviceFamily, (proxy != null
                         ? " (proxy is inactive)" : ""));
@@ -667,7 +667,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             PlatformServiceProxy proxy = this.serviceInstanceProxies.get(serviceInstanceId);
             if (proxy == null || !proxy.isActive())
             {
-                if (!this.serviceInstanceAvailableListeners.getCacheSnapshot().keySet().contains(serviceInstanceId))
+                if (!this.serviceInstanceAvailableListeners.keySet().contains(serviceInstanceId))
                 {
                     Log.log(PlatformRegistryAgent.this, "No service instance available for ", serviceInstanceId,
                         (proxy != null ? " (proxy is inactive)" : ""));

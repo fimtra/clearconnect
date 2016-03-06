@@ -141,7 +141,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public Set<String> getAllRecordNames()
     {
-        return this.recordAvailableNotifyingCache.getCacheSnapshot().keySet();
+        return this.recordAvailableNotifyingCache.keySet();
     }
 
     @Override
