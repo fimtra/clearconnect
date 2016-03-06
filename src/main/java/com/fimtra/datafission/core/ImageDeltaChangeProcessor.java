@@ -26,6 +26,10 @@ import com.fimtra.util.LowGcLinkedList;
 
 /**
  * Handles applying images/delta changes to local records received from remote records.
+ * <p>
+ * NOTE: this class has logic to deal with multicast topology where deltas are sent on a separate
+ * stream to images, hence why this class has logic to cache deltas and apply them on image being
+ * received.
  * 
  * @author Ramon Servadei
  */
@@ -58,6 +62,8 @@ final class ImageDeltaChangeProcessor
     int processRxChange(final IRecordChange changeToApply, final String name, IRecord record)
     {
         final boolean imageAlreadyReceived = this.imageReceived.containsKey(name);
+        
+        // if the sequence is wrong...
         if (record.getSequence() + 1 != changeToApply.getSequence())
         {
             final boolean isDelta = changeToApply.getScope() == IRecordChange.DELTA_SCOPE_CHAR;
@@ -69,10 +75,8 @@ final class ImageDeltaChangeProcessor
                         Long.toString(changeToApply.getSequence()), ", record.seq=",
                         Long.toString(record.getSequence()));
 
-                    if (this.imageReceived.remove(name) != null)
-                    {
-                        return RESYNC;
-                    }
+                    this.imageReceived.remove(name);
+                    return RESYNC;
                 }
                 else
                 {
@@ -85,10 +89,8 @@ final class ImageDeltaChangeProcessor
                             Long.toString(changeToApply.getSequence()), ", record.seq=",
                             Long.toString(record.getSequence()));
 
-                        if (this.imageReceived.remove(name) != null)
-                        {
-                            return RESYNC;
-                        }
+                        this.imageReceived.remove(name);
+                        return RESYNC;
                     }
                 }
             }
@@ -111,6 +113,7 @@ final class ImageDeltaChangeProcessor
                     
                     if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD * 2)
                     {
+                        Log.log(this, "Scheduling resync, too many cached deltas for ", name);
                         return RESYNC;
                     }
                 }
@@ -120,22 +123,21 @@ final class ImageDeltaChangeProcessor
                 // its an image
 
                 changeToApply.applyCompleteAtomicChangeToRecord(record);
-                // apply any subsequent deltas
-                LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
+                
+                // apply any subsequent deltas (this only occurs over multicast topology)
+                final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
                 if (deltas != null)
                 {
-                    if (deltas.size() > DataFissionProperties.Values.DELTA_COUNT_LOG_THRESHOLD)
-                    {
-                        Log.log(this, "Processing deltas for image ", name, ", image.seq=",
-                            Long.toString(changeToApply.getSequence()), ", delta count is ",
-                            Integer.toString(deltas.size()));
-                    }
+                    Log.log(this, "Processing deltas for image ", name, ", image.seq=",
+                        Long.toString(changeToApply.getSequence()), ", delta count is ",
+                        Integer.toString(deltas.size()));
 
                     long deltaSequence = -1;
                     long lastSequence = -1;
                     for (IRecordChange deltaChange : deltas)
                     {
                         deltaSequence = deltaChange.getSequence();
+                        // this allows us to skip deltas that are earlier than the received image
                         if (deltaSequence > changeToApply.getSequence())
                         {
                             if (lastSequence > -1 && lastSequence + 1 != deltaSequence)
