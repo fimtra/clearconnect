@@ -764,7 +764,8 @@ public class PlatformUtils
      */
     public static String[] decomposePlatformServiceInstanceID(String platformServiceInstanceID)
     {
-        int index = platformServiceInstanceID.indexOf(SERVICE_INSTANCE_PREFIX);
+        final int length = platformServiceInstanceID.length();
+        int index = platformServiceInstanceID.lastIndexOf(SERVICE_INSTANCE_PREFIX, length);
         if (index == -1)
         {
             return null;
@@ -772,7 +773,7 @@ public class PlatformUtils
         return new String[] {
             platformServiceInstanceID.substring(0, index),
             platformServiceInstanceID.substring(index + SERVICE_INSTANCE_PREFIX.length(),
-                platformServiceInstanceID.length() - SERVICE_INSTANCE_SUFFIX.length()) };
+                length - SERVICE_INSTANCE_SUFFIX.length()) };
     }
 
     public static final int DECOMPOSED_SERVICE_NAME_INDEX = 0;
@@ -838,6 +839,7 @@ public class PlatformUtils
         final String rpcName, final IValue... rpcArgs) throws TimeOutException
     {
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
+        // TODO getAllRpcs is expensive - calls snapshot each time
         rpcRef.set(component.getAllRpcs().get(rpcName));
         if (rpcRef.get() == null)
         {
