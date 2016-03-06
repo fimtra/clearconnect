@@ -726,8 +726,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         // update the image with the atomic changes in the runnable
                         final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
                         
-                        // this can happen if there is a concurrent delete 
-                        if(notifyImage == null)
+                        // this can happen if there is a concurrent delete
+                        if (notifyImage == null)
                         {
                             return;
                         }
@@ -861,9 +861,22 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             }
                             final long start = System.nanoTime();
                             final IRecord imageSnapshot = getLastPublishedImage(name);
-                            observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
-                            ContextUtils.measureTask(name, "record image-on-subscribe", observer,
-                                (System.nanoTime() - start));
+                            // this can be null if there is a concurrent delete
+                            // ... nothing we can do about this, the subscription is still valid though
+                            if (imageSnapshot != null)
+                            {
+                                observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
+                                ContextUtils.measureTask(name, "record image-on-subscribe", observer,
+                                    (System.nanoTime() - start));
+                            }
+                            else
+                            {
+                                if (log)
+                                {
+                                    Log.log(this, "No initial image available '", name, "', listener=",
+                                        ObjectUtils.safeToString(observer));
+                                }
+                            }
                         }
 
                         @Override
