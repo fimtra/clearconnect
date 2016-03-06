@@ -267,7 +267,12 @@ final class AtomicChangeTeleporter
         this.maxChangesPerPart = maxChangesPerPart;
         this.receivedParts = new ConcurrentHashMap<String, AtomicChange>();
     }
-
+    
+    void reset()
+    {
+        this.receivedParts.clear();
+    }
+    
     /**
      * Split the change into parts
      * 

@@ -22,8 +22,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -48,6 +48,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.mockito.internal.verification.AtLeast;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -499,8 +500,8 @@ public class ProxyContextTest
 
         awaitLatch(record1Latch);
 
-        Mockito.verify(filter).accept(eq(permissionToken), eq(record1));
-        Mockito.verify(filter).accept(eq(permissionToken), eq(record2));
+        Mockito.verify(filter, atLeast(1)).accept(eq(permissionToken), eq(record1));
+        Mockito.verify(filter, atLeast(1)).accept(eq(permissionToken), eq(record2));
         verifyNoMoreInteractions(filter);
     }
 

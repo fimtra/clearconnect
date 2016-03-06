@@ -888,6 +888,7 @@ public final class ProxyContext implements IObserverContext
                     }
 
                     ProxyContext.this.imageDeltaProcessor.reset();
+                    ProxyContext.this.teleportReceiver.reset();
                     
                     // update the connection status
                     ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
