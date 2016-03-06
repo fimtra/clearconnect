@@ -744,9 +744,18 @@ public class PlatformUtils
      * 
      * @return the ID to uniquely identify the service member of this service, format is
      *         <tt>'serviceFamily[serviceMember]'</tt>
+     * @throws IllegalArgumentException
+     *             if the service member contains "[" or "]"
      */
     public static String composePlatformServiceInstanceID(String serviceFamily, String serviceMember)
     {
+        if (serviceMember.indexOf(SERVICE_INSTANCE_PREFIX, 0) > -1
+            || serviceMember.indexOf(SERVICE_INSTANCE_SUFFIX, 0) > -1)
+        {
+            throw new IllegalArgumentException(
+                "Service member name '" + serviceMember + "' cannot contain characters [ or ]");
+        }
+            
         final StringBuilder sb =
             new StringBuilder(serviceFamily.length() + serviceMember.length() + SERVICE_INSTANCE_PREFIX.length()
                 + SERVICE_INSTANCE_SUFFIX.length());

@@ -129,4 +129,20 @@ public class PlatformUtilsTest
                 serviceName, serviceMemberName))[1]);
         assertNull(PlatformUtils.decomposePlatformServiceInstanceID("not correct format"));
     }
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testComposeServiceInstanceID_with_close_square_brace_in_memberName()
+    {
+        String serviceName = "sdf1 d[a special]";
+        String serviceMemberName = "sdf2 ]sdf";
+        PlatformUtils.composePlatformServiceInstanceID(serviceName, serviceMemberName);
+    }
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testComposeServiceInstanceID_with_open_square_brace_in_memberName()
+    {
+        String serviceName = "sdf1 d[a special]";
+        String serviceMemberName = "sdf2 [sdf";
+        PlatformUtils.composePlatformServiceInstanceID(serviceName, serviceMemberName);
+    }
 }
