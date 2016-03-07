@@ -1171,13 +1171,10 @@ public final class ProxyContext implements IObserverContext
                         return;
                     }
 
-                    // todo need an actual resync command AND batch up pending commands into a single send
+                    // todo need to batch up pending commands into a single send
                     Log.log(this, "Sending re-sync ", name);
                     final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
-                    ProxyContext.this.channel.sendAsync(
-                        ProxyContext.this.codec.getTxMessageForUnsubscribe(recordNames));
-                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
-                        insertPermissionToken(ProxyContext.this.tokenPerRecord.get(name), recordNames)));
+                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForResync(recordNames));
                 }
             }, this.resyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS, TimeUnit.MICROSECONDS);
         }

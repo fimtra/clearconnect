@@ -90,6 +90,8 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static final String RPC_COMMAND = "rpc" + DELIMITER;
     static final char[] RPC_COMMAND_CHARS = RPC_COMMAND.toCharArray();
+    static final String RESYNC_COMMAND = "r" + DELIMITER;
+    static final char[] RESYNC_COMMAND_CHARS = RESYNC_COMMAND.toCharArray();
     static final String SUBSCRIBE_COMMAND = "s" + DELIMITER;
     static final char[] SUBSCRIBE_COMMAND_CHARS = SUBSCRIBE_COMMAND.toCharArray();
     static final String UNSUBSCRIBE_COMMAND = "u" + DELIMITER;
@@ -114,6 +116,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public CommandEnum getCommand(char[] decodedMessage)
     {
+        // todo optimise this to just scan and process once...
+        
         // commands from a client:
         // show = show all record names
         // s|<name>|<name>|... = subscribe for records
@@ -127,6 +131,10 @@ public class StringProtocolCodec implements ICodec<char[]>
         if (isCommand(decodedMessage, UNSUBSCRIBE_COMMAND_CHARS))
         {
             return CommandEnum.UNSUBSCRIBE;
+        }
+        if (isCommand(decodedMessage, RESYNC_COMMAND_CHARS))
+        {
+            return CommandEnum.RESYNC;
         }
         if (isCommand(decodedMessage, RPC_COMMAND_CHARS))
         {
@@ -197,6 +205,12 @@ public class StringProtocolCodec implements ICodec<char[]>
     public byte[] getTxMessageForIdentify(String proxyIdentity)
     {
         return (getEncodedNamesForCommandMessage(IDENTIFY_COMMAND, proxyIdentity)).getBytes(getCharset());
+    }
+
+    @Override
+    public byte[] getTxMessageForResync(String... names)
+    {
+        return (getEncodedNamesForCommandMessage(RESYNC_COMMAND, names)).getBytes(getCharset());
     }
 
     /**
@@ -782,7 +796,13 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
-
+    
+    @Override
+    public List<String> getResyncArgumentsFromDecodedMessage(char[] decodedMessage)
+    {
+        return getNamesFromCommandMessage(decodedMessage);
+    }
+    
     @Override
     public String getIdentityArgumentFromDecodedMessage(char[] decodedMessage)
     {

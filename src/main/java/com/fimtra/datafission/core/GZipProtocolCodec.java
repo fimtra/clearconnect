@@ -86,4 +86,10 @@ public class GZipProtocolCodec extends StringProtocolCodec
     {
         return new GZipProtocolCodec();
     }
+
+    @Override
+    public byte[] getTxMessageForResync(String... names)
+    {
+        return GZipUtils.compress(super.getTxMessageForResync(names));
+    }
 }

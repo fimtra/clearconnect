@@ -35,7 +35,7 @@ public interface ICodec<T>
     public enum CommandEnum
     {
         // todo remove SHOW and corresponding Tx methods on codec
-        NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY
+        NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
     }
 
     /**
@@ -80,6 +80,15 @@ public interface ICodec<T>
     List<String> getUnsubscribeArgumentsFromDecodedMessage(T decodedMessage);
 
     /**
+     * Get the names of the records to resync
+     * 
+     * @param decodedMessage
+     *            the decoded data for the resync command
+     * @return the names of the records in the resync command
+     */
+    List<String> getResyncArgumentsFromDecodedMessage(T decodedMessage);
+
+    /**
      * @return the message byte[] to send that represents the atomic change
      */
     byte[] getTxMessageForAtomicChange(IRecordChange atomicChange);
@@ -106,11 +115,16 @@ public interface ICodec<T>
      * @see #getSubscribeArgumentsFromDecodedMessage(Object)
      */
     byte[] getTxMessageForSubscribe(String... names);
-
+    
     /**
      * @return the message byte[] to send that represents an unsubscribe for the named records
      */
     byte[] getTxMessageForUnsubscribe(String... names);
+
+    /**
+     * @return the message byte[] to send that represents a resync for the named records
+     */
+    byte[] getTxMessageForResync(String... names);
 
     /**
      * Create an {@link IRecordChange} representing the RPC and encode into a byte[]

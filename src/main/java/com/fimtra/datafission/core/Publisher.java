@@ -527,6 +527,37 @@ public class Publisher
             }
         }
 
+        void resync(final String name)
+        {
+            try
+            {
+                Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
+                {
+
+                    @Override
+                    public void run()
+                    {
+                        final IRecord lastPublishedImage = Publisher.this.context.getLastPublishedImage(name);
+                        if (lastPublishedImage != null)
+                        {
+                            publish(ProxyContextPublisher.this.codec.getTxMessageForAtomicChange(
+                                new AtomicChange(lastPublishedImage)), true);
+                        }
+                    }
+
+                    @Override
+                    public Object context()
+                    {
+                        return name;
+                    }
+                });
+            }
+            catch (Exception e)
+            {
+                Log.log(ProxyContextPublisher.this, "Could not resync " + name, e);
+            }
+        }
+
         void destroy()
         {
             this.active = false;
@@ -582,6 +613,7 @@ public class Publisher
         }
     }
 
+    final ConcurrentMap<String, Future<?>> pendingResyncs;
     final ConcurrentMap<String, Future<?>> pendingSubscribes;
     final Map<ITransportChannel, ProxyContextPublisher> proxyContextPublishers;
     final Context context;
@@ -638,6 +670,7 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new ReentrantLock();
+        this.pendingResyncs = new ConcurrentHashMap<String, Future<?>>();
         this.pendingSubscribes = new ConcurrentHashMap<String, Future<?>>();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
@@ -711,6 +744,10 @@ public class Publisher
                                 case UNSUBSCRIBE:
                                     unsubscribe(
                                         channelsCodec.getUnsubscribeArgumentsFromDecodedMessage(decodedMessage), source);
+                                    break;
+                                case RESYNC:
+                                    resync(
+                                        channelsCodec.getResyncArgumentsFromDecodedMessage(decodedMessage), source);
                                     break;
                                 case NOOP:
                                     break;
@@ -865,7 +902,26 @@ public class Publisher
         }
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
     }
-    
+
+    void resync(List<String> recordNames, ITransportChannel client)
+    {
+        final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
+        for (final String name : recordNames)
+        {
+            // this is a throttle to reduce image flooding on the network due to mass resyncs
+            this.pendingResyncs.put(name, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    Publisher.this.pendingResyncs.remove(name);
+                    proxyContextPublisher.resync(name);
+                }
+            }, this.pendingResyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
+                TimeUnit.MICROSECONDS));
+        }
+    }
+
     void subscribe(final List<String> recordNames, final ITransportChannel client)
     {
         // the first item is always the permission token
