@@ -116,7 +116,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache;
     final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionListenerCache;
     final IRecord stats;
-
+    final EndPointAddress endPointAddress;
     final ScheduledFuture<?> statsUpdateTask;
 
     @SuppressWarnings({ "unchecked" })
@@ -126,7 +126,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         TransportTechnologyEnum transportTechnology)
     {
         this.startTimeMillis = System.currentTimeMillis();
-
+        
         this.platformName = platformName;
         this.serviceFamily = serviceFamily;
         this.serviceMember = serviceMember;
@@ -253,6 +253,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             this.context.createRpc(rpc);
         }
 
+        // NOTE: we need to return the actual port used by the publisher for transport assigned port
+        // (e.g. ephemeral port for TCP)
+        this.endPointAddress = new EndPointAddress(host, this.publisher.getEndPointAddress().getPort());
+        
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
@@ -478,7 +482,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public EndPointAddress getEndPointAddress()
     {
-        return this.publisher.getEndPointAddress();
+        return this.endPointAddress;
     }
 
     @Override
