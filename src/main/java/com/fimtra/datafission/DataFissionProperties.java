@@ -169,11 +169,11 @@ public abstract class DataFissionProperties
         String DELTA_COUNT_LOG_THRESHOLD = BASE + "deltaCountLogThreshold";
 
         /**
-         * The number of milliseconds to delay each re-sync message. This reduces re-sync flooding
+         * The number of microseconds to delay each re-sync message. This reduces re-sync flooding
          * when a {@link ProxyContext} reconnects to a bounced {@link Context}. <br>
-         * E.g. <code>-DdataFission.resyncDelayMillis=10</code>
+         * E.g. <code>-DdataFission.resyncDelayMicros=100</code>
          */
-        String RESYNC_DELAY_MILLIS = BASE + "resyncDelayMillis";
+        String RESYNC_DELAY_MICROS = BASE + "resyncDelayMicros";
     }
 
     /**
@@ -353,11 +353,11 @@ public abstract class DataFissionProperties
         /**
          * The delay between sending subsequent resync messages.
          * <p>
-         * Default is 10.
+         * Default is 100.
          * 
-         * @see Names#RESYNC_DELAY_MILLIS
+         * @see Names#RESYNC_DELAY_MICROS
          */
-        int RESYNC_DELAY_MILLIS = Integer.parseInt(System.getProperty(Names.RESYNC_DELAY_MILLIS, "10"));
+        int RESYNC_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.RESYNC_DELAY_MICROS, "100"));
     }
 
     private DataFissionProperties()
