@@ -22,8 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -580,6 +582,7 @@ public class Publisher
         }
     }
 
+    final ConcurrentMap<String, Future<?>> pendingSubscribes;
     final Map<ITransportChannel, ProxyContextPublisher> proxyContextPublishers;
     final Context context;
     final ICodec mainCodec;
@@ -635,6 +638,7 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new ReentrantLock();
+        this.pendingSubscribes = new ConcurrentHashMap<String, Future<?>>();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
@@ -847,13 +851,21 @@ public class Publisher
     void unsubscribe(List<String> recordNames, ITransportChannel client)
     {
         ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
+        Future<?> future;
         for (String name : recordNames)
         {
+            future = this.pendingSubscribes.remove(name);
+            if (future != null)
+            {
+                // even if there is a concurrent subscribe, the actions occur on a sequential
+                // runnable bound to the name so the unsubscribe will happen after the subscribe
+                future.cancel(false);
+            }
             proxyContextPublisher.unsubscribe(name);
         }
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
     }
-
+    
     void subscribe(final List<String> recordNames, final ITransportChannel client)
     {
         // the first item is always the permission token
@@ -862,20 +874,31 @@ public class Publisher
         final List<String> ackSubscribes = new ArrayList<String>(recordNames.size());
         final List<String> nokSubscribes = new ArrayList<String>(recordNames.size());
 
-        for (String name : recordNames)
+        for (final String name : recordNames)
         {
-            proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes, new Runnable()
+            // this is a throttle for inbound subscribes, reduces initial image flooding on the
+            // network due to mass subscription
+            this.pendingSubscribes.put(name, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
+                    Publisher.this.pendingSubscribes.remove(name);
+                    proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes, new Runnable()
                     {
-                        sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                        sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                    }
+                        @Override
+                        public void run()
+                        {
+                            if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
+                            {
+                                sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                                sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                            }
+                        }
+                    });
                 }
-            });
+            }, this.pendingSubscribes.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
+                TimeUnit.MICROSECONDS));
         }
     }
 

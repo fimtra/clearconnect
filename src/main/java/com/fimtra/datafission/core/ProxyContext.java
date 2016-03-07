@@ -1179,7 +1179,7 @@ public final class ProxyContext implements IObserverContext
                     ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
                         insertPermissionToken(ProxyContext.this.tokenPerRecord.get(name), recordNames)));
                 }
-            }, this.resyncs.size() * DataFissionProperties.Values.RESYNC_DELAY_MICROS, TimeUnit.MICROSECONDS);
+            }, this.resyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS, TimeUnit.MICROSECONDS);
         }
         else
         {
