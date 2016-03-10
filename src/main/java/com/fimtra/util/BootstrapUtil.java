@@ -37,7 +37,7 @@ public abstract class BootstrapUtil {
 	private final static String sysKeyFileSeparator = "file.separator";
 
 	private final static String initKeyInitFileName = "boot.initFilename";
-	private final static String initKeyRegstryEndPointAddresses = "boot.registryEndPointsAddresses";
+	private final static String initKeyRegstryEndPointAddresses = "boot.registryEndPointAddresses";
 	private static final char colonDelimiter = ':';
 	private static final char commaDelimiter = ',';
 	private static final String fileExtProperties = ".properties";
@@ -66,7 +66,7 @@ public abstract class BootstrapUtil {
 			registryConfigString = initProperties.getProperty(initKeyRegstryEndPointAddresses);
 		}
 		List<EndPointAddress> registryEndPoints = new ArrayList<EndPointAddress>();
-		if (registryConfigString == null) {
+		if (registryConfigString == null || registryConfigString.isEmpty()) {
 			registryEndPoints.add(new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT));
 		} else {
 			List<String> registryConfigs = StringUtils.split(registryConfigString, commaDelimiter);
