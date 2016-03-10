@@ -30,7 +30,7 @@ import com.fimtra.tcpchannel.TcpChannelUtils;
  * 
  * @author Paul Mackinlay
  */
-public abstract class BootstrapUtil {
+public abstract class BootstrapUtils {
 
 	private final static String sysKeyHomeDir = "user.home";
 	private final static String sysKeyWorkingDir = "user.dir";
@@ -43,7 +43,7 @@ public abstract class BootstrapUtil {
 	private static final String fileExtProperties = ".properties";
 	private static final String dot = ".";
 
-	private BootstrapUtil() {
+	private BootstrapUtils() {
 		// no access outside this class
 	}
 
@@ -86,7 +86,7 @@ public abstract class BootstrapUtil {
 	 * </ol>
 	 */
 	public static String getHomeDirInitFilename(String uiName) {
-		return (System.getenv(initKeyInitFileName) == null
+		return (System.getProperty(initKeyInitFileName) == null
 				? System.getProperty(sysKeyHomeDir) + System.getProperty(sysKeyFileSeparator) + dot + uiName + fileExtProperties
 				: System.getProperty(initKeyInitFileName));
 	}
@@ -99,19 +99,19 @@ public abstract class BootstrapUtil {
 	 * </ol>
 	 */
 	public static String getWorkingDirInitFilename(String serverName) {
-		return (System.getenv(initKeyInitFileName) == null
+		return (System.getProperty(initKeyInitFileName) == null
 				? System.getProperty(sysKeyWorkingDir) + System.getProperty(sysKeyFileSeparator) + serverName + fileExtProperties
 				: System.getProperty(initKeyInitFileName));
 	}
 
 	/**
-	 * Returns the initial properties in the initFilename.
+	 * Returns the initial properties in the initFilename. Note the root of initFilename is the classpath root.
 	 */
 	public static Properties getInitProperties(String initFilename) {
 		Properties initProperties = new Properties();
 		InputStream inputStream = null;
 		try {
-			inputStream = BootstrapUtil.class.getResourceAsStream(initFilename);
+			inputStream = BootstrapUtils.class.getResourceAsStream(initFilename);
 			initProperties.load(inputStream);
 		} catch (Exception e) {
 			// no properties - will use defaults
