@@ -189,6 +189,7 @@ public final class PlatformRegistry
         String SERVICES = "Services";
         String SERVICE_INSTANCES = "ServiceInstances";
         String CONNECTIONS = "Connections";
+        String UPTIME = "Uptime";
     }
 
     public static final String SERVICE_NAME = "PlatformRegistry";
@@ -749,6 +750,7 @@ public final class PlatformRegistry
 @SuppressWarnings("synthetic-access")
 final class EventHandler
 {
+    final long startTimeMillis;
     final PlatformRegistry registry;
     private final ScheduledExecutorService eventExecutor;
     final Set<String> pendingPublish;
@@ -757,6 +759,7 @@ final class EventHandler
     {
         // todo all members of the registry should be moved into this class
         this.registry = registry;
+        this.startTimeMillis = System.currentTimeMillis();
         this.pendingPublish = new HashSet<String>();
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
     }
@@ -890,9 +893,18 @@ final class EventHandler
         }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
             LongValue.valueOf(serviceInstanceCount));
-
+        
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
+
+        final long uptimeSecs = (long) ((System.currentTimeMillis() - this.startTimeMillis) * 0.001);
+        final int minsPerDay = 3600 * 24;
+        final long days = uptimeSecs / minsPerDay;
+        final long hoursMinsLeft = uptimeSecs - (days * minsPerDay);
+        final long hours = hoursMinsLeft / 3600;
+        final double mins = (long) (((double) hoursMinsLeft % 3600) / 60);
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.UPTIME,
+            "" + days + "d:" + (hours < 10 ? "0" : "") + hours + "h:" + (mins < 10 ? "0" : "") + (long) mins + "m");
         publishTimed(this.registry.platformSummary);
     }
 
@@ -1149,7 +1161,7 @@ final class EventHandler
                             // service is connected
                             registerPlatformServiceInstance(agentName, serviceInstanceId, serviceRecordStructure,
                                 redundancyModeEnum);
-
+                         // todo banner all registered services?
                             Log.log(EventHandler.this.registry, "Registered ", redundancyMode, " service ",
                                 serviceInstanceId, " (monitoring with " + serviceProxy.getChannelString(), ")");
                         }

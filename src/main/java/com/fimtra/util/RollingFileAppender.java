@@ -212,8 +212,9 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
 
             if (this.currentCharCount >= this.maxChars)
             {
-                this.writer.close();
                 final String rolledFileName = this.name + "." + this.rollCount++ + ".logged";
+                this.writer.append("file closed as ").append(rolledFileName);
+                this.writer.close();
                 if (this.currentFile.renameTo(new File(this.parent, rolledFileName)))
                 {
                     this.currentFile = new File(this.parent, this.name);
