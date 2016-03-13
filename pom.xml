@@ -4,7 +4,7 @@
 
 	<groupId>com.fimtra</groupId>
 	<artifactId>clearconnect</artifactId>
-	<version>3.5.1</version>
+	<version>3.5.2-SNAPSHOT</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>A real-time multi-process application framework</description>
 	<packaging>jar</packaging>
