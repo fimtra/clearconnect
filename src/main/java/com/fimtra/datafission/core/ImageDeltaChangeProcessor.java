@@ -80,15 +80,14 @@ final class ImageDeltaChangeProcessor
                 }
                 else
                 {
-                    // an image is only acceptable when it has already been received if the image
-                    // sequence number matches the current record sequence number (it is, in effect
-                    // a duplicate), otherwise we must re-sync
-                    if (record.getSequence() != changeToApply.getSequence())
+                    // if the image is a previous image...
+                    if (record.getSequence() > changeToApply.getSequence())
                     {
                         Log.log(this, "Incorrect image seq for ", name, ", image.seq=",
                             Long.toString(changeToApply.getSequence()), ", record.seq=",
                             Long.toString(record.getSequence()));
 
+                        // todo should this be a NOOP instead?
                         this.imageReceived.remove(name);
                         return RESYNC;
                     }
@@ -130,10 +129,6 @@ final class ImageDeltaChangeProcessor
                 final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
                 if (deltas != null)
                 {
-                    Log.log(this, "Processing deltas for image ", name, ", image.seq=",
-                        Long.toString(changeToApply.getSequence()), ", delta count is ",
-                        Integer.toString(deltas.size()));
-
                     long deltaSequence = -1;
                     long lastSequence = changeToApply.getSequence();
                     for (IRecordChange deltaChange : deltas)

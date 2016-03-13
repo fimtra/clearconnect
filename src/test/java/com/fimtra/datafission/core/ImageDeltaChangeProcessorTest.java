@@ -90,16 +90,31 @@ public class ImageDeltaChangeProcessorTest
         verify(this.record).clear();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
+    
+    @Test
+    public void testProcessRxChange_Image_Sequence_Behind()
+    {
+        when(this.changeToApply.getSequence()).thenReturn(23l);
+        when(this.record.getSequence()).thenReturn(26l);
+        when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
+        
+        assertEquals(ImageDeltaChangeProcessor.RESYNC, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
+        verify(this.changeToApply).getScope();
+        verifyGetSequenceCalled();
+        verifyNoMoreInteractions(this.record, this.changeToApply);
+    }
 
     @Test
-    public void testProcessRxChange_Image_Sequence_Wrong()
+    public void testProcessRxChange_Image_Sequence_Ahead()
     {
         when(this.changeToApply.getSequence()).thenReturn(23l);
         when(this.record.getSequence()).thenReturn(1l);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
 
-        assertEquals(ImageDeltaChangeProcessor.RESYNC, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
+        assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
         verify(this.changeToApply).getScope();
+        verify(this.record).clear();
+        verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
         verifyGetSequenceCalled();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
