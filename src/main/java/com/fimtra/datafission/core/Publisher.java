@@ -406,10 +406,12 @@ public class Publisher
         volatile long bytesPublished;
         String identity;
         volatile boolean active;
+        boolean codecSyncExpected;
 
         ProxyContextPublisher(ITransportChannel client, ICodec codec)
         {
             this.active = true;
+            this.codecSyncExpected = true;
             this.codec = codec;
             this.start = System.currentTimeMillis();
             this.client = client;
@@ -700,7 +702,15 @@ public class Publisher
                         @Override
                         public void run()
                         {
-                            final ICodec channelsCodec = getProxyContextPublisher(source).codec;
+                            final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(source);
+                            final ICodec channelsCodec = proxyContextPublisher.codec;
+                            if(proxyContextPublisher.codecSyncExpected)
+                            {
+                                proxyContextPublisher.codecSyncExpected = false;
+                                channelsCodec.handleCodecSyncData(data);
+                                proxyContextPublisher.client.sendAsync(channelsCodec.getTxMessageForCodecSync());
+                                return;
+                            }
                             Object decodedMessage = channelsCodec.decode(data);
                             final CommandEnum command = channelsCodec.getCommand(decodedMessage);
                             if (log)

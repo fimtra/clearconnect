@@ -34,8 +34,8 @@ public interface ICodec<T>
 {
     public enum CommandEnum
     {
-        // todo remove SHOW and corresponding Tx methods on codec
-        NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
+            // todo remove SHOW and corresponding Tx methods on codec
+            NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
     }
 
     /**
@@ -115,7 +115,7 @@ public interface ICodec<T>
      * @see #getSubscribeArgumentsFromDecodedMessage(Object)
      */
     byte[] getTxMessageForSubscribe(String... names);
-    
+
     /**
      * @return the message byte[] to send that represents an unsubscribe for the named records
      */
@@ -176,4 +176,15 @@ public interface ICodec<T>
      * @return the charset used by this code
      */
     Charset getCharset();
+
+    /**
+     * @return the byte[] for the codec sync message
+     */
+    byte[] getTxMessageForCodecSync();
+
+    /**
+     * @param data
+     *            the data from {@link #getTxMessageForCodecSync()} from the codec at the other end
+     */
+    void handleCodecSyncData(byte[] data);
 }

@@ -794,7 +794,8 @@ public final class ProxyContext implements IObserverContext
         final IReceiver receiver = new IReceiver()
         {
             final Object receiverToken = newToken;
-
+            boolean codecSyncExpected = true;
+            
             @Override
             public void onChannelConnected(ITransportChannel channel)
             {
@@ -811,7 +812,12 @@ public final class ProxyContext implements IObserverContext
                     // the previous codec
                     ProxyContext.this.codec = ProxyContext.this.codec.newInstance();
 
-                    ProxyContext.this.onChannelConnected();
+                    // proxy initiates the codec-sync operation
+                    // THIS MUST BE THE FIRST MESSAGE SENT
+                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());      
+                    
+                    // now identity the proxy with the publisher end
+                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
                 }
             }
 
@@ -824,6 +830,15 @@ public final class ProxyContext implements IObserverContext
                 // thread
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
+                    if (this.codecSyncExpected)
+                    {
+                        this.codecSyncExpected = false;
+                        ProxyContext.this.codec.handleCodecSyncData(data);
+                        // the proxy is only informed of the connection when the codec-sync has completed                        
+                        ProxyContext.this.onChannelConnected();
+                        return;
+                    }
+                    
                     try
                     {
                         ProxyContext.this.onDataReceived(data);
@@ -865,7 +880,6 @@ public final class ProxyContext implements IObserverContext
         this.currentEndPoint = channelBuilder.getEndPointAddress();
         Log.log(this, "Constructing channel using ", ObjectUtils.safeToString(channelBuilder));
         final ITransportChannel channel = channelBuilder.buildChannel(receiver);
-        channel.sendAsync(this.codec.getTxMessageForIdentify(getName()));
         return channel;
     }
 
@@ -889,7 +903,7 @@ public final class ProxyContext implements IObserverContext
 
                     ProxyContext.this.imageDeltaProcessor.reset();
                     ProxyContext.this.teleportReceiver.reset();
-                    
+
                     // update the connection status
                     ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
 

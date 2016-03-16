@@ -65,6 +65,8 @@ public class StringProtocolCodec implements ICodec<char[]>
 {
     public static final int CHARRAY_SIZE = 32;
 
+    static final byte[] SYNC = "sync".getBytes();
+    
     static final char CHAR_TOKEN_DELIM = '|';
     static final char CHAR_KEY_VALUE_SEPARATOR = '=';
     static final char CHAR_ESCAPE = '\\';
@@ -843,6 +845,18 @@ public class StringProtocolCodec implements ICodec<char[]>
     public Charset getCharset()
     {
         return UTF8;
+    }
+
+    @Override
+    public byte[] getTxMessageForCodecSync()
+    {
+        return SYNC;
+    }
+
+    @Override
+    public void handleCodecSyncData(byte[] data)
+    {
+        
     }
 }
 
