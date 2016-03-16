@@ -183,7 +183,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
-            new NotifyingCache<IServiceAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IServiceAvailableListener, String>()
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -241,7 +241,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
-            new NotifyingCache<IServiceInstanceAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IServiceInstanceAvailableListener, String>()
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -310,7 +310,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
-            new NotifyingCache<IRecordAvailableListener, String>(context.getUtilityExecutor())
+            new NotifyingCache<IRecordAvailableListener, String>()
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordAvailableListener listener, String key, String data)
@@ -355,7 +355,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
-            new NotifyingCache<IRpcAvailableListener, IRpcInstance>(context.getUtilityExecutor())
+            new NotifyingCache<IRpcAvailableListener, IRpcInstance>()
             {
                 @Override
                 protected void notifyListenerDataAdded(IRpcAvailableListener listener, String key, IRpcInstance data)
@@ -422,7 +422,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
-            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(context.getUtilityExecutor())
+            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>()
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordSubscriptionListener listener, String key,
@@ -486,7 +486,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
-            new NotifyingCache<IRecordConnectionStatusListener, IValue>(proxyContext.getUtilityExecutor())
+            new NotifyingCache<IRecordConnectionStatusListener, IValue>()
             {
                 @Override
                 protected void notifyListenerDataRemoved(IRecordConnectionStatusListener listener, String key,
@@ -544,7 +544,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionNotifyingCache =
-            new NotifyingCache<IProxyConnectionListener, IValue>(proxyContext.getUtilityExecutor())
+            new NotifyingCache<IProxyConnectionListener, IValue>()
             {
                 @Override
                 protected void notifyListenerDataRemoved(IProxyConnectionListener listener, String key, IValue data)
@@ -615,7 +615,7 @@ public class PlatformUtils
     {
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
-            new NotifyingCache<IServiceConnectionStatusListener, Connection>(proxyContext.getUtilityExecutor())
+            new NotifyingCache<IServiceConnectionStatusListener, Connection>()
             {
                 @Override
                 protected void notifyListenerDataRemoved(IServiceConnectionStatusListener listener, String key,
