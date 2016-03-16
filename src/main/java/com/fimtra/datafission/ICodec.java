@@ -18,7 +18,6 @@ package com.fimtra.datafission;
 import java.nio.charset.Charset;
 import java.rmi.Remote;
 import java.util.List;
-import java.util.Set;
 
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 
@@ -34,8 +33,7 @@ public interface ICodec<T>
 {
     public enum CommandEnum
     {
-            // todo remove SHOW and corresponding Tx methods on codec
-            NOOP, SHOW, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
+            NOOP, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
     }
 
     /**
@@ -151,11 +149,6 @@ public interface ICodec<T>
      * @see #getAtomicChangeFromRxMessage(byte[])
      */
     IRecordChange getRpcFromRxMessage(T decodedMessage);
-
-    /**
-     * @return the message to send that holds all the record names
-     */
-    byte[] getTxMessageForShow(Set<String> recordNames);
 
     /**
      * Decode the byte[] into the data object type

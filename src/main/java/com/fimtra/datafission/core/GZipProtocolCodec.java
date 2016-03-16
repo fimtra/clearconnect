@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
-import java.util.Set;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
@@ -61,12 +60,6 @@ public class GZipProtocolCodec extends StringProtocolCodec
     public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
     {
         return GZipUtils.compress(super.getTxMessageForRpc(rpcName, args, resultRecordName));
-    }
-
-    @Override
-    public byte[] getTxMessageForShow(Set<String> recordNames)
-    {
-        return GZipUtils.compress(super.getTxMessageForShow(recordNames));
     }
 
     @Override

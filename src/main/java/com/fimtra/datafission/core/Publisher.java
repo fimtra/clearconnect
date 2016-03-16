@@ -744,9 +744,6 @@ public class Publisher
                                     identify(channelsCodec.getIdentityArgumentFromDecodedMessage(decodedMessage),
                                         source);
                                     break;
-                                case SHOW:
-                                    show(source);
-                                    break;
                                 case SUBSCRIBE:
                                     subscribe(channelsCodec.getSubscribeArgumentsFromDecodedMessage(decodedMessage),
                                         source);
@@ -887,12 +884,6 @@ public class Publisher
                 return client;
             }
         });
-    }
-
-    @SuppressWarnings("unchecked")
-    void show(ITransportChannel client)
-    {
-        client.sendAsync(getProxyContextPublisher(client).codec.getTxMessageForShow(this.context.getRecordNames()));
     }
 
     void unsubscribe(List<String> recordNames, ITransportChannel client)

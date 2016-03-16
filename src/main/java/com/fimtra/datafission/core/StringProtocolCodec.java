@@ -98,8 +98,6 @@ public class StringProtocolCodec implements ICodec<char[]>
     static final char[] SUBSCRIBE_COMMAND_CHARS = SUBSCRIBE_COMMAND.toCharArray();
     static final String UNSUBSCRIBE_COMMAND = "u" + DELIMITER;
     static final char[] UNSUBSCRIBE_COMMAND_CHARS = UNSUBSCRIBE_COMMAND.toCharArray();
-    static final String SHOW_COMMAND = "show";
-    static final char[] SHOW_COMMAND_CHARS = SHOW_COMMAND.toCharArray();
     static final String IDENTIFY_COMMAND = "i" + DELIMITER;
     static final char[] IDENTIFY_COMMAND_CHARS = IDENTIFY_COMMAND.toCharArray();
 
@@ -145,10 +143,6 @@ public class StringProtocolCodec implements ICodec<char[]>
         if (isCommand(decodedMessage, IDENTIFY_COMMAND_CHARS))
         {
             return CommandEnum.IDENTIFY;
-        }
-        if (isCommand(decodedMessage, SHOW_COMMAND_CHARS))
-        {
-            return CommandEnum.SHOW;
         }
         throw new IllegalArgumentException("Could not interpret command '" + new String(decodedMessage) + "'");
     }
@@ -809,18 +803,6 @@ public class StringProtocolCodec implements ICodec<char[]>
     public String getIdentityArgumentFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage).get(0);
-    }
-
-    @Override
-    public byte[] getTxMessageForShow(Set<String> recordNames)
-    {
-        final StringBuilder result = new StringBuilder(recordNames.size() * 10);
-        for (String name : recordNames)
-        {
-            result.append(name).append(StringProtocolCodec.DELIMITER);
-        }
-        byte[] bytes = result.toString().getBytes(getCharset());
-        return bytes;
     }
 
     @Override
