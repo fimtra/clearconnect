@@ -311,8 +311,8 @@ public final class RpcInstance implements IRpcInstance
                         }
                         if (ContextUtils.isCoreThread() || ContextUtils.isRpcThread())
                         {
-                            Log.log(this,
-                                "WARNING: RPC being called using a core/RPC thread - this can lead to a stall.");
+                            Log.log(this, "WARNING: RPC ", this.rpcName,
+                                " is being called using a core/RPC thread - this can lead to a stall.");
                         }
                         this.callReceiver.sendAsync(this.codec.getTxMessageForRpc(this.rpcName, args, resultMapName));
 
