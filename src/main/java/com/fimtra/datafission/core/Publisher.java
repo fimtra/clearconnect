@@ -109,8 +109,8 @@ public class Publisher
      * 
      * @see ISystemRecordNames
      */
-    static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER = ThreadUtils.newScheduledExecutorService(
-        "system-record-publisher", 1);
+    static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
+        ThreadUtils.newScheduledExecutorService("system-record-publisher", 1);
 
     final Lock lock;
 
@@ -187,9 +187,9 @@ public class Publisher
         final boolean isSystemRecordUpdateCoalesced(String name)
         {
             return ContextUtils.isSystemRecordName(name) &&
-            // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
-            // CONNECTED/DISCONNECTED
-                !ISystemRecordNames.CONTEXT_STATUS.equals(name);
+                // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
+                // CONNECTED/DISCONNECTED
+            !ISystemRecordNames.CONTEXT_STATUS.equals(name);
         }
 
         @Override
@@ -261,7 +261,8 @@ public class Publisher
                                 {
                                     Log.log(Publisher.this.context,
                                         "Could not get result from addObserver call for permissionToken="
-                                            + permissionToken + ", recordName=" + name, e);
+                                            + permissionToken + ", recordName=" + name,
+                                        e);
                                     nokSubscribes.add(name);
                                 }
                             }
@@ -289,8 +290,9 @@ public class Publisher
                                                         // NOTE: sequences increment-then-get, hence
                                                         // to send the previous image, we need to
                                                         // subtract 1
-                                                        change.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
-                                                            name).get() - 1);
+                                                        change.setSequence(
+                                                            ProxyContextMultiplexer.this.systemRecordSequences.get(
+                                                                name).get() - 1);
                                                         publishImageOnSubscribe(publisher, change);
                                                     }
 
@@ -452,31 +454,30 @@ public class Publisher
                 @Override
                 public void run()
                 {
-                    final Map<String, IValue> submapConnections =
-                        Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(ProxyContextPublisher.this.client));
+                    final Map<String, IValue> submapConnections = Publisher.this.connectionsRecord.getOrCreateSubMap(
+                        getTransmissionStatisticsFieldName(ProxyContextPublisher.this.client));
 
                     final double perSec =
                         1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
                     final double inverse_1K = 1 / 1024d;
-                    submapConnections.put(
-                        IContextConnectionsRecordFields.MSGS_PER_SEC,
-                        LongValue.valueOf((long) ((ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished) * perSec)));
-                    submapConnections.put(
-                        IContextConnectionsRecordFields.KB_PER_SEC,
-                        DoubleValue.valueOf((((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished)
-                            * inverse_1K * perSec) * 10)) / 10d)));
+                    submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC, LongValue.valueOf(
+                        (long) ((ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished) * perSec)));
+                    submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC,
+                        DoubleValue.valueOf(
+                            (((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished)
+                                * inverse_1K * perSec) * 10)) / 10d)));
                     submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
                         LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
-                            : ProxyContextPublisher.this.bytesPublished / ProxyContextPublisher.this.messagesPublished));
+                            : ProxyContextPublisher.this.bytesPublished
+                                / ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
                         LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
                     submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
                         LongValue.valueOf((long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
                     submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
-                    submapConnections.put(
-                        IContextConnectionsRecordFields.UPTIME,
-                        LongValue.valueOf((long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
+                    submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
+                        (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
 
                     this.lastMessagesPublished = ProxyContextPublisher.this.messagesPublished;
                     this.lastBytesPublished = ProxyContextPublisher.this.bytesPublished;
@@ -681,16 +682,15 @@ public class Publisher
         this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
 
         this.mainCodec = codec;
-        this.server =
-            transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
-                new EndPointAddress(node, port)).buildService(new IReceiver()
+        this.server = transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
+            new EndPointAddress(node, port)).buildService(new IReceiver()
             {
                 @Override
                 public void onChannelConnected(ITransportChannel channel)
                 {
                     // construct the ProxyContextPublisher
-                    Publisher.this.proxyContextPublishers.put(channel, new ProxyContextPublisher(channel,
-                        Publisher.this.mainCodec.newInstance()));
+                    Publisher.this.proxyContextPublishers.put(channel,
+                        new ProxyContextPublisher(channel, Publisher.this.mainCodec.newInstance()));
                 }
 
                 @Override
@@ -704,7 +704,7 @@ public class Publisher
                         {
                             final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(source);
                             final ICodec channelsCodec = proxyContextPublisher.codec;
-                            if(proxyContextPublisher.codecSyncExpected)
+                            if (proxyContextPublisher.codecSyncExpected)
                             {
                                 proxyContextPublisher.codecSyncExpected = false;
                                 channelsCodec.handleCodecSyncData(data);
@@ -725,8 +725,9 @@ public class Publisher
                                     }
                                     else
                                     {
-                                        Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage, 0,
-                                            maxLogLength), "...(too long)' from ", ObjectUtils.safeToString(source));
+                                        Log.log(Publisher.class, "(<-) '",
+                                            new String((char[]) decodedMessage, 0, maxLogLength),
+                                            "...(too long)' from ", ObjectUtils.safeToString(source));
                                     }
                                 }
                                 else
@@ -749,12 +750,11 @@ public class Publisher
                                         source);
                                     break;
                                 case UNSUBSCRIBE:
-                                    unsubscribe(
-                                        channelsCodec.getUnsubscribeArgumentsFromDecodedMessage(decodedMessage), source);
+                                    unsubscribe(channelsCodec.getUnsubscribeArgumentsFromDecodedMessage(decodedMessage),
+                                        source);
                                     break;
                                 case RESYNC:
-                                    resync(
-                                        channelsCodec.getResyncArgumentsFromDecodedMessage(decodedMessage), source);
+                                    resync(channelsCodec.getResyncArgumentsFromDecodedMessage(decodedMessage), source);
                                     break;
                                 case NOOP:
                                     break;
@@ -800,34 +800,33 @@ public class Publisher
             this.contextConnectionsRecordPublishTask.cancel(false);
         }
         this.contextConnectionsRecordPublishTask =
-            this.context.getUtilityExecutor().scheduleWithFixedDelay(
-                new Runnable()
+            this.context.getUtilityExecutor().scheduleWithFixedDelay(new Runnable()
+            {
+                CountDownLatch publishAtomicChange = new CountDownLatch(0);
+
+                @Override
+                public void run()
                 {
-                    CountDownLatch publishAtomicChange = new CountDownLatch(0);
-
-                    @Override
-                    public void run()
+                    if (this.publishAtomicChange.getCount() == 0)
                     {
-                        if (this.publishAtomicChange.getCount() == 0)
+                        // check each connection is still active - remove if not
+                        final Set<String> connectionIds =
+                            new HashSet<String>(Publisher.this.connectionsRecord.getSubMapKeys());
+                        final Set<ITransportChannel> channels = Publisher.this.proxyContextPublishers.keySet();
+                        for (ITransportChannel channel : channels)
                         {
-                            // check each connection is still active - remove if not
-                            final Set<String> connectionIds =
-                                new HashSet<String>(Publisher.this.connectionsRecord.getSubMapKeys());
-                            final Set<ITransportChannel> channels = Publisher.this.proxyContextPublishers.keySet();
-                            for (ITransportChannel channel : channels)
-                            {
-                                connectionIds.remove(getTransmissionStatisticsFieldName(channel));
-                            }
-                            for (String connectionId : connectionIds)
-                            {
-                                Publisher.this.connectionsRecord.removeSubMap(connectionId);
-                            }
-
-                            this.publishAtomicChange =
-                                Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+                            connectionIds.remove(getTransmissionStatisticsFieldName(channel));
                         }
+                        for (String connectionId : connectionIds)
+                        {
+                            Publisher.this.connectionsRecord.removeSubMap(connectionId);
+                        }
+
+                        this.publishAtomicChange =
+                            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
                     }
-                }, this.contextConnectionsRecordPublishPeriodMillis, this.contextConnectionsRecordPublishPeriodMillis,
+                }
+            }, this.contextConnectionsRecordPublishPeriodMillis, this.contextConnectionsRecordPublishPeriodMillis,
                 TimeUnit.MILLISECONDS);
 
         // reschedule the stats update tasks at the new period
@@ -1001,8 +1000,8 @@ public class Publisher
         if (proxyContextPublisher == null)
         {
             // ProxyContextPublisher only constructed on channel connection!
-            throw new NullPointerException("No ProxyContextPublisher for " + ObjectUtils.safeToString(client)
-                + ", is the channel closed?");
+            throw new NullPointerException(
+                "No ProxyContextPublisher for " + ObjectUtils.safeToString(client) + ", is the channel closed?");
         }
         return proxyContextPublisher;
     }
