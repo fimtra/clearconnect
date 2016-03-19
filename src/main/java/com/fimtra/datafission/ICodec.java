@@ -178,6 +178,12 @@ public interface ICodec<T>
     /**
      * @param data
      *            the data from {@link #getTxMessageForCodecSync()} from the codec at the other end
+     * @return a response to send, <code>null</code> for no response
      */
-    void handleCodecSyncData(byte[] data);
+    byte[] handleCodecSyncData(byte[] data);
+
+    /**
+     * @return <code>true</code> if the codec is synced with its counterpart
+     */
+    boolean isSynced();
 }

@@ -836,9 +836,15 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public void handleCodecSyncData(byte[] data)
+    public byte[] handleCodecSyncData(byte[] data)
     {
-        
+        return null;
+    }
+
+    @Override
+    public boolean isSynced()
+    {
+        return true;
     }
 }
 
