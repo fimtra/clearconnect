@@ -22,13 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.CollectionUtils;
 
@@ -65,81 +58,119 @@ public final class ThimbleExecutor implements Executor
     public static final String QUEUE_LEVEL_STATS = "QueueLevelStats";
 
     /**
-     * A task runner exists for each internal single-threaded Executor used by the
-     * {@link ThimbleExecutor}. The task runner handles dequeuing of tasks from the internal
-     * {@link TaskQueue} and executing them using its single-threaded executor.
+     * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
+     * and executing them.
      * 
      * @author Ramon Servadei
      */
     final class TaskRunner implements Runnable
     {
-        private Runnable task;
-        private final ExecutorService executor;
+        final Thread workerThread;
+        final Object lock;
 
-        TaskRunner(ExecutorService executor)
+        Runnable task;
+        boolean active = true;
+
+        TaskRunner(final String name)
         {
             super();
-            this.executor = executor;
+            this.lock = new Object();
+            this.workerThread = new Thread(this, name);
+            this.workerThread.setDaemon(true);
+            this.workerThread.start();
         }
 
         @Override
         public void run()
         {
-            // todo should the run add some context to the thread name?
-            // System.err.println(Thread.currentThread() + " running " + task);
-            try
+            while (this.active)
             {
-                this.task.run();
-            }
-            catch (Exception e)
-            {
-                StringWriter stringWriter = new StringWriter(1000);
-                PrintWriter pw = new PrintWriter(stringWriter);
-                pw.print(Thread.currentThread() + " could not execute " + this.task + " due to: ");
-                e.printStackTrace(pw);
-                System.err.print(stringWriter.toString());
-            }
-            finally
-            {
-                this.task = null;
-                
-                ThimbleExecutor.this.taskQueue.lock.lock();
-                try
+                if (this.task != null)
                 {
-                    executeNextTask_callWhilstHoldingLock(this);
+                    try
+                    {
+                        this.task.run();
+                    }
+                    catch (Exception e)
+                    {
+                        StringWriter stringWriter = new StringWriter(1000);
+                        PrintWriter pw = new PrintWriter(stringWriter);
+                        pw.print(Thread.currentThread() + " could not execute " + this.task + " due to: ");
+                        e.printStackTrace(pw);
+                        System.err.print(stringWriter.toString());
+                    }
+                    finally
+                    {
+                        this.task = null;
+
+                        ThimbleExecutor.this.taskQueue.lock.lock();
+                        try
+                        {
+                            ThimbleExecutor.this.stats.itemExecuted();
+                            
+                            this.task = ThimbleExecutor.this.taskQueue.poll_callWhilstHoldingLock();
+                            if (this.task == null)
+                            {
+                                // no more tasks so place back into the runners list
+                                ThimbleExecutor.this.taskRunners.offer(TaskRunner.this);
+                            }
+                        }
+                        finally
+                        {
+                            ThimbleExecutor.this.taskQueue.lock.unlock();
+                        }
+                    }
                 }
-                finally
+                else
                 {
-                    ThimbleExecutor.this.taskQueue.lock.unlock();
+                    synchronized (this.lock)
+                    {
+                        if (this.task == null)
+                        {
+                            try
+                            {
+                                this.lock.wait();
+                            }
+                            catch (InterruptedException e)
+                            {
+                                // don't care
+                            }
+                        }
+                    }
                 }
             }
         }
 
         void execute(Runnable task)
         {
-            this.task = task;
-            try
+            synchronized (this.lock)
             {
-                this.executor.execute(this);
-            }
-            catch (RejectedExecutionException e)
-            {
-                // REALLY don't care
+                this.task = task;
+                this.lock.notify();
             }
         }
 
         void destroy()
         {
-            this.executor.shutdown();
+            this.active = false;
+            // trigger to stop
+            execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    // noop
+                }
+            });
         }
     }
 
     final TaskQueue taskQueue;
-    private final Queue<TaskRunner> taskRunners;
+    final Queue<TaskRunner> taskRunners;
     private final List<TaskRunner> taskRunnersRef;
     private final String name;
     private final int size;
-    private TaskStatistics stats;
+    TaskStatistics stats;
 
     /**
      * Construct the {@link ThimbleExecutor} with a specific thread pool size.
@@ -171,21 +202,7 @@ public final class ThimbleExecutor implements Executor
         for (int i = 0; i < size; i++)
         {
             final String threadName = this.name + i;
-            ThreadPoolExecutor executor =
-                new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.MILLISECONDS,
-                    new LinkedBlockingDeque<Runnable>(), new ThreadFactory()
-                    {
-                        private final AtomicInteger threadNumber = new AtomicInteger();
-
-                        @Override
-                        public Thread newThread(Runnable r)
-                        {
-                            Thread t = new Thread(r, threadName + "-" + this.threadNumber.getAndIncrement());
-                            t.setDaemon(true);
-                            return t;
-                        }
-                    });
-            this.taskRunners.offer(new TaskRunner(executor));
+            this.taskRunners.offer(new TaskRunner(threadName));
         }
         this.taskRunnersRef = new ArrayList<TaskRunner>(this.taskRunners);
     }
@@ -199,16 +216,38 @@ public final class ThimbleExecutor implements Executor
     @Override
     public void execute(Runnable command)
     {
-        this.stats.itemSubmitted();
+        final Runnable task;
+        TaskRunner runner = null; 
+        
         this.taskQueue.lock.lock();
         try
         {
             this.taskQueue.offer_callWhilstHoldingLock(command);
-            executeNextTask_callWhilstHoldingLock(null);
+            this.stats.itemSubmitted();
+            
+            if (this.taskRunners.size() == 0)
+            {
+                // all runners being used - they will auto-drain the taskQueue
+                return;
+            }
+
+            task = this.taskQueue.poll_callWhilstHoldingLock();
+            // depending on the type of runnable, the queue may return null (e.g. if its a
+            // sequential task that is already processing)
+            if (task != null)
+            {
+                runner = this.taskRunners.poll();
+            }
         }
         finally
         {
             this.taskQueue.lock.unlock();
+        }
+        
+        // do the runner execute outside of the task queue lock
+        if(runner != null)
+        {
+            runner.execute(task);
         }
     }
 
@@ -244,29 +283,6 @@ public final class ThimbleExecutor implements Executor
     public TaskStatistics getExecutorStatistics()
     {
         return this.stats.intervalFinished();
-    }
-
-    void executeNextTask_callWhilstHoldingLock(final TaskRunner taskRunner)
-    {
-        TaskRunner runner = taskRunner;
-        if (runner == null)
-        {
-            if (this.taskRunners.size() == 0)
-            {
-                return;
-            }
-            runner = this.taskRunners.poll();
-        }
-        Runnable task = this.taskQueue.poll_callWhilstHoldingLock();
-        if (task != null)
-        {
-            runner.execute(task);
-            this.stats.itemExecuted();
-        }
-        else
-        {
-            this.taskRunners.offer(runner);
-        }
     }
 
     public void destroy()
