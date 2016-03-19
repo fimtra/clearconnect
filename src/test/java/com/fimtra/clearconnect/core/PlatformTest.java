@@ -43,7 +43,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -81,10 +83,13 @@ import com.fimtra.util.ThreadUtils;
 @SuppressWarnings({ "boxing", "unused" })
 public class PlatformTest
 {
-    private static String logStart(String string)
+    @Rule
+    public TestName name = new TestName();
+    
+    private String logStart()
     {
-        System.err.println(string);
-        return string;
+        System.err.println(this.name.getMethodName());
+        return this.name.getMethodName();
     }
 
     static class TestServiceAvailableListener implements IServiceAvailableListener
@@ -300,10 +305,57 @@ public class PlatformTest
         ChannelUtils.WATCHDOG.configure(5000);
     }
 
+    @Test
+    public void testBounceRegistry() throws Exception
+    {
+        final String SERVICE1 = logStart();
+        createAgent();
+        createAgent008();
+        this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+        
+        final TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
+        agent.addServiceAvailableListener(serviceListener);
+        TestServiceInstanceAvailableListener serviceInstanceListener = new TestServiceInstanceAvailableListener();
+        agent.addServiceInstanceAvailableListener(serviceInstanceListener);
+     
+        serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));
+
+        // stop the registry
+        registry.destroy();
+        
+        serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
+        serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));
+
+        // bit of a sleep for I/O to settle so we can re-create on the same port
+        int i = 0;
+        try
+        {
+            while (i++ < 10)
+            {
+                new Socket(registryHost, registryPort).close();
+                Thread.sleep(200);
+            }
+        }
+        catch (Exception er)
+        {
+        }
+     
+        // restart the registry, then check we get our services back
+        this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, registryPort);
+        this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
+        this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
+        
+        serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));        
+    }
+    
+    
     @Test(timeout = 30000l)
     public void testWaitForServices() throws IOException, InterruptedException
     {
-        final String SERVICE1 = logStart("testWaitForServices");
+        final String SERVICE1 = logStart();
         createAgent();
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -314,7 +366,7 @@ public class PlatformTest
     @Test(timeout = 30000l)
     public void testWaitForServicesNull() throws IOException, InterruptedException
     {
-        final String SERVICE1 = logStart("testWaitForServicesNull");
+        final String SERVICE1 = logStart();
         createAgent();
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -325,7 +377,7 @@ public class PlatformTest
     @Test
     public void testGetPlatformName() throws IOException, EventFailedException, InterruptedException
     {
-        final String SERVICE1 = logStart("testGetPlatformName");
+        final String SERVICE1 = logStart();
         createAgent();
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -336,7 +388,7 @@ public class PlatformTest
     @Test
     public void testCreateMultipleServiceInstances() throws IOException
     {
-        final String SERVICE1 = logStart("testCreateMultipleServiceInstances");
+        final String SERVICE1 = logStart();
         createAgent();
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -351,7 +403,7 @@ public class PlatformTest
     @Test
     public void testCannotMixRedundancyModeServices() throws IOException
     {
-        final String SERVICE1 = logStart("testCannotMixRedundancyModeServices");
+        final String SERVICE1 = logStart();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
@@ -362,7 +414,7 @@ public class PlatformTest
     @Test
     public void testLoadBalancedServices() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testLoadBalancedServices");
+        final String SERVICE1 = logStart();
         createAgent();
         createAgent008();
 
@@ -444,7 +496,7 @@ public class PlatformTest
     public void testFaultToleranceServiceInstanceChangesOverThenDestroyLastService() throws InterruptedException,
         IOException
     {
-        final String SERVICE1 = logStart("testFaultToleranceServiceInstanceChangesOverThenDestroyLastService");
+        final String SERVICE1 = logStart();
         Log.log(this, ">>>>>> START testServiceInstanceChangesOverThenDestroyLastService");
         createAgent();
         try
@@ -516,7 +568,7 @@ public class PlatformTest
     @Test
     public void testDestroyRegistry() throws IOException
     {
-        final String SERVICE1 = logStart("testDestroyRegistry");
+        final String SERVICE1 = logStart();
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -534,7 +586,7 @@ public class PlatformTest
     @Test
     public void testDestroyProxy() throws IOException
     {
-        final String SERVICE1 = logStart("testDestroyProxy");
+        final String SERVICE1 = logStart();
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -564,9 +616,9 @@ public class PlatformTest
     @Test
     public void testLocalServiceAddRemove() throws IOException
     {
-        final String SERVICE1 = logStart("testLocalServiceAddRemove1");
-        final String SERVICE2 = "testLocalServiceAddRemove2";
-        final String SERVICE3 = "testLocalServiceAddRemove3";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE3 = name.getMethodName() + "3";
         createAgent();
         boolean platformService =
             this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -595,7 +647,7 @@ public class PlatformTest
     @Test
     public void testAddProxyConnectionAvailableListener() throws IOException, InterruptedException
     {
-        final String SERVICE1 = logStart("testAddProxyConnectionAvailableListener");
+        final String SERVICE1 = logStart();
         createAgent008();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -638,9 +690,9 @@ public class PlatformTest
     @Test
     public void testAddServiceAvailableListenerAfterCreatingService() throws IOException
     {
-        final String SERVICE1 = logStart("testAddServiceAvailableListenerAfterCreatingService1");
-        final String SERVICE2 = "testAddServiceAvailableListenerAfterCreatingService2";
-        final String SERVICE3 = "testAddServiceAvailableListenerAfterCreatingService3";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE3 = name.getMethodName() + "3";
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -672,7 +724,7 @@ public class PlatformTest
     @Test
     public void testCannotCreateDuplicateNamedLocalService() throws IOException
     {
-        final String SERVICE1 = logStart("testCannotCreateDuplicateNamedLocalService");
+        final String SERVICE1 = logStart();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
@@ -683,8 +735,8 @@ public class PlatformTest
     @Test
     public void testDuplicatePortBetweenAgents() throws IOException
     {
-        final String SERVICE1 = logStart("testDuplicatePortBetweenAgents1");
-        final String SERVICE2 = "testDuplicatePortBetweenAgents2";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
         createAgent();
         createAgent008();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -696,8 +748,8 @@ public class PlatformTest
     @Test
     public void testServiceDetectedBetweenAgents() throws IOException
     {
-        final String SERVICE1 = logStart("testServiceDetectedBetweenAgents1");
-        final String SERVICE2 = "testServiceDetectedBetweenAgents2";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
         createAgent();
         createAgent008();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
@@ -724,7 +776,7 @@ public class PlatformTest
     @Test
     public void testDetectWhenPlatformServiceDies() throws IOException
     {
-        final String SERVICE1 = logStart("testDetectWhenPlatformServiceDies");
+        final String SERVICE1 = logStart();
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -743,7 +795,7 @@ public class PlatformTest
     @Test
     public void testDetectWhenPlatformServiceInstanceStartedAndDestroyed() throws Exception
     {
-        final String SERVICE1 = logStart("testDetectWhenPlatformServiceInstanceStartedAndDestroyed");
+        final String SERVICE1 = logStart();
         createAgent();
         createAgent008();
         TestServiceInstanceAvailableListener listener = new TestServiceInstanceAvailableListener();
@@ -832,7 +884,7 @@ public class PlatformTest
     @Test
     public void testDetectWhenPlatformServiceDiesAndResurrects() throws IOException
     {
-        final String SERVICE1 = logStart("testDetectWhenPlatformServiceDiesAndResurrects");
+        final String SERVICE1 = logStart();
         Log.log(this, ">>>>> START testDetectWhenPlatformServiceDiesAndResurrects");
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
@@ -857,8 +909,8 @@ public class PlatformTest
     @Test
     public void testUsingServiceProxiesBetweenServices() throws IOException, InterruptedException
     {
-        final String SERVICE1 = logStart("testUsingServiceProxiesBetweenServices1");
-        final String SERVICE2 = "testUsingServiceProxiesBetweenServices2";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
         Log.log(this, ">>>>> START testUsingServiceProxiesBetweenServices");
         createAgent();
         createAgent008();
@@ -905,8 +957,8 @@ public class PlatformTest
     @Test
     public void testDetectWhenPlatformRegistryDestroyed() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testDetectWhenPlatformRegistryDestroyed1");
-        final String SERVICE2 = "testDetectWhenPlatformRegistryDestroyed2";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
         createAgent();
         createAgent008();
         final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
@@ -971,7 +1023,7 @@ public class PlatformTest
         InterruptedException
     {
         final String SERVICE1 =
-            logStart("testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
+            logStart();
         Log.log(this, ">>>>> START testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
 
         int oldPort = registryPort;
@@ -1042,8 +1094,8 @@ public class PlatformTest
     public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents() throws IOException,
         InterruptedException
     {
-        final String SERVICE1 = logStart("testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents1");
-        final String SERVICE2 = "testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents2";
+        final String SERVICE1 = logStart();
+        final String SERVICE2 = name.getMethodName() + "2";
 
         Log.log(this, ">>>>> START testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
 
@@ -1215,12 +1267,12 @@ public class PlatformTest
 
     @Ignore
     @Test
-    // note: we ignore this as there is already a test doing this with to agents ->
+    // note: we ignore this as there is already a test doing this with two agents ->
     // testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents
     public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed() throws IOException,
         InterruptedException
     {
-        final String SERVICE1 = logStart("testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed1");
+        final String SERVICE1 = logStart();
 
         Log.log(this, ">>>>> START testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
 
@@ -1333,7 +1385,7 @@ public class PlatformTest
     @Test
     public void testPlatformRegistryDefaultPort() throws IOException, EventFailedException, InterruptedException
     {
-        final String SERVICE1 = logStart("testPlatformRegistryDefaultPort1");
+        final String SERVICE1 = logStart();
 
         this.registry.destroy();
         this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost);
@@ -1352,7 +1404,7 @@ public class PlatformTest
     @Test
     public void testPlatformServices() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testPlatformServices1");
+        final String SERVICE1 = logStart();
 
         Log.log(this, "START testPlatformServices");
 
@@ -1454,7 +1506,7 @@ public class PlatformTest
     @Test
     public void testPlatformConnections() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testPlatformConnections");
+        final String SERVICE1 = logStart();
 
         Log.log(this, "START testPlatformConnections");
 
@@ -1490,7 +1542,7 @@ public class PlatformTest
     @Test
     public void testPlatformRpcs() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testPlatformRpcs_FT");
+        final String SERVICE1 = logStart();
         final String SERVICE2 = "testPlatformRpcs_LB";
 
         Log.log(this, "START testPlatformRpcs");
@@ -1629,7 +1681,7 @@ public class PlatformTest
     @Test
     public void testPlatformRecords() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testPlatformRecords_FT");
+        final String SERVICE1 = logStart();
         final String SERVICE2 = "testPlatformRecords_LB";
 
         createAgent();
@@ -1769,7 +1821,7 @@ public class PlatformTest
     @Test
     public void testCountingRecordSubscriptionsPerService() throws InterruptedException, IOException
     {
-        final String SERVICE1 = logStart("testCountingRecordSubscriptionsPerService1");
+        final String SERVICE1 = logStart();
 
         createAgent();
 

@@ -410,7 +410,13 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         Log.log(PlatformRegistryAgent.this, "Dropped service: '", serviceFamily, "'");
                     }
                 }
-                // todo notify serviceInstanceAvailableListeners
+                for (String serviceInstance : this.serviceInstanceAvailableListeners.keySet())
+                {
+                    if (this.serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstance, serviceInstance))
+                    {
+                        Log.log(PlatformRegistryAgent.this, "Dropped serviceInstance: '", serviceInstance, "'");
+                    }
+                }
                 this.registryAvailableListeners.notifyListenersDataRemoved(this.platformName, this.platformName);
                 this.platformName = null;
             }
