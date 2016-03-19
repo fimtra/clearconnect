@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -101,7 +102,7 @@ public final class PlatformRegistry
     static final String RUNTIME_DYNAMIC = "runtimeDynamic";
     static final String AGENT_PROXY_ID_PREFIX = PlatformRegistry.SERVICE_NAME + PlatformUtils.SERVICE_CLIENT_DELIMITER;
     static final int AGENT_PROXY_ID_PREFIX_LEN = AGENT_PROXY_ID_PREFIX.length();
-
+    
     /**
      * Access for starting a {@link PlatformRegistry} using command line.
      * 
@@ -217,7 +218,7 @@ public final class PlatformRegistry
          * 
          * <pre>
          * sub-map key: serviceFamily
-         * sub-map structure: {key=service member name (NOT the service instance ID), value=system time when registered/last used}
+         * sub-map structure: {key=service member name (NOT the service instance ID), value=sequence number when registered/last used}
          * </pre>
          */
         String SERVICE_INSTANCES_PER_SERVICE_FAMILY = "Service Instances Per Service Family";
@@ -352,7 +353,8 @@ public final class PlatformRegistry
     final Map<String, IValue> pendingPlatformServices;
     final ThimbleExecutor coalescingExecutor;
     final EventHandler eventHandler;
-
+    final AtomicLong serviceSequence;
+    
     /**
      * Construct the platform registry using the default platform registry port.
      * 
@@ -400,7 +402,8 @@ public final class PlatformRegistry
         Log.log(this, "Creating ", registryInstanceId);
         this.coalescingExecutor = new ThimbleExecutor("coalescing-eventExecutor-" + registryInstanceId, 1);
         this.eventHandler = new EventHandler(this);
-
+        this.serviceSequence = new AtomicLong(0);
+        
         this.platformName = platformName;
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
@@ -426,7 +429,7 @@ public final class PlatformRegistry
         // register the RegistryService as a service!
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
         this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,
-            LongValue.valueOf(System.currentTimeMillis()));
+            LongValue.valueOf(nextSequence()));
         this.context.addObserver(new IRecordListener()
         {
             @Override
@@ -497,6 +500,11 @@ public final class PlatformRegistry
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
+    long nextSequence()
+    {
+        return this.serviceSequence.incrementAndGet();
+    }
+    
     private void createGetServiceInfoRecordNameForServiceRpc()
     {
         final RpcInstance getServiceInfoRecordNameForServiceRpc =
@@ -944,11 +952,11 @@ final class EventHandler
                 if (RedundancyModeEnum.valueOf(redundancyModeValue.textValue()) == RedundancyModeEnum.LOAD_BALANCED)
                 {
                     /*
-                     * for LB, the timestamp is updated to be the last selected time so the next
-                     * instance selected will be one with an earlier time and thus produce a
-                     * round-robin style selection policy
+                     * for LB, the sequence is updated so the next instance selected will be one
+                     * with an earlier sequence and thus produce a round-robin style selection
+                     * policy
                      */
-                    serviceInstances.put(activeServiceMemberName, LongValue.valueOf(System.currentTimeMillis()));
+                    serviceInstances.put(activeServiceMemberName, LongValue.valueOf(this.registry.nextSequence()));
                 }
                 else
                 {
@@ -1537,7 +1545,7 @@ final class EventHandler
 
         // register the service member
         this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).put(serviceMember,
-            LongValue.valueOf(System.currentTimeMillis()));
+            LongValue.valueOf(this.registry.nextSequence()));
         publishTimed(this.registry.serviceInstancesPerServiceFamily);
 
         // register the service instance against the agent
