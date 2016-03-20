@@ -847,12 +847,6 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
         return null;
     }
-
-    @Override
-    public boolean isSynced()
-    {
-        return this.synced;
-    }
 }
 
 /**

@@ -183,18 +183,21 @@ public interface ICodec<T>
     Charset getCharset();
 
     /**
-     * @return the byte[] for the codec sync message
-     * @see #isSynced()
+     * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
+     * 
+     * <pre>
+     * [proxy(client)]        [publisher(server)]
+     *        |                        |
+     *        |----(INITIAL SYNC)----->|
+     *        |                        |
+     *        |<---(SYNC RESPONSE)-----|
+     *        |                        |
+     *        |----(SYNC RESPONSE)---->|
+     * </pre>
+     * 
+     * @return the byte[] for the initial codec sync message
      */
     byte[] getTxMessageForCodecSync();
-
-    /**
-     * @param data
-     *            the data from {@link #getTxMessageForCodecSync()} from the codec at the other end
-     * @return a response to send, <code>null</code> for no response
-     * @see #isSynced()
-     */
-    byte[] handleCodecSyncData(byte[] data);
 
     /**
      * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
@@ -209,7 +212,9 @@ public interface ICodec<T>
      *        |----(SYNC RESPONSE)---->|
      * </pre>
      * 
-     * @return <code>true</code> if the codec is synced with its counterpart
+     * @param data
+     *            the data from the codec at the other end
+     * @return a response to send, <code>null</code> for no response
      */
-    boolean isSynced();
+    byte[] handleCodecSyncData(byte[] data);
 }
