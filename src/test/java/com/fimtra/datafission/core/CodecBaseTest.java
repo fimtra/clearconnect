@@ -262,10 +262,11 @@ public abstract class CodecBaseTest
     public void testRpcDetailsEncodeDecode()
     {
         IValue[] args = new IValue[] { TextValue.valueOf("lasers"), new DoubleValue(123d) };
-        byte[] txMessageForRpc = constructCandidate().getTxMessageForRpc("testRpc", args, "The result record name");
+        final ICodec constructCandidate = constructCandidate();
+        byte[] txMessageForRpc = constructCandidate.getTxMessageForRpc("testRpc", args, "The result record name");
 
         IRecordChange rpcDetails =
-            constructCandidate().getRpcFromRxMessage(constructCandidate().decode(txMessageForRpc));
+            constructCandidate.getRpcFromRxMessage(constructCandidate.decode(txMessageForRpc));
 
         Map<String, IValue> expected = new HashMap<String, IValue>();
         expected.put(RpcInstance.Remote.ARG_ + "0", TextValue.valueOf("lasers"));
@@ -280,13 +281,14 @@ public abstract class CodecBaseTest
     @Test
     public void testRpcDetailsEncodeDecodeWithSpecialCharacters()
     {
+        final ICodec constructCandidate = constructCandidate();
         IValue[] args = new IValue[] { TextValue.valueOf("lasers |\\="), new DoubleValue(123d) };
         byte[] txMessageForRpc =
-            constructCandidate().getTxMessageForRpc("testRpcDetailsEncodeDecodeWithSpecialCharacters", args,
+                constructCandidate.getTxMessageForRpc("testRpcDetailsEncodeDecodeWithSpecialCharacters", args,
                 "The result record name\\||=");
 
         IRecordChange rpcDetails =
-            constructCandidate().getRpcFromRxMessage(constructCandidate().decode(txMessageForRpc));
+            constructCandidate.getRpcFromRxMessage(constructCandidate.decode(txMessageForRpc));
 
         Map<String, IValue> expected = new HashMap<String, IValue>();
         expected.put(RpcInstance.Remote.ARG_ + "0", TextValue.valueOf("lasers |\\="));
