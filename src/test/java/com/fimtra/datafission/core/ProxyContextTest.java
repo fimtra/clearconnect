@@ -46,7 +46,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.mockito.Mockito;
 import org.mockito.internal.verification.AtLeast;
 
@@ -82,7 +84,11 @@ import com.fimtra.util.ThreadUtils;
 @SuppressWarnings({ "boxing", "unused" })
 public class ProxyContextTest
 {
-    private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 1000;
+    @Rule
+    public TestName name = new TestName();
+    
+    // note: the cipher protocol takes longer to initialise to increase to 3 secs
+    private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 3000;
 
     static List<TestLongValueSequenceCheckingAtomicChangeObserver> observers =
         new ArrayList<TestLongValueSequenceCheckingAtomicChangeObserver>();
@@ -117,9 +123,9 @@ public class ProxyContextTest
         this.PORT = getNextFreePort();
     }
 
-    void createComponents(String name) throws IOException
+    private void createComponents() throws IOException
     {
-        this.contextName = getClass().getSimpleName() + "-" + name;
+        this.contextName = getClass().getSimpleName() + "-" + this.name.getMethodName();
         System.err.println(this.contextName);
         Log.log(this, ">>> START: " + this.contextName);
         this.context = new Context(this.contextName);
@@ -276,7 +282,7 @@ public class ProxyContextTest
     @Test
     public void testGetSubscribedRecords() throws Exception
     {
-        createComponents("testGetSubscribedRecords");
+        createComponents();
         assertEquals(0, this.candidate.getSubscribedRecords().size());
         IRecordListener observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, "one", "two", "three");
@@ -302,7 +308,7 @@ public class ProxyContextTest
     @Test
     public void testResubscribe() throws Exception
     {
-        createComponents("testResubscribe");
+        createComponents();
         final String name = "sdf1";
         final String key = "Kmy1";
         final TextValue v1 = TextValue.valueOf("value1");
@@ -328,7 +334,7 @@ public class ProxyContextTest
     @Test
     public void testResync() throws Exception
     {
-        createComponents("testResync");
+        createComponents();
         final String name = "sdf1";
         final String key = "Kmy1";
         final TextValue v1 = TextValue.valueOf("value1");
@@ -372,7 +378,7 @@ public class ProxyContextTest
     @Test
     public void testResyncForIncorrectSequence() throws Exception
     {
-        createComponents("testResubscribe");
+        createComponents();
         final String name = "sdf1";
         final String key = "Kmy1";
         final TextValue v1 = TextValue.valueOf("value1");
@@ -404,7 +410,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextSubMap() throws Exception
     {
-        createComponents("testSingleRemoteContextSubMap");
+        createComponents();
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(listener, "subMap1");
 
@@ -423,7 +429,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContext_RemoveFieldFromRecord() throws Exception
     {
-        createComponents("testSingleRemoteContext_RemoveFieldFromRecord");
+        createComponents();
         final String recordName = "record78";
         final IRecord record = this.context.createRecord(recordName);
         record.put("F1", "lasers");
@@ -465,7 +471,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextSingleSubscription() throws Exception
     {
-        createComponents("testSingleRemoteContextSingleSubscription");
+        createComponents();
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
 
@@ -475,7 +481,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextSingleSubscription_permission() throws Exception
     {
-        createComponents("testSingleRemoteContextSingleSubscription_permission");
+        createComponents();
 
         String name2 = "duff2";
         String permissionToken = "pt_sdf2";
@@ -508,7 +514,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextSingleSubscription_removeNullObserver() throws Exception
     {
-        createComponents("testSingleRemoteContextSingleSubscription_removeNullObserver");
+        createComponents();
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
 
@@ -521,7 +527,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextMultipleSubscriptions() throws Exception
     {
-        createComponents("testSingleRemoteContextMultipleSubscriptions");
+        createComponents();
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
         CountDownLatch record2Latch = new CountDownLatch(UPDATE_COUNT);
@@ -537,7 +543,7 @@ public class ProxyContextTest
     @Test
     public void testSubscribeForRemoteContextRegistry() throws Exception
     {
-        createComponents("testSubscribeForRemoteContextRegistry");
+        createComponents();
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(true);
         observer.latch = new CountDownLatch(3);
         this.candidate.addObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
@@ -569,7 +575,7 @@ public class ProxyContextTest
     @Test
     public void testSingleRemoteContextWithUnsubscribing() throws Exception
     {
-        createComponents("testSingleRemoteContextWithUnsubscribing");
+        createComponents();
         assertFalse(this.candidate.isRecordConnected(record1));
         assertFalse(this.candidate.isRecordConnected(record2));
         assertFalse(this.candidate.isRecordConnected(record3));
@@ -631,7 +637,7 @@ public class ProxyContextTest
     @Test
     public void testMultipleRemoteContextsAndSubscribeForSingleRecord() throws Exception
     {
-        createComponents("testMultipleRemoteContextsAndSubscribeForSingleRecord");
+        createComponents();
         ProxyContext candidate2 = new ProxyContext("testRemote2", getProtocolCodec(), LOCALHOST, this.PORT);
         try
         {
@@ -675,7 +681,7 @@ public class ProxyContextTest
     public void testMultipleRemoteContextsAndSubscribeForRemoteContextSubscriptions()
         throws IOException, InterruptedException
     {
-        createComponents("testMultipleRemoteContextsAndSubscribeForRemoteContextSubscriptions");
+        createComponents();
         ProxyContext candidate2 = new ProxyContext("testRemote2", getProtocolCodec(), LOCALHOST, this.PORT);
         try
         {
@@ -732,7 +738,7 @@ public class ProxyContextTest
     @Test
     public void testContextStatusReflectsMultipleRemoteContexts() throws Exception
     {
-        createComponents("testContextStatusReflectsMultipleRemoteContexts");
+        createComponents();
         final int fieldCountForSingleConnection = 14;
 
         this.publisher.publishContextConnectionsRecordAtPeriod(20);
@@ -890,7 +896,7 @@ public class ProxyContextTest
     @Test
     public void testDuplicateSubscriptions() throws Exception
     {
-        createComponents("testDuplicateSubscriptions");
+        createComponents();
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
 
@@ -907,7 +913,7 @@ public class ProxyContextTest
     @Test
     public void testDuplicateSubscriptionsFromDifferentRemoteContexts() throws Exception
     {
-        createComponents("testDuplicateSubscriptionsFromDifferentRemoteContexts");
+        createComponents();
         ProxyContext candidate2 = new ProxyContext("c2", getProtocolCodec(), LOCALHOST, this.PORT);
         try
         {
@@ -933,7 +939,7 @@ public class ProxyContextTest
     @Test
     public void testSubscriptionsBeforeMapCreation() throws Exception
     {
-        createComponents("testSubscriptionsBeforeMapCreation");
+        createComponents();
         this.executor.shutdownNow();
         this.candidate.destroy();
         this.publisher.destroy();
@@ -962,7 +968,7 @@ public class ProxyContextTest
     @Test
     public void testPublisherWithSingleSubscriptionAndTcpConnectionInterrupted() throws Exception
     {
-        createComponents("testPublisherWithSingleSubscriptionAndTcpConnectionInterrupted");
+        createComponents();
         final int timeout = TIMEOUT;
         final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
 
@@ -1041,7 +1047,7 @@ public class ProxyContextTest
     @Test
     public void testPublisherWithMultipleSubscriptionsAndTcpConnectionInterrupted() throws Exception
     {
-        createComponents("testPublisherWithMultipleSubscriptionsAndTcpConnectionInterrupted");
+        createComponents();
         final int timeout = TIMEOUT;
         final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
 
@@ -1164,7 +1170,7 @@ public class ProxyContextTest
     @Test
     public void testPublisherDestroyed() throws Exception
     {
-        createComponents("testPublisherDestroyed");
+        createComponents();
         TestCachingAtomicChangeObserver contextStatusObserver = new TestCachingAtomicChangeObserver(true);
         this.candidate.addObserver(contextStatusObserver, ISystemRecordNames.CONTEXT_STATUS);
         TestCachingAtomicChangeObserver recordConnectionObserver = new TestCachingAtomicChangeObserver();
@@ -1275,7 +1281,7 @@ public class ProxyContextTest
     @Test
     public void testTextValueWithCRLF() throws Exception
     {
-        createComponents("testTextValueWithCRLF");
+        createComponents();
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
         String crlfMapName = "crlfMap";
@@ -1308,7 +1314,7 @@ public class ProxyContextTest
     @Test
     public void testGetRemoteRecordImage() throws Exception
     {
-        createComponents("testGetRemoteRecordImage");
+        createComponents();
         Map<?, ?> remoteRecordImage = this.candidate.getRemoteRecordImage(record1, REMOTE_RECORD_GET_TIMEOUT_MILLIS);
         assertNotNull(remoteRecordImage);
         assertFalse("Got: " + remoteRecordImage, remoteRecordImage.size() == 0);
@@ -1328,7 +1334,7 @@ public class ProxyContextTest
     @Test
     public void testRemoteRecordUpdateSequenceTracksLocal() throws Exception
     {
-        createComponents("testRemoteRecordUpdateSequenceTracksLocal");
+        createComponents();
         String recordName = "sdf3";
         IRecord record = this.context.createRecord(recordName);
 
@@ -1389,7 +1395,7 @@ public class ProxyContextTest
     @Test
     public void test2Publishers() throws Exception
     {
-        createComponents("test2Publishers");
+        createComponents();
         this.candidate.destroy();
 
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
@@ -1433,7 +1439,7 @@ public class ProxyContextTest
     @Test
     public void testInitialObserverForBlankMap() throws Exception
     {
-        createComponents("testInitialObserverForBlankMap");
+        createComponents();
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
         this.candidate.addObserver(observer, "name");
@@ -1446,7 +1452,7 @@ public class ProxyContextTest
     @Test
     public void testSubscribeForRpcBeforeRpcIsCreated() throws Exception
     {
-        createComponents("testSubscribeForRpcBeforeRpcIsCreated");
+        createComponents();
         assertNull(this.candidate.getRpc("getTime"));
         CountDownLatch latch = new CountDownLatch(1);
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(latch);
@@ -1472,7 +1478,7 @@ public class ProxyContextTest
     @Test
     public void testSubscribeForRpcAfterRpcIsCreated() throws Exception
     {
-        createComponents("testSubscribeForRpcAfterRpcIsCreated");
+        createComponents();
         assertNull(this.candidate.getRpc("getTime"));
 
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
@@ -1493,7 +1499,7 @@ public class ProxyContextTest
     public void testSubscribeForRpcAfterRpcIsCreatedAndDestroyed()
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testSubscribeForRpcAfterRpcIsCreatedAndDestroyed");
+        createComponents();
         assertNull(this.candidate.getRpc("getTime"));
 
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
@@ -1568,7 +1574,7 @@ public class ProxyContextTest
     @Test
     public void testRpcNoArgs() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcNoArgs");
+        createComponents();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
@@ -1591,7 +1597,7 @@ public class ProxyContextTest
     @Test
     public void testRpcNoArgsNoResponse() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcNoArgs");
+        createComponents();
         final CountDownLatch latch = new CountDownLatch(1);
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
@@ -1614,7 +1620,7 @@ public class ProxyContextTest
     @Test
     public void testRpcWithSimpleArgs() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcWithSimpleArgs");
+        createComponents();
         this.executor.shutdownNow();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
@@ -1642,7 +1648,7 @@ public class ProxyContextTest
     public void testMultithreadRpcWithSimpleArgs()
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testMultithreadRpcWithSimpleArgs");
+        createComponents();
         this.executor.shutdownNow();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
@@ -1709,7 +1715,7 @@ public class ProxyContextTest
     public void testRpcWithSimpleArgsNoLogging()
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcWithSimpleArgsNoLogging");
+        createComponents();
         this.executor.shutdownNow();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
@@ -1738,7 +1744,7 @@ public class ProxyContextTest
     public void testRpcWithSimpleArgs_noResponse()
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcWithSimpleArgs");
+        createComponents();
         this.executor.shutdownNow();
         final StringBuilder sb = new StringBuilder();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -1768,7 +1774,7 @@ public class ProxyContextTest
     @Test
     public void testRpcReturnsNull() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcReturnsNull");
+        createComponents();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
@@ -1789,7 +1795,7 @@ public class ProxyContextTest
     public void testRpcWithSpecialCharsInArgs()
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcWithSpecialCharsInArgs");
+        createComponents();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
@@ -1815,7 +1821,7 @@ public class ProxyContextTest
     @Test
     public void testRpcExecutionException() throws InterruptedException, TimeOutException, IOException
     {
-        createComponents("testRpcExecutionException");
+        createComponents();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
@@ -1841,7 +1847,7 @@ public class ProxyContextTest
     @Test
     public void testRpcTimeOut() throws ExecutionException, InterruptedException, IOException
     {
-        createComponents("testRpcTimeOut");
+        createComponents();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
@@ -1877,7 +1883,7 @@ public class ProxyContextTest
     @Test
     public void testPublisherBounced() throws Exception
     {
-        createComponents("testPublisherBounced");
+        createComponents();
         final String rpcName = "RPC_FOR_testPublisherBounced";
         this.context.createRpc(new RpcInstance(TypeEnum.TEXT, rpcName));
 
@@ -1970,7 +1976,7 @@ public class ProxyContextTest
     @Test
     public void testPublisherConnectionChanged() throws Exception
     {
-        createComponents("testPublisherConnectionChanged");
+        createComponents();
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(UPDATE_COUNT);
         this.candidate.addObserver(observer, record1);
@@ -2066,7 +2072,7 @@ public class ProxyContextTest
     @Test
     public void testActive() throws Exception
     {
-        createComponents("testActive");
+        createComponents();
         assertTrue(this.candidate.isActive());
         this.candidate.destroy();
         assertFalse(this.candidate.isActive());
@@ -2075,7 +2081,7 @@ public class ProxyContextTest
     @Test
     public void testSimpleRecordName() throws Exception
     {
-        createComponents("testSimpleRecordName");
+        createComponents();
         final String simpleRecord = "sdflasers";
         final IRecord record = this.context.createRecord(simpleRecord);
         record.put(simpleRecord, TextValue.valueOf(simpleRecord));
@@ -2104,7 +2110,7 @@ public class ProxyContextTest
     @Test
     public void testRecordNameWithSpecialChars() throws Exception
     {
-        createComponents("testRecordNameWithSpecialChars");
+        createComponents();
         final String specialChars = "some value \\|| with \r\n | delimiters \\/ |\\ |/ p|sdf|";
         final IRecord record = this.context.createRecord(specialChars);
         record.put(specialChars, TextValue.valueOf(specialChars));
@@ -2133,7 +2139,7 @@ public class ProxyContextTest
     @Test
     public void testCannotRemoveRemoteRecords() throws Exception
     {
-        createComponents("testCannotRemoveRemoteRecords");
+        createComponents();
         doAddThenRemoveObservers(this.candidate, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         doAddThenRemoveObservers(this.candidate, IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS);
         doAddThenRemoveObservers(this.candidate, IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
