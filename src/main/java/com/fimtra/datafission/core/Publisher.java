@@ -706,9 +706,25 @@ public class Publisher
                             final ICodec channelsCodec = proxyContextPublisher.codec;
                             if (proxyContextPublisher.codecSyncExpected)
                             {
-                                proxyContextPublisher.codecSyncExpected = false;
-                                channelsCodec.handleCodecSyncData(data);
-                                proxyContextPublisher.client.sendAsync(channelsCodec.getTxMessageForCodecSync());
+                                // The codec has a 3-stage handshake to synchronise as shown in the
+                                // diagram below:
+                                //
+                                // [proxy(client)] [publisher(server)]
+                                // |----(INITIAL SYNC)----->|
+                                // |<---(SYNC RESPONSE)-----|
+                                // |----(SYNC RESPONSE)---->|
+                                //
+                                // The publisher will receive 2 handleCodecSyncData calls
+                                //
+                                final byte[] response = channelsCodec.handleCodecSyncData(data);
+                                if (response != null)
+                                {
+                                    proxyContextPublisher.client.sendAsync(response);
+                                }
+                                else
+                                {
+                                    proxyContextPublisher.codecSyncExpected = false;
+                                }
                                 return;
                             }
                             Object decodedMessage = channelsCodec.decode(data);

@@ -113,6 +113,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     static final String DOUBLE_KEY_PREAMBLE = KEY_PREAMBLE + KEY_PREAMBLE;
     static final int DOUBLE_KEY_PREAMBLE_LENGTH = DOUBLE_KEY_PREAMBLE.length();
 
+    boolean synced = false;
+
     @Override
     public CommandEnum getCommand(char[] decodedMessage)
     {
@@ -838,13 +840,18 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] handleCodecSyncData(byte[] data)
     {
+        if (!this.synced)
+        {
+            this.synced = true;
+            return SYNC;
+        }
         return null;
     }
 
     @Override
     public boolean isSynced()
     {
-        return true;
+        return this.synced;
     }
 }
 

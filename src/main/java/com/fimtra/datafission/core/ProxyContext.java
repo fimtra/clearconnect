@@ -795,7 +795,7 @@ public final class ProxyContext implements IObserverContext
         {
             final Object receiverToken = newToken;
             boolean codecSyncExpected = true;
-            
+
             @Override
             public void onChannelConnected(ITransportChannel channel)
             {
@@ -814,10 +814,7 @@ public final class ProxyContext implements IObserverContext
 
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
-                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());      
-                    
-                    // now identity the proxy with the publisher end
-                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
+                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());
                 }
             }
 
@@ -832,13 +829,36 @@ public final class ProxyContext implements IObserverContext
                 {
                     if (this.codecSyncExpected)
                     {
-                        this.codecSyncExpected = false;
-                        ProxyContext.this.codec.handleCodecSyncData(data);
-                        // the proxy is only informed of the connection when the codec-sync has completed                        
-                        ProxyContext.this.onChannelConnected();
+                        // The codec has a 3-stage handshake to synchronise as shown in the diagram
+                        // below:
+                        //
+                        // [proxy(client)] [publisher(server)]
+                        // |----(INITIAL SYNC)----->|
+                        // |<---(SYNC RESPONSE)-----|
+                        // |----(SYNC RESPONSE)---->|
+                        //
+                        // The proxy will receive 1 handleCodecSyncData call
+                        //
+                        final byte[] response = ProxyContext.this.codec.handleCodecSyncData(data);
+                        if (response != null)
+                        {
+                            ProxyContext.this.channel.sendAsync(response);
+
+                            this.codecSyncExpected = false;
+                            // the proxy is only informed of the connection when the codec-sync has
+                            // completed
+                            ProxyContext.this.onChannelConnected();
+                        }
+                        else
+                        {
+                            final String reason =
+                                "Incorrect sync sequence response, expected to send a response but codec "
+                                    + ObjectUtils.safeToString(ProxyContext.this.codec) + " gave us nothing";
+                            ProxyContext.this.channel.destroy(reason, new IllegalStateException(reason));
+                        }
                         return;
                     }
-                    
+
                     try
                     {
                         ProxyContext.this.onDataReceived(data);
@@ -900,6 +920,9 @@ public final class ProxyContext implements IObserverContext
                         ProxyContext.this.channel.destroy("ProxyContext not active");
                         return;
                     }
+
+                    // now identity the proxy with the publisher end
+                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
 
                     ProxyContext.this.imageDeltaProcessor.reset();
                     ProxyContext.this.teleportReceiver.reset();

@@ -24,6 +24,18 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 /**
  * A codec provides methods to decode and encode messages between {@link IPublisherContext} and
  * {@link IObserverContext} objects.
+ * <p>
+ * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
+ * 
+ * <pre>
+ * [proxy(client)]        [publisher(server)]
+ *        |                        |
+ *        |----(INITIAL SYNC)----->|
+ *        |                        |
+ *        |<---(SYNC RESPONSE)-----|
+ *        |                        |
+ *        |----(SYNC RESPONSE)---->|
+ * </pre>
  * 
  * @param <T>
  *            the type of data object the codec works with
@@ -172,6 +184,7 @@ public interface ICodec<T>
 
     /**
      * @return the byte[] for the codec sync message
+     * @see #isSynced()
      */
     byte[] getTxMessageForCodecSync();
 
@@ -179,10 +192,23 @@ public interface ICodec<T>
      * @param data
      *            the data from {@link #getTxMessageForCodecSync()} from the codec at the other end
      * @return a response to send, <code>null</code> for no response
+     * @see #isSynced()
      */
     byte[] handleCodecSyncData(byte[] data);
 
     /**
+     * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
+     * 
+     * <pre>
+     * [proxy(client)]        [publisher(server)]
+     *        |                        |
+     *        |----(INITIAL SYNC)----->|
+     *        |                        |
+     *        |<---(SYNC RESPONSE)-----|
+     *        |                        |
+     *        |----(SYNC RESPONSE)---->|
+     * </pre>
+     * 
      * @return <code>true</code> if the codec is synced with its counterpart
      */
     boolean isSynced();
