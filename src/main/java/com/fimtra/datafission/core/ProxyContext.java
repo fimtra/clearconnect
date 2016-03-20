@@ -793,6 +793,7 @@ public final class ProxyContext implements IObserverContext
 
         final IReceiver receiver = new IReceiver()
         {
+            ITransportChannel localChannelRef;
             final Object receiverToken = newToken;
             boolean codecSyncExpected = true;
 
@@ -804,6 +805,8 @@ public final class ProxyContext implements IObserverContext
                 // previous (failed) attempt
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
+                    this.localChannelRef = channel;
+                    
                     // clear records before dispatching further messages (this assumes
                     // single-threaded dispatching)
                     ContextUtils.clearNonSystemRecords(ProxyContext.this.context);
@@ -814,7 +817,7 @@ public final class ProxyContext implements IObserverContext
 
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
-                    channel.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());
+                    this.localChannelRef.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());
                 }
             }
 
@@ -842,7 +845,7 @@ public final class ProxyContext implements IObserverContext
                         final byte[] response = ProxyContext.this.codec.handleCodecSyncData(data);
                         if (response != null)
                         {
-                            ProxyContext.this.channel.sendAsync(response);
+                            this.localChannelRef.sendAsync(response);
 
                             this.codecSyncExpected = false;
                             // the proxy is only informed of the connection when the codec-sync has
