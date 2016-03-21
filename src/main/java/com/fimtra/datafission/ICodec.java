@@ -217,4 +217,14 @@ public interface ICodec<T>
      * @return a response to send, <code>null</code> for no response
      */
     byte[] handleCodecSyncData(byte[] data);
+
+    /**
+     * Called just before sending on the wire, allows codec specific encoding actions to be
+     * performed.
+     * 
+     * @param data
+     *            the prepared data to send
+     * @return the final data to send
+     */
+    byte[] finalEncode(byte[] data);
 }

@@ -496,7 +496,7 @@ public class Publisher
         {
             if (pointToPoint)
             {
-                this.client.sendAsync(txMessage);
+                sendAsync(txMessage);
             }
             this.bytesPublished += txMessage.length;
             this.messagesPublished++;
@@ -582,7 +582,7 @@ public class Publisher
         @Override
         public boolean sendAsync(byte[] toSend)
         {
-            return this.client.sendAsync(toSend);
+            return this.client.sendAsync(this.codec.finalEncode(toSend));
         }
 
         @Override
@@ -1001,7 +1001,8 @@ public class Publisher
         {
             Log.log(Publisher.class, "(->) ", ObjectUtils.safeToString(atomicChange));
         }
-        client.sendAsync(proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange));
+        client.sendAsync(proxyContextPublisher.codec.finalEncode(
+            proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange)));
     }
 
     void identify(String identityOfRemoteProxy, ITransportChannel client)

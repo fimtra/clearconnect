@@ -26,8 +26,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 import com.fimtra.datafission.ICodec;
-import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.AsymmetricCipher;
 import com.fimtra.util.Pair;
@@ -81,51 +79,6 @@ public final class CipherProtocolCodec extends StringProtocolCodec
         }
     }
 
-    private CipherProtocolCodec(SecretKey key)
-    {
-        super();
-        try
-        {
-            this.handshakeCipher = createAsymmetricCipher();
-            this.txKey = key;
-            this.txCipher = createSymmetricCipher(this.txKey);
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForAtomicChange(atomicChange));
-    }
-
-    @Override
-    public byte[] getTxMessageForSubscribe(String... names)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForSubscribe(names));
-    }
-
-    @Override
-    public byte[] getTxMessageForUnsubscribe(String... names)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForUnsubscribe(names));
-    }
-
-    @Override
-    public byte[] getTxMessageForIdentify(String proxyIdentity)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForIdentify(proxyIdentity));
-    }
-
-    @Override
-    public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForRpc(rpcName, args, resultRecordName));
-    }
-
     @Override
     public char[] decode(byte[] data)
     {
@@ -141,13 +94,7 @@ public final class CipherProtocolCodec extends StringProtocolCodec
     @Override
     public ICodec<char[]> newInstance()
     {
-        return new CipherProtocolCodec(this.txKey);
-    }
-
-    @Override
-    public byte[] getTxMessageForResync(String... names)
-    {
-        return this.txCipher.encrypt(super.getTxMessageForResync(names));
+        return new CipherProtocolCodec();
     }
 
     @Override
@@ -214,5 +161,11 @@ public final class CipherProtocolCodec extends StringProtocolCodec
     public Charset getCharset()
     {
         return ISO_8859_1;
+    }
+
+    @Override
+    public byte[] finalEncode(byte[] data)
+    {
+        return this.txCipher.encrypt(data);
     }
 }

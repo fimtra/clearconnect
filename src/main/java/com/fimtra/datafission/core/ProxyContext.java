@@ -688,8 +688,7 @@ public final class ProxyContext implements IObserverContext
                                         recordsToUnsubscribe[i]);
                                 }
                             }
-                            ProxyContext.this.channel.sendAsync(
-                                ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
+                            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 
                             for (i = 0; i < recordsToUnsubscribe.length; i++)
                             {
@@ -806,7 +805,7 @@ public final class ProxyContext implements IObserverContext
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
                     this.localChannelRef = channel;
-                    
+
                     // clear records before dispatching further messages (this assumes
                     // single-threaded dispatching)
                     ContextUtils.clearNonSystemRecords(ProxyContext.this.context);
@@ -818,6 +817,7 @@ public final class ProxyContext implements IObserverContext
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
                     this.localChannelRef.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());
+                    Log.log(ProxyContext.this, "(->) Sent SYNC");
                 }
             }
 
@@ -845,9 +845,12 @@ public final class ProxyContext implements IObserverContext
                         final byte[] response = ProxyContext.this.codec.handleCodecSyncData(data);
                         if (response != null)
                         {
+                            Log.log(ProxyContext.this, "(<-) Got SYNC_RESP");
                             this.localChannelRef.sendAsync(response);
+                            Log.log(ProxyContext.this, "(->) Sent SYNC_RESP");
 
                             this.codecSyncExpected = false;
+                            Log.log(ProxyContext.this, "SYNCED");
                             // the proxy is only informed of the connection when the codec-sync has
                             // completed
                             ProxyContext.this.onChannelConnected();
@@ -925,7 +928,7 @@ public final class ProxyContext implements IObserverContext
                     }
 
                     // now identity the proxy with the publisher end
-                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
+                    finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
 
                     ProxyContext.this.imageDeltaProcessor.reset();
                     ProxyContext.this.teleportReceiver.reset();
@@ -1214,7 +1217,7 @@ public final class ProxyContext implements IObserverContext
                     // todo need to batch up pending commands into a single send
                     Log.log(this, "Sending re-sync ", name);
                     final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
-                    ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForResync(recordNames));
+                    finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(recordNames));
                 }
             }, this.resyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS, TimeUnit.MICROSECONDS);
         }
@@ -1508,7 +1511,7 @@ public final class ProxyContext implements IObserverContext
                 ((ISubscribingChannel) ProxyContext.this.channel).contextSubscribed(recordsToSubscribeFor[i]);
             }
         }
-        ProxyContext.this.channel.sendAsync(ProxyContext.this.codec.getTxMessageForSubscribe(
+        finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
     }
 
@@ -1543,5 +1546,10 @@ public final class ProxyContext implements IObserverContext
             subscribe(token, records.toArray(new String[records.size()]));
         }
 
+    }
+
+    void finalEncodeAndSendToPublisher(byte[] data)
+    {
+        this.channel.sendAsync(this.codec.finalEncode(data));
     }
 }

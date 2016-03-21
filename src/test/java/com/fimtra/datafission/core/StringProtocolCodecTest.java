@@ -21,7 +21,6 @@ import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Test;
 
@@ -206,8 +205,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEncodeDecodeAtomicChange_preamble_noArgs()
     {
         byte[] txMessageForRpc =
-            this.candidate.getTxMessageForRpc("rpcException", new IValue[0],
-                "_RPC_rpcException:304189752:1405541086282:1");
+                this.candidate.finalEncode(this.candidate.getTxMessageForRpc("rpcException", new IValue[0],
+                "_RPC_rpcException:304189752:1405541086282:1"));
         IRecordChange atomicChangeFromRxMessage = this.candidate.getAtomicChangeFromRxMessage(txMessageForRpc);
         System.err.println(atomicChangeFromRxMessage);
         assertEquals("_RPC_rpcException:304189752:1405541086282:1",

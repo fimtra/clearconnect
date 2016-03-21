@@ -203,8 +203,9 @@ public final class RpcInstance implements IRpcInstance
                     {
                         Log.log(CallReceiver.class, "(->) STARTED ", resultRecordName);
                     }
-                    this.caller.sendAsync(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
-                        resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP)));
+                    this.caller.sendAsync(
+                        this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
+                            resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
 
                     try
                     {
@@ -222,8 +223,9 @@ public final class RpcInstance implements IRpcInstance
                         Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName, ", ",
                             ContextUtils.mapToString(resultEntries));
                     }
-                    this.caller.sendAsync(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
-                        resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP)));
+                    this.caller.sendAsync(
+                        this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
+                            resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
                 }
             }
         }
@@ -297,7 +299,8 @@ public final class RpcInstance implements IRpcInstance
                     {
                         Log.log(Caller.class, "(->) CALLING RPC (no ack) ", this.rpcName);
                     }
-                    this.callReceiver.sendAsync(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName));
+                    this.callReceiver.sendAsync(
+                        this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName)));
                     return null;
                 }
                 else
@@ -314,7 +317,8 @@ public final class RpcInstance implements IRpcInstance
                             Log.log(this, "WARNING: RPC ", this.rpcName,
                                 " is being called using a core/RPC thread - this can lead to a stall.");
                         }
-                        this.callReceiver.sendAsync(this.codec.getTxMessageForRpc(this.rpcName, args, resultMapName));
+                        this.callReceiver.sendAsync(
+                            this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, args, resultMapName)));
 
                         try
                         {

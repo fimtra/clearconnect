@@ -847,6 +847,12 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
         return null;
     }
+
+    @Override
+    public byte[] finalEncode(byte[] data)
+    {
+        return data;
+    }
 }
 
 /**
