@@ -41,6 +41,11 @@ import com.fimtra.datafission.core.ContextUtils;
 public interface IPlatformServiceComponent
 {
     /**
+     * @return the descriptive name of this component
+     */
+    String getComponentName();
+    
+    /**
      * @return the name of the platform
      */
     String getPlatformName();

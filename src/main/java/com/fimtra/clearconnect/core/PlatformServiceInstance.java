@@ -214,6 +214,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 @Override
                 public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
                 {
+                    // todo do we really need to use a utility executor?
                     PlatformServiceInstance.this.context.getUtilityExecutor().execute(new Runnable()
                     {
                         @Override
@@ -588,5 +589,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     public void setPermissionFilter(IPermissionFilter filter)
     {
         this.context.setPermissionFilter(filter);
+    }
+
+    @Override
+    public String getComponentName()
+    {
+        return this.context.getName();
     }
 }

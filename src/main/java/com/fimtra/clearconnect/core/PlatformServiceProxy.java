@@ -307,4 +307,10 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         return this.proxyContext.isConnected();
     }
+
+    @Override
+    public String getComponentName()
+    {
+        return this.proxyContext.getName();
+    }
 }
