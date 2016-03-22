@@ -82,12 +82,12 @@ public abstract class BootstrapUtils {
 	 * Returns the init filename by detecting it in this order:
 	 * <ol>
 	 * <li>the system property with key <i>boot.initFilename</i></li>
-	 * <li>a file called .uiName.properties in the home directory where uiName is the method parameter</li>
+	 * <li>a file called '.initFile.properties' in the home directory where initFile is the method parameter</li>
 	 * </ol>
 	 */
-	public static String getHomeDirInitFilename(String uiName) {
+	public static String getHomeDirInitFilename(String initFile) {
 		return (System.getProperty(initKeyInitFileName) == null
-				? System.getProperty(sysKeyHomeDir) + System.getProperty(sysKeyFileSeparator) + dot + uiName + fileExtProperties
+				? System.getProperty(sysKeyHomeDir) + System.getProperty(sysKeyFileSeparator) + dot + initFile + fileExtProperties
 				: System.getProperty(initKeyInitFileName));
 	}
 
@@ -95,7 +95,7 @@ public abstract class BootstrapUtils {
 	 * Returns the init filename by detecting it in this order:
 	 * <ol>
 	 * <li>the system property with key <i>boot.initFilename</i></li>
-	 * <li>a file called serverName.properties in the working directory where serverName is the method parameter</li>
+	 * <li>a file called 'serverName.properties' in the working directory where serverName is the method parameter</li>
 	 * </ol>
 	 */
 	public static String getWorkingDirInitFilename(String serverName) {
