@@ -18,11 +18,8 @@ package com.fimtra.datafission.core;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.security.InvalidKeyException;
 import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 import com.fimtra.datafission.ICodec;
@@ -44,19 +41,6 @@ public final class CipherProtocolCodec extends StringProtocolCodec
 
     private static final String SYMMETRIC_TRANSFORMATION = SymmetricCipher.ALGORITHM_AES;
 
-    static AsymmetricCipher createAsymmetricCipher()
-        throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
-    {
-        // note: 2048 to accomodate sending 128bit symmetric key
-        return new AsymmetricCipher();
-    }
-
-    static SymmetricCipher createSymmetricCipher(SecretKey key)
-        throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
-    {
-        return new SymmetricCipher(SYMMETRIC_TRANSFORMATION, key);
-    }
-
     final AsymmetricCipher handshakeCipher;
     final SecretKey txKey;
     final SymmetricCipher txCipher;
@@ -69,9 +53,10 @@ public final class CipherProtocolCodec extends StringProtocolCodec
         super();
         try
         {
-            this.handshakeCipher = createAsymmetricCipher();
+            // note: 2048 to accomodate sending 128bit symmetric key
+            this.handshakeCipher = new AsymmetricCipher();
             this.txKey = SymmetricCipher.generate128BitKey(SYMMETRIC_TRANSFORMATION);
-            this.txCipher = createSymmetricCipher(this.txKey);
+            this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
         }
         catch (Exception e)
         {
