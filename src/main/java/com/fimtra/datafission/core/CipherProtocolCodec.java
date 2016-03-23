@@ -98,7 +98,7 @@ public final class CipherProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    public byte[] getTxMessageForCodecSync()
+    public byte[] getTxMessageForCodecSync(String sessionContext)
     {
         try
         {
@@ -128,6 +128,7 @@ public final class CipherProtocolCodec extends StringProtocolCodec
             }
             else
             {
+                // todo pass in sec context
                 if (fromByteArray instanceof Pair)
                 {
                     final Pair<Key, byte[]> pair = (Pair<Key, byte[]>) fromByteArray;

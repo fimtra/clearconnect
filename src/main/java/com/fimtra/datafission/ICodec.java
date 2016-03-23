@@ -195,9 +195,12 @@ public interface ICodec<T>
      *        |----(SYNC RESPONSE)---->|
      * </pre>
      * 
+     * @param sessionContext
+     *            the session context for the codec sync
+     * 
      * @return the byte[] for the initial codec sync message
      */
-    byte[] getTxMessageForCodecSync();
+    byte[] getTxMessageForCodecSync(String sessionContext);
 
     /**
      * A codec has a 3-stage handshake to synchronise as shown in the diagram below:

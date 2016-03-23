@@ -832,7 +832,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public byte[] getTxMessageForCodecSync()
+    public byte[] getTxMessageForCodecSync(String sessionContext)
     {
         return SYNC;
     }
