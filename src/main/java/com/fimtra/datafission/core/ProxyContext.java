@@ -816,7 +816,9 @@ public final class ProxyContext implements IObserverContext
 
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
-                    this.localChannelRef.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync());
+                    
+                    // todo how can we get the SessionContextName?
+                    this.localChannelRef.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync(null));
                     Log.log(ProxyContext.this, "(->) Sent SYNC");
                 }
             }
