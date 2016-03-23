@@ -36,6 +36,7 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -838,14 +839,14 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public byte[] handleCodecSyncData(byte[] data)
+    public Pair<Boolean, byte[]> handleCodecSyncData(byte[] data)
     {
         if (!this.synced)
         {
             this.synced = true;
-            return SYNC;
+            return new Pair<Boolean, byte[]>(Boolean.TRUE, SYNC);
         }
-        return null;
+        return new Pair<Boolean, byte[]>(Boolean.TRUE, null);
     }
 
     @Override

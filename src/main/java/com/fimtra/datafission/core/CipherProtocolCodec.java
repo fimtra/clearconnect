@@ -98,7 +98,7 @@ public final class CipherProtocolCodec extends StringProtocolCodec
 
     @SuppressWarnings("unchecked")
     @Override
-    public byte[] handleCodecSyncData(byte[] data)
+    public Pair<Boolean, byte[]> handleCodecSyncData(byte[] data)
     {
         try
         {
@@ -108,8 +108,8 @@ public final class CipherProtocolCodec extends StringProtocolCodec
                 this.handshakeCipher.setEncryptionKey((Key) fromByteArray);
 
                 this.encryptedSymmetricalKeySent = true;
-                return SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
-                    this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey))));
+                return new Pair<Boolean, byte[]>(Boolean.TRUE, SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
+                    this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey)))));
             }
             else
             {
@@ -125,12 +125,12 @@ public final class CipherProtocolCodec extends StringProtocolCodec
                     if (!this.encryptedSymmetricalKeySent)
                     {
                         this.encryptedSymmetricalKeySent = true;
-                        return SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
-                            this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey))));
+                        return new Pair<Boolean, byte[]>(Boolean.TRUE, SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
+                            this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey)))));
                     }
                     else
                     {
-                        return null;
+                        return new Pair<Boolean, byte[]>(Boolean.TRUE, null);
                     }
                 }
             }

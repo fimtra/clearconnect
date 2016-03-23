@@ -20,6 +20,7 @@ import java.rmi.Remote;
 import java.util.List;
 
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
+import com.fimtra.util.Pair;
 
 /**
  * A codec provides methods to decode and encode messages between {@link IPublisherContext} and
@@ -217,9 +218,11 @@ public interface ICodec<T>
      * 
      * @param data
      *            the data from the codec at the other end
-     * @return a response to send, <code>null</code> for no response
+     * @return Pair{syncValidFlag, responseData}, if syncValidFlag is <code>false</code> the codec
+     *         sync operation should be forcefully terminated. The byte[] is the response to send,
+     *         if null then no response is needed.
      */
-    byte[] handleCodecSyncData(byte[] data);
+    Pair<Boolean, byte[]> handleCodecSyncData(byte[] data);
 
     /**
      * Called just before sending on the wire, allows codec specific encoding actions to be

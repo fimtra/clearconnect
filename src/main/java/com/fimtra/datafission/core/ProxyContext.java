@@ -66,6 +66,7 @@ import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 
 /**
@@ -301,7 +302,7 @@ public final class ProxyContext implements IObserverContext
     volatile boolean active;
     volatile boolean connected;
     final Context context;
-    ICodec codec;
+    ICodec<?> codec;
     final ImageDeltaChangeProcessor imageDeltaProcessor;
     ITransportChannel channel;
     ITransportChannelBuilderFactory channelBuilderFactory;
@@ -850,25 +851,28 @@ public final class ProxyContext implements IObserverContext
                         //
                         // The proxy will receive 1 handleCodecSyncData call
                         //
-                        final byte[] response = ProxyContext.this.codec.handleCodecSyncData(data);
-                        if (response != null)
+                        final Pair<Boolean, byte[]> response = ProxyContext.this.codec.handleCodecSyncData(data);
+                        if(response.getFirst().booleanValue())
                         {
-                            Log.log(ProxyContext.this, "(<-) Got SYNC_RESP");
-                            this.localChannelRef.sendAsync(response);
-                            Log.log(ProxyContext.this, "(->) Sent SYNC_RESP");
-
-                            this.codecSyncExpected = false;
-                            Log.log(ProxyContext.this, "SYNCED");
-                            // the proxy is only informed of the connection when the codec-sync has
-                            // completed
-                            ProxyContext.this.onChannelConnected();
-                        }
-                        else
-                        {
-                            final String reason =
-                                "Incorrect sync sequence response, expected to send a response but codec "
-                                    + ObjectUtils.safeToString(ProxyContext.this.codec) + " gave us nothing";
-                            ProxyContext.this.channel.destroy(reason, new IllegalStateException(reason));
+                            if (response.getSecond() != null)
+                            {
+                                Log.log(ProxyContext.this, "(<-) Got SYNC_RESP");
+                                this.localChannelRef.sendAsync(response.getSecond());
+                                Log.log(ProxyContext.this, "(->) Sent SYNC_RESP");
+    
+                                this.codecSyncExpected = false;
+                                Log.log(ProxyContext.this, "SYNCED");
+                                // the proxy is only informed of the connection when the codec-sync has
+                                // completed
+                                ProxyContext.this.onChannelConnected();
+                            }
+                            else
+                            {
+                                final String reason =
+                                    "Incorrect sync sequence response, expected to send a response but codec "
+                                        + ObjectUtils.safeToString(ProxyContext.this.codec) + " gave us nothing";
+                                ProxyContext.this.channel.destroy(reason, new IllegalStateException(reason));
+                            }
                         }
                         return;
                     }

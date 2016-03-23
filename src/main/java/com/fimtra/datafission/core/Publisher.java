@@ -54,6 +54,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -716,14 +717,21 @@ public class Publisher
                                 //
                                 // The publisher will receive 2 handleCodecSyncData calls
                                 //
-                                final byte[] response = channelsCodec.handleCodecSyncData(data);
-                                if (response != null)
+                                final Pair<Boolean, byte[]> response = channelsCodec.handleCodecSyncData(data);
+                                if (response.getFirst().booleanValue())
                                 {
-                                    proxyContextPublisher.client.sendAsync(response);
+                                    if (response.getSecond() != null)
+                                    {
+                                        proxyContextPublisher.client.sendAsync(response.getSecond());
+                                    }
+                                    else
+                                    {
+                                        proxyContextPublisher.codecSyncExpected = false;
+                                    }
                                 }
                                 else
                                 {
-                                    proxyContextPublisher.codecSyncExpected = false;
+                                    proxyContextPublisher.client.destroy("Sync failed");
                                 }
                                 return;
                             }
