@@ -186,7 +186,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.registryProxy =
             new ProxyContext(PlatformUtils.composeProxyName(PlatformRegistry.SERVICE_NAME, this.agentName),
                 PlatformRegistry.CODEC, TransportChannelBuilderFactoryLoader.load(
-                    PlatformRegistry.CODEC.getFrameEncodingFormat(), registryAddresses));
+                    PlatformRegistry.CODEC.getFrameEncodingFormat(), registryAddresses), PlatformRegistry.SERVICE_NAME);
 
         this.registryProxy.setReconnectPeriodMillis(registryReconnectPeriodMillis);
 

@@ -345,6 +345,9 @@ public final class ProxyContext implements IObserverContext
 
     /** Tracks records that have a re-sync operation pending */
     final Set<String> resyncs;
+    
+    /** The name given to the "session" between this proxy and its remote context. */
+    final String sessionContextName;
 
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
@@ -366,7 +369,7 @@ public final class ProxyContext implements IObserverContext
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort)
     {
-        this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty());
+        this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty(), null);
     }
 
     /**
@@ -384,19 +387,22 @@ public final class ProxyContext implements IObserverContext
      *            the end-point port of the publisher process
      * @param transportTechnology
      *            the transport technology to use
+     * @param sessionContextName
+     *            the name given to the "session" between this proxy and its remote context.
      * @throws IOException
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort,
-        TransportTechnologyEnum transportTechnology)
+        TransportTechnologyEnum transportTechnology, String sessionContextName)
     {
         this(name, codec, transportTechnology.constructTransportChannelBuilderFactory(codec.getFrameEncodingFormat(),
-            new StaticEndPointAddressFactory(new EndPointAddress(publisherNode, publisherPort))));
+            new StaticEndPointAddressFactory(new EndPointAddress(publisherNode, publisherPort))), sessionContextName);
     }
 
-    public ProxyContext(String name, ICodec codec, ITransportChannelBuilderFactory channelBuilderFactory)
+    public ProxyContext(String name, ICodec codec, ITransportChannelBuilderFactory channelBuilderFactory, String sessionContextName)
     {
         super();
         this.codec = codec;
+        this.sessionContextName = sessionContextName;
         this.context = new Context(name);
         this.lock = new ReentrantLock();
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
@@ -817,8 +823,8 @@ public final class ProxyContext implements IObserverContext
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
                     
-                    // todo how can we get the SessionContextName?
-                    this.localChannelRef.sendAsync(ProxyContext.this.codec.getTxMessageForCodecSync(null));
+                    this.localChannelRef.sendAsync(
+                        ProxyContext.this.codec.getTxMessageForCodecSync(ProxyContext.this.sessionContextName));
                     Log.log(ProxyContext.this, "(->) Sent SYNC");
                 }
             }

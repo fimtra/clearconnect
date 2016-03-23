@@ -41,7 +41,7 @@ public class BenchmarkSubscriber
         final TcpChannelBuilderFactory channelBuilderFactory =
             new TcpChannelBuilderFactory(proxyCodec.getFrameEncodingFormat(), new StaticEndPointAddressFactory(
                 new EndPointAddress(args.length == 0 ? TcpChannelUtils.LOCALHOST_IP : args[0], 22222)));
-        final ProxyContext proxyContext = new ProxyContext("BenchmarkSubscriber", proxyCodec, channelBuilderFactory);
+        final ProxyContext proxyContext = new ProxyContext("BenchmarkSubscriber", proxyCodec, channelBuilderFactory, null);
 
         ContextUtils.getRpc(proxyContext, 2000, "runComplete");
 

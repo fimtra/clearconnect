@@ -74,7 +74,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
         this.registryAgent = registryAgent;
         this.proxyContext =
             new ProxyContext(PlatformUtils.composeProxyName(serviceFamily, registryAgent.getAgentName()), codec, host,
-                port, transportTechnology);
+                port, transportTechnology, serviceFamily);
 
         // set the channel builder factory to use an end-point factory that gets end-points from the
         // registry

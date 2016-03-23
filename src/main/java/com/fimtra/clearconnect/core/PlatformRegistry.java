@@ -1106,7 +1106,7 @@ final class EventHandler
             new ProxyContext(PlatformUtils.composeProxyName(serviceInstanceId, this.registry.context.getName()),
                 PlatformUtils.getCodecFromServiceInfoRecord(serviceRecordStructure),
                 PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
-                PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology);
+                PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology, PlatformRegistry.SERVICE_NAME);
 
         this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
         this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
