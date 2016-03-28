@@ -15,11 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
-import java.security.Key;
-
 import com.fimtra.datafission.ICodec;
-import com.fimtra.util.Pair;
-import com.fimtra.util.SerializationUtils;
+import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 
 /**
  * Tests for the {@link CipherProtocolCodec}
@@ -32,15 +29,14 @@ public class CipherProtocolCodecTest extends StringProtocolCodecTest
     ICodec<?> constructCandidate()
     {
         final CipherProtocolCodec codec = new CipherProtocolCodec();
-        // todo bit of a cheat here - we use the codec's own public key as the other ends key
         try
         {
-            codec.handshakeCipher.setEncryptionKey(codec.handshakeCipher.getPubKey());
-            
-            Pair<Key, byte[]> data = new Pair<Key, byte[]>(codec.handshakeCipher.getPubKey(), 
-                    codec.handshakeCipher.encrypt(SerializationUtils.toByteArray(codec.txKey)));
-                    
-            codec.handleCodecSyncData(SerializationUtils.toByteArray(data));
+            // todo bit of a cheat here - we use the codec to synchronise with itself
+            final byte[] txMessageForCodecSync =
+                codec.getSessionProtocol().getSessionSyncStartMessage("CipherProtocolCodecTest");
+            SyncResponse response = codec.getSessionProtocol().handleSessionSyncData(txMessageForCodecSync);
+            response = codec.getSessionProtocol().handleSessionSyncData(response.syncDataResponse);
+            response = codec.getSessionProtocol().handleSessionSyncData(response.syncDataResponse);
         }
         catch (Exception e)
         {

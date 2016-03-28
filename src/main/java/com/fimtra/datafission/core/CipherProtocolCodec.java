@@ -15,18 +15,12 @@
  */
 package com.fimtra.datafission.core;
 
-import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.security.Key;
-
-import javax.crypto.SecretKey;
 
 import com.fimtra.datafission.ICodec;
+import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.AsymmetricCipher;
-import com.fimtra.util.Pair;
-import com.fimtra.util.SerializationUtils;
 import com.fimtra.util.SymmetricCipher;
 
 /**
@@ -39,35 +33,9 @@ public final class CipherProtocolCodec extends StringProtocolCodec
 {
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
-    private static final String SYMMETRIC_TRANSFORMATION = SymmetricCipher.ALGORITHM_AES;
-
-    final AsymmetricCipher handshakeCipher;
-    final SecretKey txKey;
-    final SymmetricCipher txCipher;
-
-    SymmetricCipher rxCipher;
-    boolean encryptedSymmetricalKeySent;
-
     public CipherProtocolCodec()
     {
-        super();
-        try
-        {
-            // note: 2048 to accomodate sending 128bit symmetric key
-            this.handshakeCipher = new AsymmetricCipher();
-            this.txKey = SymmetricCipher.generate128BitKey(SYMMETRIC_TRANSFORMATION);
-            this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public char[] decode(byte[] data)
-    {
-        return ISO_8859_1.decode(ByteBuffer.wrap(this.rxCipher.decrypt(data))).array();
+        super(new EncryptedSessionSyncAndDataProtocol());
     }
 
     @Override
@@ -83,75 +51,8 @@ public final class CipherProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    public byte[] getTxMessageForCodecSync(String sessionContext)
-    {
-        try
-        {
-            // note: send unencrypted public handshake key
-            return SerializationUtils.toByteArray(this.handshakeCipher.getPubKey());
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Pair<Boolean, byte[]> handleCodecSyncData(byte[] data)
-    {
-        try
-        {
-            final Serializable fromByteArray = SerializationUtils.fromByteArray(data);
-            if (fromByteArray instanceof Key)
-            {
-                this.handshakeCipher.setEncryptionKey((Key) fromByteArray);
-
-                this.encryptedSymmetricalKeySent = true;
-                return new Pair<Boolean, byte[]>(Boolean.TRUE, SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
-                    this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey)))));
-            }
-            else
-            {
-                // todo pass in sec context
-                if (fromByteArray instanceof Pair)
-                {
-                    final Pair<Key, byte[]> pair = (Pair<Key, byte[]>) fromByteArray;
-                    
-                    this.handshakeCipher.setEncryptionKey(pair.getFirst());
-                    this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
-                        SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt((pair.getSecond()))));
-
-                    if (!this.encryptedSymmetricalKeySent)
-                    {
-                        this.encryptedSymmetricalKeySent = true;
-                        return new Pair<Boolean, byte[]>(Boolean.TRUE, SerializationUtils.toByteArray(new Pair<Key, byte[]>(this.handshakeCipher.getPubKey(),
-                            this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey)))));
-                    }
-                    else
-                    {
-                        return new Pair<Boolean, byte[]>(Boolean.TRUE, null);
-                    }
-                }
-            }
-            throw new IllegalStateException("Incorrect sync data: " + fromByteArray);
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
-
-    }
-
-    @Override
     public Charset getCharset()
     {
         return ISO_8859_1;
-    }
-
-    @Override
-    public byte[] finalEncode(byte[] data)
-    {
-        return this.txCipher.encrypt(data);
     }
 }

@@ -57,6 +57,7 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
+import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
@@ -66,7 +67,6 @@ import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 
 /**
@@ -346,7 +346,7 @@ public final class ProxyContext implements IObserverContext
 
     /** Tracks records that have a re-sync operation pending */
     final Set<String> resyncs;
-    
+
     /** The name given to the "session" between this proxy and its remote context. */
     final String sessionContextName;
 
@@ -370,7 +370,7 @@ public final class ProxyContext implements IObserverContext
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort)
     {
-        this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty(), null);
+        this(name, codec, publisherNode, publisherPort, TransportTechnologyEnum.getDefaultFromSystemProperty(), name);
     }
 
     /**
@@ -395,11 +395,14 @@ public final class ProxyContext implements IObserverContext
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort,
         TransportTechnologyEnum transportTechnology, String sessionContextName)
     {
-        this(name, codec, transportTechnology.constructTransportChannelBuilderFactory(codec.getFrameEncodingFormat(),
-            new StaticEndPointAddressFactory(new EndPointAddress(publisherNode, publisherPort))), sessionContextName);
+        this(name, codec,
+            transportTechnology.constructTransportChannelBuilderFactory(codec.getFrameEncodingFormat(),
+                new StaticEndPointAddressFactory(new EndPointAddress(publisherNode, publisherPort))),
+            sessionContextName);
     }
 
-    public ProxyContext(String name, ICodec codec, ITransportChannelBuilderFactory channelBuilderFactory, String sessionContextName)
+    public ProxyContext(String name, ICodec codec, ITransportChannelBuilderFactory channelBuilderFactory,
+        String sessionContextName)
     {
         super();
         this.codec = codec;
@@ -695,7 +698,8 @@ public final class ProxyContext implements IObserverContext
                                         recordsToUnsubscribe[i]);
                                 }
                             }
-                            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
+                            finalEncodeAndSendToPublisher(
+                                ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 
                             for (i = 0; i < recordsToUnsubscribe.length; i++)
                             {
@@ -823,10 +827,10 @@ public final class ProxyContext implements IObserverContext
 
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
-                    
+
                     this.localChannelRef.sendAsync(
-                        ProxyContext.this.codec.getTxMessageForCodecSync(ProxyContext.this.sessionContextName));
-                    Log.log(ProxyContext.this, "(->) Sent SYNC");
+                        ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(ProxyContext.this.sessionContextName));
+                    Log.log(ProxyContext.this, "(->) START SESSION SYNC");
                 }
             }
 
@@ -841,38 +845,29 @@ public final class ProxyContext implements IObserverContext
                 {
                     if (this.codecSyncExpected)
                     {
-                        // The codec has a 3-stage handshake to synchronise as shown in the diagram
-                        // below:
-                        //
-                        // [proxy(client)] [publisher(server)]
-                        // |----(INITIAL SYNC)----->|
-                        // |<---(SYNC RESPONSE)-----|
-                        // |----(SYNC RESPONSE)---->|
-                        //
-                        // The proxy will receive 1 handleCodecSyncData call
-                        //
-                        final Pair<Boolean, byte[]> response = ProxyContext.this.codec.handleCodecSyncData(data);
-                        if(response.getFirst().booleanValue())
+                        final SyncResponse response =
+                            ProxyContext.this.codec.getSessionProtocol().handleSessionSyncData(data);
+                        if (!response.syncFailed)
                         {
-                            if (response.getSecond() != null)
+                            Log.log(ProxyContext.this, "(<-) SYNC RESP");
+                            if (response.syncDataResponse != null)
                             {
-                                Log.log(ProxyContext.this, "(<-) Got SYNC_RESP");
-                                this.localChannelRef.sendAsync(response.getSecond());
-                                Log.log(ProxyContext.this, "(->) Sent SYNC_RESP");
-    
+                                this.localChannelRef.sendAsync(response.syncDataResponse);
+                                Log.log(ProxyContext.this, "(->) SYNC RESP");
+                            }
+                            if (response.syncComplete)
+                            {
                                 this.codecSyncExpected = false;
-                                Log.log(ProxyContext.this, "SYNCED");
-                                // the proxy is only informed of the connection when the codec-sync has
-                                // completed
+                                Log.log(ProxyContext.this, "SESSION SYNCED");
                                 ProxyContext.this.onChannelConnected();
                             }
-                            else
-                            {
-                                final String reason =
-                                    "Incorrect sync sequence response, expected to send a response but codec "
-                                        + ObjectUtils.safeToString(ProxyContext.this.codec) + " gave us nothing";
-                                ProxyContext.this.channel.destroy(reason, new IllegalStateException(reason));
-                            }
+                        }
+                        else
+                        {
+                            final String reason =
+                                "Session sync failed for " + ObjectUtils.safeToString(ProxyContext.this.codec);
+                            Log.log(ProxyContext.this, reason, new IllegalStateException(reason));
+                            destroy();
                         }
                         return;
                     }
@@ -909,6 +904,7 @@ public final class ProxyContext implements IObserverContext
             {
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
+                    ProxyContext.this.codec.getSessionProtocol().destroy();
                     ProxyContext.this.onChannelClosed();
                 }
             }
@@ -919,6 +915,7 @@ public final class ProxyContext implements IObserverContext
         Log.log(this, "Constructing channel using ", ObjectUtils.safeToString(channelBuilder));
         final ITransportChannel channel = channelBuilder.buildChannel(receiver);
         return channel;
+
     }
 
     void onChannelConnected()
@@ -1096,6 +1093,7 @@ public final class ProxyContext implements IObserverContext
 
         executeSequentialCoreTask(new ISequentialRunnable()
         {
+
             @Override
             public void run()
             {
@@ -1179,6 +1177,7 @@ public final class ProxyContext implements IObserverContext
             {
                 return changeName;
             }
+
         });
     }
 

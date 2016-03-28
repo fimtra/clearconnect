@@ -20,24 +20,14 @@ import java.rmi.Remote;
 import java.util.List;
 
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
-import com.fimtra.util.Pair;
 
 /**
  * A codec provides methods to decode and encode messages between {@link IPublisherContext} and
  * {@link IObserverContext} objects.
  * <p>
- * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
+ * A codec uses an {@link ISessionProtocol} to provide a session link with another codec instance.
  * 
- * <pre>
- * [proxy(client)]        [publisher(server)]
- *        |                        |
- *        |----(INITIAL SYNC)----->|
- *        |                        |
- *        |<---(SYNC RESPONSE)-----|
- *        |                        |
- *        |----(SYNC RESPONSE)---->|
- * </pre>
- * 
+ * @see ISessionProtocol
  * @param <T>
  *            the type of data object the codec works with
  * @author Ramon Servadei
@@ -184,53 +174,17 @@ public interface ICodec<T>
     Charset getCharset();
 
     /**
-     * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
-     * 
-     * <pre>
-     * [proxy(client)]        [publisher(server)]
-     *        |                        |
-     *        |----(INITIAL SYNC)----->|
-     *        |                        |
-     *        |<---(SYNC RESPONSE)-----|
-     *        |                        |
-     *        |----(SYNC RESPONSE)---->|
-     * </pre>
-     * 
-     * @param sessionContext
-     *            the session context for the codec sync
-     * 
-     * @return the byte[] for the initial codec sync message
-     */
-    byte[] getTxMessageForCodecSync(String sessionContext);
-
-    /**
-     * A codec has a 3-stage handshake to synchronise as shown in the diagram below:
-     * 
-     * <pre>
-     * [proxy(client)]        [publisher(server)]
-     *        |                        |
-     *        |----(INITIAL SYNC)----->|
-     *        |                        |
-     *        |<---(SYNC RESPONSE)-----|
-     *        |                        |
-     *        |----(SYNC RESPONSE)---->|
-     * </pre>
-     * 
-     * @param data
-     *            the data from the codec at the other end
-     * @return Pair{syncValidFlag, responseData}, if syncValidFlag is <code>false</code> the codec
-     *         sync operation should be forcefully terminated. The byte[] is the response to send,
-     *         if null then no response is needed.
-     */
-    Pair<Boolean, byte[]> handleCodecSyncData(byte[] data);
-
-    /**
-     * Called just before sending on the wire, allows codec specific encoding actions to be
-     * performed.
+     * Called just before sending on the wire, allows session protocol specific encoding actions to
+     * be performed.
      * 
      * @param data
      *            the prepared data to send
      * @return the final data to send
      */
     byte[] finalEncode(byte[] data);
+
+    /**
+     * @return the session protocol instance for this codec
+     */
+    ISessionProtocol getSessionProtocol();
 }

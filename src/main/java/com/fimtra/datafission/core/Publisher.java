@@ -46,6 +46,7 @@ import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnec
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.field.DoubleValue;
@@ -54,7 +55,6 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -395,7 +395,7 @@ public class Publisher
      */
     private final class ProxyContextPublisher implements ITransportChannel
     {
-        final ITransportChannel client;
+        final ITransportChannel channel;
         final CopyOnWriteArraySet<String> subscriptions = new CopyOnWriteArraySet<String>();
         final long start;
         /**
@@ -411,19 +411,19 @@ public class Publisher
         volatile boolean active;
         boolean codecSyncExpected;
 
-        ProxyContextPublisher(ITransportChannel client, ICodec codec)
+        ProxyContextPublisher(ITransportChannel channel, ICodec codec)
         {
             this.active = true;
             this.codecSyncExpected = true;
             this.codec = codec;
             this.start = System.currentTimeMillis();
-            this.client = client;
+            this.channel = channel;
 
             // add the connection record static parts
             final Map<String, IValue> submapConnections =
-                Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(client));
+                Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(channel));
             final EndPointAddress endPointAddress = Publisher.this.server.getEndPointAddress();
-            final String clientSocket = client.getEndPointDescription();
+            final String clientSocket = channel.getEndPointDescription();
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_ID,
                 TextValue.valueOf(Publisher.this.context.getName()));
             submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_NODE,
@@ -438,7 +438,7 @@ public class Publisher
 
             scheduleStatsUpdateTask();
 
-            Log.log(this, "Constructed for ", ObjectUtils.safeToString(client));
+            Log.log(this, "Constructed for ", ObjectUtils.safeToString(channel));
         }
 
         void scheduleStatsUpdateTask()
@@ -456,7 +456,7 @@ public class Publisher
                 public void run()
                 {
                     final Map<String, IValue> submapConnections = Publisher.this.connectionsRecord.getOrCreateSubMap(
-                        getTransmissionStatisticsFieldName(ProxyContextPublisher.this.client));
+                        getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel));
 
                     final double perSec =
                         1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
@@ -565,6 +565,7 @@ public class Publisher
         void destroy()
         {
             this.active = false;
+            this.codec.getSessionProtocol().destroy();
             this.statsUpdateTask.cancel(false);
             for (String name : this.subscriptions)
             {
@@ -573,47 +574,47 @@ public class Publisher
             Log.log(this, "Destroyed");
         }
 
+        @Override
+        public void destroy(String reason, Exception... e)
+        {
+            this.channel.destroy(reason, e);
+        }
+        
         void setProxyContextIdentity(String identity)
         {
             this.identity = identity;
-            Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.client)).put(
+            Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.channel)).put(
                 IContextConnectionsRecordFields.PROXY_ID, TextValue.valueOf(this.identity));
         }
 
         @Override
         public boolean sendAsync(byte[] toSend)
         {
-            return this.client.sendAsync(this.codec.finalEncode(toSend));
+            return this.channel.sendAsync(this.codec.finalEncode(toSend));
         }
 
         @Override
         public boolean isConnected()
         {
-            return this.client.isConnected();
+            return this.channel.isConnected();
         }
 
         @Override
         public String getEndPointDescription()
         {
-            return this.client.getEndPointDescription();
+            return this.channel.getEndPointDescription();
         }
 
         @Override
         public String getDescription()
         {
-            return this.client.getDescription();
-        }
-
-        @Override
-        public void destroy(String reason, Exception... e)
-        {
-            this.client.destroy(reason, e);
+            return this.channel.getDescription();
         }
 
         @Override
         public boolean hasRxData()
         {
-            return this.client.hasRxData();
+            return this.channel.hasRxData();
         }
     }
 
@@ -707,31 +708,22 @@ public class Publisher
                             final ICodec channelsCodec = proxyContextPublisher.codec;
                             if (proxyContextPublisher.codecSyncExpected)
                             {
-                                // The codec has a 3-stage handshake to synchronise as shown in the
-                                // diagram below:
-                                //
-                                // [proxy(client)] [publisher(server)]
-                                // |----(INITIAL SYNC)----->|
-                                // |<---(SYNC RESPONSE)-----|
-                                // |----(SYNC RESPONSE)---->|
-                                //
-                                // The publisher will receive 2 handleCodecSyncData calls
-                                //
-                                final Pair<Boolean, byte[]> response = channelsCodec.handleCodecSyncData(data);
-                                if (response.getFirst().booleanValue())
+                                final SyncResponse response =
+                                    channelsCodec.getSessionProtocol().handleSessionSyncData(data);
+                                if (response.syncDataResponse != null)
                                 {
-                                    if (response.getSecond() != null)
-                                    {
-                                        proxyContextPublisher.client.sendAsync(response.getSecond());
-                                    }
-                                    else
+                                    proxyContextPublisher.channel.sendAsync(response.syncDataResponse);
+                                }
+                                if (!response.syncFailed)
+                                {
+                                    if (response.syncComplete)
                                     {
                                         proxyContextPublisher.codecSyncExpected = false;
                                     }
                                 }
                                 else
                                 {
-                                    proxyContextPublisher.client.destroy("Sync failed");
+                                    proxyContextPublisher.channel.destroy("Sync failed");
                                 }
                                 return;
                             }

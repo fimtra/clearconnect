@@ -24,7 +24,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,6 +65,10 @@ import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
+import com.fimtra.datafission.core.session.ISessionAttributesProvider;
+import com.fimtra.datafission.core.session.ISessionListener;
+import com.fimtra.datafission.core.session.ISessionManager;
+import com.fimtra.datafission.core.session.SessionContexts;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -86,7 +89,7 @@ public class ProxyContextTest
 {
     @Rule
     public TestName name = new TestName();
-    
+
     // note: the cipher protocol takes longer to initialise to increase to 3 secs
     private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 3000;
 
@@ -117,15 +120,20 @@ public class ProxyContextTest
     @Before
     public void setUp() throws Exception
     {
-        ChannelUtils.WATCHDOG.configure(200, 10);
+        ChannelUtils.WATCHDOG.configure(500, 10);
         observers.clear();
         // cycle the ports for each test
         this.PORT = getNextFreePort();
     }
 
+    String getContextName()
+    {
+        return getClass().getSimpleName() + "-" + name.getMethodName();
+    }
+
     private void createComponents() throws IOException
     {
-        this.contextName = getClass().getSimpleName() + "-" + this.name.getMethodName();
+        this.contextName = getContextName();
         System.err.println(this.contextName);
         Log.log(this, ">>> START: " + this.contextName);
         this.context = new Context(this.contextName);
@@ -2067,6 +2075,68 @@ public class ProxyContextTest
         remote.addObserver(observer, recordName);
         observers.add(observer);
         return observer;
+    }
+
+    @Test
+    public void testSession() throws Exception
+    {
+        // prepare mocks
+        ISessionAttributesProvider provider = mock(ISessionAttributesProvider.class);
+        final String[] attrs = new String[] { "a1", "a2", "a3" };
+        when(provider.getSessionAttributes()).thenReturn(attrs);
+
+        ISessionManager manager = mock(ISessionManager.class);
+        final String sessionContextName = getContextName();
+        final String sessionId = "sesh-" + sessionContextName;
+        when(manager.createSession(eq(attrs))).thenReturn(sessionId);
+
+        ISessionListener listener = mock(ISessionListener.class);
+
+        // register session collaborators
+        SessionContexts.registerSessionProvider(sessionContextName, provider);
+        SessionContexts.registerSessionManager(sessionContextName, manager);
+        SessionContexts.registerSessionListener(sessionContextName, listener);
+
+        createComponents();
+
+        verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
+
+        Thread.sleep(500);
+        this.candidate.destroy();
+
+        verify(listener, timeout(1000)).onSessionClosed(eq(sessionContextName), eq(sessionId));
+        verify(manager, timeout(1000)).sessionEnded(eq(sessionId));
+    }
+
+    @Test
+    public void testSessionEndedByPublisher() throws Exception
+    {
+        // prepare mocks
+        ISessionAttributesProvider provider = mock(ISessionAttributesProvider.class);
+        final String[] attrs = new String[] { "a1", "a2", "a3" };
+        when(provider.getSessionAttributes()).thenReturn(attrs);
+
+        ISessionManager manager = mock(ISessionManager.class);
+        final String sessionContextName = getContextName();
+        final String sessionId = "sesh-" + sessionContextName;
+        when(manager.createSession(eq(attrs))).thenReturn(sessionId);
+
+        ISessionListener listener = mock(ISessionListener.class);
+
+        // register session collaborators
+        SessionContexts.registerSessionProvider(sessionContextName, provider);
+        SessionContexts.registerSessionManager(sessionContextName, manager);
+        SessionContexts.registerSessionListener(sessionContextName, listener);
+
+        createComponents();
+
+        verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
+
+        Thread.sleep(500);
+        this.publisher.destroy();
+
+        verify(listener, timeout(1000)).onSessionClosed(eq(sessionContextName), eq(sessionId));
+        verify(manager, timeout(1000)).sessionEnded(eq(sessionId));
     }
 
     @Test

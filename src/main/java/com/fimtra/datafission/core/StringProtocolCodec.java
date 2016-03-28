@@ -27,8 +27,10 @@ import java.util.Set;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.RpcInstance.Remote;
+import com.fimtra.datafission.core.session.SimpleSessionProtocol;
 import com.fimtra.datafission.field.AbstractValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -36,7 +38,6 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.Pair;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -67,7 +68,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     public static final int CHARRAY_SIZE = 32;
 
     static final byte[] SYNC = "sync".getBytes();
-    
+
     static final char CHAR_TOKEN_DELIM = '|';
     static final char CHAR_KEY_VALUE_SEPARATOR = '=';
     static final char CHAR_ESCAPE = '\\';
@@ -114,13 +115,24 @@ public class StringProtocolCodec implements ICodec<char[]>
     static final String DOUBLE_KEY_PREAMBLE = KEY_PREAMBLE + KEY_PREAMBLE;
     static final int DOUBLE_KEY_PREAMBLE_LENGTH = DOUBLE_KEY_PREAMBLE.length();
 
-    boolean synced = false;
+    final ISessionProtocol sessionSyncProtocol;
+
+    public StringProtocolCodec()
+    {
+        // todo add a way to select what type of session sync protocol to use
+        this(new SimpleSessionProtocol());
+    }
+
+    protected StringProtocolCodec(ISessionProtocol sessionSyncProtocol)
+    {
+        this.sessionSyncProtocol = sessionSyncProtocol;
+    }
 
     @Override
     public CommandEnum getCommand(char[] decodedMessage)
     {
         // todo optimise this to just scan and process once...
-        
+
         // commands from a client:
         // show = show all record names
         // s|<name>|<name>|... = subscribe for records
@@ -293,19 +305,17 @@ public class StringProtocolCodec implements ICodec<char[]>
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeSubMapEntryUpdatedChange(
-                                                    subMapName,
+                                                atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
                                                     decodeKey(currentTokenChars, 0, j, true, tempArr),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr), null);
+                                                        tempArr),
+                                                    null);
                                             }
                                             else
                                             {
-                                                atomicChange.mergeSubMapEntryRemovedChange(
-                                                    subMapName,
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr));
+                                                atomicChange.mergeSubMapEntryRemovedChange(subMapName,
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), decodeValue(
+                                                        currentTokenChars, j + 1, currentTokenChars.length, tempArr));
                                             }
                                         }
                                         else
@@ -315,14 +325,14 @@ public class StringProtocolCodec implements ICodec<char[]>
                                                 atomicChange.mergeEntryUpdatedChange(
                                                     decodeKey(currentTokenChars, 0, j, true, tempArr),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr), null);
+                                                        tempArr),
+                                                    null);
                                             }
                                             else
                                             {
                                                 atomicChange.mergeEntryRemovedChange(
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr));
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), decodeValue(
+                                                        currentTokenChars, j + 1, currentTokenChars.length, tempArr));
                                             }
                                         }
                                         j = chars.length;
@@ -627,8 +637,9 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
         }
 
-        return hasPreamble ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr
-            - DOUBLE_KEY_PREAMBLE_LENGTH) : new String(unescaped, 0, unescapedPtr);
+        return hasPreamble
+            ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr - DOUBLE_KEY_PREAMBLE_LENGTH)
+            : new String(unescaped, 0, unescapedPtr);
     }
 
     static String encodeValue(IValue value)
@@ -724,7 +735,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             {
                 case CHAR_TOKEN_DELIM:
                     if (previous != CHAR_ESCAPE ||
-                    // the previous was '\' and there was an even number of contiguous slashes
+                        // the previous was '\' and there was an even number of contiguous slashes
                         (slashCount % 2 == 0))
                     {
                         // an unescaped "|" is a true delimiter so start a new token
@@ -774,8 +785,8 @@ public class StringProtocolCodec implements ICodec<char[]>
             callDetails.put(Remote.ARG_ + i, args[i]);
         }
 
-        return encodeAtomicChange(RPC_COMMAND_CHARS, new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP,
-            ContextUtils.EMPTY_MAP), getCharset());
+        return encodeAtomicChange(RPC_COMMAND_CHARS,
+            new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP), getCharset());
     }
 
     @Override
@@ -795,13 +806,13 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
-    
+
     @Override
     public List<String> getResyncArgumentsFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
-    
+
     @Override
     public String getIdentityArgumentFromDecodedMessage(char[] decodedMessage)
     {
@@ -811,7 +822,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public char[] decode(byte[] data)
     {
-        return getCharset().decode(ByteBuffer.wrap(data)).array();
+        return getCharset().decode(ByteBuffer.wrap(this.sessionSyncProtocol.decode(data))).array();
     }
 
     @Override
@@ -833,26 +844,15 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public byte[] getTxMessageForCodecSync(String sessionContext)
+    public final byte[] finalEncode(byte[] data)
     {
-        return SYNC;
+        return this.sessionSyncProtocol.encode(data);
     }
 
     @Override
-    public Pair<Boolean, byte[]> handleCodecSyncData(byte[] data)
+    public ISessionProtocol getSessionProtocol()
     {
-        if (!this.synced)
-        {
-            this.synced = true;
-            return new Pair<Boolean, byte[]>(Boolean.TRUE, SYNC);
-        }
-        return new Pair<Boolean, byte[]>(Boolean.TRUE, null);
-    }
-
-    @Override
-    public byte[] finalEncode(byte[] data)
-    {
-        return data;
+        return this.sessionSyncProtocol;
     }
 }
 
