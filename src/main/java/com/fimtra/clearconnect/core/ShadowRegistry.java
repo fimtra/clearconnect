@@ -15,9 +15,12 @@
  */
 package com.fimtra.clearconnect.core;
 
+import java.util.concurrent.Executor;
+
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
+import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.util.Log;
 import com.fimtra.util.SystemUtils;
@@ -44,13 +47,17 @@ public final class ShadowRegistry
      *  arg[2] is the primary registry port (mandatory)
      *  arg[2] is the shadow registry host (mandatory)
      *  arg[2] is the shadow registry port (mandatory)
-     * </pre>
+     *            </pre>
+     * 
      * @throws InterruptedException
      * @throws RegistryNotAvailableException
      */
     @SuppressWarnings("unused")
     public static void main(String[] args) throws InterruptedException, RegistryNotAvailableException
     {
+        // ensure our agent waits forever to connect
+        System.getProperties().setProperty(PlatformCoreProperties.Names.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS,
+            "0");
         try
         {
             switch(args.length)
@@ -66,9 +73,9 @@ public final class ShadowRegistry
         catch (RuntimeException e)
         {
             throw new RuntimeException(SystemUtils.lineSeparator() + "Usage: " + ShadowRegistry.class.getSimpleName()
-                + " platformName primaryRegistryHostName primaryRegistryTcpPort shadowRegistryHostName shadowRegistryTcpPort " 
-                + SystemUtils.lineSeparator() + "    platformName is mandatory"
-                + SystemUtils.lineSeparator() + "    the hostName arguments are either a hostname or IP address", e);
+                + " platformName primaryRegistryHostName primaryRegistryTcpPort shadowRegistryHostName shadowRegistryTcpPort "
+                + SystemUtils.lineSeparator() + "    platformName is mandatory" + SystemUtils.lineSeparator()
+                + "    the hostName arguments are either a hostname or IP address", e);
         }
         synchronized (args)
         {
@@ -81,6 +88,7 @@ public final class ShadowRegistry
     final EndPointAddress primaryRegistryEndPoint;
     final EndPointAddress shadowRegistryEndPoint;
     final IPlatformRegistryAgent primaryRegistryAgent;
+    final Executor startStopService;
 
     /**
      * Start the shadow registry
@@ -100,6 +108,10 @@ public final class ShadowRegistry
         this.platformName = platformName;
         this.primaryRegistryEndPoint = primaryRegistryEndPoint;
         this.shadowRegistryEndPoint = shadowRegistryEndPoint;
+
+        this.startStopService = ThreadUtils.newSingleThreadExecutorService("start-stop-service");
+
+        startShadowRegistry();
 
         this.primaryRegistryAgent = new PlatformRegistryAgent("ShadowRegistryMonitor", primaryRegistryEndPoint);
         this.primaryRegistryAgent.addRegistryAvailableListener(new IRegistryAvailableListener()
@@ -126,7 +138,7 @@ public final class ShadowRegistry
 
     void startShadowRegistry()
     {
-        ThreadUtils.newThread(new Runnable()
+        this.startStopService.execute(new Runnable()
         {
             @Override
             public void run()
@@ -134,22 +146,28 @@ public final class ShadowRegistry
                 if (ShadowRegistry.this.registry == null)
                 {
                     Log.log(ShadowRegistry.this, "Starting shadow registry");
-                    ShadowRegistry.this.registry =
-                        new PlatformRegistry(ShadowRegistry.this.platformName,
-                            ShadowRegistry.this.shadowRegistryEndPoint);
+                    ShadowRegistry.this.registry = new PlatformRegistry(ShadowRegistry.this.platformName,
+                        ShadowRegistry.this.shadowRegistryEndPoint);
                 }
             }
-        }, "shadow-registry-startup").start();
+        });
     }
 
     void stopShadowRegistry()
     {
-        if (this.registry != null)
+        this.startStopService.execute(new Runnable()
         {
-            Log.log(this, "Stopping shadow registry");
-            this.registry.destroy();
-            this.registry = null;
-        }
+            @Override
+            public void run()
+            {
+                if (ShadowRegistry.this.registry != null)
+                {
+                    Log.log(ShadowRegistry.this, "Stopping shadow registry");
+                    ShadowRegistry.this.registry.destroy();
+                    ShadowRegistry.this.registry = null;
+                }
+            }
+        });
     }
 
     public void destroy()

@@ -15,6 +15,8 @@
  */
 package com.fimtra.clearconnect;
 
+import java.util.concurrent.Executor;
+
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
@@ -44,12 +46,16 @@ public class ShadowKernel
      *  arg[2] is the primary kernel port (mandatory)
      *  arg[3] is the shadow kernel host (mandatory)
      *  arg[4] is the shadow kernel port (mandatory)
-     * </pre>
+     *            </pre>
+     * 
      * @throws RegistryNotAvailableException
      */
     @SuppressWarnings("unused")
     public static void main(String[] args) throws InterruptedException, RegistryNotAvailableException
     {
+        // ensure our agent waits forever to connect
+        System.getProperties().setProperty(PlatformCoreProperties.Names.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS,
+            "0");
         try
         {
             switch(args.length)
@@ -78,6 +84,7 @@ public class ShadowKernel
     final EndPointAddress primaryRegistryEndPoint;
     final EndPointAddress shadowRegistryEndPoint;
     final IPlatformRegistryAgent primaryRegistryAgent;
+    final Executor startStopService;
 
     /**
      * Start the shadow kernel
@@ -97,6 +104,10 @@ public class ShadowKernel
         this.platformName = platformName;
         this.primaryRegistryEndPoint = primaryRegistryEndPoint;
         this.shadowRegistryEndPoint = shadowRegistryEndPoint;
+
+        this.startStopService = ThreadUtils.newSingleThreadExecutorService("start-stop-service");
+
+        startShadowRegistry();
 
         this.primaryRegistryAgent = new PlatformRegistryAgent("shadowKernelMonitor", primaryRegistryEndPoint);
         this.primaryRegistryAgent.addRegistryAvailableListener(new IRegistryAvailableListener()
@@ -123,7 +134,7 @@ public class ShadowKernel
 
     void startShadowRegistry()
     {
-        ThreadUtils.newThread(new Runnable()
+        this.startStopService.execute(new Runnable()
         {
             @Override
             public void run()
@@ -135,17 +146,24 @@ public class ShadowKernel
                         new PlatformKernel(ShadowKernel.this.platformName, ShadowKernel.this.shadowRegistryEndPoint);
                 }
             }
-        }, "ShadowKernelStartup").start();
+        });
     }
 
     void stopShadowKernel()
     {
-        if (this.kernel != null)
+        this.startStopService.execute(new Runnable()
         {
-            Log.log(this, "Stopping shadow kernel");
-            this.kernel.destroy();
-            this.kernel = null;
-        }
+            @Override
+            public void run()
+            {
+                if (ShadowKernel.this.kernel != null)
+                {
+                    Log.log(ShadowKernel.this, "Stopping shadow kernel");
+                    ShadowKernel.this.kernel.destroy();
+                    ShadowKernel.this.kernel = null;
+                }
+            }
+        });
     }
 
     public void destroy()
