@@ -2104,8 +2104,10 @@ public class ProxyContextTest
         Thread.sleep(500);
         this.candidate.destroy();
 
-        verify(listener, timeout(1000)).onSessionClosed(eq(sessionContextName), eq(sessionId));
-        verify(manager, timeout(1000)).sessionEnded(eq(sessionId));
+        // NOTE: at least once because the JVM has a single SessionContexts which is accessed by
+        // proxy and publisher
+        verify(listener, timeout(1000).atLeastOnce()).onSessionClosed(eq(sessionContextName), eq(sessionId));
+        verify(manager, timeout(1000).atLeastOnce()).sessionEnded(eq(sessionId));
     }
 
     @Test
@@ -2135,8 +2137,10 @@ public class ProxyContextTest
         Thread.sleep(500);
         this.publisher.destroy();
 
-        verify(listener, timeout(1000).times(2)).onSessionClosed(eq(sessionContextName), eq(sessionId));
-        verify(manager, timeout(1000).times(2)).sessionEnded(eq(sessionId));
+        // NOTE: at least once because the JVM has a single SessionContexts which is accessed by
+        // proxy and publisher
+        verify(listener, timeout(1000).atLeastOnce()).onSessionClosed(eq(sessionContextName), eq(sessionId));
+        verify(manager, timeout(1000).atLeastOnce()).sessionEnded(eq(sessionId));
     }
 
     @Test
