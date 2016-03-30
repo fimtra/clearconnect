@@ -124,11 +124,11 @@ public class SimpleSessionProtocol implements ISessionProtocol
                     final FromPublisher fromPublisher = (FromPublisher) fromByteArray;
                     if (fromPublisher.session != null)
                     {
-                        String sessionId = new String(fromPublisher.session);
+                        this.sessionId = new String(fromPublisher.session);
                         try
                         {
                             SessionContexts.getSessionListener(this.sessionContext).onSessionOpen(this.sessionContext,
-                                sessionId);
+                                this.sessionId);
                             return new SyncComplete(null);
                         }
                         catch (Exception e)

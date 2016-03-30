@@ -2135,8 +2135,8 @@ public class ProxyContextTest
         Thread.sleep(500);
         this.publisher.destroy();
 
-        verify(listener, timeout(1000)).onSessionClosed(eq(sessionContextName), eq(sessionId));
-        verify(manager, timeout(1000)).sessionEnded(eq(sessionId));
+        verify(listener, timeout(1000).times(2)).onSessionClosed(eq(sessionContextName), eq(sessionId));
+        verify(manager, timeout(1000).times(2)).sessionEnded(eq(sessionId));
     }
 
     @Test
