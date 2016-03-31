@@ -579,7 +579,7 @@ public class Publisher
         {
             this.channel.destroy(reason, e);
         }
-        
+
         void setProxyContextIdentity(String identity)
         {
             this.identity = identity;
@@ -690,9 +690,14 @@ public class Publisher
                 @Override
                 public void onChannelConnected(ITransportChannel channel)
                 {
-                    // construct the ProxyContextPublisher
-                    Publisher.this.proxyContextPublishers.put(channel,
-                        new ProxyContextPublisher(channel, Publisher.this.mainCodec.newInstance()));
+                    // synchronize to avoid race conditions that can remove the static portions of
+                    // the connections of a proxyContextPublisher for one that is in the process of
+                    // being constructed 
+                    synchronized (Publisher.this.proxyContextPublishers)
+                    {
+                        Publisher.this.proxyContextPublishers.put(channel,
+                            new ProxyContextPublisher(channel, Publisher.this.mainCodec.newInstance()));
+                    }
                 }
 
                 @Override
@@ -788,7 +793,11 @@ public class Publisher
                 @Override
                 public void onChannelClosed(ITransportChannel channel)
                 {
-                    ProxyContextPublisher clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
+                    ProxyContextPublisher clientPublisher;
+                    synchronized (Publisher.this.proxyContextPublishers)
+                    {
+                        clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
+                    }
                     if (clientPublisher != null)
                     {
                         clientPublisher.destroy();
@@ -825,19 +834,22 @@ public class Publisher
                 {
                     if (this.publishAtomicChange.getCount() == 0)
                     {
-                        // check each connection is still active - remove if not
-                        final Set<String> connectionIds =
-                            new HashSet<String>(Publisher.this.connectionsRecord.getSubMapKeys());
-                        final Set<ITransportChannel> channels = Publisher.this.proxyContextPublishers.keySet();
-                        for (ITransportChannel channel : channels)
+                        synchronized (Publisher.this.proxyContextPublishers)
                         {
-                            connectionIds.remove(getTransmissionStatisticsFieldName(channel));
+                            // check each connection is still active - remove if not
+                            final Set<String> connectionIds =
+                                new HashSet<String>(Publisher.this.connectionsRecord.getSubMapKeys());
+                            final Set<ITransportChannel> channels = Publisher.this.proxyContextPublishers.keySet();
+                            for (ITransportChannel channel : channels)
+                            {
+                                connectionIds.remove(getTransmissionStatisticsFieldName(channel));
+                            }
+                            for (String connectionId : connectionIds)
+                            {
+                                Publisher.this.connectionsRecord.removeSubMap(connectionId);
+                            }
                         }
-                        for (String connectionId : connectionIds)
-                        {
-                            Publisher.this.connectionsRecord.removeSubMap(connectionId);
-                        }
-
+                        
                         this.publishAtomicChange =
                             Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
                     }
