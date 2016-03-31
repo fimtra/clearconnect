@@ -76,12 +76,12 @@ public final class TaskStatistics
             + ", totalExecuted=" + this.totalExecuted + "]";
     }
 
-    void itemSubmitted()
+    synchronized void itemSubmitted()
     {
         this.currentSubmitted++;
     }
 
-    void itemExecuted()
+    synchronized void itemExecuted()
     {
         this.currentExecuted++;
     }
