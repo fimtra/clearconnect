@@ -74,8 +74,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     public NotifyingCache(Executor executor)
     {
-        this.cache = new LinkedHashMap<String, DATA>();
-        this.listeners = new ArrayList<LISTENER_CLASS>();
+        this.cache = new LinkedHashMap<String, DATA>(2);
+        this.listeners = new ArrayList<LISTENER_CLASS>(1);
         this.executor = executor;
         final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
         this.readLock = reentrantReadWriteLock.readLock();
