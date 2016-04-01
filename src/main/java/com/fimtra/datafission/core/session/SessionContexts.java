@@ -19,14 +19,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.fimtra.datafission.ISessionProtocol;
-import com.fimtra.util.SubscriptionManager;
 
 /**
  * The central point for registering and obtaining {@link ISessionManager},
- * {@link ISessionAttributesProvider} and {@link ISessionListener} instances for specific
- * "session contexts". A session context is identified by a unique name and describes a grouping of
- * one or more sessions that are separated from other sessions in other session contexts. A session
- * exists between a proxy and a publisher.
+ * {@link ISessionAttributesProvider} instances for specific "session contexts". A session context
+ * is identified by a unique name and describes a grouping of one or more sessions that are
+ * separated from other sessions in other session contexts. A session exists between a proxy and a
+ * publisher.
  * <p>
  * A session is established (synchronised) between a proxy and publisher by the protocol implemented
  * by the {@link ISessionProtocol}.
