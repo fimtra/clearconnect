@@ -62,10 +62,12 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.StringSymbolProtocolCodec.MissingKeySymbolMappingException;
+import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
+import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 
@@ -349,6 +351,8 @@ public final class ProxyContext implements IObserverContext
 
     /** The name given to the "session" between this proxy and its remote context. */
     final String sessionContextName;
+    final ISessionListener sessionListener;
+    final NotifyingCache<ISessionListener, String> sessionCache;
 
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
@@ -407,6 +411,34 @@ public final class ProxyContext implements IObserverContext
         super();
         this.codec = codec;
         this.sessionContextName = sessionContextName;
+        this.sessionListener = new ISessionListener()
+        {
+            @Override
+            public void onSessionOpen(String sessionContext, String sessionId)
+            {
+                ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext, sessionId);
+            }
+
+            @Override
+            public void onSessionClosed(String sessionContext, String sessionId)
+            {
+                ProxyContext.this.sessionCache.notifyListenersDataRemoved(sessionContext, sessionId);
+            }
+        };
+        this.sessionCache = new NotifyingCache<ISessionListener, String>()
+        {
+            @Override
+            protected void notifyListenerDataRemoved(ISessionListener listener, String key, String data)
+            {
+                listener.onSessionClosed(key, data);
+            }
+
+            @Override
+            protected void notifyListenerDataAdded(ISessionListener listener, String key, String data)
+            {
+                listener.onSessionOpen(key, data);
+            }
+        };
         this.context = new Context(name);
         this.lock = new ReentrantLock();
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
@@ -432,6 +464,16 @@ public final class ProxyContext implements IObserverContext
 
         // this allows the ProxyContext to be constructed and reconnects asynchronously
         reconnect();
+    }
+
+    public boolean addSessionListener(ISessionListener listener)
+    {
+        return this.sessionCache.addListener(listener);
+    }
+
+    public boolean removeSessionListener(ISessionListener listener)
+    {
+        return this.sessionCache.removeListener(listener);
     }
 
     /**
@@ -824,12 +866,14 @@ public final class ProxyContext implements IObserverContext
                     // when connecting, initialise a new codec instance to reset any state held by
                     // the previous codec
                     ProxyContext.this.codec = ProxyContext.this.codec.newInstance();
+                    ProxyContext.this.codec.getSessionProtocol().setSessionListener(ProxyContext.this.sessionListener);
 
                     // proxy initiates the codec-sync operation
                     // THIS MUST BE THE FIRST MESSAGE SENT
 
                     this.localChannelRef.sendAsync(
-                        ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(ProxyContext.this.sessionContextName));
+                        ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(
+                            ProxyContext.this.sessionContextName));
                     Log.log(ProxyContext.this, "(->) START SESSION SYNC");
                 }
             }

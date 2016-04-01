@@ -2095,9 +2095,10 @@ public class ProxyContextTest
         // register session collaborators
         SessionContexts.registerSessionProvider(sessionContextName, provider);
         SessionContexts.registerSessionManager(sessionContextName, manager);
-        SessionContexts.registerSessionListener(sessionContextName, listener);
 
         createComponents();
+        
+        this.candidate.addSessionListener(listener);
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
 
@@ -2128,9 +2129,11 @@ public class ProxyContextTest
         // register session collaborators
         SessionContexts.registerSessionProvider(sessionContextName, provider);
         SessionContexts.registerSessionManager(sessionContextName, manager);
-        SessionContexts.registerSessionListener(sessionContextName, listener);
-
+        
         createComponents();
+        
+        this.candidate.addSessionListener(listener);
+
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
 

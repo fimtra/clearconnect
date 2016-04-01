@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.fimtra.datafission.ISessionProtocol;
+import com.fimtra.util.SubscriptionManager;
 
 /**
  * The central point for registering and obtaining {@link ISessionManager},
@@ -29,6 +30,9 @@ import com.fimtra.datafission.ISessionProtocol;
  * <p>
  * A session is established (synchronised) between a proxy and publisher by the protocol implemented
  * by the {@link ISessionProtocol}.
+ * <p>
+ * Note: this design using statics is not fantastic but allows session management to be orthogonal
+ * to functionality. May be refactored in the future...
  * 
  * @author Ramon Servadei
  */
@@ -37,8 +41,6 @@ public class SessionContexts
     final static Map<String, ISessionManager> managers = new HashMap<String, ISessionManager>();
 
     final static Map<String, ISessionAttributesProvider> providers = new HashMap<String, ISessionAttributesProvider>();
-
-    final static Map<String, ISessionListener> listeners = new HashMap<String, ISessionListener>();
 
     private static final String[] DEFAULT_ATTRIBUTES = new String[] { "defaults" };
 
@@ -53,21 +55,6 @@ public class SessionContexts
 
         @Override
         public void sessionEnded(String sessionId)
-        {
-            // noop
-        }
-    };
-
-    private static final ISessionListener DEFAULT_LISTENER = new ISessionListener()
-    {
-        @Override
-        public void onSessionOpen(String sessionContext, String sessionId)
-        {
-            // noop
-        }
-
-        @Override
-        public void onSessionClosed(String sessionContext, String sessionId)
         {
             // noop
         }
@@ -102,22 +89,6 @@ public class SessionContexts
         synchronized (providers)
         {
             providers.put(sessionContextName, provider);
-        }
-    }
-
-    /**
-     * Register a session listener for the passed in session context.
-     * 
-     * @param sessionContextName
-     *            the name of the session context the listener is interested in
-     * @param listener
-     *            the listener to register
-     */
-    public static void registerSessionListener(String sessionContextName, ISessionListener listener)
-    {
-        synchronized (listeners)
-        {
-            listeners.put(sessionContextName, listener);
         }
     }
 
@@ -163,24 +134,4 @@ public class SessionContexts
         return provider.getSessionAttributes();
     }
 
-    /**
-     * Get the session listener registered for the session context
-     * 
-     * @param sessionContextName
-     *            the name of the session context
-     * @return the listener associated with the session context
-     */
-    public static ISessionListener getSessionListener(String sessionContextName)
-    {
-        final ISessionListener listener;
-        synchronized (listeners)
-        {
-            listener = listeners.get(sessionContextName);
-        }
-        if (listener == null)
-        {
-            return DEFAULT_LISTENER;
-        }
-        return listener;
-    }
 }

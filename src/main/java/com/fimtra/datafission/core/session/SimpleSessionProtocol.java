@@ -54,6 +54,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
 
     String sessionId;
     String sessionContext;
+    ISessionListener sessionListener;
 
     public SimpleSessionProtocol()
     {
@@ -89,7 +90,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
             {
                 // the publisher handles these
 
-                FromProxy fromProxy = (FromProxy) fromByteArray;
+                final FromProxy fromProxy = (FromProxy) fromByteArray;
 
                 this.sessionContext = fromProxy.sessionContext;
                 try
@@ -103,7 +104,8 @@ public class SimpleSessionProtocol implements ISessionProtocol
                     this.sessionId = null;
                 }
 
-                FromPublisher response = new FromPublisher();
+                final FromPublisher response = new FromPublisher();
+                
                 final boolean syncFailed = (this.sessionId == null);
                 if (syncFailed)
                 {
@@ -122,21 +124,27 @@ public class SimpleSessionProtocol implements ISessionProtocol
                     // proxy handles these
 
                     final FromPublisher fromPublisher = (FromPublisher) fromByteArray;
+
                     if (fromPublisher.session != null)
                     {
                         this.sessionId = new String(fromPublisher.session);
+
                         try
                         {
-                            SessionContexts.getSessionListener(this.sessionContext).onSessionOpen(this.sessionContext,
-                                this.sessionId);
-                            return new SyncComplete(null);
+                            if (this.sessionListener != null)
+                            {
+                                this.sessionListener.onSessionOpen(this.sessionContext, this.sessionId);
+                            }
                         }
                         catch (Exception e)
                         {
                             Log.log(this,
                                 "Could not notify session listener for session context:" + this.sessionContext, e);
                         }
+
+                        return new SyncComplete(null);
                     }
+
                     return new SyncFailed();
                 }
                 else
@@ -165,14 +173,16 @@ public class SimpleSessionProtocol implements ISessionProtocol
         {
             Log.log(this, "Could not notify " + ObjectUtils.safeToString(sessionManager), e);
         }
-        final ISessionListener sessionListener = SessionContexts.getSessionListener(this.sessionContext);
         try
         {
-            sessionListener.onSessionClosed(this.sessionContext, this.sessionId);
+            if (this.sessionListener != null)
+            {
+                this.sessionListener.onSessionClosed(this.sessionContext, this.sessionId);
+            }
         }
         catch (Exception e)
         {
-            Log.log(this, "Could not notify " + ObjectUtils.safeToString(sessionListener), e);
+            Log.log(this, "Could not notify " + ObjectUtils.safeToString(this.sessionListener), e);
         }
     }
 
@@ -186,5 +196,11 @@ public class SimpleSessionProtocol implements ISessionProtocol
     public byte[] decode(byte[] received)
     {
         return received;
+    }
+
+    @Override
+    public void setSessionListener(ISessionListener sessionListener)
+    {
+        this.sessionListener = sessionListener;
     }
 }

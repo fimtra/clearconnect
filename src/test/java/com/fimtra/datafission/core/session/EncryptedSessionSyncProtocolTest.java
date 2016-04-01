@@ -63,7 +63,7 @@ public class EncryptedSessionSyncProtocolTest
         // register session collaborators
         SessionContexts.registerSessionProvider(name.getMethodName(), provider);
         SessionContexts.registerSessionManager(name.getMethodName(), manager);
-        SessionContexts.registerSessionListener(name.getMethodName(), listener);
+        proxyEnd.setSessionListener(listener);
 
         // start the session sync
         final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(name.getMethodName());

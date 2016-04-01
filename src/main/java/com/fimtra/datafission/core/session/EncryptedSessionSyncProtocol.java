@@ -155,11 +155,13 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                     {
                         handleExtra(fromPublisher);
 
-                        String sessionId = new String(this.handshakeCipher.decrypt(fromPublisher.session));
+                        this.sessionId = new String(this.handshakeCipher.decrypt(fromPublisher.session));
                         try
                         {
-                            SessionContexts.getSessionListener(this.sessionContext).onSessionOpen(this.sessionContext,
-                                sessionId);
+                            if (this.sessionListener != null)
+                            {
+                                this.sessionListener.onSessionOpen(this.sessionContext, this.sessionId);
+                            }
                         }
                         catch (Exception e)
                         {
@@ -172,7 +174,8 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                 }
                 else
                 {
-                    Log.log(this, "Incorrect session sync data: " + ObjectUtils.safeToString(fromByteArray), new Exception());
+                    Log.log(this, "Incorrect session sync data: " + ObjectUtils.safeToString(fromByteArray),
+                        new Exception());
                     return new SyncFailed();
                 }
             }

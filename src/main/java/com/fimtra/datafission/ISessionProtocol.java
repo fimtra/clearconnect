@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission;
 
+import com.fimtra.datafission.core.session.ISessionListener;
+
 /**
  * Handles operations required to synchronise a session between a proxy and a publisher. The
  * protocol to synchronise a session is implementation specific and consists of an initial sync
@@ -32,8 +34,7 @@ package com.fimtra.datafission;
  * </pre>
  * 
  * Once synchronised, sending data using the session is done via the {@link #encode(byte[])} and
- * {@link #decode(byte[])} methods and can provide session specific data transfer (e.g.
- * encryption).
+ * {@link #decode(byte[])} methods and can provide session specific data transfer (e.g. encryption).
  * 
  * @author Ramon Servadei
  */
@@ -87,7 +88,6 @@ public interface ISessionProtocol
      * 
      * @param sessionContext
      *            the session context for the codec sync
-     * 
      * @return the byte[] for the initial codec sync message
      */
     byte[] getSessionSyncStartMessage(String sessionContext);
@@ -123,4 +123,12 @@ public interface ISessionProtocol
      * @return the decoded data for the session
      */
     byte[] decode(byte[] received);
+
+    /**
+     * Set the listener to receive callbacks about the session status
+     * 
+     * @param sessionListener
+     *            the listener
+     */
+    void setSessionListener(ISessionListener sessionListener);
 }
