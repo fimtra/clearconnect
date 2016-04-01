@@ -15,9 +15,13 @@
  */
 package com.fimtra.util;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.UUID;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -91,6 +95,20 @@ public class FileUtilsTest {
 		FileUtils.getRecordNameFromFile(recordFile);
 	}
 
+	@Test
+	public void testWriteInputStreamToFile() throws IOException
+    {
+        String string = "hello-" + UUID.randomUUID();
+        for (int i = 0; i < 1000; i++)
+        {
+            string += "-hello-" + UUID.randomUUID();
+        }
+        ByteArrayInputStream bis = new ByteArrayInputStream(string.getBytes());
+        final File file = new File("target/testWriteInputStreamToFile.txt");
+        FileUtils.writeInputStreamToFile(bis, file);
+        assertEquals(string, new BufferedReader(new FileReader(file)).readLine());
+    }
+	
 	@Test
 	public void testCopyMoveDeleteDirectory() throws IOException {
 		final File srcDir = new File(System.getProperty("user.dir"));

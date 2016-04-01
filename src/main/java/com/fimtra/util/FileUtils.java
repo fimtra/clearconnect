@@ -15,6 +15,7 @@
  */
 package com.fimtra.util;
 
+import java.io.BufferedOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileFilter;
@@ -246,20 +247,26 @@ public abstract class FileUtils {
 
     private static void fastCopyFile(final File sourceFile, final File targetFile) throws IOException
     {
-		FileChannel sourceChannel = null;
-		FileChannel destinationChannel = null;
+        FileChannel sourceChannel = null;
+        FileChannel destinationChannel = null;
+        FileInputStream fileInputStream = null;
+        FileOutputStream fileOutputStream = null;
         try
         {
-			sourceChannel = new FileInputStream(sourceFile).getChannel();
-			destinationChannel = new FileOutputStream(targetFile).getChannel();
-			sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);
+            fileInputStream = new FileInputStream(sourceFile);
+            sourceChannel = fileInputStream.getChannel();
+            fileOutputStream = new FileOutputStream(targetFile);
+            destinationChannel = fileOutputStream.getChannel();
+            sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);
         }
         finally
         {
-			FileUtils.safeClose(sourceChannel);
-			FileUtils.safeClose(destinationChannel);
-		}
-	}
+            FileUtils.safeClose(fileInputStream);
+            FileUtils.safeClose(fileOutputStream);
+            FileUtils.safeClose(sourceChannel);
+            FileUtils.safeClose(destinationChannel);
+        }
+    }
 
 	/**
 	 * Call {@link Closeable#close()} on the target, catching any exception
@@ -379,6 +386,34 @@ public abstract class FileUtils {
 		}
 	}
 
+    /**
+     * Write the input stream to a file. 
+     * <p>
+     * The input stream is not closed after this.
+     * @param in the input stream 
+     * @param file the file to write to
+     * @throws IOException
+     */
+    public static final void writeInputStreamToFile(InputStream in, File file) throws IOException
+    {
+        OutputStream out = null;
+        try
+        {
+            out = new BufferedOutputStream(new FileOutputStream(file));
+            final byte[] chunk = new byte[1024];
+            int len;
+            while ((len = in.read(chunk, 0, 1024)) > -1)
+            {
+                out.write(chunk, 0, len);
+            }
+            out.flush();
+        }
+        finally
+        {
+            safeClose(out);
+        }
+    }
+    
 	private static class OlderThanFileFilter implements FileFilter {
 
 		private final long olderThan;
