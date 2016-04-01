@@ -42,6 +42,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
+import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
@@ -312,5 +313,17 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     public String getComponentName()
     {
         return this.proxyContext.getName();
+    }
+
+    @Override
+    public boolean addSessionListener(ISessionListener listener)
+    {
+        return this.proxyContext.addSessionListener(listener);
+    }
+
+    @Override
+    public boolean removeSessionListener(ISessionListener listener)
+    {
+        return this.proxyContext.removeSessionListener(listener);
     }
 }

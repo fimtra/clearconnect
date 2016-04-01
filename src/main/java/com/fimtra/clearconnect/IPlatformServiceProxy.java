@@ -19,6 +19,7 @@ import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
+import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.tcpchannel.TcpChannel;
 
@@ -145,4 +146,22 @@ public interface IPlatformServiceProxy extends IPlatformServiceComponent
      * @see IPlatformServiceProxy#addServiceConnectionStatusListener(IServiceConnectionStatusListener)
      */
     boolean isConnected();
+
+    /**
+     * Add a session listener to receive session status updates from this proxy
+     * 
+     * @param listener
+     *            the session listener to add
+     * @return <code>true</code> if added, <code>false</code> if already added
+     */
+    boolean addSessionListener(ISessionListener listener);
+
+    /**
+     * Remove a previously added session listener
+     * 
+     * @param listener
+     *            the listener to remove
+     * @return <code>true</code> if removed
+     */
+    boolean removeSessionListener(ISessionListener listener);
 }

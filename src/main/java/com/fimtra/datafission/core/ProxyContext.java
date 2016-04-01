@@ -466,11 +466,25 @@ public final class ProxyContext implements IObserverContext
         reconnect();
     }
 
+    /**
+     * Add a session listener to receive session status updates from this proxy
+     * 
+     * @param listener
+     *            the session listener to add
+     * @return <code>true</code> if added, <code>false</code> if already added
+     */
     public boolean addSessionListener(ISessionListener listener)
     {
         return this.sessionCache.addListener(listener);
     }
 
+    /**
+     * Remove a previously added session listener
+     * 
+     * @param listener
+     *            the listener to remove
+     * @return <code>true</code> if removed
+     */
     public boolean removeSessionListener(ISessionListener listener)
     {
         return this.sessionCache.removeListener(listener);
