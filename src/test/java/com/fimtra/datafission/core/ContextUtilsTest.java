@@ -317,4 +317,20 @@ public class ContextUtilsTest
         verify(rec).clear();
         verify(context).publishAtomicChange(eq(rec));
     }
+    
+    
+    @Test
+    public void shouldGetRecordFromFile() {
+        String[] validFileNames = new String[] { "test." + ContextUtils.RECORD_FILE_EXTENSION, "test.another." + ContextUtils.RECORD_FILE_EXTENSION };
+        for (String fileName : validFileNames) {
+            File recordFile = new File(fileName);
+            assertEquals(fileName.substring(0, fileName.lastIndexOf(".")), ContextUtils.getRecordNameFromFile(recordFile));
+        }
+    }
+
+    @Test
+    public void shouldNotGetRecordFromFile() {
+        File recordFile = new File("test.someext");
+        assertNull(ContextUtils.getRecordNameFromFile(recordFile));
+    }
 }

@@ -36,9 +36,39 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class FileUtils {
 
-	public static final String recordFileExtension = "record";
-	public static final String propertyFileExtension = "properties";
-	private static File logDirCanonical;
+    private FileUtils() {
+        // Not for instantiation
+    }
+    
+    /**
+     * Filter that accepts files with allowed extensions.
+     */
+    public static final class ExtensionFileFilter implements FileFilter {
+
+        private final String[] allowedFileExtensions;
+
+        /**
+         * Filters files that have an allowed file extension. Lowercase and uppercase extensions are
+         * ignored, so .ext, .EXT, .eXt are all matched.
+         * @param allowedFileExtensions the extenstions to allow, specified <b>without a "."</b> so "ext" NOT ".ext"
+         */
+        public ExtensionFileFilter(String... allowedFileExtensions) {
+            this.allowedFileExtensions = allowedFileExtensions;
+        }
+
+        @Override
+        public boolean accept(File pathname) {
+            for (String allowedExt : this.allowedFileExtensions) {
+                StringBuilder extBuilder = (new StringBuilder()).append(".").append(allowedExt);
+                if (pathname.getName().toLowerCase().endsWith(extBuilder.toString().toLowerCase())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private static File logDirCanonical;
 	private static File archiveDirCanonical;
 	static {
 		try {
@@ -53,20 +83,6 @@ public abstract class FileUtils {
 		}
 	}
 
-	private FileUtils() {
-		// Not for instantiation
-	}
-
-	public static final String getRecordNameFromFile(File recordFile) {
-		StringBuilder extBuilder = (new StringBuilder()).append(".").append(recordFileExtension);
-		String fileName = recordFile.getName();
-		if (fileName.endsWith(extBuilder.toString())) {
-			return fileName.substring(0, fileName.lastIndexOf("."));
-		}
-        throw new IllegalArgumentException("The record file [" + recordFile.getName() + "] should have the extension ["
-                + recordFileExtension + "]");
-	}
-
 	/**
 	 * @return a {@link List} of {@link File}s in a directory with {@link File}s that are filtered
 	 *         using the fileFilter.
@@ -78,30 +94,6 @@ public abstract class FileUtils {
 			throw new IllegalArgumentException(directory.getName() + " is not a directory");
 		}
 		return directory.listFiles(fileFilter);
-	}
-
-	public static final class ExtensionFileFilter implements FileFilter {
-
-		private final String[] allowedFileExtensions;
-
-		/**
-		 * Filters files that have an allowed file extension. Lowercase and uppercase extensions are
-		 * ignored, so .ext, .EXT, .eXt are all matched.
-		 */
-		public ExtensionFileFilter(String... allowedFileExtensions) {
-			this.allowedFileExtensions = allowedFileExtensions;
-		}
-
-		@Override
-		public boolean accept(File pathname) {
-			for (String allowedExt : this.allowedFileExtensions) {
-				StringBuilder extBuilder = (new StringBuilder()).append(".").append(allowedExt);
-				if (pathname.getName().toLowerCase().endsWith(extBuilder.toString().toLowerCase())) {
-					return true;
-				}
-			}
-			return false;
-		}
 	}
 
 	/**
@@ -233,7 +225,7 @@ public abstract class FileUtils {
 		}
 	}
 
-	private static void copyFile(File src, File dest) throws IOException {
+	public static void copyFile(File src, File dest) throws IOException {
 		if (!dest.exists()) {
 			dest.createNewFile();
 		}

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
 import com.fimtra.util.is;
@@ -35,10 +36,10 @@ import com.fimtra.util.is;
  */
 class ConfigDirReader {
 
-	static final ExtensionFileFilter recordFileFilter = new FileUtils.ExtensionFileFilter(FileUtils.recordFileExtension);
-	static final ExtensionFileFilter propertyFileFilter = new FileUtils.ExtensionFileFilter(FileUtils.propertyFileExtension);
+    static final String propertyFileExtension = "properties";
+	static final ExtensionFileFilter propertyFileFilter = new FileUtils.ExtensionFileFilter(ConfigDirReader.propertyFileExtension);
 
-	/**
+    /**
 	 * Encapsulates meta data for a config file.
 	 * 
 	 * @author Ramon Servadei
@@ -102,13 +103,13 @@ class ConfigDirReader {
 	 * changed.
 	 */
 	List<File> updateRecordFileCache() {
-		final File[] recordFiles = FileUtils.readFiles(this.configDir, recordFileFilter);
+		final File[] recordFiles = FileUtils.readFiles(this.configDir, ContextUtils.RECORD_FILE_FILTER);
 		final List<File> changedFiles = emptyChangedFiles(recordFiles);
 		final List<File> allFiles = emptyAllFiles(recordFiles);
 		FileMetaData fileMetaData;
 		for (File recordFile : recordFiles) {
 			allFiles.add(recordFile);
-			fileMetaData = new FileMetaData(FileUtils.getRecordNameFromFile(recordFile), recordFile.canRead(),
+			fileMetaData = new FileMetaData(ContextUtils.getRecordNameFromFile(recordFile), recordFile.canRead(),
 					recordFile.lastModified(), recordFile.length());
 			if (!(this.fileCache.containsKey(recordFile)) || !(this.fileCache.get(recordFile).equals(fileMetaData))) {
 				this.fileCache.put(recordFile, fileMetaData);

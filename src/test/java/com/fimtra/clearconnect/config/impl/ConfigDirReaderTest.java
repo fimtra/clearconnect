@@ -30,6 +30,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.clearconnect.config.impl.ConfigDirReader;
+import com.fimtra.datafission.core.ContextUtils;
 
 /**
  * @author Paul Mackinlay

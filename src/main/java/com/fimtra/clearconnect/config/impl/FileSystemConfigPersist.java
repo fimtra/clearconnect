@@ -16,7 +16,6 @@ import java.util.List;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.core.ContextUtils;
-import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -53,7 +52,11 @@ public class FileSystemConfigPersist implements IConfigPersist {
 		List<File> changedFiles = this.configDirReader.updateRecordFileCache();
 		Collection<String> changedRecordNames = new ArrayList<String>(changedFiles.size());
 		for (File file : changedFiles) {
-			changedRecordNames.add(FileUtils.getRecordNameFromFile(file));
+			final String recordNameFromFile = ContextUtils.getRecordNameFromFile(file);
+			if(recordNameFromFile != null)
+			{
+			    changedRecordNames.add(recordNameFromFile);
+			}
 		}
 		return changedRecordNames;
 	}

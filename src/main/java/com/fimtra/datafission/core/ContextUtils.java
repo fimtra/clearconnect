@@ -54,6 +54,7 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
+import com.fimtra.util.FileUtils.ExtensionFileFilter;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.RollingFileAppender;
@@ -70,6 +71,7 @@ import com.fimtra.util.is;
  */
 public class ContextUtils
 {
+
     /**
      * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register
      * an inner listener to any new records in the context.
@@ -126,7 +128,9 @@ public class ContextUtils
     static final String FISSION_CORE = "fission-core";
 
     private static final String RECORD_FILE_EXTENSION_NAME = "record";
-    private static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
+    static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
+    public static final ExtensionFileFilter RECORD_FILE_FILTER = new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
+    
     private static final double INVERSE_1000000 = 1d / 1000000;
 
     public static final Set<String> SYSTEM_RECORDS;
@@ -306,7 +310,7 @@ public class ContextUtils
     public static void resolveContextFromDirectory(IPublisherContext context, File directory) throws IOException
     {
         File[] recordFiles =
-            FileUtils.readFiles(directory, new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME));
+            FileUtils.readFiles(directory, RECORD_FILE_FILTER);
         String recordName;
         IRecord record;
         for (File recordFile : recordFiles)
@@ -402,6 +406,24 @@ public class ContextUtils
         return false;
     }
 
+    /**
+     * Convenience method to get the record name from a record file. This expects the file name to
+     * be in the format: {record name}.record
+     * 
+     * @param recordFile
+     *            the record file
+     * @return the record name of the file, <code>null</code> if not a record file
+     */
+    public static final String getRecordNameFromFile(File recordFile)
+    {
+        final String fileName = recordFile.getName();
+        if (fileName.endsWith(RECORD_FILE_EXTENSION))
+        {
+            return fileName.substring(0, fileName.lastIndexOf("."));
+        }
+        return null;
+    }
+    
     /**
      * @return <code>true</code> if the record name is a reserved name (one of the system
      *         CONTEXT_XXX record names)

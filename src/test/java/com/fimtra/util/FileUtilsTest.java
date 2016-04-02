@@ -81,21 +81,6 @@ public class FileUtilsTest {
 	}
 
 	@Test
-	public void shouldGetRecordFromFile() {
-		String[] validFileNames = new String[] { "test." + FileUtils.recordFileExtension, "test.another." + FileUtils.recordFileExtension };
-		for (String fileName : validFileNames) {
-			File recordFile = new File(fileName);
-			assertEquals(fileName.substring(0, fileName.lastIndexOf(".")), FileUtils.getRecordNameFromFile(recordFile));
-		}
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void shouldNotGetRecordFromFile() {
-		File recordFile = new File("test.someext");
-		FileUtils.getRecordNameFromFile(recordFile);
-	}
-
-	@Test
 	public void testWriteInputStreamToFile() throws IOException
     {
         String string = "hello-" + UUID.randomUUID();

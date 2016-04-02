@@ -82,7 +82,7 @@ public class ConfigService {
 			throws IOException, FileNotFoundException {
 		File[] propertyFiles = FileUtils.readFiles(configDir, ConfigDirReader.propertyFileFilter);
 		IConfig config = null;
-		final String configServicePropertiesFileName = IConfigServiceProxy.CONFIG_SERVICE + "." + FileUtils.propertyFileExtension;
+		final String configServicePropertiesFileName = IConfigServiceProxy.CONFIG_SERVICE + "." + ConfigDirReader.propertyFileExtension;
 		for (File propertyFile : propertyFiles) {
 			if (is.eq(propertyFile.getName(), configServicePropertiesFileName)) {
 				final Properties props = new Properties();
