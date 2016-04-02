@@ -19,9 +19,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Enumeration;
 import java.util.Properties;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
@@ -34,6 +40,8 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.FileUtils;
+import com.fimtra.util.Log;
+import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
@@ -52,6 +60,10 @@ import com.fimtra.util.is;
  * <p>
  * The config service will poll the config store every 60 seconds to check for config changes. By default any changes to the files in the
  * directory are published. The changes that are detected are: file modified timestamp, file size change, new files and deleted files.
+ * <p>
+ * <b>Defaults:</b> on startup, the classpath is searched for any directory called 'defaultConfig'. The files in here will be copied into 
+ * the 'config' directory. If the config directory already contains the file, it is not copied from defaultConfig. This mechanism allows 
+ * default configuration to be packaged in a jar file and unpacked as initial defaults.
  * <p>
  * A custom implementation of {@link IConfigPersist} can be defined using {@link ConfigServiceProperties.Values#CONFIG_PERSIST_CLASS}.
  *
@@ -98,6 +110,10 @@ public class ConfigService {
 		this(TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT);
 	}
 
+    protected ConfigService(String registryHost, int registryPort) {
+        this(new EndPointAddress(registryHost, registryPort));
+    }
+    
 	protected ConfigService(EndPointAddress registryEndpoint) {
 		try {
 			this.scheduledExecutor = ThreadUtils.newScheduledExecutorService("config-polling", 1);
@@ -106,6 +122,9 @@ public class ConfigService {
 			if (!configDir.exists()) {
 				configDir.mkdir();
 			}
+			
+			unpackDefaultConfig(configDir);
+			
 			IConfigPersist configPersist = ConfigPersistFactory.getInstance(configDir).getIConfigPersist();
 
 			this.platformRegistryAgent = new PlatformRegistryAgent(IConfigServiceProxy.CONFIG_SERVICE, registryEndpoint);
@@ -120,10 +139,6 @@ public class ConfigService {
 		}
 	}
 
-	protected ConfigService(String registryHost, int registryPort) {
-		this(new EndPointAddress(registryHost, registryPort));
-	}
-
 	public void destroy() {
 		ConfigPersistFactory.reset();
 		this.scheduledExecutor.shutdownNow();
@@ -135,7 +150,88 @@ public class ConfigService {
 		super.finalize();
 		destroy();
 	}
-
+	
+    void unpackDefaultConfig(final File configDir) throws IOException, MalformedURLException
+    {
+        final String defaultConfig = "defaultConfig";
+        final URL resource = getClass().getClassLoader().getResource(defaultConfig);
+        if (resource != null)
+        {
+            final File resourceFile = new File(resource.getFile());
+            if (resourceFile.isDirectory())
+            {
+                Log.log(this, "Default configuration files found: ", resourceFile.getPath());
+                for (File defaultConfigFile : FileUtils.readFiles(resourceFile, ConfigDirReader.propertyFileFilter))
+                {
+                    final File configFile = new File(configDir, defaultConfigFile.getName());
+                    if (!configFile.exists())
+                    {
+                        Log.log(this, "Creating default config: ", configFile.getPath());
+                        FileUtils.copyFile(defaultConfigFile, configFile);
+                    }
+                    else
+                    {
+                        Log.log(this, "Config already exists: ", configFile.getPath());
+                    }
+                }
+            }
+            else
+            {
+                String canonicalPath = resourceFile.getParent();
+                if (canonicalPath.endsWith("jar!"))
+                {
+                    canonicalPath = canonicalPath.substring(0, canonicalPath.length() - 1);
+                    Log.log(this, "Default configuration files found (jar): ", canonicalPath);
+                    ZipFile configJar = null;
+                    try
+                    {
+                        configJar = new ZipFile(new URL(canonicalPath).getFile());
+                        ZipEntry configFileZipEntry;
+                        final Enumeration<? extends ZipEntry> entries = configJar.entries();
+                        while (entries.hasMoreElements())
+                        {
+                            configFileZipEntry = entries.nextElement();
+                            if (configFileZipEntry.getName().startsWith(defaultConfig, 0))
+                            {
+                                if (configFileZipEntry.isDirectory())
+                                {
+                                    continue;
+                                }
+                                final File configFile = new File(configDir,
+                                    configFileZipEntry.getName().substring(defaultConfig.length() + 1));
+                                if (!configFile.exists())
+                                {
+                                    Log.log(this, "Creating default config: ", configFile.getPath());
+                                    final InputStream configInputStream = configJar.getInputStream(configFileZipEntry);
+                                    try
+                                    {
+                                        FileUtils.writeInputStreamToFile(configInputStream, configFile);
+                                    }
+                                    finally
+                                    {
+                                        FileUtils.safeClose(configInputStream);
+                                    }
+                                }
+                                else
+                                {
+                                    Log.log(this, "Config already exists: ", configFile.getPath());
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        FileUtils.safeClose(configJar);
+                    }
+                }
+                else
+                {
+                    Log.log(this, "Unknown default config resource:", ObjectUtils.safeToString(resourceFile));
+                }
+            }
+        }
+    }
+    
 	void publishConfig() {
 		if (this.configPublisher != null && this.scheduledExecutor != null) {
 			this.scheduledExecutor.execute(this.configPublisher);
