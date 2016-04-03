@@ -16,6 +16,7 @@
 package com.fimtra.clearconnect.config.impl;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
@@ -152,7 +153,7 @@ public abstract class ConfigUtils {
 	public synchronized static IPlatformServiceInstance getPlatformServiceInstance(String serviceName, IConfig config, IPlatformRegistryAgent agent) {
 		String host = ConfigUtils.getHost(config);
 		int port = ConfigUtils.getPort(config, host);
-		String serviceMemberName = host + ":" + port;
+		String serviceMemberName = host + ":" + port + ":" + UUID.randomUUID();
 		return getPlatformServiceInstanceInternal(serviceName, serviceMemberName, config, agent, host, port);
 	}
 
