@@ -526,6 +526,8 @@ public class ContextUtils
         {
             switch(c)
             {
+                case '\r':
+                    break;
                 case ContextUtils.LINE_SEPARATOR:
                     // we have a line - escaped(key)=escaped(value)
                     key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
