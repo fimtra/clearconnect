@@ -196,31 +196,31 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                             {
                                 clone = null;
                             }
+
+                            if (result.get())
+                            {
+                                Map.Entry<String, DATA> entry = null;
+                                for (@SuppressWarnings("null")
+                                Iterator<Map.Entry<String, DATA>> it = clone.entrySet().iterator(); it.hasNext();)
+                                {
+                                    entry = it.next();
+                                    try
+                                    {
+                                        notifyListenerDataAdded(listener, entry.getKey(), entry.getValue());
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.log(NotifyingCache.this,
+                                            "Could not notify " + ObjectUtils.safeToString(listener)
+                                                + " with initial image " + ObjectUtils.safeToString(entry),
+                                            e);
+                                    }
+                                }
+                            }
                         }
                         finally
                         {
                             NotifyingCache.this.writeLock.unlock();
-                        }
-
-                        if (result.get())
-                        {
-                            Map.Entry<String, DATA> entry = null;
-                            for (@SuppressWarnings("null")
-                            Iterator<Map.Entry<String, DATA>> it = clone.entrySet().iterator(); it.hasNext();)
-                            {
-                                entry = it.next();
-                                try
-                                {
-                                    notifyListenerDataAdded(listener, entry.getKey(), entry.getValue());
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(NotifyingCache.this,
-                                        "Could not notify " + ObjectUtils.safeToString(listener)
-                                            + " with initial image " + ObjectUtils.safeToString(entry),
-                                        e);
-                                }
-                            }
                         }
                     }
                     finally
@@ -288,34 +288,34 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         {
             added = !is.eq(this.cache.put(key, data), data);
             listenersToNotify = this.listeners;
+            if (added)
+            {
+                this.executor.execute(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        for (LISTENER_CLASS listener : listenersToNotify)
+                        {
+                            try
+                            {
+                                notifyListenerDataAdded(listener, key, data);
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
+                                    + " with ADD " + ObjectUtils.safeToString(data), e);
+                            }
+                        }
+                    }
+                });
+            }
         }
         finally
         {
             this.writeLock.unlock();
         }
 
-        if (added)
-        {
-            this.executor.execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    for (LISTENER_CLASS listener : listenersToNotify)
-                    {
-                        try
-                        {
-                            notifyListenerDataAdded(listener, key, data);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
-                                + " with ADD " + ObjectUtils.safeToString(data), e);
-                        }
-                    }
-                }
-            });
-        }
         return added;
     }
 
@@ -334,34 +334,34 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         {
             removed = this.cache.remove(key) != null;
             listenersToNotify = this.listeners;
+            if (removed)
+            {
+                this.executor.execute(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        for (LISTENER_CLASS listener : listenersToNotify)
+                        {
+                            try
+                            {
+                                notifyListenerDataRemoved(listener, key, data);
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
+                                    + " with REMOVE " + ObjectUtils.safeToString(data), e);
+                            }
+                        }
+                    }
+                });
+            }
         }
         finally
         {
             this.writeLock.unlock();
         }
 
-        if (removed)
-        {
-            this.executor.execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    for (LISTENER_CLASS listener : listenersToNotify)
-                    {
-                        try
-                        {
-                            notifyListenerDataRemoved(listener, key, data);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
-                                + " with REMOVE " + ObjectUtils.safeToString(data), e);
-                        }
-                    }
-                }
-            });
-        }
         return removed;
     }
 
