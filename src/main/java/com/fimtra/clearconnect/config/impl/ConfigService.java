@@ -161,8 +161,13 @@ public class ConfigService {
             if (resourceFile.isDirectory())
             {
                 Log.log(this, "Default configuration files found: ", resourceFile.getPath());
-                for (File defaultConfigFile : FileUtils.readFiles(resourceFile, ConfigDirReader.propertyFileFilter))
+                for (File defaultConfigFile : resourceFile.listFiles())
                 {
+                    if(defaultConfigFile.isDirectory())
+                    {
+                        continue;
+                    }
+                    
                     final File configFile = new File(configDir, defaultConfigFile.getName());
                     if (!configFile.exists())
                     {
