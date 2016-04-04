@@ -98,11 +98,7 @@ public class PlatformServiceAccess
             throw new RuntimeException("Unable to create platform registry agent", e);
         }
 
-        this.platformRegistryAgent.waitForPlatformService(IConfigServiceProxy.CONFIG_SERVICE);
-
-        this.configServiceProxy =
-            new ConfigServiceProxy(
-                this.platformRegistryAgent.getPlatformServiceProxy(IConfigServiceProxy.CONFIG_SERVICE));
+        this.configServiceProxy = ConfigServiceProxy.getDefaultInstance(this.platformRegistryAgent);
 
         IConfig config = this.configServiceProxy.getConfig(serviceFamily, serviceMember);
 
