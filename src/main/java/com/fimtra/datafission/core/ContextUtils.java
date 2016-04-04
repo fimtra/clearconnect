@@ -129,11 +129,13 @@ public class ContextUtils
 
     private static final String RECORD_FILE_EXTENSION_NAME = "record";
     static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
-    public static final ExtensionFileFilter RECORD_FILE_FILTER = new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
-    
+    public static final ExtensionFileFilter RECORD_FILE_FILTER =
+        new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
+
     private static final double INVERSE_1000000 = 1d / 1000000;
 
     public static final Set<String> SYSTEM_RECORDS;
+
     static
     {
         Set<String> set = new HashSet<String>();
@@ -148,22 +150,22 @@ public class ContextUtils
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
      */
-    final static ThimbleExecutor CORE_EXECUTOR = new ThimbleExecutor(FISSION_CORE,
-        DataFissionProperties.Values.CORE_THREAD_COUNT);
+    final static ThimbleExecutor CORE_EXECUTOR =
+        new ThimbleExecutor(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
      * This is dedicated to handle RPC results. If RPC results are handled by the
      * {@link #CORE_EXECUTOR}, a timeout could occur if the result is placed onto the same queue of
      * the thread that is waiting for the result!
      */
-    final static ThimbleExecutor RPC_EXECUTOR = new ThimbleExecutor(FISSION_RPC,
-        DataFissionProperties.Values.RPC_THREAD_COUNT);
+    final static ThimbleExecutor RPC_EXECUTOR =
+        new ThimbleExecutor(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
 
     /**
      * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.
      */
-    final static ScheduledExecutorService UTILITY_SCHEDULER = ThreadUtils.newPermanentScheduledExecutorService(
-        "fission-utility", 1);
+    final static ScheduledExecutorService UTILITY_SCHEDULER =
+        ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
     /**
      * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
@@ -173,8 +175,9 @@ public class ContextUtils
         "fission-reconnect", DataFissionProperties.Values.RECONNECT_THREAD_COUNT);
 
     static Map<Object, TaskStatistics> coreSequentialStats;
-    static RollingFileAppender statisticsLog = RollingFileAppender.createStandardRollingFileAppender("Qstats",
-        UtilProperties.Values.LOG_DIR);
+    static RollingFileAppender statisticsLog =
+        RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
+
     static
     {
         try
@@ -309,8 +312,7 @@ public class ContextUtils
      */
     public static void resolveContextFromDirectory(IPublisherContext context, File directory) throws IOException
     {
-        File[] recordFiles =
-            FileUtils.readFiles(directory, RECORD_FILE_FILTER);
+        File[] recordFiles = FileUtils.readFiles(directory, RECORD_FILE_FILTER);
         String recordName;
         IRecord record;
         for (File recordFile : recordFiles)
@@ -423,7 +425,7 @@ public class ContextUtils
         }
         return null;
     }
-    
+
     /**
      * @return <code>true</code> if the record name is a reserved name (one of the system
      *         CONTEXT_XXX record names)
@@ -505,8 +507,8 @@ public class ContextUtils
                 case '|':
                 case '"':
                 case '*':
-                    throw new IllegalArgumentException("Cannot use < > | \\ / : ? \" * in a record name: '" + name
-                        + "'");
+                    throw new IllegalArgumentException(
+                        "Cannot use < > | \\ / : ? \" * in a record name: '" + name + "'");
             }
         }
         return true;
@@ -517,32 +519,41 @@ public class ContextUtils
         String key;
         IValue value;
         int index = 0;
-        char c;
-        boolean indexFound;
+        int c;
+        boolean indexFound = false;
         CharBuffer cbuf = CharBuffer.allocate(CharBufferUtils.BLOCK_SIZE);
-        while (reader.ready())
+        while ((c = reader.read()) != -1)
         {
-            indexFound = false;
-            index = 0;
-            while ((c = (char) reader.read()) != ContextUtils.LINE_SEPARATOR)
+            switch(c)
             {
-                cbuf = CharBufferUtils.put(c, cbuf);
-                if (c == '=')
-                {
+                case ContextUtils.LINE_SEPARATOR:
+                    // we have a line - escaped(key)=escaped(value)
+                    key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
+                    value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+                        new char[cbuf.position() - (index + 1)]);
+                    map.put(key, value);
+                    cbuf.position(0);
+                    indexFound = false;
+                    index = 0;
+                    break;
+                case '=':
                     indexFound = true;
-                }
-                if (!indexFound)
-                {
-                    index++;
-                }
+                    //$FALL-THROUGH$
+                default :
+                    cbuf = CharBufferUtils.put((char) c, cbuf);
+                    if (!indexFound)
+                    {
+                        index++;
+                    }
             }
-            // we have a line - escaped(key)=escaped(value)
+        }
+        // need to do the final one
+        if(index > 0 && indexFound)
+        {
             key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
-            value =
-                StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(), new char[cbuf.position()
-                    - (index + 1)]);
+            value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+                new char[cbuf.position() - (index + 1)]);
             map.put(key, value);
-            cbuf.position(0);
         }
     }
 
@@ -552,9 +563,9 @@ public class ContextUtils
         Map.Entry<String, IValue> entry = null;
         String key = null;
         IValue value = null;
-        
+
         final CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
-        
+
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
