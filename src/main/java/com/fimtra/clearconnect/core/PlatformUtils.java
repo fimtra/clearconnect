@@ -29,8 +29,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarFile;
 
 import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceComponent;
+import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.config.IConfig;
+import com.fimtra.clearconnect.config.impl.ConfigServiceProxy;
+import com.fimtra.clearconnect.config.impl.ConfigUtils;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
 import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
@@ -77,6 +82,7 @@ import com.fimtra.util.is;
 public class PlatformUtils
 {
     public final static String VERSION;
+
     static
     {
         String version = "";
@@ -396,9 +402,8 @@ public class PlatformUtils
                 RpcInstance rpcFromDefinition;
                 for (Entry<String, IValue> removedRpc : removedRpcs)
                 {
-                    rpcFromDefinition =
-                        RpcInstance.constructInstanceFromDefinition(removedRpc.getKey(),
-                            removedRpc.getValue().textValue());
+                    rpcFromDefinition = RpcInstance.constructInstanceFromDefinition(removedRpc.getKey(),
+                        removedRpc.getValue().textValue());
                     if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(rpcFromDefinition.getName(),
                         rpcFromDefinition))
                     {
@@ -495,7 +500,8 @@ public class PlatformUtils
                 }
 
                 @Override
-                protected void notifyListenerDataAdded(IRecordConnectionStatusListener listener, String key, IValue data)
+                protected void notifyListenerDataAdded(IRecordConnectionStatusListener listener, String key,
+                    IValue data)
                 {
                     if (ProxyContext.RECORD_CONNECTED == (data))
                     {
@@ -522,7 +528,8 @@ public class PlatformUtils
                 Map.Entry<String, IValue> entry = null;
                 String key = null;
                 IValue value = null;
-                for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
+                for (Iterator<Map.Entry<String, IValue>> it =
+                    atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
                 {
                     entry = it.next();
                     key = entry.getKey();
@@ -579,9 +586,8 @@ public class PlatformUtils
                         if (subMapAtomicChange.getRemovedEntries().isEmpty())
                         {
                             added.add(connectionId);
-                            this.current.put(
-                                connectionId,
-                                subMapAtomicChange.getPutEntries().get(IContextConnectionsRecordFields.PROXY_ID).textValue());
+                            this.current.put(connectionId, subMapAtomicChange.getPutEntries().get(
+                                IContextConnectionsRecordFields.PROXY_ID).textValue());
                         }
                         else
                         {
@@ -730,7 +736,8 @@ public class PlatformUtils
 
     static TransportTechnologyEnum getTransportTechnologyFromServiceInfoRecord(Map<String, IValue> serviceRecord)
     {
-        return TransportTechnologyEnum.valueOf(serviceRecord.get(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD).textValue());
+        return TransportTechnologyEnum.valueOf(
+            serviceRecord.get(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD).textValue());
     }
 
     static ICodec<?> getCodecFromServiceInfoRecord(Map<String, IValue> serviceRecord)
@@ -755,10 +762,9 @@ public class PlatformUtils
             throw new IllegalArgumentException(
                 "Service member name '" + serviceMember + "' cannot contain characters [ or ]");
         }
-            
-        final StringBuilder sb =
-            new StringBuilder(serviceFamily.length() + serviceMember.length() + SERVICE_INSTANCE_PREFIX.length()
-                + SERVICE_INSTANCE_SUFFIX.length());
+
+        final StringBuilder sb = new StringBuilder(serviceFamily.length() + serviceMember.length()
+            + SERVICE_INSTANCE_PREFIX.length() + SERVICE_INSTANCE_SUFFIX.length());
         sb.append(serviceFamily).append(SERVICE_INSTANCE_PREFIX).append(serviceMember).append(SERVICE_INSTANCE_SUFFIX);
         return sb.toString();
     }
@@ -779,10 +785,8 @@ public class PlatformUtils
         {
             return null;
         }
-        return new String[] {
-            platformServiceInstanceID.substring(0, index),
-            platformServiceInstanceID.substring(index + SERVICE_INSTANCE_PREFIX.length(),
-                length - SERVICE_INSTANCE_SUFFIX.length()) };
+        return new String[] { platformServiceInstanceID.substring(0, index), platformServiceInstanceID.substring(
+            index + SERVICE_INSTANCE_PREFIX.length(), length - SERVICE_INSTANCE_SUFFIX.length()) };
     }
 
     public static final int DECOMPOSED_SERVICE_NAME_INDEX = 0;
@@ -922,9 +926,8 @@ public class PlatformUtils
     {
         try
         {
-            boolean isCountedDown =
-                updateWaitLatch.await(DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS,
-                    TimeUnit.MILLISECONDS);
+            boolean isCountedDown = updateWaitLatch.await(
+                DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             if (!isCountedDown)
             {
                 Log.log(logContext, "Initial image for '", recordName, "' was not received after waiting [",
@@ -935,5 +938,28 @@ public class PlatformUtils
         {
             // ignore
         }
+    }
+
+    /**
+     * This is a "no-brainer" convenience method that will get a platform service instance, creating
+     * it if necessary. During creation, relevant configuration for the instance (host, port,
+     * wireprotocol, redundancy mode) is retrieved from the ConfigService, if it is available,
+     * otherwise suitable defaults will be used.
+     * 
+     * @param serviceName
+     *            the service family name
+     * @param serviceMemberName
+     *            the service member name
+     * @param agent
+     *            the agent to use
+     * @return the instance
+     */
+    public static IPlatformServiceInstance getOrCreatePlatformServiceInstance(String serviceName,
+        String serviceMemberName, IPlatformRegistryAgent agent)
+    {
+        final IConfig config =
+            ConfigServiceProxy.getDefaultInstanceOrDummy(agent).getConfig(serviceName, serviceMemberName);
+        Log.log(PlatformUtils.class, ObjectUtils.safeToString(config));
+        return ConfigUtils.getPlatformServiceInstance(serviceName, serviceMemberName, config, agent);
     }
 }
