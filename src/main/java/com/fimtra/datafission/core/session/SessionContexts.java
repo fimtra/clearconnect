@@ -41,9 +41,15 @@ public class SessionContexts
 
     final static Map<String, ISessionAttributesProvider> providers = new HashMap<String, ISessionAttributesProvider>();
 
-    private static final String[] DEFAULT_ATTRIBUTES = new String[] { "defaults" };
-
-    private static final ISessionManager DEFAULT_MANAGER = new ISessionManager()
+    public static final ISessionAttributesProvider DEFAULT_PROVIDER = new ISessionAttributesProvider()
+    {
+        @Override
+        public String[] getSessionAttributes()
+        {
+            return new String[] { "defaults" };
+        }
+    };
+    public static final ISessionManager DEFAULT_MANAGER = new ISessionManager()
     {
         @Override
         public String createSession(String[] details)
@@ -100,16 +106,20 @@ public class SessionContexts
      */
     public static ISessionManager getSessionManager(String sessionContextName)
     {
-        final ISessionManager listener;
+        ISessionManager manager;
         synchronized (managers)
         {
-            listener = managers.get(sessionContextName);
+            manager = managers.get(sessionContextName);
+            if (manager == null)
+            {
+                manager = managers.get(null);
+            }
         }
-        if (listener == null)
+        if (manager == null)
         {
             return DEFAULT_MANAGER;
         }
-        return listener;
+        return manager;
     }
 
     /**
@@ -121,14 +131,18 @@ public class SessionContexts
      */
     public static String[] getSessionAttributes(String sessionContextName)
     {
-        final ISessionAttributesProvider provider;
+        ISessionAttributesProvider provider;
         synchronized (providers)
         {
             provider = providers.get(sessionContextName);
+            if (provider == null)
+            {
+                provider = providers.get(null);
+            }
         }
         if (provider == null)
         {
-            return DEFAULT_ATTRIBUTES;
+            provider = DEFAULT_PROVIDER;
         }
         return provider.getSessionAttributes();
     }
