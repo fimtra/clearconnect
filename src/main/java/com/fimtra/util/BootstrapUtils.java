@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2016 Paul Mackinlay, Fimtra
- *  
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -59,6 +61,9 @@ public abstract class BootstrapUtils {
 	 * <pre>
 	 * host1:port1,host2:port2...
 	 * </pre>
+	 * 
+	 * @see TcpChannelUtils#LOCALHOST_IP
+	 * @see PlatformCoreProperties.Values#REGISTRY_PORT
 	 */
 	public static EndPointAddress[] getRegistryEndPoints(Properties initProperties) {
 		String registryConfigString = System.getProperty(initKeyRegstryEndPointAddresses);
@@ -105,13 +110,25 @@ public abstract class BootstrapUtils {
 	}
 
 	/**
-	 * Returns the initial properties in the initFilename. Note the root of initFilename is the classpath root.
+	 * Returns the initial properties in the initFilename. If will detect location of the initFilename by:
+	 * <ol>
+	 * <li>using the filesystem</li>
+	 * <li>using the classloader (searches within the classpath), this will also find files packaged within a jar</li>
+	 * </ol>
 	 */
 	public static Properties getInitProperties(String initFilename) {
 		Properties initProperties = new Properties();
 		InputStream inputStream = null;
 		try {
-			inputStream = BootstrapUtils.class.getResourceAsStream(initFilename);
+			try {
+				inputStream = new FileInputStream(initFilename);
+			} catch (FileNotFoundException e) {
+				// ignore
+			}
+			if (inputStream == null) {
+				// Not on the filesystem - will try the classpath (possibly within a jar)
+				inputStream = BootstrapUtils.class.getResourceAsStream(initFilename);
+			}
 			initProperties.load(inputStream);
 		} catch (Exception e) {
 			// no properties - will use defaults
