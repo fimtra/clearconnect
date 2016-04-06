@@ -69,7 +69,8 @@ public class SessionContexts
      * Register a manager that operates in the passed in session context.
      * 
      * @param sessionContextName
-     *            the name of the session context the manager operates in
+     *            the name of the session context the manager operates in,
+     *            <code>null</code> for a wildcard to cover all session contexts
      * @param manager
      *            the session manager to register
      */
@@ -85,7 +86,8 @@ public class SessionContexts
      * Register a session attributes provider for the passed in session context.
      * 
      * @param sessionContextName
-     *            the name of the session context the attributes provider operates in
+     *            the name of the session context the attributes provider operates in,
+     *            <code>null</code> for a wildcard to cover all session contexts
      * @param provider
      *            the provider to register
      */
