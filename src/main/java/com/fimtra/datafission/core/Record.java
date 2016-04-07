@@ -910,7 +910,7 @@ final class SubMap implements Map<String, IValue>
         return ContextUtils.mapToString(this.subMap);
     }
 
-    Iterator<Map.Entry<String, IValue>> subMapIterator(final Iterator<Map.Entry<String, IValue>> subMapIterator)
+    static Iterator<Map.Entry<String, IValue>> subMapIterator(final Iterator<Map.Entry<String, IValue>> subMapIterator)
     {
         return new Iterator<Map.Entry<String, IValue>>()
         {
