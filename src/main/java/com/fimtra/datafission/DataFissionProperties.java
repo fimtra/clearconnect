@@ -188,23 +188,24 @@ public abstract class DataFissionProperties
          * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
          * {@link Context} instances in the runtime.
          * <p>
-         * Default is 1x available CPU cores (+1) in the host runtime.
+         * Default is minimum of 4 OR 1x available CPU cores (+1) in the host runtime
          * 
          * @see Names#CORE_THREAD_COUNT
          */
-        int CORE_THREAD_COUNT = Integer.parseInt(
-            System.getProperty(Names.CORE_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors() + 1)));
+        int CORE_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.CORE_THREAD_COUNT, ""
+            + (Runtime.getRuntime().availableProcessors() < 4 ? 4 : (Runtime.getRuntime().availableProcessors() + 1))));
 
         /**
          * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all
-         * DataFission {@link Context} instances in the runtime.
+         * DataFission {@link Context} instances in the runtime. 
          * <p>
-         * Default is 1x available CPU cores in the host runtime.
+         * Default is minimum of 4 OR 1x available CPU cores in the host runtime.
          * 
          * @see Names#RPC_THREAD_COUNT
          */
         int RPC_THREAD_COUNT = Integer.parseInt(
-            System.getProperty(Names.RPC_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors())));
+            System.getProperty(Names.RPC_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors() < 4 ? 4
+                : (Runtime.getRuntime().availableProcessors()))));
 
         /**
          * The timeout to wait for an RPC to start.
