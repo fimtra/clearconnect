@@ -129,16 +129,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public CommandEnum getCommand(char[] decodedMessage)
+    public final CommandEnum getCommand(char[] decodedMessage)
     {
-        // todo optimise this to just scan and process once...
-
-        // commands from a client:
-        // show = show all record names
-        // s|<name>|<name>|... = subscribe for records
-        // u|<name>|<name>|... = unsubscribe for records
-        // rpc|RPC_details_as_atomic_change = rpc call
-        //
         if (isCommand(decodedMessage, SUBSCRIBE_COMMAND_CHARS))
         {
             return CommandEnum.SUBSCRIBE;
@@ -790,31 +782,31 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public IRecordChange getRpcFromRxMessage(char[] decodedMessage)
+    public final IRecordChange getRpcFromRxMessage(char[] decodedMessage)
     {
         return decodeAtomicChange(decodedMessage);
     }
 
     @Override
-    public List<String> getSubscribeArgumentsFromDecodedMessage(char[] decodedMessage)
+    public final List<String> getSubscribeArgumentsFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
 
     @Override
-    public List<String> getUnsubscribeArgumentsFromDecodedMessage(char[] decodedMessage)
+    public final List<String> getUnsubscribeArgumentsFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
 
     @Override
-    public List<String> getResyncArgumentsFromDecodedMessage(char[] decodedMessage)
+    public final List<String> getResyncArgumentsFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage);
     }
 
     @Override
-    public String getIdentityArgumentFromDecodedMessage(char[] decodedMessage)
+    public final String getIdentityArgumentFromDecodedMessage(char[] decodedMessage)
     {
         return getNamesFromCommandMessage(decodedMessage).get(0);
     }
@@ -850,7 +842,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public ISessionProtocol getSessionProtocol()
+    public final ISessionProtocol getSessionProtocol()
     {
         return this.sessionSyncProtocol;
     }
