@@ -598,13 +598,20 @@ public class PlatformUtils
 
                 for (String connectionId : removed)
                 {
-                    proxyConnectionNotifyingCache.notifyListenersDataRemoved(this.current.remove(connectionId), null);
+                    if (proxyConnectionNotifyingCache.notifyListenersDataRemoved(this.current.remove(connectionId),
+                        null))
+                    {
+                        Log.log(logContext, "Proxy DISCONNECTED: ", connectionId);
+                    }
                 }
 
                 for (String connectionId : added)
                 {
-                    proxyConnectionNotifyingCache.notifyListenersDataAdded(this.current.get(connectionId),
-                        LongValue.valueOf(1));
+                    if (proxyConnectionNotifyingCache.notifyListenersDataAdded(this.current.get(connectionId),
+                        LongValue.valueOf(1)))
+                    {
+                        Log.log(logContext, "Proxy CONNECTED: ", connectionId);
+                    }
                 }
                 updateWaitLatch.countDown();
             }
