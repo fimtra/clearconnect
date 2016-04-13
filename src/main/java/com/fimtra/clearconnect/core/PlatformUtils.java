@@ -962,4 +962,15 @@ public class PlatformUtils
         Log.log(PlatformUtils.class, ObjectUtils.safeToString(config));
         return ConfigUtils.getPlatformServiceInstance(serviceName, serviceMemberName, config, agent);
     }
+
+	/**
+	 * Checks if a record name is used by ClearConnect.
+	 * 
+	 * @param recordName
+	 *            the record name to check
+	 * @return true if the recordName is used by ClearConnect
+	 */
+	public static boolean isClearConnectRecord(String recordName) {
+		return (ContextUtils.isSystemRecordName(recordName)) || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName);
+	}
 }
