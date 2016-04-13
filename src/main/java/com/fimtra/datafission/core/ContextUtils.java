@@ -437,7 +437,7 @@ public class ContextUtils
      */
     public static boolean isSystemRecordName(String name)
     {
-        if (name.startsWith(ISystemRecordNames.CONTEXT, 0))
+		if (name != null && name.startsWith(ISystemRecordNames.CONTEXT, 0))
         {
             return SYSTEM_RECORDS.contains(name);
         }

@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei, Fimtra
+ * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay, Fimtra
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,11 +15,7 @@
  */
 package com.fimtra.clearconnect.core;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,12 +30,22 @@ import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
+import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.field.TextValue;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for {@link PlatformUtils}
  * 
  * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 @SuppressWarnings("boxing")
 public class PlatformUtilsTest
@@ -145,4 +151,15 @@ public class PlatformUtilsTest
         String serviceMemberName = "sdf2 [sdf";
         PlatformUtils.composePlatformServiceInstanceID(serviceName, serviceMemberName);
     }
+
+	@Test
+	public void testIsClearConnectRecord() {
+		String recordName = null;
+		assertFalse(PlatformUtils.isClearConnectRecord(recordName));
+		assertFalse(PlatformUtils.isClearConnectRecord("a custom name of my choice"));
+		assertTrue(PlatformUtils.isClearConnectRecord(PlatformServiceInstance.SERVICE_STATS_RECORD_NAME));
+		for (String name : ContextUtils.SYSTEM_RECORDS) {
+			assertTrue(PlatformUtils.isClearConnectRecord(name));
+		}
+	}
 }
