@@ -420,8 +420,8 @@ public final class RpcInstance implements IRpcInstance
             {
                 args = definition.substring(ARGS.length(), indexOfRet);
             }
-            String ret = definition.substring(indexOfRet + RETURNS.length(), definition.length() - CLOSE_CHAR.length());
-            String[] tokens = args.split(ARG_SEPARATOR);
+            final String ret = definition.substring(indexOfRet + RETURNS.length(), definition.length() - CLOSE_CHAR.length());
+            final String[] tokens = args.split(ARG_SEPARATOR);
             TypeEnum[] argTypes = new TypeEnum[tokens.length];
             if (tokens.length == 1 && "".equals(tokens[0]))
             {
