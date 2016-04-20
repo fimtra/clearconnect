@@ -69,6 +69,7 @@ import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 
 /**
@@ -352,7 +353,7 @@ public final class ProxyContext implements IObserverContext
     /** The name given to the "session" between this proxy and its remote context. */
     final String sessionContextName;
     final ISessionListener sessionListener;
-    final NotifyingCache<ISessionListener, String> sessionCache;
+    final NotifyingCache<ISessionListener, Pair<String, Boolean>> sessionCache;
 
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
@@ -416,27 +417,40 @@ public final class ProxyContext implements IObserverContext
             @Override
             public void onSessionOpen(String sessionContext, String sessionId)
             {
-                ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext, sessionId);
+                ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext,
+                    new Pair<String, Boolean>(sessionId, Boolean.TRUE));
             }
 
             @Override
             public void onSessionClosed(String sessionContext, String sessionId)
             {
+                // NOTE: we use the ADDED events to trigger notification of listeners
+                ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext,
+                    new Pair<String, Boolean>(sessionId, Boolean.FALSE));
+
+                // remove the data
                 ProxyContext.this.sessionCache.notifyListenersDataRemoved(sessionContext);
             }
         };
-        this.sessionCache = new NotifyingCache<ISessionListener, String>()
+        this.sessionCache = new NotifyingCache<ISessionListener, Pair<String, Boolean>>()
         {
             @Override
-            protected void notifyListenerDataRemoved(ISessionListener listener, String key, String data)
+            protected void notifyListenerDataRemoved(ISessionListener listener, String key, Pair<String, Boolean> data)
             {
-                listener.onSessionClosed(key, data);
+                // noop
             }
 
             @Override
-            protected void notifyListenerDataAdded(ISessionListener listener, String key, String data)
+            protected void notifyListenerDataAdded(ISessionListener listener, String key, Pair<String, Boolean> data)
             {
-                listener.onSessionOpen(key, data);
+                if (data.getSecond().booleanValue())
+                {
+                    listener.onSessionOpen(key, data.getFirst());
+                }
+                else
+                {
+                    listener.onSessionClosed(key, data.getFirst());
+                }
             }
         };
         this.context = new Context(name);

@@ -42,6 +42,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 import org.junit.After;
 import org.junit.Before;
@@ -2097,7 +2099,7 @@ public class ProxyContextTest
         SessionContexts.registerSessionManager(sessionContextName, manager);
 
         createComponents();
-        
+
         this.candidate.addSessionListener(listener);
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
@@ -2109,6 +2111,32 @@ public class ProxyContextTest
         // proxy and publisher
         verify(listener, timeout(1000).atLeastOnce()).onSessionClosed(eq(sessionContextName), eq(sessionId));
         verify(manager, timeout(1000).atLeastOnce()).sessionEnded(eq(sessionId));
+    }
+
+    @Test
+    public void testSessionRejectedByPublisher() throws Exception
+    {
+        // prepare mocks
+        ISessionAttributesProvider provider = mock(ISessionAttributesProvider.class);
+        final String[] attrs = new String[] { "a1", "a2", "a3" };
+        when(provider.getSessionAttributes()).thenReturn(attrs);
+
+        ISessionManager manager = mock(ISessionManager.class);
+        final String sessionContextName = getContextName();
+        when(manager.createSession(eq(attrs))).thenReturn(null);
+
+        ISessionListener listener = mock(ISessionListener.class);
+
+        // register session collaborators
+        SessionContexts.registerSessionProvider(sessionContextName, provider);
+        SessionContexts.registerSessionManager(sessionContextName, manager);
+
+        createComponents();
+
+        this.candidate.addSessionListener(listener);
+
+        verify(listener, timeout(5000)).onSessionClosed(eq(sessionContextName), anyString());
+        verify(listener, never()).onSessionOpen(eq(sessionContextName), anyString());
     }
 
     @Test
@@ -2129,11 +2157,10 @@ public class ProxyContextTest
         // register session collaborators
         SessionContexts.registerSessionProvider(sessionContextName, provider);
         SessionContexts.registerSessionManager(sessionContextName, manager);
-        
-        createComponents();
-        
-        this.candidate.addSessionListener(listener);
 
+        createComponents();
+
+        this.candidate.addSessionListener(listener);
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
 

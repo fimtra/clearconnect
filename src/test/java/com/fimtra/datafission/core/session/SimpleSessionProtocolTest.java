@@ -95,7 +95,7 @@ public class SimpleSessionProtocolTest
         SyncResponse response = this.publisherEnd.handleSessionSyncData(syncInit);
         assertFalse(response.syncComplete);
         assertTrue(response.syncFailed);
-        assertNull(response.syncDataResponse);
+        assertNotNull(response.syncDataResponse);
     }
 
 }

@@ -122,7 +122,7 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                     final boolean syncFailed = (this.sessionId == null);
                     if (syncFailed)
                     {
-                        return new SyncFailed();
+                        return new SyncFailed(SerializationUtils.toByteArray(response));
                     }
                     else
                     {
@@ -176,14 +176,14 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                 {
                     Log.log(this, "Incorrect session sync data: " + ObjectUtils.safeToString(fromByteArray),
                         new Exception());
-                    return new SyncFailed();
+                    return new SyncFailed(null);
                 }
             }
         }
         catch (Exception e)
         {
             Log.log(this, "Error synchronising session", e);
-            return new SyncFailed();
+            return new SyncFailed(null);
         }
     }
 

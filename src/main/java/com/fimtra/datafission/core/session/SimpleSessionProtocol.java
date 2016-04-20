@@ -109,7 +109,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
                 final boolean syncFailed = (this.sessionId == null);
                 if (syncFailed)
                 {
-                    return new SyncFailed();
+                    return new SyncFailed(SerializationUtils.toByteArray(response));
                 }
                 else
                 {
@@ -145,19 +145,19 @@ public class SimpleSessionProtocol implements ISessionProtocol
                         return new SyncComplete(null);
                     }
 
-                    return new SyncFailed();
+                    return new SyncFailed(null);
                 }
                 else
                 {
                     Log.log(this, "Incorrect session sync data: " + fromByteArray, new Exception());
-                    return new SyncFailed();
+                    return new SyncFailed(null);
                 }
             }
         }
         catch (Exception e)
         {
             Log.log(this, "Error synchronising session", e);
-            return new SyncFailed();
+            return new SyncFailed(null);
         }
     }
 

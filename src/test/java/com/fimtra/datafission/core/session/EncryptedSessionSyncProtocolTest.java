@@ -116,7 +116,7 @@ public class EncryptedSessionSyncProtocolTest
         response = this.publisherEnd.handleSessionSyncData(response.syncDataResponse);
         assertFalse(response.syncComplete);
         assertTrue(response.syncFailed);
-        assertNull(response.syncDataResponse);
+        assertNotNull(response.syncDataResponse);
     }
 
 }

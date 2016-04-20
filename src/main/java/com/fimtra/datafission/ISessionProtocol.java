@@ -69,9 +69,9 @@ public interface ISessionProtocol
 
     final class SyncFailed extends SyncResponse
     {
-        public SyncFailed()
+        public SyncFailed(byte[] syncDataResponse)
         {
-            super(true, false, null);
+            super(true, false, syncDataResponse);
         }
     }
 
