@@ -405,19 +405,19 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 Log.log(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
                 for (String serviceFamily : this.serviceAvailableListeners.keySet())
                 {
-                    if (this.serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily, serviceFamily))
+                    if (this.serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
                     {
                         Log.log(PlatformRegistryAgent.this, "Dropped service: '", serviceFamily, "'");
                     }
                 }
                 for (String serviceInstance : this.serviceInstanceAvailableListeners.keySet())
                 {
-                    if (this.serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstance, serviceInstance))
+                    if (this.serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstance))
                     {
                         Log.log(PlatformRegistryAgent.this, "Dropped serviceInstance: '", serviceInstance, "'");
                     }
                 }
-                this.registryAvailableListeners.notifyListenersDataRemoved(this.platformName, this.platformName);
+                this.registryAvailableListeners.notifyListenersDataRemoved(this.platformName);
                 this.platformName = null;
             }
         }

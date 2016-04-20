@@ -422,7 +422,7 @@ public final class ProxyContext implements IObserverContext
             @Override
             public void onSessionClosed(String sessionContext, String sessionId)
             {
-                ProxyContext.this.sessionCache.notifyListenersDataRemoved(sessionContext, sessionId);
+                ProxyContext.this.sessionCache.notifyListenersDataRemoved(sessionContext);
             }
         };
         this.sessionCache = new NotifyingCache<ISessionListener, String>()

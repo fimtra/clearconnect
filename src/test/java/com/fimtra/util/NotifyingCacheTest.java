@@ -236,7 +236,7 @@ public class NotifyingCacheTest
     {
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
-        assertTrue(this.candidate.notifyListenersDataRemoved("1", "1"));
+        assertTrue(this.candidate.notifyListenersDataRemoved("1"));
         assertEquals(this.candidate.cache, this.candidate.getCacheSnapshot());
     }
 
@@ -244,25 +244,25 @@ public class NotifyingCacheTest
     public void testAddDuplicatesData()
     {
         assertFalse(this.candidate.notifyListenersDataAdded(null, null));
-        assertFalse(this.candidate.notifyListenersDataRemoved(null, null));
+        assertFalse(this.candidate.notifyListenersDataRemoved(null));
         assertFalse(this.candidate.notifyListenersDataAdded("null", null));
-        assertFalse(this.candidate.notifyListenersDataRemoved("null", null));
+        assertFalse(this.candidate.notifyListenersDataRemoved("null"));
         
         assertTrue(this.candidate.notifyListenersDataAdded(null, "1"));
         assertFalse(this.candidate.notifyListenersDataAdded(null, "1"));
-        assertTrue(this.candidate.notifyListenersDataRemoved(null, "1"));
-        assertFalse(this.candidate.notifyListenersDataRemoved(null, "1"));
+        assertTrue(this.candidate.notifyListenersDataRemoved(null));
+        assertFalse(this.candidate.notifyListenersDataRemoved(null));
         
 
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertFalse(this.candidate.notifyListenersDataAdded("1", "1"));
-        assertTrue(this.candidate.notifyListenersDataRemoved("1", "1"));
-        assertFalse(this.candidate.notifyListenersDataRemoved("1", "1"));
+        assertTrue(this.candidate.notifyListenersDataRemoved("1"));
+        assertFalse(this.candidate.notifyListenersDataRemoved("1"));
         
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("1", null));
         assertFalse(this.candidate.notifyListenersDataAdded("1", null));
-        assertFalse(this.candidate.notifyListenersDataRemoved("1", null));
+        assertFalse(this.candidate.notifyListenersDataRemoved("1"));
     }
 
     @Test
@@ -357,7 +357,7 @@ public class NotifyingCacheTest
         assertTrue("Got: " + listener2, listener2.contains("1"));
         assertTrue("Got: " + listener2, listener2.contains("2"));
 
-        this.candidate.notifyListenersDataRemoved("2", "2");
+        this.candidate.notifyListenersDataRemoved("2");
         assertTrue(removed1.get().await(1, TimeUnit.SECONDS));
         assertTrue(removed2.get().await(1, TimeUnit.SECONDS));
 
@@ -369,7 +369,7 @@ public class NotifyingCacheTest
         assertTrue(this.candidate.removeListener(listener2));
 
         removed1.set(new CountDownLatch(1));
-        this.candidate.notifyListenersDataRemoved("1", "1");
+        this.candidate.notifyListenersDataRemoved("1");
         assertTrue(removed1.get().await(1, TimeUnit.SECONDS));
 
         assertEquals("Got: " + listener1, 0, listener1.size());
@@ -414,7 +414,7 @@ public class NotifyingCacheTest
         assertTrue(candidate.addListener(o2));
 
         assertTrue(candidate.notifyListenersDataAdded("1", "1"));
-        assertTrue(candidate.notifyListenersDataRemoved("1", "1"));
+        assertTrue(candidate.notifyListenersDataRemoved("1"));
 
         assertEquals(expectedNotifiedAdded, notifiedAdded);
         assertEquals(expectedNotifiedRemoved, notifiedRemoved);

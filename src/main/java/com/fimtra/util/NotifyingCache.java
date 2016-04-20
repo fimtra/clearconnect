@@ -185,9 +185,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                                 new ArrayList<LISTENER_CLASS>(NotifyingCache.this.listeners);
                             result.set(copy.add(listener));
                             NotifyingCache.this.listeners = copy;
-                            
+
                             latch.countDown();
-                            
+
                             if (result.get())
                             {
                                 clone = new LinkedHashMap<String, DATA>(NotifyingCache.this.cache);
@@ -273,7 +273,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners with the new data using the internal executor
+     * Notify all registered listeners with the new data. The notification is done using the
+     * internal executor.
      * 
      * @return <code>true</code> if the data was added (it was not already contained),
      *         <code>false</code> if it was already in the cache (no listeners are notified in this
@@ -320,19 +321,23 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners with the data that was removed using the internal executor
+     * Notify all registered listeners that the data for this key is removed. The notification is
+     * done using the internal executor.
      * 
+     * @param the
+     *            key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
      *         found (no listeners are notified in this case)
      */
-    public final boolean notifyListenersDataRemoved(final String key, final DATA data)
+    public final boolean notifyListenersDataRemoved(final String key)
     {
         final boolean removed;
         final List<LISTENER_CLASS> listenersToNotify;
         this.writeLock.lock();
         try
         {
-            removed = this.cache.remove(key) != null;
+            final DATA removedData = this.cache.remove(key);
+            removed = removedData != null;
             listenersToNotify = this.listeners;
             if (removed)
             {
@@ -345,12 +350,12 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         {
                             try
                             {
-                                notifyListenerDataRemoved(listener, key, data);
+                                notifyListenerDataRemoved(listener, key, removedData);
                             }
                             catch (Exception e)
                             {
                                 Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
-                                    + " with REMOVE " + ObjectUtils.safeToString(data), e);
+                                    + " with REMOVE " + ObjectUtils.safeToString(removedData), e);
                             }
                         }
                     }

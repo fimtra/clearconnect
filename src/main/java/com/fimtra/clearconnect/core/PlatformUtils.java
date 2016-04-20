@@ -62,7 +62,6 @@ import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
-import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
@@ -227,7 +226,7 @@ public class PlatformUtils
                     {
                         continue;
                     }
-                    if (serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily, serviceFamily))
+                    if (serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
                     {
                         Log.log(logContext, "Service unavailable (lost): '", serviceFamily, "'");
                     }
@@ -293,8 +292,7 @@ public class PlatformUtils
                     {
                         serviceInstanceId =
                             PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId,
-                            serviceInstanceId))
+                        if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId))
                         {
                             Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
                         }
@@ -343,7 +341,7 @@ public class PlatformUtils
                 Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
                 for (String recordName : removedRecords)
                 {
-                    recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName, recordName);
+                    recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName);
                 }
                 updateWaitLatch.countDown();
             }
@@ -399,13 +397,9 @@ public class PlatformUtils
                     }
                 }
                 Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
-                RpcInstance rpcFromDefinition;
                 for (Entry<String, IValue> removedRpc : removedRpcs)
                 {
-                    rpcFromDefinition = RpcInstance.constructInstanceFromDefinition(removedRpc.getKey(),
-                        removedRpc.getValue().textValue());
-                    if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(rpcFromDefinition.getName(),
-                        rpcFromDefinition))
+                    if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(removedRpc.getKey()))
                     {
                         Log.log(logContext, "RPC removed: '", removedRpc.getKey(), "' in ",
                             ObjectUtils.safeToString(logContext));
@@ -473,7 +467,7 @@ public class PlatformUtils
                     subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
                     if (currentSubscriberCount == 0)
                     {
-                        subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName(), info);
+                        subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName());
                     }
                 }
                 updateWaitLatch.countDown();
@@ -598,8 +592,7 @@ public class PlatformUtils
 
                 for (String connectionId : removed)
                 {
-                    if (proxyConnectionNotifyingCache.notifyListenersDataRemoved(this.current.remove(connectionId),
-                        null))
+                    if (proxyConnectionNotifyingCache.notifyListenersDataRemoved(this.current.remove(connectionId)))
                     {
                         Log.log(logContext, "Proxy DISCONNECTED: ", connectionId);
                     }
