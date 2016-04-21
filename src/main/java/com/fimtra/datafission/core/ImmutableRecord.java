@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Ramon 
+ * Copyright (c) 2013 Ramon Servadei
  *  
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.concurrent.locks.Lock;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
+import com.fimtra.util.CollectionUtils;
 
 /**
  * An immutable {@link IRecord}.
@@ -102,29 +103,29 @@ public class ImmutableRecord implements IRecord
     @Override
     public IValue put(String key, IValue value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue remove(Object key)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
     public void clear()
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
@@ -142,7 +143,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public Set<java.util.Map.Entry<String, IValue>> entrySet()
     {
-        return Collections.unmodifiableSet(this.backingRecord.data.entrySet());
+        return CollectionUtils.unmodifiableEntrySet(this.backingRecord.data.entrySet());
     }
 
     @Override
@@ -172,22 +173,22 @@ public class ImmutableRecord implements IRecord
     @Override
     public IValue put(String key, long value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue put(String key, double value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
     public IValue put(String key, String value)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
@@ -209,8 +210,8 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> removeSubMap(String subMapKey)
     {
-        throw new UnsupportedOperationException("Cannot call on immutable record "
-            + this.backingRecord.getContextName() + ":" + this.backingRecord.getName());
+        throw new UnsupportedOperationException("Cannot call on immutable record " + this.backingRecord.getContextName()
+            + ":" + this.backingRecord.getName());
     }
 
     @Override
@@ -355,7 +356,7 @@ class ImmutableSubmap implements Map<String, IValue>
     @Override
     public Set<java.util.Map.Entry<String, IValue>> entrySet()
     {
-        return Collections.unmodifiableSet(this.delegate.subMap.entrySet());
+        return CollectionUtils.unmodifiableEntrySet(this.delegate.subMap.entrySet());
     }
 
     @Override

@@ -225,7 +225,7 @@ public class ImmutableRecordTest
     {
         assertEquals(this.image.entrySet(), this.candidate.entrySet());
     }
-
+    
     /**
      * Test method for {@link com.fimtra.datafission.core.ImmutableRecord#entrySet()}.
      */
@@ -235,6 +235,16 @@ public class ImmutableRecordTest
         final Iterator<Entry<String, IValue>> iterator = this.candidate.entrySet().iterator();
         iterator.next();
         iterator.remove();
+    }
+
+    /**
+     * Test method for {@link com.fimtra.datafission.core.ImmutableRecord#entrySet()}.
+     */
+    @Test(expected = UnsupportedOperationException.class)
+    public void testEntrySetImmutableSetValue()
+    {
+        final Iterator<Entry<String, IValue>> iterator = this.candidate.entrySet().iterator();
+        iterator.next().setValue(TextValue.valueOf("oh no"));
     }
 
     /**
@@ -339,14 +349,22 @@ public class ImmutableRecordTest
     {
         this.candidate.removeSubMap(SUB_MAP_KEY);
     }
-
+    
     @Test(expected = UnsupportedOperationException.class)
     public void testSubMapIterator()
     {
         final Iterator<Entry<String, IValue>> iterator =
-            this.candidate.getOrCreateSubMap(SUB_MAP_KEY).entrySet().iterator();
+                this.candidate.getOrCreateSubMap(SUB_MAP_KEY).entrySet().iterator();
         iterator.next();
         iterator.remove();
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void testSubMapEntrySetIteratorSetValue()
+    {
+        final Iterator<Entry<String, IValue>> iterator =
+            this.candidate.getOrCreateSubMap(SUB_MAP_KEY).entrySet().iterator();
+        iterator.next().setValue(TextValue.valueOf("oh no"));
     }
 
     @Test
