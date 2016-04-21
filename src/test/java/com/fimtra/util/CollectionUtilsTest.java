@@ -17,7 +17,9 @@ package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -34,6 +36,28 @@ public class CollectionUtilsTest
     {
     }
 
+    @Test(expected = UnsupportedOperationException.class)
+    public void testUnmodifiableEntrySetIterator()
+    {
+        Map<Long, Long> m = new HashMap<Long, Long>();
+        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().remove();
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void testUnmodifiableEntrySetAdd()
+    {
+        Map<Long, Long> m = new HashMap<Long, Long>();
+        CollectionUtils.unmodifiableEntrySet(m.entrySet()).add(null);
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void testUnmodifiableEntrySetIteratorSetValue()
+    {
+        Map<Long, Long> m = new HashMap<Long, Long>();
+        m.put(1l, 1l);
+        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().next().setValue(2l);
+    }
+    
     @Test
     public void testNewSetFromString()
     {

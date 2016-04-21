@@ -15,10 +15,14 @@
  */
 package com.fimtra.util;
 
+import java.util.AbstractSet;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import com.fimtra.util.UtilProperties.Values;
@@ -30,6 +34,78 @@ import com.fimtra.util.UtilProperties.Values;
  */
 public abstract class CollectionUtils
 {
+    /**
+     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable (
+     * {@link Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
+     * 
+     * @author Ramon Servadei
+     */
+    static final class UnmodifiableEntrySet<K,V> extends AbstractSet<Map.Entry<K,V>>
+    {
+        private final static class UnmodifiableEntry<K, V> implements Entry<K, V>
+        {
+            final Entry<K, V> backingEntry;
+
+            UnmodifiableEntry(java.util.Map.Entry<K, V> backingEntry)
+            {
+                super();
+                this.backingEntry = backingEntry;
+            }
+
+            @Override
+            public K getKey()
+            {
+                return this.backingEntry.getKey();
+            }
+
+            @Override
+            public V getValue()
+            {
+                return this.backingEntry.getValue();
+            }
+
+            @Override
+            public V setValue(V value)
+            {
+                throw new UnsupportedOperationException();
+            }
+        }
+
+        final Set<Entry<K, V>> entrySet;
+
+        UnmodifiableEntrySet(Set<Entry<K, V>> entrySet)
+        {
+            this.entrySet = Collections.unmodifiableSet(entrySet);
+        }
+
+        @Override
+        public Iterator<java.util.Map.Entry<K, V>> iterator()
+        {
+            return new Iterator<Map.Entry<K, V>>()
+            {
+                final Iterator<Map.Entry<K, V>> backingIterator = UnmodifiableEntrySet.this.entrySet.iterator();
+
+                @Override
+                public boolean hasNext()
+                {
+                    return this.backingIterator.hasNext();
+                }
+
+                @Override
+                public java.util.Map.Entry<K, V> next()
+                {
+                    return new UnmodifiableEntry<K,V>(this.backingIterator.next());
+                }
+            };
+        }
+
+        @Override
+        public int size()
+        {
+            return this.entrySet.size();
+        }
+    }
+
     private CollectionUtils()
     {
     }
@@ -72,5 +148,16 @@ public abstract class CollectionUtils
             set.add(split[i].trim());
         }
         return Collections.unmodifiableSet(set);
+    }
+
+    /**
+     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in
+     *         entrySet
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static <K, V> Set<java.util.Map.Entry<K, V>> unmodifiableEntrySet(
+        final Set<java.util.Map.Entry<K, V>> entrySet)
+    {
+        return new UnmodifiableEntrySet(entrySet);
     }
 }
