@@ -35,14 +35,15 @@ public interface IRecordListener
      * <p>
      * The passed in 'image' reflects all atomic changes that have occurred to the source record,
      * including the current one. It is a 'snapshot' of the state of the record when the publish
-     * occurred. The image <b>must not</b> be cached as the record image is updated by future calls.
+     * occurred. If you cache this image, be aware that its contents will be altered every time a
+     * change to the underlying record is published.
      * 
-     * @param imageValidInCallingThreadOnly
-     *            an immutable and re-used instance of the source record's image. This image will
-     *            include the current atomic change. <b>This instance must not be cached and it must
-     *            only be accessed in the thread that calls this method.</b>
+     * @param image
+     *            an immutable, thread-safe and re-used instance of the source record's image. The
+     *            image contents will change each time the source record is published and will
+     *            reflect the current state of the source record; be aware if you cache this image.
      * @param atomicChange
      *            the atomic change that has occurred to the record - thread safe.
      */
-    void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange);
+    void onChange(IRecord image, IRecordChange atomicChange);
 }
