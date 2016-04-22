@@ -26,8 +26,11 @@ import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
 import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
-import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.*;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.AVG_MSG_SIZE;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_PER_SEC;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MESSAGE_COUNT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MSGS_PER_SEC;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROTOCOL;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ENDPOINT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID;
@@ -57,6 +60,7 @@ import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
@@ -67,10 +71,10 @@ import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.CoalescingRecordListener;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.ProxyContext;
-import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -102,8 +106,8 @@ import com.fimtra.util.is;
  * Code can interact directly with platform services and platform service instances by using the
  * {@link IObserverContext} returned from one of these:
  * <ul>
- * <li> {@link #getProxyContextForPlatformService(String)}
- * <li> {@link #getProxyContextForPlatformServiceInstance(String)}
+ * <li>{@link #getProxyContextForPlatformService(String)}
+ * <li>{@link #getProxyContextForPlatformServiceInstance(String)}
  * </ul>
  * A convenience method {@link #executeRpc(IObserverContext, String, IValue...)} exists to execute
  * an RPC on the proxy context returned from the above. The platform agent of the
@@ -130,7 +134,7 @@ public final class PlatformMetaDataModel
      */
     public static enum NodesMetaDataRecordDefinition
     {
-        InstanceCount
+            InstanceCount
     }
 
     /**
@@ -140,7 +144,7 @@ public final class PlatformMetaDataModel
      */
     public static enum AgentMetaDataRecordDefinition
     {
-        Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
+            Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
             Runtime, User, EPM
     }
 
@@ -148,10 +152,10 @@ public final class PlatformMetaDataModel
      * The fields for each record in the service-proxies context
      * 
      * @see PlatformMetaDataModel#getPlatformServiceProxiesContext()
-     * */
+     */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
-        EndPoint, SubscriptionCount, MessagesReceived, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
+            EndPoint, SubscriptionCount, MessagesReceived, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
             ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
     }
 
@@ -159,10 +163,10 @@ public final class PlatformMetaDataModel
      * The fields for each record in the services context
      * 
      * @see PlatformMetaDataModel#getPlatformServicesContext()
-     * */
+     */
     public static enum ServiceMetaDataRecordDefinition
     {
-        Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount
+            Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount
     }
 
     /**
@@ -172,7 +176,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceInstanceMetaDataRecordDefinition
     {
-        Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
+            Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
             MessagesSent, AvgMsgSizeBytes, KbSent, MsgsPerSec, KbPerSec, Transport, Version
     }
 
@@ -183,7 +187,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceRecordMetaDataRecordDefinition
     {
-        SubscriptionCount
+            SubscriptionCount
     }
 
     /**
@@ -193,7 +197,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceInstanceRecordMetaDataRecordDefinition
     {
-        SubscriptionCount
+            SubscriptionCount
     }
 
     /**
@@ -203,7 +207,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceRpcMetaDataRecordDefinition
     {
-        Definition
+            Definition
     }
 
     /**
@@ -213,7 +217,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceInstanceRpcMetaDataRecordDefinition
     {
-        Definition
+            Definition
     }
 
     static void removeRecordsNotUpdated(final Set<String> updatedRecords, Context context)
@@ -285,14 +289,41 @@ public final class PlatformMetaDataModel
         }
     }
 
-    static void updateRecordWithCountsAndPublish(String recordName, final Map<String, IValue> instancesToCount,
-        Context context, String countField)
+    static void updateRecordWithCountsAndPublish(final String recordName, final Map<String, IValue> instancesToCount,
+        final Context context, final String countField, ConcurrentMap<String, Runnable> pendingTasks)
     {
         final int size = instancesToCount.size();
-        // NOTE: its correct to always do get-or-create here
-        final IRecord serviceRecord = context.getOrCreateRecord(recordName);
-        serviceRecord.put(countField, LongValue.valueOf(size));
-        context.publishAtomicChange(serviceRecord);
+        final IRecord serviceRecord = context.getRecord(recordName);
+        final Runnable task = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                final IRecord record = context.getRecord(recordName);
+                record.put(countField, LongValue.valueOf(size));
+                context.publishAtomicChange(record);
+            }
+        };
+
+        if (serviceRecord != null)
+        {
+            task.run();
+        }
+        else
+        {
+            /*
+             * This prevents the following race condition:
+             * 
+             * - if a service is destroyed, it is removed from the registry SERVICES record and
+             * published instantly (t1) but the records/RPCs from the service are removed and
+             * published by the registry after a delay (t2)...so if you connect to the registry in
+             * between t1 and t2 you will accidentally create the record representing the service if
+             * using getOrCreate and it will not be removed (because no more signals happen to say
+             * the service is gone)...so we use this observer on when the record is created to
+             * actually fire the change
+             */
+            pendingTasks.put(recordName, task);
+        }
     }
 
     static void removeSystemRecords(Map<String, IValue> records)
@@ -388,6 +419,9 @@ public final class PlatformMetaDataModel
 
     boolean reset;
 
+    // track tasks that should only run when the service exists
+    final ConcurrentMap<String, Runnable> pendingTasks;
+
     public PlatformMetaDataModel(String registryNode, int registryPort) throws IOException
     {
         this.agent = new PlatformRegistryAgent(PlatformMetaDataModel.class.getSimpleName(), registryNode, registryPort);
@@ -407,6 +441,8 @@ public final class PlatformMetaDataModel
         this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
         this.serviceInstanceRecordsContext = new ConcurrentHashMap<String, Context>();
 
+        this.pendingTasks = new ConcurrentHashMap<String, Runnable>();
+
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -421,115 +457,123 @@ public final class PlatformMetaDataModel
             }
         });
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.servicesContext.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord image, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handlePlatformServicesUpdate(imageCopy, atomicChange);
-                }
-            }, SERVICES), SERVICES);
+                handlePendingTasks(image, PlatformMetaDataModel.this.pendingTasks);
+            }
+        }, ISystemRecordNames.CONTEXT_RECORDS);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.serviceInstancesContext.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord image, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
-                }
-            }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCES_PER_AGENT);
+                handlePendingTasks(image, PlatformMetaDataModel.this.pendingTasks);
+            }
+        }, ISystemRecordNames.CONTEXT_RECORDS);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleServiceInstanceStatsUpdate(atomicChange);
-                }
-            }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCE_STATS);
+                checkReset();
+                handlePlatformServicesUpdate(imageCopy, atomicChange);
+            }
+        }, SERVICES), SERVICES);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handlePlatformServiceInstancesUpdate(imageCopy);
-                }
-            }, SERVICE_INSTANCES_PER_SERVICE_FAMILY), SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+                checkReset();
+                handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
+            }
+        }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCES_PER_AGENT);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleRecordsPerServiceUpdate(imageCopy, atomicChange);
-                }
-            }, RECORDS_PER_SERVICE_FAMILY), RECORDS_PER_SERVICE_FAMILY);
+                checkReset();
+                handleServiceInstanceStatsUpdate(atomicChange);
+            }
+        }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCE_STATS);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
-                }
-            }, RECORDS_PER_SERVICE_INSTANCE), RECORDS_PER_SERVICE_INSTANCE);
+                checkReset();
+                handlePlatformServiceInstancesUpdate(imageCopy);
+            }
+        }, SERVICE_INSTANCES_PER_SERVICE_FAMILY), SERVICE_INSTANCES_PER_SERVICE_FAMILY);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleRpcsPerServiceUpdate(imageCopy, atomicChange);
-                }
-            }, RPCS_PER_SERVICE_FAMILY), RPCS_PER_SERVICE_FAMILY);
+                checkReset();
+                handleRecordsPerServiceUpdate(imageCopy, atomicChange);
+            }
+        }, RECORDS_PER_SERVICE_FAMILY), RECORDS_PER_SERVICE_FAMILY);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
-                }
-            }, RPCS_PER_SERVICE_INSTANCE), RPCS_PER_SERVICE_INSTANCE);
+                checkReset();
+                handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
+            }
+        }, RECORDS_PER_SERVICE_INSTANCE), RECORDS_PER_SERVICE_INSTANCE);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleConnectionsUpdate(imageCopy);
-                }
-            }, PLATFORM_CONNECTIONS), PLATFORM_CONNECTIONS);
+                checkReset();
+                handleRpcsPerServiceUpdate(imageCopy, atomicChange);
+            }
+        }, RPCS_PER_SERVICE_FAMILY), RPCS_PER_SERVICE_FAMILY);
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor,
-            new IRecordListener()
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handleRuntimeStatusUpdate(imageCopy);
-                }
-            }, RUNTIME_STATUS), RUNTIME_STATUS);
+                checkReset();
+                handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
+            }
+        }, RPCS_PER_SERVICE_INSTANCE), RPCS_PER_SERVICE_INSTANCE);
+
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleConnectionsUpdate(imageCopy);
+            }
+        }, PLATFORM_CONNECTIONS), PLATFORM_CONNECTIONS);
+
+        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRuntimeStatusUpdate(imageCopy);
+            }
+        }, RUNTIME_STATUS), RUNTIME_STATUS);
     }
 
     void checkReset()
@@ -737,7 +781,8 @@ public final class PlatformMetaDataModel
 
         // todo this leaves a connection leak if the proxy is not destroyed when no more components
         // need it from the model
-        return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0], family_member[1])).proxyContext;
+        return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0],
+            family_member[1])).proxyContext;
     }
 
     /**
@@ -809,7 +854,8 @@ public final class PlatformMetaDataModel
         }
 
         // handle removed services
-        for (Iterator<Map.Entry<String, IValue>> it = atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
+        for (Iterator<Map.Entry<String, IValue>> it =
+            atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
         {
             removeService(it.next().getKey());
         }
@@ -874,7 +920,7 @@ public final class PlatformMetaDataModel
 
             // update the instance count per service
             updateRecordWithCountsAndPublish(serviceFamily, instances, this.servicesContext,
-                ServiceMetaDataRecordDefinition.InstanceCount.toString());
+                ServiceMetaDataRecordDefinition.InstanceCount.toString(), this.pendingTasks);
 
             // add new instances
             for (Iterator<Map.Entry<String, IValue>> it = instances.entrySet().iterator(); it.hasNext();)
@@ -908,7 +954,7 @@ public final class PlatformMetaDataModel
             records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceFamily));
             removeSystemRecords(records);
             updateRecordWithCountsAndPublish(serviceFamily, records, this.servicesContext,
-                ServiceMetaDataRecordDefinition.RecordCount.toString());
+                ServiceMetaDataRecordDefinition.RecordCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceFamily, this.serviceRecordsContext, records,
                 change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
@@ -924,7 +970,7 @@ public final class PlatformMetaDataModel
             records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceInstanceID));
             removeSystemRecords(records);
             updateRecordWithCountsAndPublish(serviceInstanceID, records, this.serviceInstancesContext,
-                ServiceInstanceMetaDataRecordDefinition.RecordCount.toString());
+                ServiceInstanceMetaDataRecordDefinition.RecordCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceInstanceID, this.serviceInstanceRecordsContext, records,
                 change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),
@@ -939,7 +985,7 @@ public final class PlatformMetaDataModel
         {
             rpcs = imageCopy.getOrCreateSubMap(serviceFamily);
             updateRecordWithCountsAndPublish(serviceFamily, rpcs, this.servicesContext,
-                ServiceMetaDataRecordDefinition.RpcCount.toString());
+                ServiceMetaDataRecordDefinition.RpcCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceFamily, this.serviceRpcsContext, rpcs,
                 change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
@@ -954,7 +1000,7 @@ public final class PlatformMetaDataModel
         {
             rpcs = imageCopy.getOrCreateSubMap(serviceInstanceID);
             updateRecordWithCountsAndPublish(serviceInstanceID, rpcs, this.serviceInstancesContext,
-                ServiceInstanceMetaDataRecordDefinition.RpcCount.toString());
+                ServiceInstanceMetaDataRecordDefinition.RpcCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceInstanceID, this.serviceInstanceRpcsContext, rpcs,
                 change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),
@@ -1119,8 +1165,7 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.EndPoint.toString(), proxyEndPoint);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MessagesReceived.toString(),
                         messageCount);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvgMsgSizeBytes.toString(),
-                        avgMsgSize);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvgMsgSizeBytes.toString(), avgMsgSize);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);
@@ -1131,8 +1176,7 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.Service.toString(), serviceFamily);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceInstance.toString(),
                         platformServiceInstanceID);
-                    serviceProxyRecord.put(
-                        ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.ServiceEndPoint.toString(),
                         publisherNode.textValue()
                             + (TransportTechnologyEnum.valueOf(transport.textValue()).getNodePortDelimiter())
                             + publisherPort.textValue());
@@ -1249,13 +1293,17 @@ public final class PlatformMetaDataModel
                         {
                             return;
                         }
-                        if (PlatformMetaDataModel.this.serviceInstancesContext.removeRecord(platformServiceInstanceID) != null)
+                        if (PlatformMetaDataModel.this.serviceInstancesContext.removeRecord(
+                            platformServiceInstanceID) != null)
                         {
-                            Log.log(PlatformMetaDataModel.this, "Removing serviceInstance '",
-                                platformServiceInstanceID, "'");
-                            removeRecords(PlatformMetaDataModel.this.serviceInstanceRecordsContext.get(platformServiceInstanceID));
-                            removeRecords(PlatformMetaDataModel.this.serviceInstanceRpcsContext.get(platformServiceInstanceID));
-                            PlatformMetaDataModel.this.serviceInstancesContext.publishAtomicChange(platformServiceInstanceID);
+                            Log.log(PlatformMetaDataModel.this, "Removing serviceInstance '", platformServiceInstanceID,
+                                "'");
+                            removeRecords(PlatformMetaDataModel.this.serviceInstanceRecordsContext.get(
+                                platformServiceInstanceID));
+                            removeRecords(
+                                PlatformMetaDataModel.this.serviceInstanceRpcsContext.get(platformServiceInstanceID));
+                            PlatformMetaDataModel.this.serviceInstancesContext.publishAtomicChange(
+                                platformServiceInstanceID);
 
                             // remove the service instance from the nodes
                             IRecord hostRecord = null;
@@ -1285,6 +1333,32 @@ public final class PlatformMetaDataModel
                 });
             }
         }, PAUSE_BEFORE_REMOVING_SERVICE_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
+    static void handlePendingTasks(IRecord image, final ConcurrentMap<String, Runnable> pendingTasks)
+    {
+        Map.Entry<String, Runnable> entry = null;
+        String key = null;
+        Runnable value = null;
+        for (Iterator<Map.Entry<String, Runnable>> it = pendingTasks.entrySet().iterator(); it.hasNext();)
+        {
+            entry = it.next();
+            key = entry.getKey();
+            value = entry.getValue();
+
+            if (image.containsKey(key))
+            {
+                it.remove();
+                try
+                {
+                    value.run();
+                }
+                catch (Exception e)
+                {
+                    Log.log(PlatformMetaDataModel.class, "Could not handle pending task for " + key, e);
+                }
+            }
+        }
     }
 
     static void removeRecords(final Context context)
