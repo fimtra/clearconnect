@@ -1456,7 +1456,7 @@ final class EventHandler
 
     /**
      * Publishes the record at a point in time in the future (in seconds). If there is a pending
-     * publish for the record, this will do nothing.
+     * publish for the record then the current call will do nothing and use the pending publish.
      */
     private void publishTimed(final IRecord record)
     {
