@@ -825,16 +825,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     void doAddSingleObserver(final String name, final IRecordListener observer)
     {
-        final IRecord record = this.records.get(name);
-        final Lock lock;
-        if (record != null)
-        {
-            lock = record.getWriteLock();
-        }
-        else
-        {
-            lock = this.recordCreateLock;
-        }
+        // NOTE: use a single lock to ensure thread-safe access to recordObservers
+        final Lock lock = this.recordCreateLock;
         lock.lock();
         try
         {
@@ -908,16 +900,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     private void doRemoveSingleObserver(final String name, IRecordListener observer)
     {
-        final IRecord record = this.records.get(name);
-        final Lock lock;
-        if (record != null)
-        {
-            lock = record.getWriteLock();
-        }
-        else
-        {
-            lock = this.recordCreateLock;
-        }
+        // NOTE: use a single lock to ensure thread-safe access to recordObservers
+        final Lock lock = this.recordCreateLock;
         lock.lock();
         try
         {
