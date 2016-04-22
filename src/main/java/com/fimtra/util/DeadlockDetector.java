@@ -167,18 +167,20 @@ public final class DeadlockDetector
                             Log.log(ThreadUtils.class, sb.toString());
                             deadlockObserver.onDeadlockFound(deadlocks);
                         }
-                        try
-                        {
-                            Thread.sleep(checkPeriodMillis);
-                        }
-                        catch (InterruptedException e)
-                        {
-                            // don't care
-                        }
                     }
                     catch (Exception e)
                     {
                         Log.log(this, "Exception during processing, will continue processing", e);
+                    }
+                    
+                    // sleep OUTSIDE the loop so we don't spam if there are continual exceptions!
+                    try
+                    {
+                        Thread.sleep(checkPeriodMillis);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        // don't care
                     }
                 }
             }
