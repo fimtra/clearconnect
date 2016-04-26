@@ -42,7 +42,6 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -124,8 +123,6 @@ public final class PlatformMetaDataModel
 {
 
     static final String RECORD_NAME_FIELD = "name";
-
-    static final int PAUSE_BEFORE_REMOVING_SERVICE_MILLIS = 1000;
 
     /**
      * The fields for each record in the hosts context
@@ -414,7 +411,6 @@ public final class PlatformMetaDataModel
     final ConcurrentMap<String, Context> serviceInstanceRpcsContext;
     final ConcurrentMap<String, Context> serviceInstanceRecordsContext;
 
-    final Set<String> pendingRemoves;
     final ThimbleExecutor coalescingExecutor;
 
     boolean reset;
@@ -426,7 +422,6 @@ public final class PlatformMetaDataModel
     {
         this.agent = new PlatformRegistryAgent(PlatformMetaDataModel.class.getSimpleName(), registryNode, registryPort);
 
-        this.pendingRemoves = Collections.synchronizedSet(new HashSet<String>());
         this.coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
 
         this.nodesContext = new Context("nodes");
@@ -847,7 +842,6 @@ public final class PlatformMetaDataModel
             entry = it.next();
             serviceFamilyName = entry.getKey();
             redundancyMode = entry.getValue();
-            this.pendingRemoves.remove(serviceFamilyName);
             this.servicesContext.getOrCreateRecord(serviceFamilyName).put(
                 ServiceMetaDataRecordDefinition.Mode.toString(), redundancyMode.textValue());
             this.servicesContext.publishAtomicChange(serviceFamilyName);
@@ -930,7 +924,6 @@ public final class PlatformMetaDataModel
                     ServiceInstanceMetaDataRecordDefinition.Service.toString(), serviceFamilyTextValue);
                 this.serviceInstancesContext.publishAtomicChange(serviceInstanceID);
                 serviceInstanceIDs.add(serviceInstanceID);
-                this.pendingRemoves.remove(serviceInstanceID);
             }
         }
 
@@ -1232,107 +1225,48 @@ public final class PlatformMetaDataModel
 
     void removeService(final String serviceFamily)
     {
-        this.pendingRemoves.add(serviceFamily);
-        this.agent.getUtilityExecutor().schedule(new Runnable()
+        if (this.servicesContext.removeRecord(serviceFamily) != null)
         {
-            @Override
-            public void run()
-            {
-                PlatformMetaDataModel.this.coalescingExecutor.execute(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        if (!PlatformMetaDataModel.this.pendingRemoves.remove(serviceFamily))
-                        {
-                            return;
-                        }
-                        if (PlatformMetaDataModel.this.servicesContext.removeRecord(serviceFamily) != null)
-                        {
-                            Log.log(PlatformMetaDataModel.this, "Removing service '", serviceFamily, "'");
-                            removeRecords(PlatformMetaDataModel.this.serviceRecordsContext.get(serviceFamily));
-                            removeRecords(PlatformMetaDataModel.this.serviceRpcsContext.get(serviceFamily));
-                            PlatformMetaDataModel.this.servicesContext.publishAtomicChange(serviceFamily);
-                        }
-                        // remove instances linked to this service
-                        final Set<String> serviceInstanceIds =
-                            PlatformMetaDataModel.this.serviceInstancesContext.getRecordNames();
-                        IRecord serviceInstanceRecord;
-                        IValue service;
-                        for (String serviceInstanceId : serviceInstanceIds)
-                        {
-                            serviceInstanceRecord =
-                                PlatformMetaDataModel.this.serviceInstancesContext.getRecord(serviceInstanceId);
-                            service =
-                                serviceInstanceRecord.get(ServiceInstanceMetaDataRecordDefinition.Service.toString());
-                            if (service != null && is.eq(serviceFamily, service.textValue()))
-                            {
-                                removeServiceInstance(serviceInstanceId);
-                            }
-                        }
-                    }
-                });
-            }
-        }, PAUSE_BEFORE_REMOVING_SERVICE_MILLIS, TimeUnit.MILLISECONDS);
+            Log.log(PlatformMetaDataModel.this, "Removing service '", serviceFamily, "'");
+            removeRecords(this.serviceRecordsContext.get(serviceFamily));
+            removeRecords(this.serviceRpcsContext.get(serviceFamily));
+            this.servicesContext.publishAtomicChange(serviceFamily);
+        }
     }
 
     void removeServiceInstance(final String platformServiceInstanceID)
     {
-        this.pendingRemoves.add(platformServiceInstanceID);
-        this.agent.getUtilityExecutor().schedule(new Runnable()
+        if (this.serviceInstancesContext.removeRecord(platformServiceInstanceID) != null)
         {
-            @Override
-            public void run()
-            {
-                PlatformMetaDataModel.this.coalescingExecutor.execute(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        if (!PlatformMetaDataModel.this.pendingRemoves.remove(platformServiceInstanceID))
-                        {
-                            return;
-                        }
-                        if (PlatformMetaDataModel.this.serviceInstancesContext.removeRecord(
-                            platformServiceInstanceID) != null)
-                        {
-                            Log.log(PlatformMetaDataModel.this, "Removing serviceInstance '", platformServiceInstanceID,
-                                "'");
-                            removeRecords(PlatformMetaDataModel.this.serviceInstanceRecordsContext.get(
-                                platformServiceInstanceID));
-                            removeRecords(
-                                PlatformMetaDataModel.this.serviceInstanceRpcsContext.get(platformServiceInstanceID));
-                            PlatformMetaDataModel.this.serviceInstancesContext.publishAtomicChange(
-                                platformServiceInstanceID);
+            Log.log(PlatformMetaDataModel.this, "Removing serviceInstance '", platformServiceInstanceID, "'");
+            removeRecords(this.serviceInstanceRecordsContext.get(platformServiceInstanceID));
+            removeRecords(this.serviceInstanceRpcsContext.get(platformServiceInstanceID));
+            this.serviceInstancesContext.publishAtomicChange(platformServiceInstanceID);
 
-                            // remove the service instance from the nodes
-                            IRecord hostRecord = null;
-                            Map<String, IValue> instancesPerNodeSubMap = null;
-                            for (String hostNode : PlatformMetaDataModel.this.nodesContext.getRecordNames())
-                            {
-                                hostRecord = PlatformMetaDataModel.this.nodesContext.getRecord(hostNode);
-                                if (hostRecord != null)
-                                {
-                                    instancesPerNodeSubMap = hostRecord.getOrCreateSubMap("Instances");
-                                    if (instancesPerNodeSubMap.remove(platformServiceInstanceID) != null)
-                                    {
-                                        if (instancesPerNodeSubMap.size() == 0)
-                                        {
-                                            PlatformMetaDataModel.this.nodesContext.removeRecord(hostNode);
-                                        }
-                                        else
-                                        {
-                                            PlatformMetaDataModel.this.nodesContext.publishAtomicChange(hostRecord);
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
+            // remove the service instance from the nodes
+            IRecord hostRecord = null;
+            Map<String, IValue> instancesPerNodeSubMap = null;
+            for (String hostNode : this.nodesContext.getRecordNames())
+            {
+                hostRecord = this.nodesContext.getRecord(hostNode);
+                if (hostRecord != null)
+                {
+                    instancesPerNodeSubMap = hostRecord.getOrCreateSubMap("Instances");
+                    if (instancesPerNodeSubMap.remove(platformServiceInstanceID) != null)
+                    {
+                        if (instancesPerNodeSubMap.size() == 0)
+                        {
+                            this.nodesContext.removeRecord(hostNode);
                         }
+                        else
+                        {
+                            this.nodesContext.publishAtomicChange(hostRecord);
+                        }
+                        break;
                     }
-                });
+                }
             }
-        }, PAUSE_BEFORE_REMOVING_SERVICE_MILLIS, TimeUnit.MILLISECONDS);
+        }
     }
 
     static void handlePendingTasks(IRecord image, final ConcurrentMap<String, Runnable> pendingTasks)
