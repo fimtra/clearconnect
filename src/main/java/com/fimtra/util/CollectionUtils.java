@@ -96,6 +96,12 @@ public abstract class CollectionUtils
                 {
                     return new UnmodifiableEntry<K,V>(this.backingIterator.next());
                 }
+
+                @Override
+                public void remove()
+                {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
 
