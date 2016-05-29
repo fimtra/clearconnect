@@ -461,12 +461,14 @@ public class Publisher
                     final double perSec =
                         1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
                     final double inverse_1K = 1 / 1024d;
-                    submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC, LongValue.valueOf(
-                        (long) ((ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished) * perSec)));
+                    final long intervalMessagesPublished =
+                        ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished;
+                    submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC,
+                        LongValue.valueOf((long) (intervalMessagesPublished * perSec)));
+                    final long intervalBytesPublished =
+                        ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished;
                     submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC,
-                        DoubleValue.valueOf(
-                            (((long) (((ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished)
-                                * inverse_1K * perSec) * 10)) / 10d)));
+                        DoubleValue.valueOf((((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
                     submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
                         LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
                             : ProxyContextPublisher.this.bytesPublished
@@ -479,6 +481,9 @@ public class Publisher
                         LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
                     submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
                         (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
+
+                    submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
+                        intervalMessagesPublished == 0 ? 0 : intervalBytesPublished / intervalMessagesPublished));
 
                     this.lastMessagesPublished = ProxyContextPublisher.this.messagesPublished;
                     this.lastBytesPublished = ProxyContextPublisher.this.bytesPublished;

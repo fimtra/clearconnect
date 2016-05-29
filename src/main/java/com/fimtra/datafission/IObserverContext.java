@@ -174,6 +174,7 @@ public interface IObserverContext
             String KB_PER_SEC = "Kb per sec";
             String MESSAGE_COUNT = "Msgs published";
             String AVG_MSG_SIZE = "Avg msg size (bytes)";
+            String LAST_INTERVAL_MSG_SIZE = "Lst msg size (bytes)";
             String KB_COUNT = "Kb published";
             String SUBSCRIPTION_COUNT = "Subscriptions";
             String UPTIME = "Uptime(sec)";

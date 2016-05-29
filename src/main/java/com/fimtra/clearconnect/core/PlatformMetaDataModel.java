@@ -29,6 +29,7 @@ import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProx
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.AVG_MSG_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_PER_SEC;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MESSAGE_COUNT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.MSGS_PER_SEC;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PROTOCOL;
@@ -152,7 +153,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
-            EndPoint, SubscriptionCount, MessagesReceived, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
+            EndPoint, SubscriptionCount, MessagesReceived, LstAvgMsgSize, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
             ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
     }
 
@@ -1063,6 +1064,7 @@ public final class PlatformMetaDataModel
         LongValue messageCount;
         LongValue avgMsgSize;
         LongValue msgPerSec;
+        LongValue lstIntervalMsgSize;
         DoubleValue kbPerSec;
         LongValue subscriptionCount;
         LongValue kbCount;
@@ -1105,6 +1107,7 @@ public final class PlatformMetaDataModel
                 messageCount = connectionRecord.get(MESSAGE_COUNT);
                 avgMsgSize = connectionRecord.get(AVG_MSG_SIZE);
                 msgPerSec = connectionRecord.get(MSGS_PER_SEC);
+                lstIntervalMsgSize = connectionRecord.get(LAST_INTERVAL_MSG_SIZE);
                 kbPerSec = connectionRecord.get(KB_PER_SEC);
                 subscriptionCount = connectionRecord.get(SUBSCRIPTION_COUNT);
                 kbCount = connectionRecord.get(KB_COUNT);
@@ -1159,6 +1162,7 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MessagesReceived.toString(),
                         messageCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvgMsgSizeBytes.toString(), avgMsgSize);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.LstAvgMsgSize.toString(), lstIntervalMsgSize);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);
