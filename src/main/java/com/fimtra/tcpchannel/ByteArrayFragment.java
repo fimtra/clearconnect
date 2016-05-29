@@ -187,10 +187,10 @@ final class ByteArrayFragment
     static ByteArrayFragment fromRxBytesUTF8Header(byte[] rxData)
     {
         // UTF8 has 1 byte per char
-        int length = Integer.parseInt(new String(rxData, 0, 4));
+        int length = Integer.parseInt(new String(rxData, 0, 4, UTF8));
         final int lengthPlus4 = length + 4;
         // we don't want the first "|"
-        String header = new String(rxData, 5, length);
+        String header = new String(rxData, 5, length, UTF8);
         int[] parts = ByteArrayFragmentUtils.split3NumbersByPipe(header);
         final int id = parts[0];
         final int sequenceId = parts[1];
@@ -298,7 +298,7 @@ final class ByteArrayFragment
         sb.append('|').append(this.id).append('|').append(this.sequenceId).append('|').append(this.lastElement).append(
             '|');
         final byte[] header = sb.toString().getBytes(UTF8);
-        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(header.length).getBytes();
+        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(header.length).getBytes(UTF8);
         final int headerSize = len.length + header.length;
         final byte[] txBytes = new byte[headerSize + this.data.length];
         System.arraycopy(len, 0, txBytes, 0, len.length);
