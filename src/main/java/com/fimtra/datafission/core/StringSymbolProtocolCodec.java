@@ -193,7 +193,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             {
                 // NOTE: there are "reserved" chars:
                 // \r
-                // \r
+                // \n
                 // |
                 // =
                 // ~
@@ -209,7 +209,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     break outer;
             }
         }
-
+        
         return target;
     }
 
@@ -555,8 +555,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         final boolean isImage = atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
         final String name = atomicChange.getName();
         final boolean isProtocolMessage = ContextUtils.isProtocolPrefixed(name);
-        // todo or if its a teleported fragment
-        if (isProtocolMessage)
+        // or if its a teleported fragment
+        if (isProtocolMessage || name.startsWith(AtomicChangeTeleporter.PART_INDEX_PREFIX, 0))
         {
             sb.append(name);
         }

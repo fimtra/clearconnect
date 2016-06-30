@@ -53,7 +53,7 @@ final class AtomicChangeTeleporter
         }
     }
     
-    private static final String PART_INDEX_PREFIX = new String(new char[] { 0xa, 0xb });
+    static final String PART_INDEX_PREFIX = new String(new char[] { 0xa, 0xb });
     private static final char PART_INDEX_DELIM = 0xc;
 
     static String getRecordName(String recordName)
