@@ -56,6 +56,11 @@ final class AtomicChangeTeleporter
     static final String PART_INDEX_PREFIX = new String(new char[] { 0xa, 0xb });
     private static final char PART_INDEX_DELIM = 0xc;
 
+    static boolean startsWithFragmentPrefix(String name)
+    {
+        return name.startsWith(PART_INDEX_PREFIX, 0);
+    }
+    
     static String getRecordName(String recordName)
     {
         final AtomicReference<String> name = new AtomicReference<String>();
@@ -69,7 +74,7 @@ final class AtomicChangeTeleporter
 
     private static void getNameAndPart(String chars, AtomicReference<String> name, AtomicInteger part)
     {
-        if (chars.startsWith(PART_INDEX_PREFIX, 0))
+        if (startsWithFragmentPrefix(chars))
         {
             final int index = chars.indexOf(PART_INDEX_DELIM, 2);
             if (index > -1)

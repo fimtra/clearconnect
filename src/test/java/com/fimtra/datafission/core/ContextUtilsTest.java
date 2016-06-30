@@ -95,8 +95,8 @@ public class ContextUtilsTest
     @Test(expected = IllegalArgumentException.class)
     public void testIllegalCharacters()
     {
-        assertTrue(ContextUtils.checkLegalCharacters("hello"));
-        ContextUtils.checkLegalCharacters("hello $\\");
+        assertTrue(ContextUtils.containsLegalCharacters("hello"));
+        ContextUtils.containsLegalCharacters("hello $\\");
     }
 
     @Test

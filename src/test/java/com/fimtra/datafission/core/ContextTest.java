@@ -372,7 +372,7 @@ public class ContextTest
         assertEquals("Got: " + observer2.changes, 1, observer2.changes.size());
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextConnections()
     {
         this.candidate.createRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
@@ -390,7 +390,7 @@ public class ContextTest
         this.candidate.getRecord(ISystemRecordNames.CONTEXT_CONNECTIONS).clear();
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextRpcs()
     {
         this.candidate.createRecord(ISystemRecordNames.CONTEXT_RPCS);
@@ -408,7 +408,7 @@ public class ContextTest
         this.candidate.getRecord(ISystemRecordNames.CONTEXT_RPCS).clear();
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextRecords()
     {
         this.candidate.createRecord(ISystemRecordNames.CONTEXT_RECORDS);
@@ -433,9 +433,8 @@ public class ContextTest
         final TestCachingAtomicChangeObserver registryObserver = new TestCachingAtomicChangeObserver(true);
         this.candidate.addObserver(registryObserver, ISystemRecordNames.CONTEXT_RECORDS);
 
-        final Set<String> expected =
-            new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords",
-                "ContextRpcs", "ContextStatus", "test"));
+        final Set<String> expected = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
+            "ContextRecords", "ContextRpcs", "ContextStatus", "test"));
         waitForEvent(new EventChecker()
         {
             @Override
@@ -458,9 +457,8 @@ public class ContextTest
 
         // remove the instance
         this.candidate.removeRecord(name);
-        final Set<String> expected2 =
-            new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords",
-                "ContextRpcs", "ContextStatus"));
+        final Set<String> expected2 = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
+            "ContextRecords", "ContextRpcs", "ContextStatus"));
         waitForEvent(new EventChecker()
         {
             @Override
@@ -482,7 +480,7 @@ public class ContextTest
         });
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextStatus()
     {
         this.candidate.createRecord(ISystemRecordNames.CONTEXT_STATUS);
@@ -518,7 +516,8 @@ public class ContextTest
         subscriptionsObserver.latch = new CountDownLatch(2);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
 
         TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
         subscriptionsObserver.latch = new CountDownLatch(1);
@@ -529,7 +528,8 @@ public class ContextTest
 
         // remove the instance
         this.candidate.removeRecord(name);
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
     }
 
     static void verify(final String name_context, final TestCachingAtomicChangeObserver observer, final String... items)
@@ -590,7 +590,8 @@ public class ContextTest
         subscriptionsObserver.latch = new CountDownLatch(2);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
 
         subscriptionsObserver.latch = new CountDownLatch(1);
         subscriptionsObserver.reset();
@@ -620,12 +621,14 @@ public class ContextTest
         subscriptionsObserver.reset();
         this.candidate.removeObserver(observer3, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
 
         // attempt duff removes
         this.candidate.removeObserver(observer3, name);
         this.candidate.removeObserver(observer3, name);
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
     }
 
     @Test
@@ -639,7 +642,8 @@ public class ContextTest
         subscriptionsObserver.latch = new CountDownLatch(2);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+            "ContextSubscriptions=L1");
 
         TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
         subscriptionsObserver.latch = new CountDownLatch(2);
@@ -946,6 +950,42 @@ public class ContextTest
     {
         this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1"));
         this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1", TypeEnum.TEXT));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_ACK()
+    {
+        this.candidate.createRecord(ProxyContext.ACK);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_NOK()
+    {
+        this.candidate.createRecord(ProxyContext.NOK);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_RPC_RECORD_RESULT_PREFIX()
+    {
+        this.candidate.createRecord(RpcInstance.RPC_RECORD_RESULT_PREFIX);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_2()
+    {
+        this.candidate.createRecord("ContextRecords");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_3()
+    {
+        this.candidate.createRecord(AtomicChangeTeleporter.PART_INDEX_PREFIX + "somthing");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateIllegalNameRecord_4()
+    {
+        this.candidate.createRecord("*");
     }
 
     @Test

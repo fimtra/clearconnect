@@ -434,10 +434,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public IRecord createRecord(final String name, Map<String, IValue> initialData)
     {
-        if (ContextUtils.isSystemRecordName(name) && !ContextUtils.checkLegalCharacters(name)
-            && !ContextUtils.isProtocolPrefixed(name))
+        if (ContextUtils.isSystemRecordName(name) || !ContextUtils.containsLegalCharacters(name)
+            || ContextUtils.isProtocolPrefixed(name) || AtomicChangeTeleporter.startsWithFragmentPrefix(name))
         {
-            throw new IllegalArgumentException("The name '" + name + "' is reserved");
+            throw new IllegalArgumentException("The name '" + name + "' contains illegal characters");
         }
 
         final Record record;

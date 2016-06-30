@@ -491,7 +491,7 @@ public class ContextUtils
      * @throws IllegalArgumentException
      *             if there are any illegal characters in the name
      */
-    public static boolean checkLegalCharacters(String name)
+    public static boolean containsLegalCharacters(String name)
     {
         final char[] charArray = name.toCharArray();
         for (int i = 0; i < charArray.length; i++)
