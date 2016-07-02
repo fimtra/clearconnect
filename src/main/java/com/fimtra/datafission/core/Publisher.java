@@ -188,9 +188,9 @@ public class Publisher
         final boolean isSystemRecordUpdateCoalesced(String name)
         {
             return ContextUtils.isSystemRecordName(name) &&
-                // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
-                // CONNECTED/DISCONNECTED
-            !ISystemRecordNames.CONTEXT_STATUS.equals(name);
+            // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
+            // CONNECTED/DISCONNECTED
+                !ISystemRecordNames.CONTEXT_STATUS.equals(name);
         }
 
         @Override
@@ -242,6 +242,8 @@ public class Publisher
                     {
                         if (ProxyContextMultiplexer.this.subscribers.addSubscriberFor(name, publisher))
                         {
+                            boolean ack = false;
+
                             if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
                             {
                                 try
@@ -251,20 +253,14 @@ public class Publisher
                                     if (Publisher.this.context.addObserver(permissionToken,
                                         ProxyContextMultiplexer.this, name).get().get(name).booleanValue())
                                     {
-                                        ackSubscribes.add(name);
-                                    }
-                                    else
-                                    {
-                                        nokSubscribes.add(name);
+                                        ack = true;
                                     }
                                 }
                                 catch (Exception e)
                                 {
                                     Log.log(Publisher.this.context,
                                         "Could not get result from addObserver call for permissionToken="
-                                            + permissionToken + ", recordName=" + name,
-                                        e);
-                                    nokSubscribes.add(name);
+                                            + permissionToken + ", recordName=" + name, e);
                                 }
                             }
                             else
@@ -305,11 +301,7 @@ public class Publisher
                                             }
 
                                         }
-                                        ackSubscribes.add(name);
-                                    }
-                                    else
-                                    {
-                                        nokSubscribes.add(name);
+                                        ack = true;
                                     }
                                 }
                                 catch (Exception e)
@@ -318,6 +310,17 @@ public class Publisher
                                         + permissionToken + ", recordName=" + name, e);
                                     nokSubscribes.add(name);
                                 }
+                            }
+                            
+                            if (ack)
+                            {
+                                ackSubscribes.add(name);
+                            }
+                            else
+                            {
+                                nokSubscribes.add(name);
+                                // the subscribe was not completed, so remove the subscriber registration
+                                ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
                             }
                         }
                         else
@@ -359,15 +362,17 @@ public class Publisher
                     Publisher.this.lock.lock();
                     try
                     {
-                        ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
-                        if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 0)
+                        if(ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
                         {
-                            Publisher.this.context.removeObserver(ProxyContextMultiplexer.this, name);
-                            ProxyContextMultiplexer.this.service.endBroadcast(name);
-                        }
-                        else
-                        {
-                            Publisher.this.context.addDeltaToSubscriptionCount(name, -1);
+                            if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 0)
+                            {
+                                Publisher.this.context.removeObserver(ProxyContextMultiplexer.this, name);
+                                ProxyContextMultiplexer.this.service.endBroadcast(name);
+                            }
+                            else
+                            {
+                                Publisher.this.context.addDeltaToSubscriptionCount(name, -1);
+                            }
                         }
                     }
                     finally
@@ -697,7 +702,7 @@ public class Publisher
                 {
                     // synchronize to avoid race conditions that can remove the static portions of
                     // the connections of a proxyContextPublisher for one that is in the process of
-                    // being constructed 
+                    // being constructed
                     synchronized (Publisher.this.proxyContextPublishers)
                     {
                         Publisher.this.proxyContextPublishers.put(channel,
@@ -854,7 +859,7 @@ public class Publisher
                                 Publisher.this.connectionsRecord.removeSubMap(connectionId);
                             }
                         }
-                        
+
                         this.publishAtomicChange =
                             Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
                     }
