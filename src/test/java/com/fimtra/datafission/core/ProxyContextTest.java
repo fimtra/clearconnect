@@ -749,7 +749,7 @@ public class ProxyContextTest
     public void testContextStatusReflectsMultipleRemoteContexts() throws Exception
     {
         createComponents();
-        final int fieldCountForSingleConnection = 14;
+        final int fieldCountForSingleConnection = 15;
 
         this.publisher.publishContextConnectionsRecordAtPeriod(20);
         final IRecord connectionsRecord = this.context.getRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
