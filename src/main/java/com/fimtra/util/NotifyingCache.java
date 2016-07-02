@@ -43,7 +43,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
-    static final Executor IMAGE_NOTIFIER = ThreadUtils.newSingleThreadExecutorService("initial-image-notifier");
     static final Executor SYNCHRONOUS_EXECUTOR = new Executor()
     {
         @Override
@@ -173,6 +172,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         {
                             return;
                         }
+                        
                         final Map<String, DATA> clone;
 
                         // hold the lock and add the listener in the task to ensure the listener is
@@ -232,7 +232,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
             if (this.executor == SYNCHRONOUS_EXECUTOR)
             {
-                IMAGE_NOTIFIER.execute(addTask);
+                // create a new thread to handle initial image notification - prevents any chance of
+                // stalling due to any deadlock in the alien method notifyListenerDataAdded
+                ThreadUtils.newThread(addTask, "image-notifier-" + ObjectUtils.safeToString(listener)).start();
             }
             else
             {
