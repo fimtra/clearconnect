@@ -982,12 +982,6 @@ public class ContextTest
         this.candidate.createRecord(AtomicChangeTeleporter.PART_INDEX_PREFIX + "somthing");
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testCreateIllegalNameRecord_4()
-    {
-        this.candidate.createRecord("*");
-    }
-
     @Test
     public void testCreateRemoveCreateDuplicateRpc()
     {

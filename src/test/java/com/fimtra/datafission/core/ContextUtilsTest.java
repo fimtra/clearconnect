@@ -92,13 +92,6 @@ public class ContextUtilsTest
         }
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testIllegalCharacters()
-    {
-        assertTrue(ContextUtils.containsLegalCharacters("hello"));
-        ContextUtils.containsLegalCharacters("hello $\\");
-    }
-
     @Test
     public void testFieldCopy()
     {

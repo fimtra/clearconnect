@@ -478,42 +478,6 @@ public class ContextUtils
         }
     }
 
-    /**
-     * A record name cannot contain any of these characters
-     * 
-     * <pre>
-     * * < > | \\ / : ? \" *
-     * </pre>
-     * 
-     * @param name
-     *            the record name to check
-     * @return <code>true</code> if the name does not contain any illegal characters
-     * @throws IllegalArgumentException
-     *             if there are any illegal characters in the name
-     */
-    public static boolean containsLegalCharacters(String name)
-    {
-        final char[] charArray = name.toCharArray();
-        for (int i = 0; i < charArray.length; i++)
-        {
-            switch(charArray[i])
-            {
-                case '<':
-                case '>':
-                case '?':
-                case '\\':
-                case ':':
-                case '/':
-                case '|':
-                case '"':
-                case '*':
-                    throw new IllegalArgumentException(
-                        "Cannot use < > | \\ / : ? \" * in a record name: '" + name + "'");
-            }
-        }
-        return true;
-    }
-
     public static void resolveRecordMapFromStream(Reader reader, Map<String, IValue> map) throws IOException
     {
         String key;
