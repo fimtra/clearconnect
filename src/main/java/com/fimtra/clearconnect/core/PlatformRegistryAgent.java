@@ -694,7 +694,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     PlatformUtils.getTransportTechnologyFromServiceInfoRecord(serviceInfoRecord);
                 proxy = new PlatformServiceProxy(this, serviceInstanceId, codec, host, port, transportTechnology);
                 proxy.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
-                    PlatformRegistry.CODEC.getFrameEncodingFormat(), new IEndPointAddressFactory()
+                    codec.getFrameEncodingFormat(), new IEndPointAddressFactory()
                     {
                         @Override
                         public EndPointAddress next()
