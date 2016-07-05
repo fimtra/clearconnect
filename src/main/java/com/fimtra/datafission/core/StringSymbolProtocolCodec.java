@@ -40,10 +40,6 @@ import com.fimtra.util.ObjectUtils;
  * atomic changes. This reduces the transmission size of messages once the symbol mapping for a
  * record name or key is sent.
  * <p>
- * Typically a symbol will be between 1-8 chars. There is a separate symbol table for record names
- * and keys. <b>Note:</b> there is a limit of just under 2^64 symbols for a symbol table, but this
- * should never become a problem. Also note that this codec uses ISO-8859-1 encoding for strings.
- * <p>
  * The format of the string in ABNF notation:
  * 
  * <pre>
@@ -54,7 +50,7 @@ import com.fimtra.util.ObjectUtils;
  *  name-symbol-definition = "n" name name-symbol-instance ; if the symbol for the record has never been sent
  *  name-symbol-instance = "~" symbol-name
  *  name = 1*ALPHA ; the name of the notifying record instance
- *  symbol-name = 1*OCTET ; the symbol to substitute for the name
+ *  symbol-name = 1*ALPHA ; the symbol to substitute for the name
  *  seq = "|" scope seq_num
  *  scope = "i" | "d" ; identifies either an image or delta
  *  seq_num = 1*DIGIT ; the sequency number
@@ -98,8 +94,8 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
-    static final char START_SYMBOL = 0x0;
-    static final char END_SYMBOL = 0xff;
+    static final char START_SYMBOL = '!';
+    static final char END_SYMBOL = '}';
     private static final char CHAR_DEFINITION_PREFIX = 'n';
 
     /**
@@ -113,43 +109,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
     static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
-    /**
-     * Bit shifts to access the byte ordinal that the index represents. E.g.
-     * bitShiftForByteOrdinal[2] has a value of 8 which is the number of bits to right shift an
-     * integral to access the 2nd byte.
-     */
-    private static long[] bitShiftForByteOrdinal = new long[9];
 
-    static
+    static String getSymbolCode(char[] chars, int start, int len)
     {
-        int i = 0;
-        // 0 doesn't count
-        bitShiftForByteOrdinal[i] = 0;
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1); // 0
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1); // 8
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1); // 16
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1);
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1);
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1);
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1);
-        bitShiftForByteOrdinal[++i] = 8 * (i - 1);
-    }
-
-    static Long getSymbolCode(char[] chars, int start, int len)
-    {
-        // 8 chars in ISO-8859-1 is 8 bytes
-        if (len > 8)
-        {
-            // todo we have a problem here, we have exceeded ~2^64 symbols...
-            throw new IllegalStateException("Symbol is too big: " + new String(chars, start, len));
-        }
-        long result = 0;
-        int j = len;
-        for (int i = start; j > 0; i++)
-        {
-            result = result | ((long) chars[i] << bitShiftForByteOrdinal[j--]);
-        }
-        return Long.valueOf(result);
+        return new String(chars, start, len);
     }
 
     final static String getNextTxKeyNameSymbol()
@@ -171,7 +134,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     {
         int i = 0;
         char[] target = symbolArr;
-        
+
         while (target[i] == END_SYMBOL)
         {
             target[i] = START_SYMBOL;
@@ -209,7 +172,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                     break outer;
             }
         }
-        
+
         return target;
     }
 
@@ -236,19 +199,13 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     /**
      * Stores the symbol-code to key name for messages received by this instance
-     * <p>
-     * The symbol code is the long representation of the char[] for the symbol. This limits a coded
-     * to receiving 2^64 possible symbols.
      */
-    final ConcurrentMap<Long, String> rxSymbolToKey = new ConcurrentHashMap<Long, String>();
+    final ConcurrentMap<String, String> rxSymbolToKey = new ConcurrentHashMap<String, String>();
 
     /**
      * Stores the symbol-code to record name for messages received by this instance.
-     * <p>
-     * The symbol code is the long representation of the char[] for the symbol. This limits a coded
-     * to receiving 2^64 possible symbols.
      */
-    final ConcurrentMap<Long, String> rxSymbolToRecordName = new ConcurrentHashMap<Long, String>();
+    final ConcurrentMap<String, String> rxSymbolToRecordName = new ConcurrentHashMap<String, String>();
 
     /**
      * Get the string representing the record changes to transmit to a {@link ProxyContext}.
@@ -444,7 +401,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     private String lookupRecordNameSymbol(char[] chars, int start, int len)
     {
-        final Long symbolCode = getSymbolCode(chars, start, len);
+        final String symbolCode = getSymbolCode(chars, start, len);
         final String name = this.rxSymbolToRecordName.get(symbolCode);
         if (name == null)
         {
@@ -456,7 +413,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
 
     private String lookupKeySymbol(char[] chars, int start, int len)
     {
-        final Long symbolCode = getSymbolCode(chars, start, len);
+        final String symbolCode = getSymbolCode(chars, start, len);
         final String name = this.rxSymbolToKey.get(symbolCode);
         if (name == null)
         {
@@ -494,12 +451,12 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             throw new IllegalArgumentException("Incorrect format for key-symbol-definition: " + nameAndSymbol);
         }
         String symbol = sb.toString();
-        final Long symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
+        final String symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
         if (log)
         {
-            Log.log(this, "[rx] key-symbol ", symbol, "(", symbolCode.toString(), ")=", name);
+            Log.log(this, "[rx] key-symbol ", symbol, "=", name);
         }
-        // todo periodically log?        
+        // todo periodically log?
         this.rxSymbolToKey.put(symbolCode, name);
         return name;
     }
@@ -532,10 +489,10 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             throw new IllegalArgumentException("Incorrect format for name-symbol-definition: " + nameAndSymbol);
         }
         final String symbol = sb.toString();
-        final Long symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
+        final String symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
         if (log)
         {
-            Log.log(this, "[rx] record-symbol ", symbol, "(", symbolCode.toString(), ")=", name);
+            Log.log(this, "[rx] record-symbol ", symbol, "=", name);
         }
         this.rxSymbolToRecordName.put(symbolCode, name);
         return name;
@@ -566,13 +523,13 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope())
-        // todo compact?
-        .append(atomicChange.getSequence());
+            // todo compact?
+            .append(atomicChange.getSequence());
         addEntriesWithSymbols(DELIMITER_PUT_CODE, putEntries, sb, escapedCharsRef, buffer, isImage, name, isProtocolMessage);
         addEntriesWithSymbols(DELIMITER_REMOVE_CODE, removedEntries, sb, escapedCharsRef, buffer, isImage, name,
             isProtocolMessage);
         IRecordChange subMapAtomicChange;
-        if(subMapKeys.size() > 0)
+        if (subMapKeys.size() > 0)
         {
             for (String subMapKey : subMapKeys)
             {
@@ -787,7 +744,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-definition = "n" name symbol-instance ; if the symbol for the record has never been sent
      *  symbol-instance = "~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*OCTET ; the symbol for the notifying record instance name
+     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
      */
     void appendSymbolForRecordName(String name, StringBuilder sb, CharArrayReference chars, boolean isImage)
@@ -795,39 +752,28 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String symbol = this.txRecordNameToSymbol.get(name);
         if (isImage || symbol == null)
         {
-            synchronized (this.txRecordNameToSymbol)
+            // get from the 'master' mappings
+            synchronized (TX_RECORD_NAME_TO_SYMBOL)
             {
-                symbol = this.txRecordNameToSymbol.get(name);
+                symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
                 if (symbol == null)
                 {
-                    // check the 'master' mappings
-                    symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
-                    if (symbol == null)
+                    symbol = getNextTxRecordNameSymbol();
+                    if (log)
                     {
-                        synchronized (TX_RECORD_NAME_TO_SYMBOL)
-                        {
-                            symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
-                            if (symbol == null)
-                            {
-                                symbol = getNextTxRecordNameSymbol();
-                                if (log)
-                                {
-                                    Log.log(this, "[MASTER TX] record-symbol ", name, "=", symbol);
-                                }
-                                // todo periodically log size?
-                                TX_RECORD_NAME_TO_SYMBOL.put(name, symbol);
-                            }
-                        }
-                        if (log)
-                        {
-                            Log.log(this, "[tx] record-symbol ", name, "=", symbol);
-                        }
-                        this.txRecordNameToSymbol.put(name, symbol);
+                        Log.log(this, "[MASTER TX] record-symbol ", name, "=", symbol);
                     }
+                    // todo periodically log size?
+                    TX_RECORD_NAME_TO_SYMBOL.put(name, symbol);
                 }
-                sb.append(CHAR_DEFINITION_PREFIX);
-                escape(name, sb, chars);
             }
+            if (log)
+            {
+                Log.log(this, "[tx] record-symbol ", name, "=", symbol);
+            }
+            this.txRecordNameToSymbol.put(name, symbol);
+            sb.append(CHAR_DEFINITION_PREFIX);
+            escape(name, sb, chars);
         }
         sb.append(CHAR_SYMBOL_PREFIX).append(symbol);
     }
@@ -840,7 +786,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
      *  symbol-instance = "|~" symbol-name
      *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*OCTET ; the symbol for the notifying record instance name
+     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
      * </pre>
      */
     void appendSymbolForKey(String key, StringBuilder txString, CharArrayReference chars, boolean sendDefinition)
@@ -848,36 +794,25 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         String symbol = this.txKeyNameToSymbol.get(key);
         if (sendDefinition || symbol == null)
         {
-            synchronized (this.txKeyNameToSymbol)
+            // get from the 'master' mapping
+            synchronized (TX_KEY_NAME_TO_SYMBOL)
             {
-                symbol = this.txKeyNameToSymbol.get(key);
+                symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
                 if (symbol == null)
                 {
-                    // check the 'master' mappings
-                    symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
-                    if (symbol == null)
-                    {
-                        synchronized (TX_KEY_NAME_TO_SYMBOL)
-                        {
-                            symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
-                            if (symbol == null)
-                            {
-                                symbol = getNextTxKeyNameSymbol();
-                                if (log)
-                                {
-                                    Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
-                                }
-                                TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
-                            }
-                        }
-                    }
+                    symbol = getNextTxKeyNameSymbol();
                     if (log)
                     {
-                        Log.log(this, "[tx] key-symbol ", key, "=", symbol);
+                        Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
                     }
-                    this.txKeyNameToSymbol.put(key, symbol);
+                    TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
                 }
             }
+            if (log)
+            {
+                Log.log(this, "[tx] key-symbol ", key, "=", symbol);
+            }
+            this.txKeyNameToSymbol.put(key, symbol);
             txString.append(CHAR_DEFINITION_PREFIX);
             escape(key, txString, chars);
         }

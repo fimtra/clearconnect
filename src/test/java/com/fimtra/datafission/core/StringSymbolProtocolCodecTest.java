@@ -120,33 +120,6 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     }
 
     @Test
-    public void testGetSymbolCode()
-    {
-        char[] c;
-        String expected;
-
-        // NOTE: this technique can only work for 8 ISO-8859-1 chars (8 bytes - the max for a long)
-        for (int i = 1; i < 9; i++)
-        {
-            char start = 'a';
-            int expectHexCode = 61;
-            expected = "";
-            c = new char[i];
-            for (int j = 0; j < i; j++)
-            {
-                c[j] = start;
-                expected += "" + expectHexCode;
-                start++;
-                expectHexCode++;
-            }
-            final Long symbolCode = StringSymbolProtocolCodec.getSymbolCode(c, 0, c.length);
-            System.err.println(symbolCode.longValue() + " expected=" + expected + " from " + new String(c));
-            assertEquals("For i=" + i, expected, Long.toHexString(symbolCode.longValue()));
-        }
-
-    }
-
-    @Test
     public void testEscapeUnescape()
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
