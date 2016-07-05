@@ -104,6 +104,14 @@ public class Publisher
         return channel.getDescription();
     }
 
+    static final boolean isSystemRecordUpdateCoalesced(String name)
+    {
+        return ContextUtils.isSystemRecordName(name) &&
+        // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
+        // CONNECTED/DISCONNECTED
+            !ISystemRecordNames.CONTEXT_STATUS.equals(name);
+    }
+
     /**
      * A single-threaded executor that is used exclusively for coalescing and publishing system
      * record updates.
@@ -183,14 +191,6 @@ public class Publisher
                         }
                     }, CachePolicyEnum.NO_IMAGE_NEEDED));
             }
-        }
-
-        final boolean isSystemRecordUpdateCoalesced(String name)
-        {
-            return ContextUtils.isSystemRecordName(name) &&
-            // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
-            // CONNECTED/DISCONNECTED
-                !ISystemRecordNames.CONTEXT_STATUS.equals(name);
         }
 
         @Override
@@ -273,34 +273,7 @@ public class Publisher
 
                                         // we must send an initial image to the new client if it is
                                         // not the first one to register
-                                        final IRecord record = Publisher.this.context.getLastPublishedImage(name);
-                                        if (record != null)
-                                        {
-                                            final AtomicChange change = new AtomicChange(record);
-                                            if (isSystemRecordUpdateCoalesced(record.getName()))
-                                            {
-                                                SYSTEM_RECORD_PUBLISHER.execute(new Runnable()
-                                                {
-                                                    @Override
-                                                    public void run()
-                                                    {
-                                                        // NOTE: sequences increment-then-get, hence
-                                                        // to send the previous image, we need to
-                                                        // subtract 1
-                                                        change.setSequence(
-                                                            ProxyContextMultiplexer.this.systemRecordSequences.get(
-                                                                name).get() - 1);
-                                                        publishImageOnSubscribe(publisher, change);
-                                                    }
-
-                                                });
-                                            }
-                                            else
-                                            {
-                                                publishImageOnSubscribe(publisher, change);
-                                            }
-
-                                        }
+                                        republishImage(name, publisher);
                                         ack = true;
                                     }
                                 }
@@ -311,7 +284,7 @@ public class Publisher
                                     nokSubscribes.add(name);
                                 }
                             }
-                            
+
                             if (ack)
                             {
                                 ackSubscribes.add(name);
@@ -335,15 +308,6 @@ public class Publisher
                     }
                 }
 
-                void publishImageOnSubscribe(final ProxyContextPublisher publisher, final AtomicChange change)
-                {
-                    final AtomicChange[] parts = ProxyContextMultiplexer.this.teleporter.split(change);
-                    for (int i = 0; i < parts.length; i++)
-                    {
-                        publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true);
-                    }
-                }
-
                 @Override
                 public Object context()
                 {
@@ -362,7 +326,7 @@ public class Publisher
                     Publisher.this.lock.lock();
                     try
                     {
-                        if(ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
+                        if (ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
                         {
                             if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 0)
                             {
@@ -387,6 +351,54 @@ public class Publisher
                     return name;
                 }
             });
+        }
+
+        /**
+         * <b>ONLY CALL THIS IN AN {@link ISequentialRunnable} RUNNING IN THE SAME CONTEXT AS THE
+         * RECORD NAME! OTHERWISE YOU ARE NOT GUARANTEED TO GET THE LAST PUBLISHED IMAGE.</b>
+         * <P>
+         * @see Context#getLastPublishedImage(String)
+         * @param recordNameToRepublish
+         * @param publisher
+         */
+        void republishImage(final String recordNameToRepublish, final ProxyContextPublisher publisher)
+        {
+            final IRecord record = Publisher.this.context.getLastPublishedImage(recordNameToRepublish);
+            if (record != null)
+            {
+                final AtomicChange change = new AtomicChange(record);
+                if (isSystemRecordUpdateCoalesced(record.getName()))
+                {
+                    SYSTEM_RECORD_PUBLISHER.execute(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            // NOTE: sequences increment-then-get, hence
+                            // to send the previous image, we need to
+                            // subtract 1
+                            change.setSequence(
+                                ProxyContextMultiplexer.this.systemRecordSequences.get(recordNameToRepublish).get()
+                                    - 1);
+                            publishImageOnSubscribe(publisher, change);
+                        }
+
+                    });
+                }
+                else
+                {
+                    publishImageOnSubscribe(publisher, change);
+                }
+            }
+        }
+
+        void publishImageOnSubscribe(final ProxyContextPublisher publisher, final AtomicChange change)
+        {
+            final AtomicChange[] parts = this.teleporter.split(change);
+            for (int i = 0; i < parts.length; i++)
+            {
+                publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true);
+            }
         }
     }
 
@@ -547,16 +559,10 @@ public class Publisher
             {
                 Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                 {
-
                     @Override
                     public void run()
                     {
-                        final IRecord lastPublishedImage = Publisher.this.context.getLastPublishedImage(name);
-                        if (lastPublishedImage != null)
-                        {
-                            publish(ProxyContextPublisher.this.codec.getTxMessageForAtomicChange(
-                                new AtomicChange(lastPublishedImage)), true);
-                        }
+                        Publisher.this.multiplexer.republishImage(name, ProxyContextPublisher.this);
                     }
 
                     @Override
