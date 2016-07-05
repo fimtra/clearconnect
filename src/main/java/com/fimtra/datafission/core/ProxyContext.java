@@ -122,6 +122,14 @@ public final class ProxyContext implements IObserverContext
      */
     public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
 
+    /**
+     * Controls logging of:
+     * <ul>
+     * <li>Inbound messages
+     * </ul>
+     */
+    public static boolean logRx = Boolean.getBoolean("logRx." + ProxyContext.class.getCanonicalName());
+
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
@@ -1158,6 +1166,7 @@ public final class ProxyContext implements IObserverContext
                             return changeName;
                         }
                     });
+                    
                     return;
                 }
             }
@@ -1171,8 +1180,13 @@ public final class ProxyContext implements IObserverContext
             {
                 try
                 {
+                    if (logRx)
+                    {
+                        Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                    }
+                    
                     final String name = substituteLocalNameWithRemoteName(changeName);
-
+                    
                     final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
                     if (isImage)
                     {
