@@ -90,6 +90,11 @@ public class Publisher
     public static boolean log = Boolean.getBoolean("log." + Publisher.class.getCanonicalName());
 
     /**
+     * Controls logging of outbound traffic. Only the first 200 bytes per message are logged.
+     */
+    public static boolean logTx = Boolean.getBoolean("logTx." + ProxyContextPublisher.class.getCanonicalName());
+
+    /**
      * Delimiter for statistics attributes published for each proxy context connection in the
      * {@link ISystemRecordNames#CONTEXT_STATUS}
      */
@@ -606,6 +611,13 @@ public class Publisher
         @Override
         public boolean sendAsync(byte[] toSend)
         {
+            if (logTx)
+            {
+                // log first 200 bytes that are sent
+                Log.log(ProxyContextPublisher.this, "(->) ",
+                    new String(toSend, 0, (toSend.length < 200 ? toSend.length : 200)),
+                    (toSend.length < 200 ? "" : "...(truncated)"));
+            }
             return this.channel.sendAsync(this.codec.finalEncode(toSend));
         }
 
