@@ -16,11 +16,9 @@
 package com.fimtra.datafission.core;
 
 import static com.fimtra.datafission.core.StringSymbolProtocolCodec.END_SYMBOL;
-import static com.fimtra.datafission.core.StringSymbolProtocolCodec.NEXT_TX_KEY_NAME_SYMBOL;
-import static com.fimtra.datafission.core.StringSymbolProtocolCodec.NEXT_TX_RECORD_NAME_SYMBOL;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.NEXT_TX_SYMBOL;
 import static com.fimtra.datafission.core.StringSymbolProtocolCodec.START_SYMBOL;
-import static com.fimtra.datafission.core.StringSymbolProtocolCodec.getNextTxKeyNameSymbol;
-import static com.fimtra.datafission.core.StringSymbolProtocolCodec.getNextTxRecordNameSymbol;
+import static com.fimtra.datafission.core.StringSymbolProtocolCodec.getNextTxSymbol;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -56,38 +54,6 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
     CharArrayReference chars = new CharArrayReference(new char[StringSymbolProtocolCodec.CHARRAY_SIZE]);
 
     @Test
-    public void testRanges_getNextTxRecordNameSymbol()
-    {
-        // test for 8 loops which test 8 bytes
-        for (int i = 0; i < 8; i++)
-        {
-            // simulate cycling all combinations for the current byte count so that we increment the
-            // bytes by 1 and it starts at 1
-            for (int j = 0; j <= i; j++)
-            {
-                NEXT_TX_RECORD_NAME_SYMBOL[j] = END_SYMBOL;
-            }
-            getNextTxRecordNameSymbol();
-            assertEquals(i + 2, NEXT_TX_RECORD_NAME_SYMBOL.length);
-            for (int j = 0; j <= i; j++)
-            {
-                assertEquals("At j=" + j, START_SYMBOL, NEXT_TX_RECORD_NAME_SYMBOL[j]);
-            }
-            assertEquals(START_SYMBOL + 1, NEXT_TX_RECORD_NAME_SYMBOL[i + 1]);
-
-            // check cycling the least significant bytes again
-            for (int j = 0; j <= i; j++)
-            {
-                NEXT_TX_RECORD_NAME_SYMBOL[j] = END_SYMBOL;
-            }
-            getNextTxRecordNameSymbol();
-            assertEquals(START_SYMBOL, NEXT_TX_RECORD_NAME_SYMBOL[0]);
-            assertEquals(START_SYMBOL + 2, NEXT_TX_RECORD_NAME_SYMBOL[i + 1]);
-        }
-        NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
-    }
-
-    @Test
     public void testRanges_getNextTxKeyNameSymbol()
     {
         // test for 8 loops which test 8 bytes
@@ -97,26 +63,26 @@ public class StringSymbolProtocolCodecTest extends CodecBaseTest
             // bytes by 1 and it starts at 1
             for (int j = 0; j <= i; j++)
             {
-                NEXT_TX_KEY_NAME_SYMBOL[j] = END_SYMBOL;
+                NEXT_TX_SYMBOL[j] = END_SYMBOL;
             }
-            getNextTxKeyNameSymbol();
-            assertEquals(i + 2, NEXT_TX_KEY_NAME_SYMBOL.length);
+            getNextTxSymbol();
+            assertEquals(i + 2, NEXT_TX_SYMBOL.length);
             for (int j = 0; j <= i; j++)
             {
-                assertEquals("At j=" + j, START_SYMBOL, NEXT_TX_KEY_NAME_SYMBOL[j]);
+                assertEquals("At j=" + j, START_SYMBOL, NEXT_TX_SYMBOL[j]);
             }
-            assertEquals(START_SYMBOL + 1, NEXT_TX_KEY_NAME_SYMBOL[i + 1]);
+            assertEquals(START_SYMBOL + 1, NEXT_TX_SYMBOL[i + 1]);
 
             // check cycling the least significant bytes again
             for (int j = 0; j <= i; j++)
             {
-                NEXT_TX_KEY_NAME_SYMBOL[j] = END_SYMBOL;
+                NEXT_TX_SYMBOL[j] = END_SYMBOL;
             }
-            getNextTxKeyNameSymbol();
-            assertEquals(START_SYMBOL, NEXT_TX_KEY_NAME_SYMBOL[0]);
-            assertEquals(START_SYMBOL + 2, NEXT_TX_KEY_NAME_SYMBOL[i + 1]);
+            getNextTxSymbol();
+            assertEquals(START_SYMBOL, NEXT_TX_SYMBOL[0]);
+            assertEquals(START_SYMBOL + 2, NEXT_TX_SYMBOL[i + 1]);
         }
-        NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+        NEXT_TX_SYMBOL = new char[] { START_SYMBOL };
     }
 
     @Test

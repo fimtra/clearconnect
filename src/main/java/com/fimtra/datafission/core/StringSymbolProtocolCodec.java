@@ -43,26 +43,22 @@ import com.fimtra.util.ObjectUtils;
  * The format of the string in ABNF notation:
  * 
  * <pre>
- *  preamble name-symbol seq [puts] [removes] [sub-map]
+ *  preamble "|" symbol-element seq [puts] [removes] [sub-map]
  *  
  *  preamble = 0*ALPHA
- *  name-symbol = "|" ( name-symbol-definition | name-symbol-instance )
- *  name-symbol-definition = "n" name name-symbol-instance ; if the symbol for the record has never been sent
- *  name-symbol-instance = "~" symbol-name
- *  name = 1*ALPHA ; the name of the notifying record instance
- *  symbol-name = 1*ALPHA ; the symbol to substitute for the name
+ *  symbol-element = ( symbol-definition | symbol-instance )
+ *  symbol-definition = "n" string symbol-instance ; if the symbol for the record has never been sent
+ *  symbol-instance = "~" symbol
+ *  string = 1*ALPHA ; the string that will be substituted with the symbol
+ *  symbol = 1*ALPHA ; the symbol to substitute for the string
  *  seq = "|" scope seq_num
  *  scope = "i" | "d" ; identifies either an image or delta
  *  seq_num = 1*DIGIT ; the sequency number
  *  puts = "|p" 1*key-value-pair
  *  removes = "|r" 1*key-value-pair
  *  sub-map = "|:|" name [puts] [removes]
- *  key-value-pair = "|" key-symbol "=" value
- *  key-symbol = ( key-symbol-definition | key-symbol-instance )
- *  key-symbol-definition =  "n" key key-symbol-instance
- *  key-symbol-instance = "~" symbol-name
- *  key = 1*ALPHA ; the symbol for the key
- *  value = 1*ALPHA
+ *  key-value-pair = "|" symbol-element "=" value   
+ *  value = 1*OCTET
  *  
  *  e.g. |nmyrecord~s!|d322234|p|nkey1~#=value1|~df=value2|r|~$=value5|:|~$|p|~ty=value1
  * </pre>
@@ -99,32 +95,21 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     private static final char CHAR_DEFINITION_PREFIX = 'n';
 
     /**
-     * Stores the mappings of all key-name-to-symbol sent from this VM
+     * Stores the mappings of all string-to-symbol sent from this VM
      */
-    private static final Map<String, String> TX_KEY_NAME_TO_SYMBOL = new HashMap<String, String>();
-    /**
-     * Stores the mappings of all record-name-to-symbol sent from this VM
-     */
-    private static final Map<String, String> TX_RECORD_NAME_TO_SYMBOL = new HashMap<String, String>();
+    private static final Map<String, String> TX_STRING_TO_SYMBOL = new HashMap<String, String>();
 
-    static char[] NEXT_TX_RECORD_NAME_SYMBOL = new char[] { START_SYMBOL };
-    static char[] NEXT_TX_KEY_NAME_SYMBOL = new char[] { START_SYMBOL };
+    static char[] NEXT_TX_SYMBOL = new char[] { START_SYMBOL };
 
     static String getSymbolCode(char[] chars, int start, int len)
     {
         return new String(chars, start, len);
     }
 
-    final static String getNextTxKeyNameSymbol()
+    final static String getNextTxSymbol()
     {
-        NEXT_TX_KEY_NAME_SYMBOL = findNextValidSymbol(NEXT_TX_KEY_NAME_SYMBOL);
-        return new String(NEXT_TX_KEY_NAME_SYMBOL, 0, NEXT_TX_KEY_NAME_SYMBOL.length);
-    }
-
-    final static String getNextTxRecordNameSymbol()
-    {
-        NEXT_TX_RECORD_NAME_SYMBOL = findNextValidSymbol(NEXT_TX_RECORD_NAME_SYMBOL);
-        return new String(NEXT_TX_RECORD_NAME_SYMBOL, 0, NEXT_TX_RECORD_NAME_SYMBOL.length);
+        NEXT_TX_SYMBOL = findNextValidSymbol(NEXT_TX_SYMBOL);
+        return new String(NEXT_TX_SYMBOL, 0, NEXT_TX_SYMBOL.length);
     }
 
     /**
@@ -183,29 +168,19 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      * <p>
      * Synchronize access.
      * <p>
-     * TODO this is a memory leak for "temporary" records...
+     * TODO this is a memory leak for "temporary" records...but will clear up when the remote ProxyContext is destroyed
      */
     final Map<String, Set<String>> keyDefinitionsSent = new HashMap<String, Set<String>>();
     /**
-     * Stores the key name to symbol for messages sent by this instance - the mappings used are also
-     * stored in the 'master' {@value #TX_KEY_NAME_TO_SYMBOL}
+     * Stores the string-to-symbol for messages sent by this instance - the mappings used are also
+     * stored in the 'master' {@value #TX_STRING_TO_SYMBOL}
      */
-    final ConcurrentMap<String, String> txKeyNameToSymbol = new ConcurrentHashMap<String, String>();
-    /**
-     * Stores the record name to symbol for messages sent by this instance - the mappings used are
-     * also stored in the 'master' {@value #TX_RECORD_NAME_TO_SYMBOL}
-     */
-    final ConcurrentMap<String, String> txRecordNameToSymbol = new ConcurrentHashMap<String, String>();
+    final ConcurrentMap<String, String> txStringToSymbol = new ConcurrentHashMap<String, String>();
 
     /**
-     * Stores the symbol-code to key name for messages received by this instance
+     * Stores the symbol-to-string for messages received by this instance
      */
-    final ConcurrentMap<String, String> rxSymbolToKey = new ConcurrentHashMap<String, String>();
-
-    /**
-     * Stores the symbol-code to record name for messages received by this instance.
-     */
-    final ConcurrentMap<String, String> rxSymbolToRecordName = new ConcurrentHashMap<String, String>();
+    final ConcurrentMap<String, String> rxSymbolToString = new ConcurrentHashMap<String, String>();
 
     /**
      * Get the string representing the record changes to transmit to a {@link ProxyContext}.
@@ -255,11 +230,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 case CHAR_SYMBOL_PREFIX:
                     // if its just the symbol, no need to unencode
                     // symbol-instance ~<symbol>
-                    name = lookupRecordNameSymbol(tokens[1], 1, tokens[1].length - 1);
+                    name = lookupSymbol(tokens[1], 1, tokens[1].length - 1);
                     break;
                 case CHAR_DEFINITION_PREFIX:
                     // symbol-definition: n<name>~<symbol>
-                    name = defineRecordNameSymbol(stringFromCharBuffer(tokens[1], 0));
+                    name = defineSymbol(stringFromCharBuffer(tokens[1], 0));
                     break;
                 default :
                     // assume its a full name (no symbol table), e.g. RPC results, teleported record
@@ -303,11 +278,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                     case CHAR_SYMBOL_PREFIX:
                                         // if its a symbol, no need to unescape
                                         // symbol-instance ~<symbol>
-                                        subMapName = lookupKeySymbol(tokens[i], 1, tokens[i].length - 1);
+                                        subMapName = lookupSymbol(tokens[i], 1, tokens[i].length - 1);
                                         break;
                                     case CHAR_DEFINITION_PREFIX:
                                         // symbol-definition: n<name>~s<symbol>
-                                        subMapName = defineKeySymbol(stringFromCharBuffer(tokens[i], 0));
+                                        subMapName = defineSymbol(stringFromCharBuffer(tokens[i], 0));
                                         break;
                                     default :
                                         throw new IllegalArgumentException(
@@ -341,7 +316,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                             if (put)
                                             {
                                                 atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
-                                                    decodeKeyFromSymbol(currentTokenChars, 0, j),
+                                                    decodeStringFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array),
                                                     null);
@@ -349,7 +324,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                             else
                                             {
                                                 atomicChange.mergeSubMapEntryRemovedChange(subMapName,
-                                                    decodeKeyFromSymbol(currentTokenChars, 0, j),
+                                                    decodeStringFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array));
                                             }
@@ -359,7 +334,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                             if (put)
                                             {
                                                 atomicChange.mergeEntryUpdatedChange(
-                                                    decodeKeyFromSymbol(currentTokenChars, 0, j),
+                                                    decodeStringFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array),
                                                     null);
@@ -367,7 +342,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                                             else
                                             {
                                                 atomicChange.mergeEntryRemovedChange(
-                                                    decodeKeyFromSymbol(currentTokenChars, 0, j),
+                                                    decodeStringFromSymbol(currentTokenChars, 0, j),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
                                                         tempArr, buffer, array));
                                             }
@@ -399,37 +374,24 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
     }
 
-    private String lookupRecordNameSymbol(char[] chars, int start, int len)
+    private String lookupSymbol(char[] chars, int start, int len)
     {
         final String symbolCode = getSymbolCode(chars, start, len);
-        final String name = this.rxSymbolToRecordName.get(symbolCode);
+        final String name = this.rxSymbolToString.get(symbolCode);
         if (name == null)
         {
-            throw new IllegalArgumentException(
-                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
-        }
-        return name;
-    }
-
-    private String lookupKeySymbol(char[] chars, int start, int len)
-    {
-        final String symbolCode = getSymbolCode(chars, start, len);
-        final String name = this.rxSymbolToKey.get(symbolCode);
-        if (name == null)
-        {
-            throw new IllegalArgumentException(
-                "No key for symbol '" + new String(chars, start, len) + "' code:" + symbolCode);
+            throw new IllegalArgumentException("No string for symbol '" + symbolCode);
         }
         return name;
     }
 
     /**
-     * Given a symbol-definition format "n{name}~{symbol}" this populates the {@link #rxSymbolToKey}
+     * Given a symbol-definition format "n{name}~{symbol}" this populates the {@link #rxSymbolToString}
      * map with the mapping.
      * 
      * @return the name
      */
-    private String defineKeySymbol(String nameAndSymbol)
+    private String defineSymbol(String nameAndSymbol)
     {
         final char[] charArray = nameAndSymbol.toCharArray();
         final StringBuilder sb = new StringBuilder(nameAndSymbol.length());
@@ -448,53 +410,16 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
         if (name == null)
         {
-            throw new IllegalArgumentException("Incorrect format for key-symbol-definition: " + nameAndSymbol);
+            throw new IllegalArgumentException("Incorrect format for symbol-definition: " + nameAndSymbol);
         }
         String symbol = sb.toString();
         final String symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
         if (log)
         {
-            Log.log(this, "[rx] key-symbol ", symbol, "=", name);
+            Log.log(this, "[rx] ", symbol, "=", name);
         }
         // todo periodically log?
-        this.rxSymbolToKey.put(symbolCode, name);
-        return name;
-    }
-
-    /**
-     * Given a symbol-definition format "n{name}~s{symbol}" this populates the
-     * {@link #rxSymbolToRecordName} map with the mapping.
-     * 
-     * @return the name
-     */
-    private String defineRecordNameSymbol(String nameAndSymbol)
-    {
-        final char[] charArray = nameAndSymbol.toCharArray();
-        final StringBuilder sb = new StringBuilder(nameAndSymbol.length());
-        String name = null;
-        for (int i = 1; i < charArray.length; i++)
-        {
-            if (charArray[i] == CHAR_SYMBOL_PREFIX)
-            {
-                name = sb.toString();
-                sb.setLength(0);
-            }
-            else
-            {
-                sb.append(charArray[i]);
-            }
-        }
-        if (name == null)
-        {
-            throw new IllegalArgumentException("Incorrect format for name-symbol-definition: " + nameAndSymbol);
-        }
-        final String symbol = sb.toString();
-        final String symbolCode = getSymbolCode(symbol.toCharArray(), 0, symbol.length());
-        if (log)
-        {
-            Log.log(this, "[rx] record-symbol ", symbol, "=", name);
-        }
-        this.rxSymbolToRecordName.put(symbolCode, name);
+        this.rxSymbolToString.put(symbolCode, name);
         return name;
     }
 
@@ -519,7 +444,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
         }
         else
         {
-            appendSymbolForRecordName(name, sb, escapedCharsRef, isImage);
+            appendSymbol(name, sb, escapedCharsRef, isImage);
         }
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope())
@@ -535,7 +460,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             {
                 subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
                 sb.append(DELIMITER_SUBMAP_CODE);
-                appendSymbolForKey(subMapKey, sb, escapedCharsRef, isImage);
+                appendSymbol(subMapKey, sb, escapedCharsRef, isImage);
                 addEntriesWithSymbols(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, escapedCharsRef,
                     buffer, isImage, name, isProtocolMessage);
                 addEntriesWithSymbols(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb,
@@ -590,7 +515,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 }
                 else
                 {
-                    appendSymbolForKey(key, txString, escapedCharsRef, isImage || definitionNeeded.contains(key));
+                    appendSymbol(key, txString, escapedCharsRef, isImage || definitionNeeded.contains(key));
                 }
 
                 txString.append(CHAR_KEY_VALUE_SEPARATOR);
@@ -737,92 +662,50 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     }
 
     /**
-     * Appends the name-symbol portion for a record:
+     * Appends the symbol-element:
      * 
      * <pre>
-     *  name-symbol = ( symbol-definition | symbol-instance )
-     *  symbol-definition = "n" name symbol-instance ; if the symbol for the record has never been sent
-     *  symbol-instance = "~" symbol-name
-     *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
+    *  symbol-element = ( symbol-definition | symbol-instance )
+    *  symbol-definition = "n" string symbol-instance ; if the symbol for the record has never been sent
+    *  symbol-instance = "~" symbol
+    *  string = 1*ALPHA ; the string that will be substituted with the symbol
+    *  symbol = 1*ALPHA ; the symbol to substitute for the string
      * </pre>
      */
-    void appendSymbolForRecordName(String name, StringBuilder sb, CharArrayReference chars, boolean isImage)
+    void appendSymbol(String string, StringBuilder txString, CharArrayReference chars, boolean sendDefinition)
     {
-        String symbol = this.txRecordNameToSymbol.get(name);
-        if (isImage || symbol == null)
-        {
-            // get from the 'master' mappings
-            synchronized (TX_RECORD_NAME_TO_SYMBOL)
-            {
-                symbol = TX_RECORD_NAME_TO_SYMBOL.get(name);
-                if (symbol == null)
-                {
-                    symbol = getNextTxRecordNameSymbol();
-                    if (log)
-                    {
-                        Log.log(this, "[MASTER TX] record-symbol ", name, "=", symbol);
-                    }
-                    // todo periodically log size?
-                    TX_RECORD_NAME_TO_SYMBOL.put(name, symbol);
-                }
-            }
-            if (log)
-            {
-                Log.log(this, "[tx] record-symbol ", name, "=", symbol);
-            }
-            this.txRecordNameToSymbol.put(name, symbol);
-            sb.append(CHAR_DEFINITION_PREFIX);
-            escape(name, sb, chars);
-        }
-        sb.append(CHAR_SYMBOL_PREFIX).append(symbol);
-    }
-
-    /**
-     * Appends the key-symbol portion for a record:
-     * 
-     * <pre>
-     *  name-symbol = ( symbol-definition | symbol-instance )
-     *  symbol-definition = "|n" name symbol-instance ; if the symbol for the record has never been sent
-     *  symbol-instance = "|~" symbol-name
-     *  name = 1*ALPHA ; the name of the notifying record instance
-     *  symbol-name = 1*ALPHA ; the symbol for the notifying record instance name
-     * </pre>
-     */
-    void appendSymbolForKey(String key, StringBuilder txString, CharArrayReference chars, boolean sendDefinition)
-    {
-        String symbol = this.txKeyNameToSymbol.get(key);
+        String symbol = this.txStringToSymbol.get(string);
         if (sendDefinition || symbol == null)
         {
             // get from the 'master' mapping
-            synchronized (TX_KEY_NAME_TO_SYMBOL)
+            synchronized (TX_STRING_TO_SYMBOL)
             {
-                symbol = TX_KEY_NAME_TO_SYMBOL.get(key);
+                symbol = TX_STRING_TO_SYMBOL.get(string);
                 if (symbol == null)
                 {
-                    symbol = getNextTxKeyNameSymbol();
+                    symbol = getNextTxSymbol();
                     if (log)
                     {
-                        Log.log(this, "[MASTER TX] key-symbol ", key, "=", symbol);
+                        Log.log(this, "[MASTER TX] ", string, "=", symbol);
                     }
-                    TX_KEY_NAME_TO_SYMBOL.put(key, symbol);
+                    TX_STRING_TO_SYMBOL.put(string, symbol);
                 }
             }
             if (log)
             {
-                Log.log(this, "[tx] key-symbol ", key, "=", symbol);
+                Log.log(this, "[tx] ", string, "=", symbol);
             }
-            this.txKeyNameToSymbol.put(key, symbol);
+            this.txStringToSymbol.put(string, symbol);
             txString.append(CHAR_DEFINITION_PREFIX);
-            escape(key, txString, chars);
+            escape(string, txString, chars);
         }
         txString.append(CHAR_SYMBOL_PREFIX).append(symbol);
     }
 
     /**
-     * Performs unescaping and decoding of a key from its symbol
+     * Performs unescaping and decoding of a string from its symbol
      */
-    String decodeKeyFromSymbol(char[] chars, int start, int end)
+    String decodeStringFromSymbol(char[] chars, int start, int end)
     {
         if (end - start == KEY_PREAMBLE_CHARS.length)
         {
@@ -846,15 +729,15 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             case CHAR_SYMBOL_PREFIX:
                 // if its a symbol, no need to unencode
                 // symbol-instance ~<symbol>
-                key = lookupKeySymbol(chars, start + 1, end - 1);
+                key = lookupSymbol(chars, start + 1, end - 1);
                 break;
             case CHAR_DEFINITION_PREFIX:
                 // symbol-definition: n<name>~s<symbol>
-                key = defineKeySymbol(stringFromCharBuffer(chars, start, end));
+                key = defineSymbol(stringFromCharBuffer(chars, start, end));
                 break;
             default :
                 throw new IllegalArgumentException(
-                    "Could not decode key from symbol '" + stringFromCharBuffer(chars, start, end) + "'");
+                    "Could not decode string from symbol '" + stringFromCharBuffer(chars, start, end) + "'");
         }
         return key;
     }
