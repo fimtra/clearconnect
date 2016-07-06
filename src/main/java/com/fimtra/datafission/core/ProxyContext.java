@@ -1182,7 +1182,7 @@ public final class ProxyContext implements IObserverContext
                 {
                     if (logRx)
                     {
-                        Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                        Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
                     }
                     
                     final String name = substituteLocalNameWithRemoteName(changeName);
