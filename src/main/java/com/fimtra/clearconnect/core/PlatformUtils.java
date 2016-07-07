@@ -579,9 +579,13 @@ public class PlatformUtils
                         // if removed is empty, then put must NOT be empty
                         if (subMapAtomicChange.getRemovedEntries().isEmpty())
                         {
-                            added.add(connectionId);
-                            this.current.put(connectionId, subMapAtomicChange.getPutEntries().get(
-                                IContextConnectionsRecordFields.PROXY_ID).textValue());
+                            if (subMapAtomicChange.getPutEntries().get(
+                                IContextConnectionsRecordFields.PROXY_ID) != null)
+                            {
+                                added.add(connectionId);
+                                this.current.put(connectionId, subMapAtomicChange.getPutEntries().get(
+                                    IContextConnectionsRecordFields.PROXY_ID).textValue());
+                            }
                         }
                         else
                         {
