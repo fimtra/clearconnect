@@ -501,30 +501,31 @@ public class PlatformTest
         createAgent();
         try
         {
+            int activateTimeout = 5000;
+            IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
+            IFtStatusListener ftStatusListener2 = mock(IFtStatusListener.class);
+
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort +=
                 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-            allowTimeForPrimaryInstanceToRegister();
+
+            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
+            verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
+            
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
-                1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));            
+            
+            this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
 
             TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
             this.agent.addServiceAvailableListener(serviceListener);
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
 
             this.agent.waitForPlatformService(SERVICE1);
-            IPlatformServiceProxy serviceProxy = this.agent.getPlatformServiceProxy(SERVICE1);
-            serviceProxy.setReconnectPeriodMillis(RECONNECT_PERIOD);
 
-            IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
-            IFtStatusListener ftStatusListener2 = mock(IFtStatusListener.class);
-
-            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
-            this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
-
-            int activateTimeout = 5000;
-            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
-            verify(ftStatusListener2, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.secondary));
-
+            // 2 times! once when the listener is added, again when the registry says "you;re standby"
+            verify(ftStatusListener2, timeout(activateTimeout).times(2)).onStandby(eq(SERVICE1), eq(this.secondary));
+            
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY");
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
@@ -543,7 +544,7 @@ public class PlatformTest
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener3);
 
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-
+                
             verify(ftStatusListener3, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             // note: standby may or may not be called - depends on timings
             verify(ftStatusListener3, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
@@ -553,7 +554,7 @@ public class PlatformTest
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
-
+                
             serviceListener.verifyNoMoreInteractions();
             verifyNoMoreInteractions(ftStatusListener1);
             verifyNoMoreInteractions(ftStatusListener2);
@@ -661,29 +662,30 @@ public class PlatformTest
 
         // this is the registry connection
         // testAddProxyConnectionAvailableListener[PRIMARY]->PlatformRegistry[PlatformTestJUnit]@169.254.12.201
-        verify(listener, timeout(1000)).onConnected(anyString());
+        final int timeout = 2000;
+        verify(listener, timeout(timeout)).onConnected(anyString());
         reset(listener);
 
         // wait for the service to be published
         final IServiceAvailableListener serviceAvailableListener = mock(IServiceAvailableListener.class);
         this.agent.addServiceAvailableListener(serviceAvailableListener);
-        verify(serviceAvailableListener, timeout(2000)).onServiceAvailable(eq("PlatformRegistry"));
-        verify(serviceAvailableListener, timeout(2000)).onServiceAvailable(eq(SERVICE1));
+        verify(serviceAvailableListener, timeout(timeout)).onServiceAvailable(eq("PlatformRegistry"));
+        verify(serviceAvailableListener, timeout(timeout)).onServiceAvailable(eq(SERVICE1));
         
         assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
-        verify(listener, timeout(1000)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        verify(listener, timeout(timeout)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
         reset(listener);
         
         assertNotNull(this.agent008.getPlatformServiceProxy(SERVICE1));
-        verify(listener, timeout(1000)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        verify(listener, timeout(timeout)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
         reset(listener);
 
         this.agent008.destroyPlatformServiceProxy(SERVICE1);
-        verify(listener, timeout(1000)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        verify(listener, timeout(timeout)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
         reset(listener);
 
         this.agent.destroyPlatformServiceProxy(SERVICE1);
-        verify(listener, timeout(1000)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        verify(listener, timeout(timeout)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
         reset(listener);
     }
 
@@ -1553,7 +1555,9 @@ public class PlatformTest
         // create a FT service
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        allowTimeForPrimaryInstanceToRegister();
+
+        waitForPrimaryToBeActive(SERVICE1);
+        
         assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
             1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
@@ -1691,7 +1695,9 @@ public class PlatformTest
         // create a FT service
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        allowTimeForPrimaryInstanceToRegister();
+
+        waitForPrimaryToBeActive(SERVICE1);
+        
         assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
             1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
@@ -1818,6 +1824,15 @@ public class PlatformTest
         checkRecordSubmapSize(recordsAcrossFamilies, recordsForOneInstance + 6 + registryServiceRecords - 1);
     }
 
+    void waitForPrimaryToBeActive(final String SERVICE1)
+    {
+        int activateTimeout = 5000;
+        IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
+        this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
+        verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
+        verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
+    }
+
     @Test
     public void testCountingRecordSubscriptionsPerService() throws InterruptedException, IOException
     {
@@ -1911,11 +1926,6 @@ public class PlatformTest
                 Thread.sleep(50);
             }
         }
-    }
-
-    private static void allowTimeForPrimaryInstanceToRegister() throws InterruptedException
-    {
-        Thread.sleep(100);
     }
 
     private static void checkRecordSubmapSize(final AtomicReference<IRecord> record, final int expect)
