@@ -43,6 +43,9 @@ import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.core.session.ISessionListener;
+import com.fimtra.util.LazyObject;
+import com.fimtra.util.LazyObject.IDestructor;
+import com.fimtra.util.LazyObject.IConstructor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
@@ -58,11 +61,11 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
 {
     final PlatformRegistryAgent registryAgent;
     final ProxyContext proxyContext;
-    final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache;
-    final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache;
-    final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache;
-    final NotifyingCache<IRecordConnectionStatusListener, IValue> recordConnectionStatusNotifyingCache;
-    final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceConnectionStatusNotifyingCache;
+    final LazyObject<NotifyingCache<IRecordAvailableListener, String>> recordAvailableNotifyingCache;
+    final LazyObject<NotifyingCache<IRpcAvailableListener, IRpcInstance>> rpcAvailableNotifyingCache;
+    final LazyObject<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>> subscriptionNotifyingCache;
+    final LazyObject<NotifyingCache<IRecordConnectionStatusListener, IValue>> recordConnectionStatusNotifyingCache;
+    final LazyObject<NotifyingCache<IServiceConnectionStatusListener, Connection>> serviceConnectionStatusNotifyingCache;
     private final String platformName;
     final String serviceFamily;
 
@@ -103,20 +106,95 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
                 }
             }));
 
-        this.rpcAvailableNotifyingCache =
-            PlatformUtils.createRpcAvailableNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, this);
-        this.subscriptionNotifyingCache =
-            PlatformUtils.createSubscriptionNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, this);
-        this.recordAvailableNotifyingCache =
-            PlatformUtils.createRecordAvailableNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, this);
+        this.rpcAvailableNotifyingCache = new LazyObject<NotifyingCache<IRpcAvailableListener, IRpcInstance>>(
+            new IConstructor<NotifyingCache<IRpcAvailableListener, IRpcInstance>>()
+            {
+                @Override
+                public NotifyingCache<IRpcAvailableListener, IRpcInstance> construct()
+                {
+                    return PlatformUtils.createRpcAvailableNotifyingCache(PlatformServiceProxy.this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, this);
+                }
+            }, new IDestructor<NotifyingCache<IRpcAvailableListener, IRpcInstance>>()
+            {
+                @Override
+                public void destroy(NotifyingCache<IRpcAvailableListener, IRpcInstance> ref)
+                {
+                    ref.destroy();
+                }
+            });
+        this.subscriptionNotifyingCache = new LazyObject<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>(
+            new IConstructor<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>()
+            {
+                @Override
+                public NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> construct()
+                {
+                    return PlatformUtils.createSubscriptionNotifyingCache(PlatformServiceProxy.this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, this);
+                }
+            }, new IDestructor<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>()
+            {
+                @Override
+                public void destroy(NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> ref)
+                {
+                    ref.destroy();
+                }
+            });
+        this.recordAvailableNotifyingCache = new LazyObject<NotifyingCache<IRecordAvailableListener, String>>(
+            new IConstructor<NotifyingCache<IRecordAvailableListener, String>>()
+            {
+                @Override
+                public NotifyingCache<IRecordAvailableListener, String> construct()
+                {
+                    return PlatformUtils.createRecordAvailableNotifyingCache(PlatformServiceProxy.this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, this);
+                }
+            }, new IDestructor<NotifyingCache<IRecordAvailableListener, String>>()
+            {
+                @Override
+                public void destroy(NotifyingCache<IRecordAvailableListener, String> ref)
+                {
+                    ref.destroy();
+                }
+            });
         this.recordConnectionStatusNotifyingCache =
-            PlatformUtils.createRecordConnectionStatusNotifyingCache(this.proxyContext, this);
+            new LazyObject<NotifyingCache<IRecordConnectionStatusListener, IValue>>(
+                new IConstructor<NotifyingCache<IRecordConnectionStatusListener, IValue>>()
+                {
+                    @Override
+                    public NotifyingCache<IRecordConnectionStatusListener, IValue> construct()
+                    {
+                        return PlatformUtils.createRecordConnectionStatusNotifyingCache(
+                            PlatformServiceProxy.this.proxyContext, this);
+                    }
+                }, new IDestructor<NotifyingCache<IRecordConnectionStatusListener, IValue>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IRecordConnectionStatusListener, IValue> ref)
+                    {
+                        ref.destroy();
+                    }
+                });
         this.serviceConnectionStatusNotifyingCache =
-            PlatformUtils.createServiceConnectionStatusNotifyingCache(this.proxyContext, this);
-
+            new LazyObject<NotifyingCache<IServiceConnectionStatusListener, Connection>>(
+                new IConstructor<NotifyingCache<IServiceConnectionStatusListener, Connection>>()
+                {
+                    @Override
+                    public NotifyingCache<IServiceConnectionStatusListener, Connection> construct()
+                    {
+                        return PlatformUtils.createServiceConnectionStatusNotifyingCache(
+                            PlatformServiceProxy.this.proxyContext, this);
+                    }
+                }, new IDestructor<NotifyingCache<IServiceConnectionStatusListener, Connection>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IServiceConnectionStatusListener, Connection> ref)
+                    {
+                        ref.destroy();
+                    }
+                });
+        
+        
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
@@ -142,49 +220,49 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public Set<String> getAllRecordNames()
     {
-        return this.recordAvailableNotifyingCache.keySet();
+        return this.recordAvailableNotifyingCache.get().keySet();
     }
 
     @Override
     public boolean addRecordAvailableListener(IRecordAvailableListener recordListener)
     {
-        return this.recordAvailableNotifyingCache.addListener(recordListener);
+        return this.recordAvailableNotifyingCache.get().addListener(recordListener);
     }
 
     @Override
     public boolean removeRecordAvailableListener(IRecordAvailableListener recordListener)
     {
-        return this.recordAvailableNotifyingCache.removeListener(recordListener);
+        return this.recordAvailableNotifyingCache.get().removeListener(recordListener);
     }
 
     @Override
     public boolean addRecordSubscriptionListener(IRecordSubscriptionListener listener)
     {
-        return this.subscriptionNotifyingCache.addListener(listener);
+        return this.subscriptionNotifyingCache.get().addListener(listener);
     }
 
     @Override
     public boolean removeRecordSubscriptionListener(IRecordSubscriptionListener listener)
     {
-        return this.subscriptionNotifyingCache.removeListener(listener);
+        return this.subscriptionNotifyingCache.get().removeListener(listener);
     }
 
     @Override
     public boolean addRecordConnectionStatusListener(IRecordConnectionStatusListener listener)
     {
-        return this.recordConnectionStatusNotifyingCache.addListener(listener);
+        return this.recordConnectionStatusNotifyingCache.get().addListener(listener);
     }
 
     @Override
     public boolean removeRecordConnectionStatusListener(IRecordConnectionStatusListener listener)
     {
-        return this.recordConnectionStatusNotifyingCache.removeListener(listener);
+        return this.recordConnectionStatusNotifyingCache.get().removeListener(listener);
     }
 
     @Override
     public Map<String, IRpcInstance> getAllRpcs()
     {
-        return this.rpcAvailableNotifyingCache.getCacheSnapshot();
+        return this.rpcAvailableNotifyingCache.get().getCacheSnapshot();
     }
 
     @Override
@@ -204,13 +282,13 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public boolean addRpcAvailableListener(IRpcAvailableListener rpcListener)
     {
-        return this.rpcAvailableNotifyingCache.addListener(rpcListener);
+        return this.rpcAvailableNotifyingCache.get().addListener(rpcListener);
     }
 
     @Override
     public boolean removeRpcAvailableListener(IRpcAvailableListener rpcListener)
     {
-        return this.rpcAvailableNotifyingCache.removeListener(rpcListener);
+        return this.rpcAvailableNotifyingCache.get().removeListener(rpcListener);
     }
 
     /**
@@ -276,7 +354,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public Map<String, SubscriptionInfo> getAllSubscriptions()
     {
-        return this.subscriptionNotifyingCache.getCacheSnapshot();
+        return this.subscriptionNotifyingCache.get().getCacheSnapshot();
     }
 
     @Override
@@ -294,13 +372,13 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public boolean addServiceConnectionStatusListener(IServiceConnectionStatusListener listener)
     {
-        return this.serviceConnectionStatusNotifyingCache.addListener(listener);
+        return this.serviceConnectionStatusNotifyingCache.get().addListener(listener);
     }
 
     @Override
     public boolean removeServiceConnectionStatusListener(IServiceConnectionStatusListener listener)
     {
-        return this.serviceConnectionStatusNotifyingCache.removeListener(listener);
+        return this.serviceConnectionStatusNotifyingCache.get().removeListener(listener);
     }
 
     @Override
