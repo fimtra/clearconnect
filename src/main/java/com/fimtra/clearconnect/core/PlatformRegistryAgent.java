@@ -370,6 +370,19 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 {
                                     Log.log(PlatformRegistryAgent.this,
                                         "Could not register " + ObjectUtils.safeToString(platformServiceInstance), e);
+                                    try
+                                    {
+                                        platformServiceInstance.destroy();
+                                    }
+                                    catch (Exception e2)
+                                    {
+                                        Log.log(PlatformRegistryAgent.this,
+                                            "Could not destroy " + ObjectUtils.safeToString(platformServiceInstance), e);
+                                    }
+                                    finally
+                                    {
+                                        it.remove();
+                                    }
                                 }
                             }
 
@@ -562,6 +575,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 Log.log(PlatformRegistryAgent.this, "Could not create service " + serviceFamily + " at " + host + ":"
                     + port, e);
+                if(platformServiceInstance != null)
+                {
+                    platformServiceInstance.destroy();
+                }
                 return false;
             }
             this.localPlatformServiceInstances.put(
@@ -589,25 +606,31 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public boolean destroyPlatformServiceInstance(String serviceFamily, String serviceMember)
     {
-        PlatformServiceInstance service =
-            this.localPlatformServiceInstances.get(PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
-                serviceMember));
+        final String platformServiceInstanceID =
+            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+        final PlatformServiceInstance service = this.localPlatformServiceInstances.get(platformServiceInstanceID);
         if (service != null)
         {
             try
             {
                 this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(TextValue.valueOf(serviceFamily),
                     TextValue.valueOf(serviceMember));
-                this.localPlatformServiceInstances.remove(PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
-                    serviceMember));
-                service.destroy();
-                return true;
             }
             catch (Exception e)
             {
-                Log.log(PlatformRegistryAgent.this, "Could not destroy service " + serviceFamily, e);
-                return false;
+                Log.log(PlatformRegistryAgent.this,
+                    "Could not deregister service " + platformServiceInstanceID + ", continuing to destroy", e);
             }
+            try
+            {
+                service.destroy();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this, "Could not destroy service " + platformServiceInstanceID, e);
+            }
+            this.localPlatformServiceInstances.remove(platformServiceInstanceID);
+            return true;
         }
         return false;
     }
