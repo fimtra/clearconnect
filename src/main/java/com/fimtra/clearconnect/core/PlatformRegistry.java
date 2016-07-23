@@ -29,8 +29,10 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fimtra.channel.ChannelUtils;
@@ -56,17 +58,18 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.AtomicChange;
 import com.fimtra.datafission.core.CoalescingRecordListener;
+import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
-import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ICoalescingRunnable;
+import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -88,7 +91,8 @@ import com.fimtra.util.is;
  * The registry service uses a string wire-protocol
  * 
  * @see IPlatformRegistryAgent
- * @author Ramon Servadei, Paul Mackinlay
+ * @author Ramon Servadei
+ * @author Paul Mackinlay
  */
 public final class PlatformRegistry
 {
@@ -102,7 +106,7 @@ public final class PlatformRegistry
     static final String RUNTIME_DYNAMIC = "runtimeDynamic";
     static final String AGENT_PROXY_ID_PREFIX = PlatformRegistry.SERVICE_NAME + PlatformUtils.SERVICE_CLIENT_DELIMITER;
     static final int AGENT_PROXY_ID_PREFIX_LEN = AGENT_PROXY_ID_PREFIX.length();
-    
+
     /**
      * Access for starting a {@link PlatformRegistry} using command line.
      * 
@@ -354,7 +358,7 @@ public final class PlatformRegistry
     final ThimbleExecutor coalescingExecutor;
     final EventHandler eventHandler;
     final AtomicLong serviceSequence;
-    
+
     /**
      * Construct the platform registry using the default platform registry port.
      * 
@@ -403,7 +407,7 @@ public final class PlatformRegistry
         this.coalescingExecutor = new ThimbleExecutor("coalescing-eventExecutor-" + registryInstanceId, 1);
         this.eventHandler = new EventHandler(this);
         this.serviceSequence = new AtomicLong(0);
-        
+
         this.platformName = platformName;
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
@@ -504,7 +508,7 @@ public final class PlatformRegistry
     {
         return this.serviceSequence.incrementAndGet();
     }
-    
+
     private void createGetServiceInfoRecordNameForServiceRpc()
     {
         final RpcInstance getServiceInfoRecordNameForServiceRpc =
@@ -758,18 +762,90 @@ public final class PlatformRegistry
 @SuppressWarnings("synthetic-access")
 final class EventHandler
 {
+    private static final String SLOW = "*** SLOW EVENT HANDLING *** ";
+    private static final int SLOW_EVENT_MILLIS = 500;
+
+    private static interface ContextCallable<T> extends Callable<T>
+    {
+        Object context();
+    }
+    
     final long startTimeMillis;
     final PlatformRegistry registry;
-    private final ScheduledExecutorService eventExecutor;
-    final Set<String> pendingPublish;
-
+    final AtomicInteger eventCount; 
+    final ScheduledExecutorService eventExecutor;
+    final Set<String> pendingPublish;    
+    
     EventHandler(final PlatformRegistry registry)
     {
         // todo all members of the registry should be moved into this class
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
         this.pendingPublish = new HashSet<String>();
+        this.eventCount = new AtomicInteger(0);
         this.eventExecutor = ThreadUtils.newScheduledExecutorService("event-executor", 1);
+    }
+
+    void execute(final ISequentialRunnable runnable)
+    {
+        if (this.eventCount.incrementAndGet() > 10)
+        {
+            Log.log(this, "Event queue: " + this.eventCount.get());
+        }
+
+        this.eventExecutor.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                EventHandler.this.eventCount.decrementAndGet();
+                long time = System.currentTimeMillis();
+                try
+                {
+                    runnable.run();
+                }
+                finally
+                {
+                    time = System.currentTimeMillis() - time;
+                    if (time > SLOW_EVENT_MILLIS)
+                    {
+                        Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(runnable.context()), " took ",
+                            Long.toString(time), "ms");
+                    }
+                }
+            }
+        });
+    }
+
+    <T> Future<T> submit(final ContextCallable<T> callable)
+    {
+        if (this.eventCount.incrementAndGet() > 10)
+        {
+            Log.log(this, "Event queue: " + this.eventCount.get());
+        }
+
+        return this.eventExecutor.submit(new Callable<T>()
+        {
+            @Override
+            public T call() throws Exception
+            {
+                EventHandler.this.eventCount.decrementAndGet();
+                long time = System.currentTimeMillis();
+                try
+                {
+                    return callable.call();
+                }
+                finally
+                {
+                    time = System.currentTimeMillis() - time;
+                    if (time > SLOW_EVENT_MILLIS)
+                    {
+                        Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(callable.context()), " took ",
+                            Long.toString(time), "ms");
+                    }
+                }
+            }
+        });
     }
 
     void destroy()
@@ -779,8 +855,14 @@ final class EventHandler
 
     void executeRpcRuntimeDynamic(final IValue... args)
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "handleRpcRuntimeDynamic";
+            }
+            
             @Override
             public void run()
             {
@@ -791,8 +873,14 @@ final class EventHandler
 
     void executeRpcRuntimeStatic(final IValue... args)
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "handleRpcStaticRuntime";
+            }
+            
             @Override
             public void run()
             {
@@ -806,7 +894,7 @@ final class EventHandler
         final TransportTechnologyEnum transportTechnology, final Map<String, IValue> serviceRecordStructure,
         final IValue... args) throws InterruptedException, java.util.concurrent.ExecutionException
     {
-        return this.eventExecutor.submit(new Callable<Void>()
+        return submit(new ContextCallable<Void>()
         {
             @Override
             public Void call() throws Exception
@@ -814,13 +902,25 @@ final class EventHandler
                 return registerPlatformServiceInstance(serviceFamily, redundancyMode, agentName, serviceRecordStructure,
                     serviceInstanceId, redundancyModeEnum, transportTechnology, args);
             }
+
+            @Override
+            public Object context()
+            {
+                return "registerPlatformServiceInstance: " + serviceInstanceId;
+            }
         }).get();
     }
 
     void executeDeregisterPlatformServiceInstance(final String serviceInstanceId)
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "deregisterPlatformServiceInstance: " + serviceInstanceId;
+            }
+            
             @Override
             public void run()
             {
@@ -831,8 +931,14 @@ final class EventHandler
 
     void executeHandleConnectionsUpdate(final IRecordChange atomicChange)
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "handleConnectionsUpdate";
+            }
+            
             @Override
             public void run()
             {
@@ -843,8 +949,14 @@ final class EventHandler
 
     void executeHandleRecordsUpdate(final IRecordChange atomicChange)
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "handleRecordsUpdate";
+            }
+            
             @Override
             public void run()
             {
@@ -856,12 +968,18 @@ final class EventHandler
     String executeSelectNextInstance(final String serviceFamily)
         throws InterruptedException, java.util.concurrent.ExecutionException
     {
-        final String nextInstance = this.eventExecutor.submit(new Callable<String>()
+        final String nextInstance = submit(new ContextCallable<String>()
         {
             @Override
             public String call() throws Exception
             {
                 return selectNextInstance(serviceFamily);
+            }
+            
+            @Override
+            public Object context()
+            {
+                return "selectNextInstance: " + serviceFamily;
             }
         }).get();
         return nextInstance;
@@ -869,8 +987,14 @@ final class EventHandler
 
     void executeComputePlatformSummary()
     {
-        this.eventExecutor.execute(new Runnable()
+        execute(new ISequentialRunnable()
         {
+            @Override
+            public Object context()
+            {
+                return "computePlatformSummary";
+            }
+            
             @Override
             public void run()
             {
@@ -901,7 +1025,7 @@ final class EventHandler
         }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICE_INSTANCES,
             LongValue.valueOf(serviceInstanceCount));
-        
+
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
 
@@ -1116,8 +1240,15 @@ final class EventHandler
             @Override
             protected void onPlatformServiceDisconnected()
             {
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @SuppressWarnings("unqualified-field-access")
+                    @Override
+                    public Object context()
+                    {
+                        return "deregisterPlatformServiceInstance:" + serviceInstanceId;
+                    }
+                    
                     @SuppressWarnings("unqualified-field-access")
                     @Override
                     public void run()
@@ -1157,8 +1288,15 @@ final class EventHandler
                     }
                 }
 
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @SuppressWarnings("unqualified-field-access")
+                    @Override
+                    public Object context()
+                    {
+                        return "registerPlatformServiceInstance:" + serviceInstanceId;
+                    }
+                    
                     @SuppressWarnings("unqualified-field-access")
                     @Override
                     public void run()
@@ -1169,7 +1307,7 @@ final class EventHandler
                             // service is connected
                             registerPlatformServiceInstance(agentName, serviceInstanceId, serviceRecordStructure,
                                 redundancyModeEnum);
-                         // todo banner all registered services?
+                            // todo banner all registered services?
                             Log.log(EventHandler.this.registry, "Registered ", redundancyMode, " service ",
                                 serviceInstanceId, " (monitoring with " + serviceProxy.getChannelString(), ")");
                         }
@@ -1573,8 +1711,14 @@ final class EventHandler
             @Override
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
             {
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @Override
+                    public Object context()
+                    {
+                        return "handle service stats record change: " + ObjectUtils.safeToString(serviceProxy);
+                    }
+                    
                     @Override
                     public void run()
                     {
@@ -1602,8 +1746,14 @@ final class EventHandler
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
             {
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @Override
+                    public Object context()
+                    {
+                        return "handleConnectionsUpdate: " + ObjectUtils.safeToString(serviceProxy);
+                    }
+                    
                     @Override
                     public void run()
                     {
@@ -1619,8 +1769,14 @@ final class EventHandler
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
             {
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @Override
+                    public Object context()
+                    {
+                        return "handle RemoteContextRecords record change: " + ObjectUtils.safeToString(serviceProxy);
+                    }
+                    
                     @Override
                     public void run()
                     {
@@ -1646,8 +1802,14 @@ final class EventHandler
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
             {
-                EventHandler.this.eventExecutor.execute(new Runnable()
+                EventHandler.this.execute(new ISequentialRunnable()
                 {
+                    @Override
+                    public Object context()
+                    {
+                        return "handle RemoteContextRpcs record change: " + ObjectUtils.safeToString(serviceProxy);
+                    }
+                    
                     @Override
                     public void run()
                     {
