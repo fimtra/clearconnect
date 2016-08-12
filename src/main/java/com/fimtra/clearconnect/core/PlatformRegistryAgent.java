@@ -71,6 +71,7 @@ import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
@@ -108,6 +109,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     ScheduledFuture<?> dynamicAttributeUpdateTask;
     boolean onPlatformServiceConnectedInvoked;
 
+    final ScheduledExecutorService agentExecutor;
+    
     /**
      * Construct the agent connecting to the registry service on the specified host and use the
      * default registry TCP port
@@ -189,9 +192,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     PlatformRegistry.CODEC.getFrameEncodingFormat(), registryAddresses), PlatformRegistry.SERVICE_NAME);
 
         this.registryProxy.setReconnectPeriodMillis(registryReconnectPeriodMillis);
-
+        this.agentExecutor = ThreadUtils.newScheduledExecutorService("agent-executor-" + agentName, 1);
+        
         this.registryAvailableListeners =
-            new NotifyingCache<IRegistryAvailableListener, String>(this.registryProxy.getUtilityExecutor())
+            new NotifyingCache<IRegistryAvailableListener, String>(this.agentExecutor)
             {
                 @Override
                 protected void notifyListenerDataAdded(IRegistryAvailableListener listener, String key, String data)
@@ -306,7 +310,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     return;
                 }
 
-                this.registryProxy.getUtilityExecutor().execute(new Runnable()
+                this.agentExecutor.execute(new Runnable()
                 {
                     @Override
                     public void run()
@@ -772,7 +776,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 return false;
             }
-            proxy.destroy();
+            proxy.destroy();            
             return true;
         }
         finally
@@ -788,6 +792,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         try
         {
             Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+            
+            this.agentExecutor.shutdownNow();
+            
             if (this.dynamicAttributeUpdateTask != null)
             {
                 this.dynamicAttributeUpdateTask.cancel(false);
@@ -924,7 +931,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     void setupRuntimeAttributePublishing()
     {
         // tell the registry about the runtime static attributes (one-time call)
-        this.registryProxy.getUtilityExecutor().execute(new Runnable()
+        this.agentExecutor.execute(new Runnable()
         {
             @Override
             public void run()
@@ -967,7 +974,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         if (this.dynamicAttributeUpdateTask == null)
         {
             this.dynamicAttributeUpdateTask =
-                this.registryProxy.getUtilityExecutor().scheduleWithFixedDelay(
+                this.agentExecutor.scheduleWithFixedDelay(
                     new Runnable()
                     {
                         final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
