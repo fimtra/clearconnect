@@ -1310,9 +1310,8 @@ final class EventHandler
                             // service is connected
                             registerPlatformServiceInstance(agentName, serviceInstanceId, serviceRecordStructure,
                                 redundancyModeEnum);
-                            // todo banner all registered services?
-                            Log.log(EventHandler.this.registry, "Registered ", redundancyMode, " service ",
-                                serviceInstanceId, " (monitoring with " + serviceProxy.getChannelString(), ")");
+                            Log.banner(EventHandler.this.registry, "Registered " + redundancyMode + " service "
+                                + serviceInstanceId + " (monitoring with " + serviceProxy.getChannelString() + ")");
                         }
                         catch (Exception e)
                         {
