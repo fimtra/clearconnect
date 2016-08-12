@@ -82,7 +82,7 @@ class PlatformServiceConnectionMonitor
         });
     }
 
-    public void destroy()
+    public final void destroy()
     {
         try
         {
@@ -94,7 +94,7 @@ class PlatformServiceConnectionMonitor
         }
     }
 
-    void check(Connection status)
+    final void check(Connection status)
     {
         if (status != this.previous)
         {
@@ -103,12 +103,12 @@ class PlatformServiceConnectionMonitor
         }
     }
 
-    void store(Connection status)
+    final void store(Connection status)
     {
         this.previous = status;
     }
 
-    void doConnected()
+    final void doConnected()
     {
         if (this.reconnectTask != null)
         {
@@ -123,6 +123,11 @@ class PlatformServiceConnectionMonitor
                 Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceConnected ", this.serviceInstanceId);
                 onPlatformServiceConnected();
             }
+            catch (Exception e)
+            {
+                Log.log(PlatformServiceConnectionMonitor.this,
+                    "Exception logged during onPlatformServiceConnected for " + this.serviceInstanceId, e);
+            }
             finally
             {
                 this.callbackLock.unlock();
@@ -130,7 +135,7 @@ class PlatformServiceConnectionMonitor
         }
     }
 
-    void doReconnected()
+    final void doReconnected()
     {
         if (this.previous != Connection.RECONNECTING)
         {
@@ -163,6 +168,11 @@ class PlatformServiceConnectionMonitor
                 Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceReconnecting ", this.serviceInstanceId);
                 onPlatformServiceReconnecting();
             }
+            catch (Exception e)
+            {
+                Log.log(PlatformServiceConnectionMonitor.this,
+                    "Exception logged during onPlatformServiceReconnecting for " + this.serviceInstanceId, e);
+            }
             finally
             {
                 this.callbackLock.unlock();
@@ -170,7 +180,7 @@ class PlatformServiceConnectionMonitor
         }
     }
 
-    void doDisconnected()
+    final void doDisconnected()
     {
         if (this.previous != Connection.DISCONNECTED)
         {
@@ -184,6 +194,11 @@ class PlatformServiceConnectionMonitor
             {
                 Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceDisconnected ", this.serviceInstanceId);
                 onPlatformServiceDisconnected();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformServiceConnectionMonitor.this,
+                    "Exception logged during onPlatformServiceDisconnected for " + this.serviceInstanceId, e);
             }
             finally
             {
