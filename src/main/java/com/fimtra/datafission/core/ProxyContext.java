@@ -1068,7 +1068,12 @@ public final class ProxyContext implements IObserverContext
     {
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
-
+        
+        if (logRx)
+        {
+            Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+        }
+        
         if (changeToApply == null)
         {
             return;
@@ -1140,7 +1145,7 @@ public final class ProxyContext implements IObserverContext
                             final int size = subscribersFor.length;
                             if (size == 0)
                             {
-                                Log.log(ProxyContext.this, "No RPC result expected");
+                                Log.log(ProxyContext.this, "*** Unexpected RPC result for ", changeName);
                             }
                             for (int i = 0; i < size; i++)
                             {
@@ -1180,11 +1185,6 @@ public final class ProxyContext implements IObserverContext
             {
                 try
                 {
-                    if (logRx)
-                    {
-                        Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
-                    }
-                    
                     final String name = substituteLocalNameWithRemoteName(changeName);
                     
                     final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
