@@ -1282,9 +1282,12 @@ final class EventHandler
                         }
                         catch (Exception e2)
                         {
-                            Log.log(EventHandler.this.registry, "Error deregistering service " + this.serviceInstanceId,
-                                e2);
+                            Log.log(EventHandler.this.registry,
+                                "*** ALERT *** Error deregistering service " + this.serviceInstanceId, e2);
                         }
+
+                        // NOTE: early return here if there is an exception - we must not register!
+                        return;
                     }
                 }
 
@@ -1321,8 +1324,8 @@ final class EventHandler
                             }
                             catch (Exception e2)
                             {
-                                Log.log(EventHandler.this.registry, "Error deregistering service " + serviceInstanceId,
-                                    e2);
+                                Log.log(EventHandler.this.registry,
+                                    "*** ALERT *** Error deregistering service " + serviceInstanceId, e2);
                             }
                         }
                     }
@@ -1410,7 +1413,16 @@ final class EventHandler
             {
                 callFtServiceStatusRpc(previousMasterInstance, false);
             }
-            callFtServiceStatusRpc(activeServiceInstanceId, true);
+            try
+            {
+                callFtServiceStatusRpc(activeServiceInstanceId, true);
+            }
+            catch (RuntimeException e)
+            {
+                // if we fail to set the master, remove from the map!
+                this.registry.masterInstancePerFtService.remove(serviceFamily);
+                throw e;
+            }
         }
     }
 
