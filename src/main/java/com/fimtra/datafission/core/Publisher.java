@@ -743,20 +743,23 @@ public class Publisher
                             {
                                 final SyncResponse response =
                                     channelsCodec.getSessionProtocol().handleSessionSyncData(data);
+                                Log.log(Publisher.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
                                 if (response.syncDataResponse != null)
                                 {
                                     proxyContextPublisher.channel.sendAsync(response.syncDataResponse);
+                                    Log.log(Publisher.class, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
                                 }
                                 if (!response.syncFailed)
                                 {
                                     if (response.syncComplete)
                                     {
                                         proxyContextPublisher.codecSyncExpected = false;
+                                        Log.log(Publisher.class, "SESSION SYNCED ", ObjectUtils.safeToString(source));
                                     }
                                 }
                                 else
                                 {
-                                    proxyContextPublisher.channel.destroy("Sync failed");
+                                    proxyContextPublisher.channel.destroy("SYNC FAILED");
                                 }
                                 return;
                             }

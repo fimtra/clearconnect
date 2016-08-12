@@ -910,7 +910,8 @@ public final class ProxyContext implements IObserverContext
                     this.localChannelRef.sendAsync(
                         ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(
                             ProxyContext.this.sessionContextName));
-                    Log.log(ProxyContext.this, "(->) START SESSION SYNC");
+                    Log.log(ProxyContext.this, "(->) START SESSION SYNC ",
+                        ObjectUtils.safeToString(this.localChannelRef));
                 }
             }
 
@@ -929,23 +930,22 @@ public final class ProxyContext implements IObserverContext
                             ProxyContext.this.codec.getSessionProtocol().handleSessionSyncData(data);
                         if (!response.syncFailed)
                         {
-                            Log.log(ProxyContext.this, "(<-) SYNC RESP");
+                            Log.log(ProxyContext.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
                             if (response.syncDataResponse != null)
                             {
                                 this.localChannelRef.sendAsync(response.syncDataResponse);
-                                Log.log(ProxyContext.this, "(->) SYNC RESP");
+                                Log.log(ProxyContext.this, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
                             }
                             if (response.syncComplete)
                             {
                                 this.codecSyncExpected = false;
-                                Log.log(ProxyContext.this, "SESSION SYNCED");
+                                Log.log(ProxyContext.this, "SESSION SYNCED ", ObjectUtils.safeToString(source));
                                 ProxyContext.this.onChannelConnected();
                             }
                         }
                         else
                         {
-                            final String reason =
-                                "Session sync failed for " + ObjectUtils.safeToString(ProxyContext.this.codec);
+                            final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(source);
                             Log.log(ProxyContext.this, reason, new IllegalStateException(reason));
                             destroy();
                         }
@@ -1132,7 +1132,7 @@ public final class ProxyContext implements IObserverContext
                             if (log)
                             {
                                 Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
-                            }
+                            }                      
                             final IRecordListener[] subscribersFor =
                                 ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
                             IRecordListener iAtomicChangeObserver = null;
