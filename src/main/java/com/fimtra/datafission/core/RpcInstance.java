@@ -57,7 +57,7 @@ public final class RpcInstance implements IRpcInstance
     /**
      * Controls verbose logging of RPC responses
      */
-    public static boolean log = Boolean.getBoolean("log." + RpcInstance.class.getCanonicalName());
+    public static boolean logVerbose = Boolean.getBoolean("logVerbose." + RpcInstance.class.getCanonicalName());
     
     static final String RPC_RECORD_RESULT_PREFIX = ContextUtils.PROTOCOL_PREFIX + "RPC_";
     static final TextValue NO_ACK = TextValue.valueOf(RPC_RECORD_RESULT_PREFIX);
@@ -213,7 +213,7 @@ public final class RpcInstance implements IRpcInstance
                     this.caller.sendAsync(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
-                    if (log)
+                    if (logVerbose)
                     {
                         Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName, " ",
                             ContextUtils.mapToString(resultEntries));
@@ -291,7 +291,14 @@ public final class RpcInstance implements IRpcInstance
                 {
                     IValue[] callArgs = new IValue[args.length - 1];
                     System.arraycopy(args, 0, callArgs, 0, args.length - 1);
-                    Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName);
+                    if (logVerbose)
+                    {
+                        Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName, " ", Arrays.toString(callArgs));
+                    }
+                    else
+                    {
+                        Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName);
+                    }
                     this.callReceiver.sendAsync(
                         this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName)));
                     return null;
@@ -301,7 +308,14 @@ public final class RpcInstance implements IRpcInstance
                     try
                     {
                         this.context.addObserver(resultHandler, resultMapName);
-                        Log.log(Caller.class, "(->) ", resultMapName);
+                        if (logVerbose)
+                        {
+                            Log.log(Caller.class, "(->) ", resultMapName, " ", Arrays.toString(args));
+                        }
+                        else
+                        {
+                            Log.log(Caller.class, "(->) ", resultMapName);
+                        }
                         if (ContextUtils.isCoreThread() || ContextUtils.isRpcThread())
                         {
                             Log.log(this, "WARNING: RPC ", this.rpcName,
@@ -344,7 +358,7 @@ public final class RpcInstance implements IRpcInstance
                         {
                             throw new ExecutionException(exception.textValue());
                         }
-                        if (log)
+                        if (logVerbose)
                         {
                             Log.log(Caller.class, "(<-) ", resultMapName, " ", ContextUtils.mapToString(resultMap));
                         }
