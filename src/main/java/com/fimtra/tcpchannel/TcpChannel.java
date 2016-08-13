@@ -26,7 +26,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -203,7 +202,7 @@ public class TcpChannel implements ITransportChannel
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.txFrames = new ConcurrentLinkedQueue<byte[]>();
+        this.txFrames = CollectionUtils.newDeque();
         this.readFrames = CollectionUtils.newDeque();
         this.resolvedFrames = CollectionUtils.newDeque();
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
@@ -223,7 +222,7 @@ public class TcpChannel implements ITransportChannel
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
         this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.txFrames = new ConcurrentLinkedQueue<byte[]>();
+        this.txFrames = CollectionUtils.newDeque();
         this.readFrames = CollectionUtils.newDeque();
         this.resolvedFrames = CollectionUtils.newDeque();
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
