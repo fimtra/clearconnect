@@ -84,7 +84,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * Controls logging of:
      * <ul>
      * <li>subscriber changes
-     * <li>record create/delete
      * <li>add/remove listener
      * <li>notify initial image
      * </ul>
@@ -437,7 +436,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         if (ContextUtils.isSystemRecordName(name) || ContextUtils.isProtocolPrefixed(name)
             || AtomicChangeTeleporter.startsWithFragmentPrefix(name))
         {
-            throw new IllegalArgumentException("The name '" + name + "' contains illegal characters");
+            throw new IllegalArgumentException("The name [" + name + "] contains illegal characters");
         }
 
         final Record record;
@@ -478,7 +477,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             if (log)
             {
                 Log.log(this, "Subscriber count is ", Integer.toString(subscribersForInstance.length),
-                    " for created record '", name, "'");
+                    " for created record [", name, "]");
             }
 
             record.getWriteLock().lock();
@@ -541,19 +540,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final Record record;
         if (this.records.get(name) != null)
         {
-            throw new IllegalStateException("A record with the name '" + name + "' already exists in this context");
+            throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
         }
 
         this.sequences.put(name, new AtomicLong());
         this.imageCache.put(name, new Record(name, initialData, this.noopChangeManager));
         record = new Record(name, initialData, this);
-        if (!ContextUtils.isSystemRecordName(record.getName()))
-        {
-            if (log)
-            {
-                Log.log(this, "Created record '", record.getName(), "' in context '", record.getContextName(), "'");
-            }
-        }
+        Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
         this.records.put(name, record);
         return record;
     }
@@ -563,7 +556,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         if (ContextUtils.isSystemRecordName(name))
         {
-            throw new IllegalArgumentException("Cannot remove '" + name + "'");
+            throw new IllegalArgumentException("Cannot remove [" + name + "]");
         }
 
         if (!this.records.containsKey(name))
@@ -583,10 +576,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 this.pendingAtomicChanges.remove(name);
                 this.sequences.remove(name);
                 this.imageCache.remove(name);
-                if (log)
-                {
-                    Log.log(this, "Removed '", removed.getName(), "' from context '", removed.getContextName(), "'");
-                }
+
+                Log.log(this, "Removed record [", removed.getName(), "] from ", removed.getContextName());
 
                 synchronized (this.recordsToRemoveFromSystemRecords)
                 {
@@ -698,7 +689,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final IRecord record = this.records.get(name);
         if (record == null)
         {
-            Log.log(this, "Ignoring publish of non-existent record: ", name);
+            Log.log(this, "Ignoring publish of non-existent record [", name, "]");
             latch.countDown();
             return latch;
         }
@@ -834,7 +825,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 if (log)
                 {
-                    Log.log(this, "Added listener to '", name, "' listener=", ObjectUtils.safeToString(observer));
+                    Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
                 }
 
                 // Check if there is an image before creating a task to notify with the image.
@@ -849,7 +840,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         {
                             if (log)
                             {
-                                Log.log(this, "Notifying initial image '", name, "', listener=",
+                                Log.log(this, "Notifying initial image [", name, "], listener=",
                                     ObjectUtils.safeToString(observer));
                             }
                             final long start = System.nanoTime();
@@ -866,7 +857,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             {
                                 if (log)
                                 {
-                                    Log.log(this, "No initial image available '", name, "', listener=",
+                                    Log.log(this, "No initial image available [", name, "], listener=",
                                         ObjectUtils.safeToString(observer));
                                 }
                             }
@@ -912,7 +903,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 if (log)
                 {
-                    Log.log(this, "Removed listener from '", name, "' listener=", ObjectUtils.safeToString(observer));
+                    Log.log(this, "Removed listener from [", name, "] listener=", ObjectUtils.safeToString(observer));
                 }
                 addDeltaToSubscriptionCount(name, -1);
             }
@@ -1086,12 +1077,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             if (this.rpcInstances.containsKey(rpc.getName()))
             {
-                throw new IllegalStateException("An RPC already exists with name '" + rpc.getName() + "'");
+                throw new IllegalStateException("An RPC already exists with name [" + rpc.getName() + "]");
             }
             this.rpcInstances.put(rpc.getName(), rpc);
             contextRpcs.put(rpc.getName(), TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
-            Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc));
+            Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc), " in ", getName());
         }
         finally
         {
@@ -1109,7 +1100,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final IRpcInstance rpc = this.rpcInstances.remove(rpcName);
             if (rpc != null)
             {
-                Log.log(this, "Removing RPC ", ObjectUtils.safeToString(rpc));
+                Log.log(this, "Removing RPC ", ObjectUtils.safeToString(rpc), " from ", getName());
                 this.records.get(ISystemRecordNames.CONTEXT_RPCS).remove(rpcName);
                 publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
             }
