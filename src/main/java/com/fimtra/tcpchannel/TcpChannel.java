@@ -456,6 +456,14 @@ public class TcpChannel implements ITransportChannel
                 channel = channelsWithTxFrames.get(i);
                 synchronized (channel)
                 {
+                    if (channel.state == StateEnum.DESTROYED)
+                    {
+                        channelsWithTxFrames.remove(i);
+                        i--;
+                        size--;
+                        continue;
+                    }
+                    
                     data = channel.txFrames.poll();
                     if (data == null)
                     {
@@ -526,7 +534,8 @@ public class TcpChannel implements ITransportChannel
             synchronized (this)
             {
                 this.state = StateEnum.DESTROYED;
-                TcpChannel.channelsWithTxFrames.remove(this);
+                this.txFrames.clear();
+                this.rxFrames.clear();
             }
 
             if (this.socketChannel != null)
@@ -535,8 +544,7 @@ public class TcpChannel implements ITransportChannel
                 TcpChannelUtils.READER.cancel(this.socketChannel);
                 TcpChannelUtils.WRITER.cancel(this.socketChannel);
             }
-            this.txFrames.clear();
-            this.rxFrames.clear();
+            
             this.receiver.onChannelClosed(this);
         }
         catch (Exception e1)
