@@ -579,7 +579,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 // NOTE: do not remove subscribers - they are INDEPENDENT of record existence
                 // this.recordObservers.removeSubscribersFor(name);
- 
+
                 this.pendingAtomicChanges.remove(name);
                 this.sequences.remove(name);
                 this.imageCache.remove(name);
@@ -726,13 +726,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     {
                         // update the image with the atomic changes in the runnable
                         final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
-                        
+
                         // this can happen if there is a concurrent delete
                         if (notifyImage == null)
                         {
                             return;
                         }
-                        
+
                         if (Context.this.validators.size() > 0)
                         {
                             for (IValidator validator : Context.this.validators)
@@ -805,7 +805,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 for (int i = 0; i < recordNames.length; i++)
                 {
-                    if (permissionTokenValidForRecord(permissionToken, recordNames[i]))
+                    if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
                     {
                         Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
                         doAddSingleObserver(recordNames[i], observer);
@@ -893,7 +893,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         for (int i = 0; i < recordNames.length; i++)
         {
-            doRemoveSingleObserver(recordNames[i], observer);
+            if (recordNames[i] != null)
+            {
+                doRemoveSingleObserver(recordNames[i], observer);
+            }
         }
         return new CountDownLatch(0);
     }
