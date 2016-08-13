@@ -946,6 +946,8 @@ public class Publisher
 
     void unsubscribe(List<String> recordNames, ITransportChannel client)
     {
+        Log.log(this, "(<-) unsubscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
+            ObjectUtils.safeToString(client));
         ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         Future<?> future;
         for (String name : recordNames)
@@ -964,6 +966,8 @@ public class Publisher
 
     void resync(List<String> recordNames, ITransportChannel client)
     {
+        Log.log(this, "(<-) re-sync ", ObjectUtils.safeToString(recordNames.toString()), " from ",
+            ObjectUtils.safeToString(client));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         for (final String name : recordNames)
         {
@@ -985,6 +989,10 @@ public class Publisher
     {
         // the first item is always the permission token
         final String permissionToken = recordNames.remove(0);
+
+        Log.log(this, "(<-) subscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
+            ObjectUtils.safeToString(client));
+        
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new ArrayList<String>(recordNames.size());
         final List<String> nokSubscribes = new ArrayList<String>(recordNames.size());

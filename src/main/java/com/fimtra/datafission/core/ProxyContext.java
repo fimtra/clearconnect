@@ -17,6 +17,7 @@ package com.fimtra.datafission.core;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -783,6 +784,7 @@ public final class ProxyContext implements IObserverContext
                             {
                                 ProxyContext.this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
                             }
+                            Log.log(ProxyContext.this, "(->) unsubscribe ", Arrays.toString(recordsToUnsubscribe));
                         }
                     };
                     latch = executeTask(recordsToUnsubscribe, UNSUBSCRIBE, task, null, null);
@@ -1312,7 +1314,7 @@ public final class ProxyContext implements IObserverContext
                     }
 
                     // todo need to batch up pending commands into a single send
-                    Log.log(this, "Sending re-sync ", name);
+                    Log.log(this, "(->) re-sync ", name);
                     final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
                     finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(recordNames));
                 }
@@ -1610,6 +1612,7 @@ public final class ProxyContext implements IObserverContext
         }
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
+        Log.log(this, "(->) subscribe ", Arrays.toString(recordsToSubscribeFor));
     }
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
