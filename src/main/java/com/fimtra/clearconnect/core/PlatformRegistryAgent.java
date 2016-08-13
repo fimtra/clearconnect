@@ -357,31 +357,58 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             {
                                 Log.log(PlatformRegistryAgent.this, "Could not get platform name!");
                             }
-                            // (re)publish any service instances managed by
-                            // this agent
+                            
+
+                            // reset to prepare for a disconnect-reconnect sequence
+                            PlatformRegistryAgent.this.onPlatformServiceConnectedInvoked = false;
+
+                            Log.banner(PlatformRegistryAgent.this, "*** REGISTRY CONNECTED *** " + 
+                                ObjectUtils.safeToString(getRegistryEndPoint()));
+
+                            setupRuntimeAttributePublishing();
+                            
+                            // (re)publish any service instances managed by this agent
+                            final int max = 3;
                             PlatformServiceInstance platformServiceInstance = null;
+                            int tries = 0;
+                            boolean registered = false;
                             for (Iterator<Map.Entry<String, PlatformServiceInstance>> it =
                                 PlatformRegistryAgent.this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext();)
                             {
+                                tries = 0;
+                                registered = false;
                                 platformServiceInstance = it.next().getValue();
-                                try
+                                
+                                Log.log(PlatformRegistryAgent.this, "Registering ",
+                                    ObjectUtils.safeToString(platformServiceInstance));
+                                while (!registered && tries++ < max)
                                 {
-                                    Log.log(PlatformRegistryAgent.this, "Registering ",
-                                        ObjectUtils.safeToString(platformServiceInstance));
-                                    registerService(platformServiceInstance);
+                                    try
+                                    {
+                                        registerService(platformServiceInstance);
+                                        registered = true;
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.log(PlatformRegistryAgent.this,
+                                            " (" + Integer.toString(tries) + "/" + Integer.toString(max)
+                                                + ") Failed attempt registering "
+                                                + ObjectUtils.safeToString(platformServiceInstance));
+                                    }
                                 }
-                                catch (Exception e)
+
+                                if (!registered)
                                 {
-                                    Log.log(PlatformRegistryAgent.this,
-                                        "Could not register " + ObjectUtils.safeToString(platformServiceInstance), e);
+                                    Log.log(PlatformRegistryAgent.this, "*** WARNING *** Could not register ",
+                                        ObjectUtils.safeToString(platformServiceInstance));
                                     try
                                     {
                                         platformServiceInstance.destroy();
                                     }
-                                    catch (Exception e2)
+                                    catch (Exception e)
                                     {
-                                        Log.log(PlatformRegistryAgent.this,
-                                            "Could not destroy " + ObjectUtils.safeToString(platformServiceInstance), e);
+                                        Log.log(PlatformRegistryAgent.this, "*** WARNING *** Could not destroy "
+                                            + ObjectUtils.safeToString(platformServiceInstance), e);
                                     }
                                     finally
                                     {
@@ -389,14 +416,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                     }
                                 }
                             }
-
-                            // reset to prepare for a disconnect-reconnect sequence
-                            PlatformRegistryAgent.this.onPlatformServiceConnectedInvoked = false;
-
-                            Log.log(PlatformRegistryAgent.this, "*** REGISTRY CONNECTED *** ",
-                                ObjectUtils.safeToString(getRegistryEndPoint()));
-
-                            setupRuntimeAttributePublishing();
                         }
                         finally
                         {
@@ -419,7 +438,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             if (this.platformName != null)
             {
-                Log.log(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
+                Log.banner(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
                 for (String serviceFamily : this.serviceAvailableListeners.keySet())
                 {
                     if (this.serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
@@ -933,21 +952,21 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         // tell the registry about the runtime static attributes (one-time call)
         this.agentExecutor.execute(new Runnable()
         {
+
             @Override
             public void run()
             {
+                final int timeoutMillis = PlatformRegistryAgent.this.registryProxy.getReconnectPeriodMillis();
+
                 try
                 {
-                    final IRpcInstance rpc =
-                        ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
-                            PlatformRegistryAgent.this.registryProxy.getReconnectPeriodMillis(),
-                            PlatformRegistry.RUNTIME_STATIC);
+                    final IRpcInstance rpc = ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
+                        timeoutMillis, PlatformRegistry.RUNTIME_STATIC);
                     try
                     {
-                        final String runtimeDescription =
-                            System.getProperty("os.name") + " (" + System.getProperty("os.version") + "), "
-                                + System.getProperty("os.arch") + ", Java " + System.getProperty("java.version")
-                                + ", ClearConnect " + PlatformUtils.VERSION;
+                        final String runtimeDescription = System.getProperty("os.name") + " ("
+                            + System.getProperty("os.version") + "), " + System.getProperty("os.arch") + ", Java "
+                            + System.getProperty("java.version") + ", ClearConnect " + PlatformUtils.VERSION;
                         final String host = TcpChannelUtils.LOCALHOST_IP;
                         final Runtime runtime = Runtime.getRuntime();
                         final long cpuCount = runtime.availableProcessors();
@@ -965,7 +984,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 catch (TimeOutException e1)
                 {
                     Log.log(PlatformRegistryAgent.this, "RPC not available from platform registry: "
-                        + PlatformRegistry.RUNTIME_STATIC, e1);
+                        + PlatformRegistry.RUNTIME_STATIC + ", rescheduling in " + timeoutMillis + "ms", e1);
+
+                    PlatformRegistryAgent.this.agentExecutor.schedule(this, timeoutMillis, TimeUnit.MILLISECONDS);
                 }
             }
         });

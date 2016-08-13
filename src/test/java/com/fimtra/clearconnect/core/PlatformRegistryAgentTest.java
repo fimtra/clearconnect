@@ -17,12 +17,24 @@ package com.fimtra.clearconnect.core;
 
 import static org.junit.Assert.*;
 
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
+import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
+import com.fimtra.clearconnect.event.IRegistryAvailableListener;
+import com.fimtra.clearconnect.IPlatformServiceInstance;
+import com.fimtra.clearconnect.RedundancyModeEnum;
+import com.fimtra.tcpchannel.TcpChannel;
+import com.fimtra.tcpchannel.TcpChannelUtils;
 
 /**
  * Tests for the {@link PlatformRegistryAgent}
@@ -50,8 +62,65 @@ public class PlatformRegistryAgentTest
     @Test
     public void test() throws RegistryNotAvailableException
     {
-        this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),new EndPointAddress("localhost", 54321));
+        this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),
+            new EndPointAddress("localhost", 54321));
         assertTrue(this.candidate.registryProxy.isConnected());
+    }
+
+    @Test
+    public void testRetryForReRegistering() throws IOException, InterruptedException
+    {
+        this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),
+
+            new EndPointAddress("localhost", 54321));
+        final String serviceFamily = "family";
+        final String serviceMember = "member";
+        this.candidate.createPlatformServiceInstance(serviceFamily, serviceMember, TcpChannelUtils.LOCALHOST_IP,
+            ChannelUtils.getNextAvailableServicePort(), WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+        final IPlatformServiceInstance platformServiceInstance1 =
+            this.candidate.getPlatformServiceInstance(serviceFamily, serviceMember);
+
+        // insert a duplicate so on re-connect when the agent tries to re-register it will fail
+        PlatformServiceInstance duplicate = new PlatformServiceInstance("platform-name", serviceFamily, serviceMember,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT, TcpChannelUtils.LOCALHOST_IP, 0, null, null,
+            null, TransportTechnologyEnum.TCP);
+        this.candidate.localPlatformServiceInstances.put(
+            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember + 1), duplicate);
+
+        Thread.sleep(1000);
+
+        // restart the registry
+        this.registry.destroy();
+        this.registry = new PlatformRegistry("PRA-Test", "localhost", 54322);
+
+        final CountDownLatch connected = new CountDownLatch(1);
+        this.candidate.addRegistryAvailableListener(new IRegistryAvailableListener()
+        {
+            @Override
+            public void onRegistryDisconnected()
+            {
+
+            }
+
+            @Override
+            public void onRegistryConnected()
+            {
+                connected.countDown();
+            }
+        });
+
+        assertTrue("Not re-connected", connected.await(10, TimeUnit.SECONDS));
+
+        int loop = 0;
+        while (loop++ < 100 && platformServiceInstance1.isActive() && duplicate.isActive())
+        {
+            Thread.sleep(50);
+        }
+
+        // check that only one platform instance is active - one of them will have failed
+        // re-register because it was a duplicate
+        assertTrue(platformServiceInstance1.isActive() == false || duplicate.isActive() == false);
+        assertEquals(1, this.candidate.localPlatformServiceInstances.size());
     }
 
 }
