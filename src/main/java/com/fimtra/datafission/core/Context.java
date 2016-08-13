@@ -83,6 +83,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /**
      * Controls logging of:
      * <ul>
+     * <li>Created records (can get verbose)
      * <li>subscriber changes
      * <li>add/remove listener
      * <li>notify initial image
@@ -546,7 +547,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.sequences.put(name, new AtomicLong());
         this.imageCache.put(name, new Record(name, initialData, this.noopChangeManager));
         record = new Record(name, initialData, this);
-        Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
+        if (log)
+        {
+            Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
+        }
         this.records.put(name, record);
         return record;
     }
