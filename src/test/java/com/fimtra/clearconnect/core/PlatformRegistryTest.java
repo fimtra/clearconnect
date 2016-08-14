@@ -84,37 +84,30 @@ public class PlatformRegistryTest
             publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
         }
 
-        // wait for connections to close
         final CountDownLatch allConnections = new CountDownLatch(1);
-        this.candidate.context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
-            {
-                System.err.println("GOT: submap-keys.size" + imageValidInCallingThreadOnly.getSubMapKeys().size()
-                    + ", image=" + imageValidInCallingThreadOnly + ", change=" + atomicChange);
-                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
-                {
-                    allConnections.countDown();
-                }
-            }
-        }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
-
-        assertTrue(allConnections.await(10, TimeUnit.SECONDS));
-
-        // wait for connections to close
         final CountDownLatch noConnections = new CountDownLatch(1);
         this.candidate.context.addObserver(new IRecordListener()
         {
+            boolean connected;
+            
             @Override
             public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
+                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
+                {
+                    allConnections.countDown();
+                    connected = true;
+                }
+                
+                // this is for when we destroy the agents
+                if (connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
                 {
                     noConnections.countDown();
                 }
             }
         }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
+
+        assertTrue(allConnections.await(10, TimeUnit.SECONDS));
 
         for (int i = 0; i < MAX; i++)
         {

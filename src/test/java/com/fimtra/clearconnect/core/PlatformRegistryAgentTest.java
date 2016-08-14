@@ -114,7 +114,7 @@ public class PlatformRegistryAgentTest
         int loop = 0;
         while (loop++ < 100 && platformServiceInstance1.isActive() && duplicate.isActive())
         {
-            Thread.sleep(50);
+            Thread.sleep(100);
         }
 
         // check that only one platform instance is active - one of them will have failed
