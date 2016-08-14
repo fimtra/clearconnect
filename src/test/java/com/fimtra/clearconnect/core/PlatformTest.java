@@ -1829,8 +1829,9 @@ public class PlatformTest
         int activateTimeout = 10000;
         IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
         this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
-        verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
         verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
+        // when adding a listener, we are not guaranteed to be standby 
+        verify(ftStatusListener1, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
     }
 
     @Test
