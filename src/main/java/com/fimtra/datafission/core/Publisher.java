@@ -716,16 +716,29 @@ public class Publisher
             new EndPointAddress(node, port)).buildService(new IReceiver()
             {
                 @Override
-                public void onChannelConnected(ITransportChannel channel)
+                public void onChannelConnected(final ITransportChannel channel)
                 {
-                    // synchronize to avoid race conditions that can remove the static portions of
-                    // the connections of a proxyContextPublisher for one that is in the process of
-                    // being constructed
-                    synchronized (Publisher.this.proxyContextPublishers)
+                    Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                     {
-                        Publisher.this.proxyContextPublishers.put(channel,
-                            new ProxyContextPublisher(channel, Publisher.this.mainCodec.newInstance()));
-                    }
+                        @Override
+                        public void run()
+                        {
+                            // synchronize to avoid race conditions that can remove the static
+                            // portions of the connections of a proxyContextPublisher for one that
+                            // is in the process of being constructed
+                            synchronized (Publisher.this.proxyContextPublishers)
+                            {
+                                Publisher.this.proxyContextPublishers.put(channel,
+                                    new ProxyContextPublisher(channel, Publisher.this.mainCodec.newInstance()));
+                            }
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return channel;
+                        }
+                    });
                 }
 
                 @Override
@@ -816,23 +829,36 @@ public class Publisher
                         @Override
                         public Object context()
                         {
-                            return Publisher.this;
+                            return source;
                         }
                     });
                 }
 
                 @Override
-                public void onChannelClosed(ITransportChannel channel)
+                public void onChannelClosed(final ITransportChannel channel)
                 {
-                    ProxyContextPublisher clientPublisher;
-                    synchronized (Publisher.this.proxyContextPublishers)
+                    Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                     {
-                        clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
-                    }
-                    if (clientPublisher != null)
-                    {
-                        clientPublisher.destroy();
-                    }
+                        @Override
+                        public void run()
+                        {
+                            ProxyContextPublisher clientPublisher;
+                            synchronized (Publisher.this.proxyContextPublishers)
+                            {
+                                clientPublisher = Publisher.this.proxyContextPublishers.remove(channel);
+                            }
+                            if (clientPublisher != null)
+                            {
+                                clientPublisher.destroy();
+                            }
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return channel;
+                        }
+                    });
                 }
             });
 
@@ -1001,6 +1027,7 @@ public class Publisher
         {
             // this is a throttle for inbound subscribes, reduces initial image flooding on the
             // network due to mass subscription
+            // todo pendingSubscribes don't account for same record being subscribed from multiple clients
             this.pendingSubscribes.put(name, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
             {
                 @Override
