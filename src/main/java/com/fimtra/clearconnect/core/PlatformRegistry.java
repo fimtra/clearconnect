@@ -1106,8 +1106,8 @@ final class EventHandler
         ProxyContext proxy = this.registry.monitoredServiceInstances.remove(serviceInstanceId);
         if (proxy != null)
         {
-            Log.log(this.registry, "Deregistering service instance ", serviceInstanceId, " (monitored with ",
-                proxy.getChannelString(), ")");
+            Log.banner(this.registry, "Deregistering service instance " + serviceInstanceId + " (was monitored with "
+                + proxy.getChannelString() + ")");
             proxy.destroy();
 
             // remove the service instance info record
