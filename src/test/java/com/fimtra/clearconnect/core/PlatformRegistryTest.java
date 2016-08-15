@@ -119,8 +119,10 @@ public class PlatformRegistryTest
         checkEmpty();
     }
 
-    void checkEmpty()
+    void checkEmpty() throws InterruptedException
     {
+        Thread.sleep(1000);
+        
         checkZeroSize(this.candidate.platformConnections);
         checkZeroSize(this.candidate.serviceInstancesPerAgent);
         // the platform registry adds itself as a service instance
