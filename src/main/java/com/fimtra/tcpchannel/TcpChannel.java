@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
+import com.fimtra.tcpchannel.TcpChannelProperties.Values;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -46,6 +47,8 @@ import com.fimtra.util.ObjectUtils;
  */
 public class TcpChannel implements ITransportChannel
 {
+    private static final double _INVERSE_1000000 = 1 / 1000000d;
+
     /** Expresses the encoding format for the data frames */
     public static enum FrameEncodingFormatEnum
     {
@@ -359,6 +362,7 @@ public class TcpChannel implements ITransportChannel
 
     void readFrames()
     {
+        long start = System.nanoTime();
         try
         {
             final int readCount = this.socketChannel.read(this.rxFrames);
@@ -434,6 +438,15 @@ public class TcpChannel implements ITransportChannel
         catch (IOException e)
         {
             destroy("Could not read from socket (" + e.toString() + ")");
+        }
+        finally
+        {
+            final long elapsedTimeNanos = System.nanoTime() - start;
+            if (elapsedTimeNanos > Values.SLOW_RX_FRAME_THRESHOLD_NANOS)
+            {
+                Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
+                    Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms");
+            }
         }
     }
 

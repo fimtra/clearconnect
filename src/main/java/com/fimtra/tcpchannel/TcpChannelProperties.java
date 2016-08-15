@@ -66,6 +66,12 @@ public abstract class TcpChannelProperties
          * @see Socket#setReuseAddress(boolean)
          */
         String SERVER_SOCKET_REUSE_ADDR = BASE + "serverSocketReuseAddr";
+        /**
+         * The system property name to define the threshold, in nanos, for defining slow RX frame handling (and
+         * thus logging a message indicating the RX frame handling was slow).<br>
+         * E.g. <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
+         */
+        String SLOW_RX_FRAME_THRESHOLD_NANOS = BASE + "slowRxFrameThresholdNanos";
     }
 
     /**
@@ -105,6 +111,17 @@ public abstract class TcpChannelProperties
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
             Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
+        
+        /**
+         * The threshold value for logging when RX frame handling is slow, in nanos. This is
+         * important to identify potential performance problems for TCP RX handling.
+         * <p>
+         * Default is: 50000000 (50ms)
+         * 
+         * @see Names#SLOW_RX_FRAME_THRESHOLD_NANOS
+         */
+        long SLOW_RX_FRAME_THRESHOLD_NANOS =
+            Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
     }
 
     private TcpChannelProperties()
