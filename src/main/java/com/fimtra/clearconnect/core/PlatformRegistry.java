@@ -404,7 +404,6 @@ public final class PlatformRegistry
     {
         final String registryInstanceId = platformName + "@" + host + ":" + port;
         Log.log(this, "Creating ", registryInstanceId);
-        this.coalescingExecutor = new ThimbleExecutor("coalescing-eventExecutor-" + registryInstanceId, 1);
         this.eventHandler = new EventHandler(this);
         this.serviceSequence = new AtomicLong(0);
 
@@ -414,6 +413,8 @@ public final class PlatformRegistry
         this.monitoredServiceInstances = new ConcurrentHashMap<String, ProxyContext>();
         this.masterInstancePerFtService = new ConcurrentHashMap<String, String>();
         this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
+
+        this.coalescingExecutor = this.context.getCoreExecutor_internalUseOnly();
 
         this.services = this.context.createRecord(IRegistryRecordNames.SERVICES);
         this.serviceInstancesPerServiceFamily =
