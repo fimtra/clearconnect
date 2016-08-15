@@ -25,10 +25,13 @@ import com.fimtra.datafission.ISessionProtocol.SyncResponse;
  */
 public class CipherProtocolCodecTest extends StringProtocolCodecTest
 {
-    @Override
-    ICodec<?> constructCandidate()
+    final CipherProtocolCodec codec;
+    
+    public CipherProtocolCodecTest()
     {
-        final CipherProtocolCodec codec = new CipherProtocolCodec();
+        super();
+        // to speed up tests, re-use the same instance
+        codec = new CipherProtocolCodec();
         try
         {
             // todo bit of a cheat here - we use the codec to synchronise with itself
@@ -42,6 +45,11 @@ public class CipherProtocolCodecTest extends StringProtocolCodecTest
         {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    ICodec<?> constructCandidate()
+    {
         return codec;
     }
 }

@@ -22,6 +22,8 @@ package com.fimtra.datafission.core;
  */
 public class CipherProtocolProxyContextTest extends ProxyContextTest
 {
+    // to speed up tests, re-use the same instance
+    private static final CipherProtocolCodec CIPHER_PROTOCOL_CODEC = new CipherProtocolCodec();
     // these port ranges should not clash with any other ProxyContextTests
     static int START_PORT = 34000;
     static int END_PORT = 34100;
@@ -35,6 +37,6 @@ public class CipherProtocolProxyContextTest extends ProxyContextTest
     @Override
     protected StringProtocolCodec getProtocolCodec()
     {
-        return new CipherProtocolCodec();
+        return CIPHER_PROTOCOL_CODEC;
     }
 }
