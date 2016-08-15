@@ -83,7 +83,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /**
      * Controls logging of:
      * <ul>
-     * <li>Created records (can get verbose)
+     * <li>Created/removed records
      * <li>subscriber changes
      * <li>add/remove listener
      * <li>notify initial image
@@ -581,7 +581,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 this.sequences.remove(name);
                 this.imageCache.remove(name);
 
-                Log.log(this, "Removed record [", removed.getName(), "] from ", removed.getContextName());
+                if (log)
+                {
+                    Log.log(this, "Removed record [", removed.getName(), "] from ", removed.getContextName());
+                }
 
                 synchronized (this.recordsToRemoveFromSystemRecords)
                 {
