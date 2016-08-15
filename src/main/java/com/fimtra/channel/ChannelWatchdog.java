@@ -77,7 +77,7 @@ public final class ChannelWatchdog implements Runnable
         this.channels = new CopyOnWriteArraySet<ITransportChannel>();
         this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
         this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
-        configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "5000")),
+        configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "6000")),
             Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
     }
 
@@ -161,7 +161,7 @@ public final class ChannelWatchdog implements Runnable
                     // if the channel has received data, then its still alive...
                     if (channel.hasRxData())
                     {
-                        this.channelsMissingHeartbeat.remove(channel);
+                        checkHeartbeatRecovered(channel);
                     }
                     else
                     {
@@ -226,9 +226,17 @@ public final class ChannelWatchdog implements Runnable
                 if (ChannelWatchdog.this.channels.contains(channel))
                 {
                     ChannelWatchdog.this.channelsReceivingHeartbeat.add(channel);
-                    ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel);
+                    checkHeartbeatRecovered(channel);
                 }
             }
         });
+    }
+
+    void checkHeartbeatRecovered(ITransportChannel channel)
+    {
+        if (ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel) != null)
+        {
+            Log.log(this, "Heartbeat recovered for ", ObjectUtils.safeToString(channel));
+        }
     }
 }
