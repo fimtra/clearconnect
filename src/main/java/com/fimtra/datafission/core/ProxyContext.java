@@ -881,6 +881,7 @@ public final class ProxyContext implements IObserverContext
         final Object newToken = new Object();
         this.channelToken = newToken;
 
+        @SuppressWarnings("unqualified-field-access")
         final IReceiver receiver = new IReceiver()
         {
             ITransportChannel localChannelRef;
@@ -888,88 +889,115 @@ public final class ProxyContext implements IObserverContext
             boolean codecSyncExpected = true;
 
             @Override
-            public void onChannelConnected(ITransportChannel channel)
+            public void onChannelConnected(final ITransportChannel channel)
             {
-                // check the channel is the currently active one - failed re-connects can have a
-                // channel with the same receiver but we must ignore events from it as it was a
-                // previous (failed) attempt
-                if (ProxyContext.this.channelToken == this.receiverToken)
+                // check the channel is the currently active one - failed re-connects can
+                // have a channel with the same receiver but we must ignore events from it
+                // as it was a previous (failed) attempt
+                if (ProxyContext.this.channelToken == receiverToken)
                 {
-                    this.localChannelRef = channel;
+                    executeSequentialCoreTask(new ISequentialRunnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            localChannelRef = channel;
 
-                    // clear records before dispatching further messages (this assumes
-                    // single-threaded dispatching)
-                    ContextUtils.clearNonSystemRecords(ProxyContext.this.context);
+                            // clear records before dispatching further messages (this assumes
+                            // single-threaded dispatching)
+                            ContextUtils.clearNonSystemRecords(ProxyContext.this.context);
 
-                    // when connecting, initialise a new codec instance to reset any state held by
-                    // the previous codec
-                    ProxyContext.this.codec = ProxyContext.this.codec.newInstance();
-                    ProxyContext.this.codec.getSessionProtocol().setSessionListener(ProxyContext.this.sessionListener);
+                            // when connecting, initialise a new codec instance to reset any state
+                            // held by the previous codec
+                            ProxyContext.this.codec = ProxyContext.this.codec.newInstance();
+                            ProxyContext.this.codec.getSessionProtocol().setSessionListener(
+                                ProxyContext.this.sessionListener);
 
-                    // proxy initiates the codec-sync operation
-                    // THIS MUST BE THE FIRST MESSAGE SENT
+                            // proxy initiates the codec-sync operation
+                            // THIS MUST BE THE FIRST MESSAGE SENT
 
-                    this.localChannelRef.sendAsync(
-                        ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(
-                            ProxyContext.this.sessionContextName));
-                    Log.log(ProxyContext.this, "(->) START SESSION SYNC ",
-                        ObjectUtils.safeToString(this.localChannelRef));
+                            localChannelRef.sendAsync(
+                                ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(
+                                    ProxyContext.this.sessionContextName));
+                            Log.log(ProxyContext.this, "(->) START SESSION SYNC ",
+                                ObjectUtils.safeToString(localChannelRef));
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return ProxyContext.this.getName();
+                        }
+                    });
                 }
             }
 
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(final byte[] data, final ITransportChannel source)
             {
-                // NOTE: channelToken is volatile so will slow message handling speed...but there is
-                // no alternative - a local flag is not an option - setting it during
-                // onChannelConnected is not guaranteed to work as that can happen on a different
-                // thread
-                if (ProxyContext.this.channelToken == this.receiverToken)
+                // NOTE: channelToken is volatile so will slow message handling speed...but
+                // there is no alternative - a local flag is not an option - setting it
+                // during onChannelConnected is not guaranteed to work as that can happen on
+                // a different thread
+                if (ProxyContext.this.channelToken == receiverToken)
                 {
-                    if (this.codecSyncExpected)
+                    executeSequentialCoreTask(new ISequentialRunnable()
                     {
-                        final SyncResponse response =
-                            ProxyContext.this.codec.getSessionProtocol().handleSessionSyncData(data);
-                        if (!response.syncFailed)
+                        @Override
+                        public void run()
                         {
-                            Log.log(ProxyContext.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
-                            if (response.syncDataResponse != null)
+                            if (codecSyncExpected)
                             {
-                                this.localChannelRef.sendAsync(response.syncDataResponse);
-                                Log.log(ProxyContext.this, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
+                                final SyncResponse response =
+                                    ProxyContext.this.codec.getSessionProtocol().handleSessionSyncData(data);
+                                if (!response.syncFailed)
+                                {
+                                    Log.log(ProxyContext.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
+                                    if (response.syncDataResponse != null)
+                                    {
+                                        localChannelRef.sendAsync(response.syncDataResponse);
+                                        Log.log(ProxyContext.this, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
+                                    }
+                                    if (response.syncComplete)
+                                    {
+                                        codecSyncExpected = false;
+                                        Log.log(ProxyContext.this, "SESSION SYNCED ", ObjectUtils.safeToString(source));
+                                        ProxyContext.this.onChannelConnected();
+                                    }
+                                }
+                                else
+                                {
+                                    final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(source);
+                                    Log.log(ProxyContext.this, reason, new IllegalStateException(reason));
+                                    destroy();
+                                }
+                                return;
                             }
-                            if (response.syncComplete)
-                            {
-                                this.codecSyncExpected = false;
-                                Log.log(ProxyContext.this, "SESSION SYNCED ", ObjectUtils.safeToString(source));
-                                ProxyContext.this.onChannelConnected();
-                            }
-                        }
-                        else
-                        {
-                            final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(source);
-                            Log.log(ProxyContext.this, reason, new IllegalStateException(reason));
-                            destroy();
-                        }
-                        return;
-                    }
 
-                    try
-                    {
-                        ProxyContext.this.onDataReceived(data);
-                    }
-                    catch (IncorrectSequenceException e)
-                    {
-                        handleException(e.recordName, e);
-                    }
-                    catch (MissingKeySymbolMappingException e)
-                    {
-                        handleException(e.recordName, e);
-                    }
+                            try
+                            {
+                                ProxyContext.this.onDataReceived(data);
+                            }
+                            catch (IncorrectSequenceException e)
+                            {
+                                handleException(e.recordName, e);
+                            }
+                            catch (MissingKeySymbolMappingException e)
+                            {
+                                handleException(e.recordName, e);
+                            }
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return ProxyContext.this.getName();
+                        }
+                    });
                 }
             }
 
-            private void handleException(String _recName, Exception e)
+            void handleException(String _recName, Exception e)
             {
                 final String recordName =
                     substituteLocalNameWithRemoteName(AtomicChangeTeleporter.getRecordName(_recName));
@@ -986,8 +1014,21 @@ public final class ProxyContext implements IObserverContext
             {
                 if (ProxyContext.this.channelToken == this.receiverToken)
                 {
-                    ProxyContext.this.codec.getSessionProtocol().destroy();
-                    ProxyContext.this.onChannelClosed();
+                    executeSequentialCoreTask(new ISequentialRunnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            ProxyContext.this.codec.getSessionProtocol().destroy();
+                            ProxyContext.this.onChannelClosed();
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return ProxyContext.this.getName();
+                        }
+                    });
                 }
             }
         };
@@ -1002,68 +1043,54 @@ public final class ProxyContext implements IObserverContext
 
     void onChannelConnected()
     {
-        executeSequentialCoreTask(new ISequentialRunnable()
+        ProxyContext.this.lock.lock();
+        try
         {
-            @Override
-            public void run()
+            cancelReconnectTask();
+
+            if (!ProxyContext.this.active)
             {
-                ProxyContext.this.lock.lock();
-                try
-                {
-                    cancelReconnectTask();
-
-                    if (!ProxyContext.this.active)
-                    {
-                        ProxyContext.this.channel.destroy("ProxyContext not active");
-                        return;
-                    }
-
-                    // now identity the proxy with the publisher end
-                    finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
-
-                    ProxyContext.this.imageDeltaProcessor.reset();
-                    ProxyContext.this.teleportReceiver.reset();
-
-                    // update the connection status
-                    ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
-
-                    final Set<String> recordNames =
-                        new HashSet<String>(ProxyContext.this.context.getSubscribedRecords());
-
-                    // remove any local system record subscriptions (the 'local' system records of
-                    // the remote context are subscribed for as RemoteContextXYZ, not ContextXYZ)
-                    recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
-                    for (String systemRecordName : ContextUtils.SYSTEM_RECORDS)
-                    {
-                        recordNames.remove(systemRecordName);
-                    }
-
-                    // re-subscribe
-                    if (recordNames.size() > 0)
-                    {
-                        final String[] recordNamesToSubscribeFor = new String[recordNames.size()];
-                        int i = 0;
-                        for (String recordName : recordNames)
-                        {
-                            recordNamesToSubscribeFor[i++] = (substituteRemoteNameWithLocalName(recordName));
-                        }
-                        doResubscribe(recordNamesToSubscribeFor);
-                    }
-
-                    ProxyContext.this.connected = true;
-                }
-                finally
-                {
-                    ProxyContext.this.lock.unlock();
-                }
+                ProxyContext.this.channel.destroy("ProxyContext not active");
+                return;
             }
 
-            @Override
-            public Object context()
+            // now identity the proxy with the publisher end
+            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
+
+            ProxyContext.this.imageDeltaProcessor.reset();
+            ProxyContext.this.teleportReceiver.reset();
+
+            // update the connection status
+            ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
+
+            final Set<String> recordNames = new HashSet<String>(ProxyContext.this.context.getSubscribedRecords());
+
+            // remove any local system record subscriptions (the 'local' system records of
+            // the remote context are subscribed for as RemoteContextXYZ, not ContextXYZ)
+            recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
+            for (String systemRecordName : ContextUtils.SYSTEM_RECORDS)
             {
-                return ProxyContext.this.context.getName();
+                recordNames.remove(systemRecordName);
             }
-        });
+
+            // re-subscribe
+            if (recordNames.size() > 0)
+            {
+                final String[] recordNamesToSubscribeFor = new String[recordNames.size()];
+                int i = 0;
+                for (String recordName : recordNames)
+                {
+                    recordNamesToSubscribeFor[i++] = (substituteRemoteNameWithLocalName(recordName));
+                }
+                doResubscribe(recordNamesToSubscribeFor);
+            }
+
+            ProxyContext.this.connected = true;
+        }
+        finally
+        {
+            ProxyContext.this.lock.unlock();
+        }
     }
 
     void onDataReceived(byte[] data) throws IncorrectSequenceException
