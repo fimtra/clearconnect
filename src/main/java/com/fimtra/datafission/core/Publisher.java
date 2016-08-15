@@ -1067,6 +1067,11 @@ public class Publisher
     private static void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
         ProxyContextPublisher proxyContextPublisher, String responseAction)
     {
+        if (recordNames.size() == 0)
+        {
+            return;
+        }
+        
         final Map<String, IValue> puts = new HashMap<String, IValue>(recordNames.size());
         final LongValue dummy = LongValue.valueOf(1);
         for (String recordName : recordNames)
