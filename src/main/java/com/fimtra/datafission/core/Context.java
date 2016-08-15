@@ -28,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
@@ -294,8 +293,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
-    final Executor rpcExecutor;
-    final Executor coreExecutor;
+    final ThimbleExecutor rpcExecutor;
+    final ThimbleExecutor coreExecutor;
     final ScheduledExecutorService utilityExecutor;
     final Lock recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
@@ -394,7 +393,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
             if (ContextUtils.CORE_EXECUTOR != this.coreExecutor)
             {
-                ((ThimbleExecutor) this.coreExecutor).destroy();
+                this.coreExecutor.destroy();
+            }
+            if (ContextUtils.RPC_EXECUTOR != this.rpcExecutor)
+            {
+                this.rpcExecutor.destroy();
             }
             this.pendingAtomicChanges.clear();
             this.records.clear();
@@ -1263,6 +1266,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public void setPermissionFilter(IPermissionFilter filter)
     {
         this.permissionFilter = filter;
+    }
+
+    public ThimbleExecutor getCoreExecutor_internalUseOnly()
+    {
+        return this.coreExecutor;
     }
 }
 
