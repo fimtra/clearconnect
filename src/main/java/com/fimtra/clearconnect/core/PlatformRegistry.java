@@ -1159,7 +1159,7 @@ final class EventHandler
             {
                 this.registry.serviceInstancesPerAgent.removeSubMap(agentName);
             }
-
+            
             if (serviceInstances.size() == 0)
             {
                 if (this.registry.services.remove(serviceFamily) != null)
@@ -1188,11 +1188,18 @@ final class EventHandler
     private Void registerPlatformServiceInstance(final String serviceFamily, final String redundancyMode,
         final String agentName, final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
-        final IValue... args) throws ExecutionException
+        final IValue... args)
     {
         if (this.registry.monitoredServiceInstances.containsKey(serviceInstanceId))
         {
-            throw new IllegalStateException("Already registered: " + serviceInstanceId);
+            final ProxyContext proxy = this.registry.monitoredServiceInstances.get(serviceInstanceId);
+            if (proxy.isConnected())
+            {
+                throw new AlreadyRegisteredException(serviceInstanceId, agentName, proxy.getEndPointAddress().getNode(),
+                    proxy.getEndPointAddress().getPort(),
+                    checkServiceType(serviceFamily, RedundancyModeEnum.FAULT_TOLERANT)
+                        ? RedundancyModeEnum.FAULT_TOLERANT.toString() : RedundancyModeEnum.LOAD_BALANCED.toString());
+            }
         }
 
         // check if there is a conflict in service redundancy type for a pending registration
@@ -1893,5 +1900,34 @@ final class EventHandler
             PlatformUtils.composePlatformServiceInstanceID(PlatformRegistry.SERVICE_NAME, this.registry.platformName);
         atomicChange.applyTo(this.registry.recordsPerServiceInstance.getOrCreateSubMap(registryInstanceName));
         publishTimed(this.registry.recordsPerServiceInstance);
+    }
+}
+
+/**
+ * Thrown when a service attempts a re-registration when it is still active
+ * 
+ * @author Ramon Servadei
+ */
+final class AlreadyRegisteredException extends RuntimeException
+{
+    private static final long serialVersionUID = 1L;
+
+    final String serviceInstanceId;
+    final String agentName;
+    final String nodeName;
+    final long port;
+    final String redundancyMode;
+
+    AlreadyRegisteredException(String serviceInstanceId, String agentName, String nodeName, long port,
+        String redundancyMode)
+    {
+        super("[agentName=" + agentName + ", serviceInstanceId=" + serviceInstanceId + ", nodeName="
+            + nodeName + ", port=" + port + ", redundancyMode=" + redundancyMode + "]");
+        
+        this.serviceInstanceId = serviceInstanceId;
+        this.agentName = agentName;
+        this.nodeName = nodeName;
+        this.port = port;
+        this.redundancyMode = redundancyMode;
     }
 }
