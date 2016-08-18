@@ -114,6 +114,13 @@ public class PlatformServiceProxyTest
                 TransportTechnologyEnum.getDefaultFromSystemProperty());
         this.candidate.setReconnectPeriodMillis(200);
         this.agent.setRegistryReconnectPeriodMillis(200);
+
+        int i = 0;
+        while (!this.candidate.isConnected() && i++ < 20)
+        {
+            Thread.sleep(50);
+        }
+        assertTrue("Proxy did not connect so can't start the test!", this.candidate.isConnected());
     }
 
     @After
