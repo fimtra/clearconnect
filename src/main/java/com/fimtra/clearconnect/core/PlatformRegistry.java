@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -779,7 +780,6 @@ final class EventHandler
     
     EventHandler(final PlatformRegistry registry)
     {
-        // todo all members of the registry should be moved into this class
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
         this.pendingPublish = new HashSet<String>();
@@ -791,62 +791,86 @@ final class EventHandler
     {
         if (this.eventCount.incrementAndGet() > 10)
         {
-            Log.log(this, "Event queue: " + this.eventCount.get());
+            Log.log(this, "*** Event queue: " + this.eventCount.get());
         }
 
-        this.eventExecutor.execute(new Runnable()
+        try
         {
-            @Override
-            public void run()
+            this.eventExecutor.execute(new Runnable()
             {
-                EventHandler.this.eventCount.decrementAndGet();
-                long time = System.currentTimeMillis();
-                try
+                @Override
+                public void run()
                 {
-                    runnable.run();
-                }
-                finally
-                {
-                    time = System.currentTimeMillis() - time;
-                    if (time > SLOW_EVENT_MILLIS)
+                    EventHandler.this.eventCount.decrementAndGet();
+                    long time = System.currentTimeMillis();
+                    try
                     {
-                        Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(runnable.context()), " took ",
-                            Long.toString(time), "ms");
+                        runnable.run();
+                    }
+                    finally
+                    {
+                        time = System.currentTimeMillis() - time;
+                        if (time > SLOW_EVENT_MILLIS)
+                        {
+                            Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(runnable.context()), " took ",
+                                Long.toString(time), "ms");
+                        }
                     }
                 }
+            });
+        }
+        catch (RejectedExecutionException e)
+        {
+            if (!this.eventExecutor.isShutdown())
+            {
+                throw e;
             }
-        });
+        }
     }
 
     <T> Future<T> submit(final ContextCallable<T> callable)
     {
         if (this.eventCount.incrementAndGet() > 10)
         {
-            Log.log(this, "Event queue: " + this.eventCount.get());
+            Log.log(this, "*** Event queue: " + this.eventCount.get());
         }
 
-        return this.eventExecutor.submit(new Callable<T>()
+        try
         {
-            @Override
-            public T call() throws Exception
+            return this.eventExecutor.submit(new Callable<T>()
             {
-                EventHandler.this.eventCount.decrementAndGet();
-                long time = System.currentTimeMillis();
-                try
+                @Override
+                public T call() throws Exception
                 {
-                    return callable.call();
-                }
-                finally
-                {
-                    time = System.currentTimeMillis() - time;
-                    if (time > SLOW_EVENT_MILLIS)
+                    EventHandler.this.eventCount.decrementAndGet();
+                    long time = System.currentTimeMillis();
+                    try
                     {
-                        Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(callable.context()), " took ",
-                            Long.toString(time), "ms");
+                        return callable.call();
+                    }
+                    finally
+                    {
+                        time = System.currentTimeMillis() - time;
+                        if (time > SLOW_EVENT_MILLIS)
+                        {
+                            Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(callable.context()), " took ",
+                                Long.toString(time), "ms");
+                        }
                     }
                 }
+            });
+        }
+        catch (RejectedExecutionException e)
+        {
+            if (!this.eventExecutor.isShutdown())
+            {
+                throw e;
+            } 
+            else
+            {
+                return null;
             }
-        });
+        }
     }
 
     void destroy()
