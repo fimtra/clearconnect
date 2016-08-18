@@ -157,7 +157,12 @@ public class PlatformServiceProxyTest
     @Test
     public void testGetAllSubscriptions() throws InterruptedException
     {
-        final Map<String, SubscriptionInfo> allSubscriptions = this.service.getAllSubscriptions();
+        int i = 0;
+        Map<String, SubscriptionInfo> allSubscriptions;
+        while ((allSubscriptions = this.service.getAllSubscriptions()).size() != 4 && i++ < 20)
+        {
+            Thread.sleep(100);
+        }
         assertEquals("Got: " + allSubscriptions, 4, allSubscriptions.size());
 
 
