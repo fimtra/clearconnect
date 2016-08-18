@@ -27,6 +27,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,7 @@ import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
+import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.IRecord;
@@ -148,7 +150,9 @@ public class PlatformServiceProxyTest
     @Test
     public void testGetAllSubscriptions() throws InterruptedException
     {
-        assertEquals(4, this.service.getAllSubscriptions().size());
+        final Map<String, SubscriptionInfo> allSubscriptions = this.service.getAllSubscriptions();
+        assertEquals("Got: " + allSubscriptions, 4, allSubscriptions.size());
+
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
