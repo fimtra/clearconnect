@@ -64,6 +64,13 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.registryRecordPublishPeriodSecs=2</code><br>
          */
         String REGISTRY_RECORD_PUBLISH_PERIOD_SECS = BASE + "registryRecordPublishPeriodSecs";
+        
+        /**
+         * The system property name to define the maximum tries a platform agent will use for
+         * registering a service.<br>
+         * E.g. <code>-Dplatform.agentMaxServiceRegisterTries=2</code><br>
+         */
+        String PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES = BASE + "agentMaxServiceRegisterTries";
     }
 
     /**
@@ -105,7 +112,7 @@ public abstract class PlatformCoreProperties
          */
         long PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
             Names.PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS, "60000"));
-
+        
         /**
          * The period in SECONDS that the registry uses for publishing changes in its registry
          * records.
@@ -116,6 +123,16 @@ public abstract class PlatformCoreProperties
          */
         long REGISTRY_RECORD_PUBLISH_PERIOD_SECS = Long.parseLong(System.getProperty(
             Names.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, "2"));
+
+        /**
+         * The maximum tries a platform agent will use for registering a service.
+         * <p>
+         * Default is: 3
+         * 
+         * @see Names#PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES
+         */
+        int PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES = Integer.parseInt(System.getProperty(
+            Names.PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES, "3"));
     }
 
     private PlatformCoreProperties()

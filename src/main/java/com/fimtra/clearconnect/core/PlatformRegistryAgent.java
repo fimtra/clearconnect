@@ -95,6 +95,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     final String agentName;
     final String hostQualifiedAgentName;
     volatile String platformName;
+    boolean registryConnected;
     final ProxyContext registryProxy;
     final Lock createLock;
     /**
@@ -217,6 +218,42 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy,
                 IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, this);
 
+        // "split-plane" protection
+        // setup listening for services lost from the registry - we use this to detect if the
+        // registry loses a service but we still have the service...
+        this.serviceInstanceAvailableListeners.addListener(new IServiceInstanceAvailableListener()
+        {
+            @Override
+            public void onServiceInstanceUnavailable(final String serviceInstanceId)
+            {
+                // only handle service unavailable signals when the registry is connected -
+                // otherwise let the registry re-connection tasks handle this
+                if (PlatformRegistryAgent.this.registryConnected)
+                {
+                    PlatformRegistryAgent.this.agentExecutor.execute(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            final PlatformServiceInstance serviceInstance =
+                                PlatformRegistryAgent.this.localPlatformServiceInstances.get(serviceInstanceId);
+                            if (serviceInstance != null)
+                            {
+                                Log.log(PlatformRegistryAgent.this, "*** RE-REGISTERING ", serviceInstanceId);
+                                registerServiceWithRetry(serviceInstance, null);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            @Override
+            public void onServiceInstanceAvailable(String serviceInstanceId)
+            {
+                // noop
+            }
+        });
+        
         this.registryProxy.addObserver(new IRecordListener()
         {
             @Override
@@ -368,54 +405,25 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             setupRuntimeAttributePublishing();
                             
                             // (re)publish any service instances managed by this agent
-                            final int max = 3;
                             PlatformServiceInstance platformServiceInstance = null;
-                            int tries = 0;
-                            boolean registered = false;
-                            for (Iterator<Map.Entry<String, PlatformServiceInstance>> it =
+                            for (final Iterator<Map.Entry<String, PlatformServiceInstance>> it =
                                 PlatformRegistryAgent.this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext();)
                             {
-                                tries = 0;
-                                registered = false;
                                 platformServiceInstance = it.next().getValue();
-                                
                                 Log.log(PlatformRegistryAgent.this, "Registering ",
                                     ObjectUtils.safeToString(platformServiceInstance));
-                                while (!registered && tries++ < max)
+                                registerServiceWithRetry(platformServiceInstance, new Runnable()
                                 {
-                                    try
-                                    {
-                                        registerService(platformServiceInstance);
-                                        registered = true;
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        Log.log(PlatformRegistryAgent.this,
-                                            " (" + Integer.toString(tries) + "/" + Integer.toString(max)
-                                                + ") Failed attempt registering "
-                                                + ObjectUtils.safeToString(platformServiceInstance));
-                                    }
-                                }
-
-                                if (!registered)
-                                {
-                                    Log.log(PlatformRegistryAgent.this, "*** WARNING *** Could not register ",
-                                        ObjectUtils.safeToString(platformServiceInstance));
-                                    try
-                                    {
-                                        platformServiceInstance.destroy();
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        Log.log(PlatformRegistryAgent.this, "*** WARNING *** Could not destroy "
-                                            + ObjectUtils.safeToString(platformServiceInstance), e);
-                                    }
-                                    finally
+                                    @Override
+                                    public void run()
                                     {
                                         it.remove();
                                     }
-                                }
+                                });
                             }
+                            
+                            PlatformRegistryAgent.this.registryConnected = true;
+                            
                         }
                         finally
                         {
@@ -438,6 +446,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             if (this.platformName != null)
             {
+                this.registryConnected = false;
                 Log.banner(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
                 for (String serviceFamily : this.serviceAvailableListeners.keySet())
                 {
@@ -616,14 +625,34 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
-        this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
-            TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
-            TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
-            TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
-            LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
-            TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
-            TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
-            TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
+        try
+        {
+            this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
+                TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
+                TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
+                TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
+                LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
+                TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
+                TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
+                TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
+        }
+        catch (ExecutionException e)
+        {
+            if (e.getCause() instanceof AlreadyRegisteredException)
+            {
+                final AlreadyRegisteredException details = (AlreadyRegisteredException) e.getCause();
+                if (this.agentName.equals(details.agentName)
+                    && details.port == serviceInstance.endPointAddress.getPort()
+                    && details.nodeName == serviceInstance.endPointAddress.getNode()
+                    && details.redundancyMode == serviceInstance.getRedundancyMode().toString())
+                // NOTE: we're not checking the transport tech or wire protocol
+                {
+                    Log.log(this, "Registry has already registered ", ObjectUtils.safeToString(serviceInstance));
+                    return;
+                }
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -1081,5 +1110,49 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     public Map<String, IPlatformServiceProxy> getActiveProxies()
     {
         return new HashMap<String, IPlatformServiceProxy>(this.serviceProxies);
+    }
+
+    void registerServiceWithRetry(PlatformServiceInstance platformServiceInstance, final Runnable failureTask)
+    {
+        final int maxTries = PlatformCoreProperties.Values.PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES;
+        int tries = 0;
+        boolean registered = false;
+        while (!registered && tries++ < maxTries)
+        {
+            try
+            {
+                registerService(platformServiceInstance);
+                registered = true;
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this,
+                    " (" + Integer.toString(tries) + "/" + Integer.toString(maxTries) + ") Failed attempt registering "
+                        + ObjectUtils.safeToString(platformServiceInstance)
+                        + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"));
+            }
+        }
+
+        if (!registered)
+        {
+            Log.log(PlatformRegistryAgent.this, "*** ALERT *** Could not register ",
+                ObjectUtils.safeToString(platformServiceInstance));
+            try
+            {
+                platformServiceInstance.destroy();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this,
+                    "*** ALERT *** Could not destroy " + ObjectUtils.safeToString(platformServiceInstance), e);
+            }
+            finally
+            {
+                if (failureTask != null)
+                {
+                    failureTask.run();
+                }
+            }
+        }
     }
 }
