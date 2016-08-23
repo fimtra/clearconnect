@@ -762,7 +762,7 @@ public class ContextUtils
     {
         if (elapsedTimeNanos > Values.SLOW_TASK_THRESHOLD_NANOS)
         {
-            Log.log(context, "SLOW TASK: ", action, " ", taskName, " took ",
+            Log.log(context, "SLOW TASK: ", action, " [", taskName, "] took ",
                 Long.toString(((long) (elapsedTimeNanos * ContextUtils.INVERSE_1000000))), "ms");
         }
     }
