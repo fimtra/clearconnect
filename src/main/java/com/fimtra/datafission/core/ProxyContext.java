@@ -807,7 +807,7 @@ public final class ProxyContext implements IObserverContext
                 }
 
                 // mark the records as disconnected
-                final Lock recordConnectionLock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
+                final Lock recordConnectionLock = this.remoteConnectionStatusRecord.getWriteLock();
                 recordConnectionLock.lock();
                 try
                 {
@@ -1233,10 +1233,9 @@ public final class ProxyContext implements IObserverContext
                     }
 
                     IRecord record = ProxyContext.this.context.getRecord(name);
-                    final boolean emptyChange = changeToApply.isEmpty();
                     if (record == null)
                     {
-                        if (emptyChange)
+                        if (changeToApply.isEmpty())
                         {
                             // this creates the record AND notifies any listeners
                             // (publishAtomicChange would publish nothing)
@@ -1313,7 +1312,7 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "Scheduling re-sync ", name);
 
             // mark the record as disconnected, then reconnecting
-            final Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
+            final Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
             lock.lock();
             try
             {
@@ -1333,10 +1332,10 @@ public final class ProxyContext implements IObserverContext
                 public void run()
                 {
                     // todo when there is a re-sync command, we may not need to check if we are
-                    // subscribed as the receive will know if there is a subscription to re-sync...
+                    // subscribed as the receiver will know if there is a subscription to re-sync...
                     if (ProxyContext.this.context.recordObservers.getSubscribersFor(name).length == 0)
                     {
-                        Log.log(this, "No-longer subscribed, CANCELLING re-sync ", name);
+                        Log.log(this, "No longer subscribed, CANCELLING re-sync ", name);
                         return;
                     }
 
@@ -1517,7 +1516,7 @@ public final class ProxyContext implements IObserverContext
         final Set<String> recordNames = new HashSet<String>(this.context.getSubscribedRecords());
         recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
 
-        Lock lock = this.context.getRecord(RECORD_CONNECTION_STATUS_NAME).getWriteLock();
+        Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
         lock.lock();
         try
         {
@@ -1679,4 +1678,5 @@ public final class ProxyContext implements IObserverContext
     {
         this.channel.sendAsync(this.codec.finalEncode(data));
     }
+
 }
