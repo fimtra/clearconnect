@@ -21,10 +21,11 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import com.fimtra.thimble.ThimbleExecutor;
 
 /**
  * A simple logger that writes to a file and to <code>System.err</code>. Uses a
@@ -37,18 +38,96 @@ import com.fimtra.thimble.ThimbleExecutor;
  */
 public abstract class Log
 {
+    private static final int LOG_PREFIX_EST_SIZE = 256;
     /** Controls logging to std.err, default is <code>false</code> for performance reasons */
     private static final boolean LOG_TO_STDERR = UtilProperties.Values.LOG_TO_STDERR;
     private static final String TAB = "|";
-    private static final FastDateFormat fastDateFormat = new FastDateFormat();
-    private static final ThimbleExecutor FILE_APPENDER_EXECUTOR = new ThimbleExecutor("LogAsyncFileAppender", 1);
+    private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR = ThreadUtils.newScheduledExecutorService("LogAsyncFileAppender", 1);
     private static final Lock lock = new ReentrantLock();
     private static PrintStream consoleStream = System.err;
 
-    static final Queue<String> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<String>();
+    static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<LogMessage>();
     static final CharSequence LINE_SEPARATOR = SystemUtils.lineSeparator();
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;
+    private static boolean flushTaskPending;
+    private static final Runnable flushTask = new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            flushMessages();
+        }
+    };
+
+    /**
+     * Encapsulates a log message with logic to print to a stream
+     * 
+     * @author Ramon Servadei
+     */
+    private static final class LogMessage
+    {
+        private static final FastDateFormat fastDateFormat = new FastDateFormat();
+        
+        final Thread t;
+        final Object source;
+        final CharSequence[] messages;
+        final long timeMillis;
+        String formattedMessage;
+
+        LogMessage(Thread t, Object source, CharSequence... messages)
+        {
+            this.t = t;
+            this.source = source;
+            this.messages = messages;
+            this.timeMillis = System.currentTimeMillis();
+        }
+
+        String getTime()
+        {
+            return fastDateFormat.yyyyMMddHHmmssSSS(this.timeMillis);
+        }
+
+        void print(PrintStream consoleStream)
+        {
+            consoleStream.print(generateMessage());
+        }
+
+        void print(RollingFileAppender fileAppender) throws IOException
+        {
+            fileAppender.append(generateMessage());
+        }
+
+        private String generateMessage()
+        {
+            if (this.formattedMessage != null)
+            {
+                return this.formattedMessage;
+            }
+            
+            int len = LOG_PREFIX_EST_SIZE;
+            for (int i = 0; i < this.messages.length; i++)
+            {
+                if(this.messages[i] != null)
+                {
+                    len += this.messages[i].length();
+                }
+            }
+            final StringBuilder sb = new StringBuilder(len);
+            sb.append(getTime()).append(TAB).append(this.t.getName()).append(TAB).append(this.source instanceof Class
+                ? ((Class<?>) this.source).getName() : this.source.getClass().getName()).append(":").append(
+                    Integer.toString(System.identityHashCode(this.source))).append(TAB);
+            for (int i = 0; i < this.messages.length; i++)
+            {
+                sb.append(this.messages[i]);
+            }
+            sb.append(LINE_SEPARATOR);
+            
+            this.formattedMessage = sb.toString();
+            
+            return this.formattedMessage;
+        }
+    }
 
     static
     {
@@ -59,7 +138,7 @@ public abstract class Log
             public void run()
             {
                 System.err.println("Shutting down logging...");
-                FILE_APPENDER_EXECUTOR.destroy();
+                FILE_APPENDER_EXECUTOR.shutdownNow();
                 flushMessages();
                 try
                 {
@@ -79,7 +158,7 @@ public abstract class Log
                 }
             }
         }));
-        
+
         // use a thread to perform archiving/purging to prevent startup delays
         ThreadUtils.newThread(new Runnable()
         {
@@ -96,18 +175,10 @@ public abstract class Log
                 }
             }
         }, "log-archiver").start();
-        
-        lock.lock();
-        try
-        {
-            FILE_APPENDER =
-                RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
-            System.out.println("Log file " + FILE_APPENDER);
-        }
-        finally
-        {
-            lock.unlock();
-        }
+
+        FILE_APPENDER =
+            RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
+        System.out.println("Log file " + FILE_APPENDER);
     }
 
     private Log()
@@ -136,168 +207,47 @@ public abstract class Log
 
     public static final void log(Object source, String... messages)
     {
-        lock.lock();
-        try
-        {
-            println(getLogMessage(source, messages));
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    public static final void log(Object source, String message1, String message2, String message3, String message4)
-    {
-        lock.lock();
-        try
-        {
-            println(getLogMessage(source, message1, message2, message3, message4));
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    public static final void log(Object source, String message1, String message2, String message3)
-    {
-        lock.lock();
-        try
-        {
-            println(getLogMessage(source, message1, message2, message3));
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    public static final void log(Object source, String message1, String message2)
-    {
-        lock.lock();
-        try
-        {
-            println(getLogMessage(source, message1, message2));
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    public static final void log(Object source, String message)
-    {
-        lock.lock();
-        try
-        {
-            println(getLogMessage(source, message));
-        }
-        finally
-        {
-            lock.unlock();
-        }
+        log(new LogMessage(Thread.currentThread(), source, messages));
     }
 
     public static final void log(Object source, String message, Throwable t)
     {
-        lock.lock();
-        try
+        final StringWriter stringWriter = new StringWriter(1024);
+        final PrintWriter pw = new PrintWriter(stringWriter);
+        t.printStackTrace(pw);
+        final LogMessage logMessage = new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
+        log(logMessage);
+    }
+
+    private static void log(final LogMessage message)
+    {
+        LOG_MESSAGE_QUEUE.add(message);
+        if (!flushTaskPending)
         {
-            StringWriter stringWriter = new StringWriter(1024);
-            PrintWriter pw = new PrintWriter(stringWriter);
-            pw.println(getLogMessage(source, message));
-            t.printStackTrace(pw);
-            print(stringWriter.toString());
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    private static String getLogMessage(Object source, CharSequence... messages)
-    {
-        int len = 256;
-        for (int i = 0; i < messages.length; i++)
-        {
-            len += messages[i] == null ? 4 : messages[i].length();
-        }
-        StringBuilder sb = new StringBuilder(len);
-        sb.append(fastDateFormat.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(TAB).append(
-            Thread.currentThread().getName()).append(TAB).append(
-            source instanceof Class ? ((Class<?>) source).getName() : source.getClass().getName()).append(":").append(
-            System.identityHashCode(source)).append(TAB);
-        for (int i = 0; i < messages.length; i++)
-        {
-            sb.append(messages[i]);
-        }
-        return sb.toString();
-    }
-
-    private static String getLogMessage(Object source, String message1, String message2, String message3,
-        String message4)
-    {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append(fastDateFormat.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(TAB).append(
-            Thread.currentThread().getName()).append(TAB).append(
-            source instanceof Class ? ((Class<?>) source).getName() : source.getClass().getName()).append(":").append(
-            System.identityHashCode(source)).append(TAB).append(message1).append(message2).append(message3).append(
-            message4);
-        return sb.toString();
-    }
-
-    private static String getLogMessage(Object source, String message1, String message2, String message3)
-    {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append(fastDateFormat.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(TAB).append(
-            Thread.currentThread().getName()).append(TAB).append(
-            source instanceof Class ? ((Class<?>) source).getName() : source.getClass().getName()).append(":").append(
-            System.identityHashCode(source)).append(TAB).append(message1).append(message2).append(message3);
-        return sb.toString();
-    }
-
-    private static String getLogMessage(Object source, String message1, String message2)
-    {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append(fastDateFormat.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(TAB).append(
-            Thread.currentThread().getName()).append(TAB).append(
-            source instanceof Class ? ((Class<?>) source).getName() : source.getClass().getName()).append(":").append(
-            System.identityHashCode(source)).append(TAB).append(message1).append(message2);
-        return sb.toString();
-    }
-
-    private static String getLogMessage(Object source, String message)
-    {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append(fastDateFormat.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(TAB).append(
-            Thread.currentThread().getName()).append(TAB).append(
-            source instanceof Class ? ((Class<?>) source).getName() : source.getClass().getName()).append(":").append(
-            System.identityHashCode(source)).append(TAB).append(message);
-        return sb.toString();
-    }
-
-    private static void println(final String logMessage)
-    {
-        final StringBuilder sb = new StringBuilder(logMessage.length() + LINE_SEPARATOR.length());
-        sb.append(logMessage).append(LINE_SEPARATOR);
-        print(sb.toString());
-    }
-
-    private static void print(final String logMessageWithLineSeparator)
-    {
-        LOG_MESSAGE_QUEUE.add(logMessageWithLineSeparator);
-        FILE_APPENDER_EXECUTOR.execute(new Runnable()
-        {
-            @Override
-            public void run()
+            flushTaskPending = true;
+            try
             {
-                flushMessages();
+                FILE_APPENDER_EXECUTOR.schedule(flushTask, 250, TimeUnit.MILLISECONDS);
             }
-        });
+            catch (RejectedExecutionException e)
+            {
+                if (!FILE_APPENDER_EXECUTOR.isShutdown())
+                {
+                    throw e;
+                }
+            }
+        }
         if (LOG_TO_STDERR)
         {
-            consoleStream.print(logMessageWithLineSeparator);
+            lock.lock();
+            try
+            {
+                message.print(consoleStream);
+            }
+            finally
+            {
+                lock.unlock();
+            }
         }
     }
 
@@ -329,45 +279,55 @@ public abstract class Log
 
     static void flushMessages()
     {
-        final int size = LOG_MESSAGE_QUEUE.size();
-        if (size > 0)
+        flushTaskPending = false;
+
+        lock.lock();
+        try
         {
-            int i = 0;
-            if (exceptionEncountered)
+            final int size = LOG_MESSAGE_QUEUE.size();
+            if (size > 0)
             {
-                for (; i < size; i++)
+                int i = 0;
+                if (exceptionEncountered)
                 {
-                    System.err.append(LOG_MESSAGE_QUEUE.poll());
+                    for (; i < size; i++)
+                    {
+                        LOG_MESSAGE_QUEUE.poll().print(System.err);
+                    }
                 }
-            }
-            else
-            {
-                for (; i < size; i++)
+                else
                 {
+                    for (; i < size; i++)
+                    {
+                        try
+                        {
+                            LOG_MESSAGE_QUEUE.poll().print(FILE_APPENDER);
+                        }
+                        catch (IOException e)
+                        {
+                            panic(e);
+                            // print the remainder
+                            for (i++; i < size; i++)
+                            {
+                                LOG_MESSAGE_QUEUE.poll().print(System.err);
+                            }
+                            return;
+                        }
+                    }
                     try
                     {
-                        FILE_APPENDER.append(LOG_MESSAGE_QUEUE.poll());
+                        FILE_APPENDER.flush();
                     }
                     catch (IOException e)
                     {
                         panic(e);
-                        // print the remainder
-                        for (i++; i < size; i++)
-                        {
-                            System.err.append(LOG_MESSAGE_QUEUE.poll());
-                        }
-                        return;
                     }
                 }
-                try
-                {
-                    FILE_APPENDER.flush();
-                }
-                catch (IOException e)
-                {
-                    panic(e);
-                }
             }
+        }
+        finally
+        {
+            lock.unlock();
         }
     }
 
