@@ -92,7 +92,7 @@ public class ProxyContextTest
     @Rule
     public TestName name = new TestName();
 
-    // note: the cipher protocol takes longer to initialise to increase to 3 secs
+    // note: the cipher protocol takes longer to initialise so increase to 3 secs
     private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 3000;
 
     static List<TestLongValueSequenceCheckingAtomicChangeObserver> observers =
@@ -960,7 +960,8 @@ public class ProxyContextTest
 
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-
+        this.candidate.setReconnectPeriodMillis(200);
+        
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
         CountDownLatch record2Latch = new CountDownLatch(UPDATE_COUNT);
@@ -2064,7 +2065,7 @@ public class ProxyContextTest
         for (int i = 0; i < KEY_COUNT; i++)
         {
             assertTrue("Latch " + i + ", trigger count remaining: " + record1Latch.getCount(),
-                record1Latch.await(UPDATE_COUNT * ATOMIC_CHANGE_PERIOD_MILLIS * 20, TimeUnit.MILLISECONDS));
+                record1Latch.await(10000, TimeUnit.MILLISECONDS));
         }
     }
 
