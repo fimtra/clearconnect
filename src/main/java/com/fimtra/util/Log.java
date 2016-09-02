@@ -285,44 +285,40 @@ public abstract class Log
         lock.lock();
         try
         {
-            final int size = LOG_MESSAGE_QUEUE.size();
-            if (size > 0)
+            LogMessage message = null;
+            if (exceptionEncountered)
             {
-                int i = 0;
-                if (exceptionEncountered)
+                while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
                 {
-                    for (; i < size; i++)
-                    {
-                        LOG_MESSAGE_QUEUE.poll().print(System.err);
-                    }
+                    message.print(System.err);
                 }
-                else
+            }
+            else
+            {
+                while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
                 {
-                    for (; i < size; i++)
-                    {
-                        try
-                        {
-                            LOG_MESSAGE_QUEUE.poll().print(FILE_APPENDER);
-                        }
-                        catch (IOException e)
-                        {
-                            panic(e);
-                            // print the remainder
-                            for (i++; i < size; i++)
-                            {
-                                LOG_MESSAGE_QUEUE.poll().print(System.err);
-                            }
-                            return;
-                        }
-                    }
                     try
                     {
-                        FILE_APPENDER.flush();
+                        message.print(FILE_APPENDER);
                     }
                     catch (IOException e)
                     {
                         panic(e);
+                        // print the remainder
+                        while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
+                        {
+                            message.print(System.err);
+                        }
+                        return;
                     }
+                }
+                try
+                {
+                    FILE_APPENDER.flush();
+                }
+                catch (IOException e)
+                {
+                    panic(e);
                 }
             }
         }
