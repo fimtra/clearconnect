@@ -541,9 +541,16 @@ public class TestTcpServer
                 {
                     then = Integer.valueOf(-1);
                 }
-                assertEquals(then + 1, now.intValue());
-                this.lastValue.put(source, now);
-                latch.countDown();
+                final int expect = then + 1;
+                if (expect != now.intValue())
+                {
+                    Log.log(this, "Expected: " + expect + ", but got " + now.intValue() + " from " + source);
+                }
+                else
+                {
+                    this.lastValue.put(source, now);
+                    latch.countDown();
+                }
             }
         }, this.frameEncodingFormat);
 

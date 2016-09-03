@@ -109,7 +109,7 @@ public class ProxyContextTest
     final static int UPDATE_COUNT = 10;
     private static final int ATOMIC_CHANGE_PERIOD_MILLIS = 20;
 
-    private static final int TIMEOUT = 5;
+    private static final int TIMEOUT = 10;
 
     Map<String, Map<String, Long>> recordData;
 
@@ -143,6 +143,19 @@ public class ProxyContextTest
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate.setReconnectPeriodMillis(200);
+        // wait for connection
+        int i = 0;
+        while (!this.candidate.isConnected() && i++ < 200)
+        {
+            try
+            {
+                Thread.sleep(50);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
     }
 
     protected StringProtocolCodec getProtocolCodec()
