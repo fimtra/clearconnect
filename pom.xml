@@ -4,9 +4,9 @@
 
 	<groupId>com.fimtra</groupId>
 	<artifactId>clearconnect</artifactId>
-	<version>3.8.3-SNAPSHOT</version>
+	<version>3.8.3</version>
 	<name>${project.groupId}:${project.artifactId}</name>
-	<description>A real-time multi-process application framework</description>
+	<description>A micro services platform</description>
 	<packaging>jar</packaging>
 	<url>https://github.com/fimtra/clearconnect</url>
 
