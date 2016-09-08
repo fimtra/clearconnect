@@ -62,6 +62,7 @@ import com.fimtra.datafission.core.CoalescingRecordListener;
 import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
+import com.fimtra.datafission.core.GZipProtocolCodec;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
@@ -152,7 +153,7 @@ public final class PlatformRegistry
         }
     }
 
-    static final StringProtocolCodec CODEC = new StringProtocolCodec();
+    static final StringProtocolCodec CODEC = new GZipProtocolCodec();
 
     /**
      * Describes the structure of a service info record and provides the prefix for the canonical
