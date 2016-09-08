@@ -660,7 +660,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         final String platformServiceInstanceID =
             PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-        final PlatformServiceInstance service = this.localPlatformServiceInstances.get(platformServiceInstanceID);
+        final PlatformServiceInstance service = this.localPlatformServiceInstances.remove(platformServiceInstanceID);
         if (service != null)
         {
             try
@@ -681,7 +681,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 Log.log(PlatformRegistryAgent.this, "Could not destroy service " + platformServiceInstanceID, e);
             }
-            this.localPlatformServiceInstances.remove(platformServiceInstanceID);
             return true;
         }
         return false;
