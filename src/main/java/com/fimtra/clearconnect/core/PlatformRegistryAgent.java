@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -112,6 +113,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     final NotifyingCache<IRegistryAvailableListener, String> registryAvailableListeners;
     ScheduledFuture<?> dynamicAttributeUpdateTask;
     boolean onPlatformServiceConnectedInvoked;
+    Future<?> registrationFinishTaskPending;
     
     final ScheduledExecutorService agentExecutor;
     
@@ -330,7 +332,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.createLock.lock();
         try
         {
-            if (this.platformName == null)
+            if (this.registrationFinishTaskPending == null || this.registrationFinishTaskPending.isDone())
             {
                 if (calledFromPlatformServiceConnectionMonitor)
                 {
@@ -360,7 +362,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     return;
                 }
 
-                this.agentExecutor.execute(new Runnable()
+                this.registrationFinishTaskPending = this.agentExecutor.submit(new Runnable()
                 {
                     @Override
                     public void run()
@@ -440,6 +442,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         }
                         finally
                         {
+                            PlatformRegistryAgent.this.registrationFinishTaskPending = null;
                             PlatformRegistryAgent.this.createLock.unlock();
                         }
                     }
