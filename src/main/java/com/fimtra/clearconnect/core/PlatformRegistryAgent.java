@@ -32,6 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -98,6 +99,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     boolean registryConnected;
     final ProxyContext registryProxy;
     final Lock createLock;
+    /** Ensures idemptotent call to {@link #destroy()} */
+    final AtomicBoolean destroyCalled;
     /**
      * The services registered through this agent. Key=function of {serviceFamily,serviceMember}
      */
@@ -109,7 +112,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     final NotifyingCache<IRegistryAvailableListener, String> registryAvailableListeners;
     ScheduledFuture<?> dynamicAttributeUpdateTask;
     boolean onPlatformServiceConnectedInvoked;
-
+    
     final ScheduledExecutorService agentExecutor;
     
     /**
@@ -182,6 +185,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.agentName = agentName + "-" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
         this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
         this.createLock = new ReentrantLock();
+        this.destroyCalled = new AtomicBoolean(false);
         this.localPlatformServiceInstances = new ConcurrentHashMap<String, PlatformServiceInstance>();
         this.serviceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
         this.serviceInstanceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
@@ -308,6 +312,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             throw new RegistryNotAvailableException("Registry name has not been received from " + registryAddresses[0]);
         }
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                destroy();
+            }
+        }, agentName + "-shutdownHook"));
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
@@ -835,6 +848,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public void destroy()
     {
+        if (this.destroyCalled.getAndSet(true))
+        {
+            return;
+        }
+        
         this.createLock.lock();
         try
         {
