@@ -605,9 +605,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.createLock.lock();
         try
         {
+            final String platformServiceInstanceID =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
             PlatformServiceInstance platformServiceInstance =
-                this.localPlatformServiceInstances.get(PlatformUtils.composePlatformServiceInstanceID(serviceFamily,
-                    serviceMember));
+                this.localPlatformServiceInstances.get(platformServiceInstanceID);
             if (platformServiceInstance != null && platformServiceInstance.isActive())
             {
                 return false;
@@ -621,16 +622,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (Exception e)
             {
-                Log.log(PlatformRegistryAgent.this, "Could not create service " + serviceFamily + " at " + host + ":"
-                    + port, e);
-                if(platformServiceInstance != null)
+                Log.log(PlatformRegistryAgent.this,
+                    "Could not create service " + platformServiceInstanceID + " at " + host + ":" + port, e);
+                if (platformServiceInstance != null)
                 {
                     platformServiceInstance.destroy();
                 }
                 return false;
             }
             this.localPlatformServiceInstances.put(
-                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), platformServiceInstance);
+                platformServiceInstanceID, platformServiceInstance);
             return true;
         }
         finally
