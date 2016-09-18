@@ -937,15 +937,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         try
         {
-            String instanceForService =
+            final IValue instanceForService =
                 this.registryProxy.getRpc(PlatformRegistry.GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE).execute(
-                    TextValue.valueOf(serviceFamily)).textValue();
+                    TextValue.valueOf(serviceFamily));
             if (instanceForService == null)
             {
                 Log.log("Registry has no service registered for '", serviceFamily, "'");
                 return null;
             }
-            return this.registryProxy.getRemoteRecordImage(instanceForService, getRegistryReconnectPeriodMillis());
+            return this.registryProxy.getRemoteRecordImage(instanceForService.textValue(),
+                getRegistryReconnectPeriodMillis());
         }
         catch (Exception e)
         {
