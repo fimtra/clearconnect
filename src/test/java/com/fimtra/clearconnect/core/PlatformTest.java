@@ -27,12 +27,13 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -94,9 +95,10 @@ public class PlatformTest
 
     static class TestServiceAvailableListener implements IServiceAvailableListener
     {
-        List<String> available = new CopyOnWriteArrayList<String>();
-        List<String> unavailable = new CopyOnWriteArrayList<String>();
-
+        final List<String> available = new ArrayList<String>();
+        final List<String> unavailable = new ArrayList<String>();
+        boolean debug = false;
+        
         @Override
         public String toString()
         {
@@ -106,58 +108,88 @@ public class PlatformTest
         @Override
         public synchronized void onServiceAvailable(String serviceName)
         {
+            if (this.debug)
+            {
+                Log.log(this, ">>>>onServiceAvailable: ", serviceName);
+            }
+            if ("PlatformRegistry".equals(serviceName))
+            {
+                return;
+            }
             this.available.add(serviceName);
-            this.notify();
+            this.notifyAll();
         }
 
         @Override
         public synchronized void onServiceUnavailable(String serviceName)
         {
+            if (this.debug)
+            {
+                Log.log(this, ">>>>onServiceUnavailable: ", serviceName);
+            }
+            if ("PlatformRegistry".equals(serviceName))
+            {
+                return;
+            }
             this.unavailable.add(serviceName);
-            this.notify();
+            this.notifyAll();
         }
 
-        void verifyOnServiceAvailableCalled(long timeout, String... order)
+        synchronized void verifyOnServiceAvailableCalled(long timeout, String... order)
         {
             checkContains(timeout, this.available, order);
+            if (this.debug)
+            {
+                Log.log(this, ">>>>on after verifyOnServiceAvailableCalled: ", this.available.toString());
+            }
         }
 
-        void verifyOnServiceUnavailableCalled(long timeout, String... order)
+        synchronized void verifyOnServiceUnavailableCalled(long timeout, String... order)
         {
             checkContains(timeout, this.unavailable, order);
+            if (this.debug)
+            {
+                Log.log(this, ">>>>on after verifyOnServiceUnavailableCalled: ", this.unavailable.toString());
+            }
         }
 
-        void verifyNoMoreInteractions()
+        synchronized void verifyNoMoreInteractions()
         {
             assertTrue("Got: " + this, this.unavailable.size() == 0 && this.available.size() == 0);
         }
 
         private synchronized void checkContains(long timeout, List<String> list, String... availableOrder)
         {
-            long remains = timeout;
-            long start = System.currentTimeMillis();
-            final List<String> expected = Arrays.asList(availableOrder);
-            boolean containsAll = list.containsAll(expected);
-
-            while (!containsAll)
+            try
             {
-                try
+                long remains = timeout;
+                long start = System.currentTimeMillis();
+                final List<String> expected = Arrays.asList(availableOrder);
+                boolean containsAll = list.containsAll(expected);
+
+                while (!containsAll)
                 {
-                    wait(remains);
+                    try
+                    {
+                        wait(remains);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    remains = timeout - (System.currentTimeMillis() - start);
+                    containsAll = list.containsAll(expected);
+                    if (remains <= 0)
+                    {
+                        break;
+                    }
                 }
-                catch (InterruptedException e)
-                {
-                    e.printStackTrace();
-                }
-                remains = timeout - (System.currentTimeMillis() - start);
-                containsAll = list.containsAll(expected);
-                if (remains <= 0)
-                {
-                    break;
-                }
+                assertTrue("Got: " + this, containsAll);
             }
-            assertTrue("Got: " + this, containsAll);
-            list.clear();
+            finally
+            {
+                list.clear();
+            }
         }
 
     }
@@ -315,18 +347,18 @@ public class PlatformTest
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
         
         final TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
-        agent.addServiceAvailableListener(serviceListener);
+        this.agent.addServiceAvailableListener(serviceListener);
         TestServiceInstanceAvailableListener serviceInstanceListener = new TestServiceInstanceAvailableListener();
-        agent.addServiceInstanceAvailableListener(serviceInstanceListener);
+        this.agent.addServiceInstanceAvailableListener(serviceInstanceListener);
      
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // stop the registry
-        registry.destroy();
+        this.registry.destroy();
         
         serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));
+        serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // bit of a sleep for I/O to settle so we can re-create on the same port
         int i = 0;
@@ -334,7 +366,7 @@ public class PlatformTest
         {
             while (i++ < 10)
             {
-                new Socket(registryHost, registryPort).close();
+                new Socket(this.registryHost, registryPort).close();
                 Thread.sleep(200);
             }
         }
@@ -348,7 +380,7 @@ public class PlatformTest
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
         
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, primary));        
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));        
     }
     
     
@@ -517,14 +549,23 @@ public class PlatformTest
             
             this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
 
+            // wait for both instances to be registered - otherwise we can get interleaving
+            // available-unavailable-available signals in the test which causes false failures
+            IServiceInstanceAvailableListener l2 = mock(IServiceInstanceAvailableListener.class);
+            this.agent.addServiceInstanceAvailableListener(l2);
+            verify(l2, timeout(STD_TIMEOUT)).onServiceInstanceAvailable(
+                eq(PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)));
+            verify(l2, timeout(STD_TIMEOUT)).onServiceInstanceAvailable(
+                eq(PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)));
+
             TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
             this.agent.addServiceAvailableListener(serviceListener);
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
+            serviceListener.verifyNoMoreInteractions();
 
             this.agent.waitForPlatformService(SERVICE1);
 
-            // 2 times! once when the listener is added, again when the registry says "you;re standby"
-            verify(ftStatusListener2, timeout(activateTimeout).times(2)).onStandby(eq(SERVICE1), eq(this.secondary));
+            verify(ftStatusListener2, timeout(activateTimeout).times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
             
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY");
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
@@ -534,6 +575,7 @@ public class PlatformTest
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.secondary);
 
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
+            serviceListener.verifyNoMoreInteractions();
 
             Log.log(this, ">>>>> recreating SERVICE1 PRIMARY");
             // recreate the first service instance again
@@ -544,6 +586,7 @@ public class PlatformTest
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener3);
 
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
+            serviceListener.verifyNoMoreInteractions();
                 
             verify(ftStatusListener3, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             // note: standby may or may not be called - depends on timings
@@ -554,8 +597,8 @@ public class PlatformTest
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
-                
             serviceListener.verifyNoMoreInteractions();
+
             verifyNoMoreInteractions(ftStatusListener1);
             verifyNoMoreInteractions(ftStatusListener2);
             verifyNoMoreInteractions(ftStatusListener3);
@@ -618,8 +661,8 @@ public class PlatformTest
     public void testLocalServiceAddRemove() throws IOException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
-        final String SERVICE3 = name.getMethodName() + "3";
+        final String SERVICE2 = this.name.getMethodName() + "2";
+        final String SERVICE3 = this.name.getMethodName() + "3";
         createAgent();
         boolean platformService =
             this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -693,8 +736,8 @@ public class PlatformTest
     public void testAddServiceAvailableListenerAfterCreatingService() throws IOException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
-        final String SERVICE3 = name.getMethodName() + "3";
+        final String SERVICE2 = this.name.getMethodName() + "2";
+        final String SERVICE3 = this.name.getMethodName() + "3";
         createAgent();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -738,7 +781,7 @@ public class PlatformTest
     public void testDuplicatePortBetweenAgents() throws IOException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE2 = this.name.getMethodName() + "2";
         createAgent();
         createAgent008();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
@@ -751,7 +794,7 @@ public class PlatformTest
     public void testServiceDetectedBetweenAgents() throws IOException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE2 = this.name.getMethodName() + "2";
         createAgent();
         createAgent008();
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
@@ -877,7 +920,8 @@ public class PlatformTest
         {
             Thread.sleep(100);
         }
-        assertTrue(proxy.getAllRpcs().size() > 0);
+        final int size = proxy.getAllRpcs().size();
+        assertTrue("Got: " + size, size > 0);
 
         listener.verifyNoMoreInteractions();
         listener2.verifyNoMoreInteractions();
@@ -912,7 +956,7 @@ public class PlatformTest
     public void testUsingServiceProxiesBetweenServices() throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE2 = this.name.getMethodName() + "2";
         Log.log(this, ">>>>> START testUsingServiceProxiesBetweenServices");
         createAgent();
         createAgent008();
@@ -960,7 +1004,7 @@ public class PlatformTest
     public void testDetectWhenPlatformRegistryDestroyed() throws InterruptedException, IOException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE2 = this.name.getMethodName() + "2";
         createAgent();
         createAgent008();
         final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
@@ -1097,7 +1141,7 @@ public class PlatformTest
         InterruptedException
     {
         final String SERVICE1 = logStart();
-        final String SERVICE2 = name.getMethodName() + "2";
+        final String SERVICE2 = this.name.getMethodName() + "2";
 
         Log.log(this, ">>>>> START testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
 

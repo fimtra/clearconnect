@@ -71,6 +71,13 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.agentMaxServiceRegisterTries=2</code><br>
          */
         String PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES = BASE + "agentMaxServiceRegisterTries";
+        
+        /**
+         * The system property name to define the timeout the registry uses when executing the
+         * "ftServiceInstanceStatus" RPC on a service it connects to.<br>
+         * E.g. <code>-Dplatform.rpcFtServiceStatusTimeoutMillis=5000</code><br>
+         */
+        String REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS = BASE + "rpcFtServiceStatusTimeoutMillis";
     }
 
     /**
@@ -133,6 +140,17 @@ public abstract class PlatformCoreProperties
          */
         int PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES = Integer.parseInt(System.getProperty(
             Names.PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES, "3"));
+        
+        /**
+         * The timeout the registry will use for executing the "ftServiceInstanceStatus" RPC on a
+         * service it connects to.
+         * <p>
+         * Default is: 5000
+         * 
+         * @see Names#REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS
+         */
+        long REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
+            Names.REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS, "5000"));
     }
 
     private PlatformCoreProperties()

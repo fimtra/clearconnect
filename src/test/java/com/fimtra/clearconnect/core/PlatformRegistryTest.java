@@ -19,7 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -131,7 +131,9 @@ public class PlatformRegistryTest
         // the platform registry adds itself as a service
         checkSize(1, 0, this.candidate.services);
         checkZeroSize(this.candidate.monitoredServiceInstances);
-        checkZeroSize(this.candidate.masterInstancePerFtService);
+        checkZeroSize(this.candidate.pendingMasterInstancePerFtService);
+        checkZeroSize(this.candidate.confirmedMasterInstancePerFtService);
+        checkZeroSize(this.candidate.pendingPlatformServices);
 
         // the platform registry adds its records as a service instance
         checkSize(0, 1, this.candidate.recordsPerServiceInstance);
@@ -160,7 +162,7 @@ public class PlatformRegistryTest
             record.getSubMapKeys().size());
     }
 
-    private static void checkZeroSize(ConcurrentMap<?, ?> map)
+    private static void checkZeroSize(Map<?, ?> map)
     {
         assertEquals(0, map.size());
     }
