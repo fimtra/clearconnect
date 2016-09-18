@@ -1404,7 +1404,7 @@ public final class ProxyContext implements IObserverContext
      */
     public boolean isConnected()
     {
-        return this.channel.isConnected();
+        return this.channel != null && this.channel.isConnected();
     }
 
     public String getChannelString()
