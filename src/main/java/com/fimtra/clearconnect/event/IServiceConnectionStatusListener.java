@@ -20,7 +20,20 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
 /**
  * A listener that provides notifications when the connection state of a
  * {@link IPlatformServiceProxy} changes.
+ * <p>
+ * The state transition model is:
  * 
+ * <pre>
+ * onConnected -> onDisconnected -> onReconnecting
+ *     ^                ^                 |
+ *     |                |                 |
+ *     ------------------------------------
+ * </pre>
+ * 
+ * The starting state depends on the state of the connection at the point in time that the listener
+ * was registered.
+ * 
+ * @see IPlatformServiceProxy#addServiceConnectionStatusListener(IServiceConnectionStatusListener)
  * @author Ramon Servadei
  */
 public interface IServiceConnectionStatusListener
@@ -46,8 +59,8 @@ public interface IServiceConnectionStatusListener
     void onReconnecting(String serviceFamily, int identityHash);
 
     /**
-     * Called when a platform service proxy is disconnected from its service. Generally, the
-     * {@link #onReconnecting(IPlatformServiceProxy, int)} will be called some-time after this.
+     * Called when a platform service proxy is disconnected from its service. The
+     * {@link #onReconnecting(IPlatformServiceProxy, int)} will be called a short time after this.
      * 
      * @param serviceFamily
      *            the name of the service that is now disconnected
