@@ -16,11 +16,17 @@
 package com.fimtra.datafission.core.session;
 
 /**
+ * A component that manages session events occurring for connections
+ * 
  * @author Ramon Servadei
  */
 public interface ISessionManager
 {
     /**
+     * Called when an inbound connection has been completed. Creating a session is the first action
+     * performed on the new connection and can result in the connection either continuing or being
+     * disconnected.
+     * <p>
      * Given the array of String details, the manager creates a unique session ID to represent the
      * logical session that this represents
      * 
@@ -33,7 +39,8 @@ public interface ISessionManager
     String createSession(String[] sessionAttributes);
 
     /**
-     * Informs the manager that the session with the sessionId has ended.
+     * Called when a previously valid inbound connection closes. This informs the manager that the
+     * session with the sessionId has ended.
      * 
      * @param sessionId
      *            the session ID returned from {@link #createSession(String[])}
