@@ -24,6 +24,14 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * <p>
  * This listener allows application code to detect when an {@link IPlatformServiceInstance} receives
  * a new proxy connection.
+ * <p>
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one service, the callback methods are
+ * guaranteed to not execute concurrently. However, they may be executed by different threads.
+ * <li>When a listener instance is registered with multiple services, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @author Ramon Servadei
  */

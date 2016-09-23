@@ -15,12 +15,21 @@
  */
 package com.fimtra.clearconnect.event;
 
+import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 
 /**
  * Receives notifications when platform services become available/unavailable across the entire
  * platform that the registry service manages. A platform service is available when there is at
  * least one platform service <b>instance</b> that supports the platform service.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformRegistryAgent}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple agents, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @see IPlatformServiceInstance
  * @author Ramon Servadei

@@ -15,6 +15,8 @@
  */
 package com.fimtra.clearconnect.event;
 
+import com.fimtra.clearconnect.IPlatformServiceProxy;
+
 /**
  * A listener that provides notifications when records are 'connected', 'connecting' or
  * 'disconnected'. Initially a record has a 'connected' state (this reflects the proxy being
@@ -25,6 +27,14 @@ package com.fimtra.clearconnect.event;
  * <p>
  * This effectively gives a reflection of the network connection between the component and the
  * service and provides the means to detect when data for a record is valid or stale.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformServiceProxy}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple proxies, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @author Ramon Servadei
  */

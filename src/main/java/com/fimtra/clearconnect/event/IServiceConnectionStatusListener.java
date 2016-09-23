@@ -32,6 +32,14 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * 
  * The starting state depends on the state of the connection at the point in time that the listener
  * was registered.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformServiceProxy}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple components, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @see IPlatformServiceProxy#addServiceConnectionStatusListener(IServiceConnectionStatusListener)
  * @author Ramon Servadei

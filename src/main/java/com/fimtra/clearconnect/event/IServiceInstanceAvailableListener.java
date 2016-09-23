@@ -15,6 +15,8 @@
  */
 package com.fimtra.clearconnect.event;
 
+import com.fimtra.clearconnect.IPlatformRegistryAgent;
+
 /**
  * Receives notifications when platform service <b>instances</b> become available/unavailable across
  * the entire platform that the registry service manages. This instance may be part of a
@@ -22,6 +24,14 @@ package com.fimtra.clearconnect.event;
  * <p>
  * This is a low-level service listener for applications that know what they are doing with service
  * instance connections!
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformRegistryAgent}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple agents, the callback methods may execute
+ * concurrently.
+ * </ul>
  * 
  * @see
  * @author Ramon Servadei

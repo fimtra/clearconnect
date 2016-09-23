@@ -17,6 +17,13 @@ package com.fimtra.clearconnect.event;
 
 /**
  * Receives notifications when the agent is connected/disconnected to the platform registry.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one agent, the callback methods are
+ * guaranteed to not execute concurrently. However, they may be executed by different threads.
+ * <li>When a listener instance is registered with multiple agents, the callback methods may execute
+ * concurrently.
+ * </ul>
  * 
  * @author Ramon Servadei
  */

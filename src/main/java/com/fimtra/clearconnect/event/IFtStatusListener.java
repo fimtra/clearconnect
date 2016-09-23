@@ -21,6 +21,14 @@ import com.fimtra.clearconnect.RedundancyModeEnum;
 /**
  * A component that receives notifications when an {@link IPlatformServiceInstance} in
  * {@link RedundancyModeEnum#FAULT_TOLERANT} mode is the master or standby.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformServiceInstance}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple services, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @author Ramon Servadei
  */

@@ -15,9 +15,19 @@
  */
 package com.fimtra.clearconnect.event;
 
+import com.fimtra.clearconnect.IPlatformServiceComponent;
+
 /**
  * A listener that provides notifications when records are added or removed from a platform service
  * component.
+ * <h2>Threading</h2>
+ * <ul>
+ * <li>When a listener instance is registered with only one {@link IPlatformServiceComponent}, the
+ * callback methods are guaranteed to not execute concurrently. However, they may be executed by
+ * different threads.
+ * <li>When a listener instance is registered with multiple components, the callback methods may
+ * execute concurrently.
+ * </ul>
  * 
  * @author Ramon Servadei
  */
