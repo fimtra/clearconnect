@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -361,7 +362,7 @@ public final class PlatformRegistry
      */
     final Map<String, IValue> pendingPlatformServices;
     /** Tracks pending service instances to prevent duplicates */
-    final Map<String, String> pendingPlatformServiceInstances;
+    final ConcurrentMap<String, Object> registrationTokenPerInstance;
     /** Key=service family, Value=PENDING master service instance ID */
     final ConcurrentMap<String, String> pendingMasterInstancePerFtService;
     /** Key=service family, Value=Future with the actual master service instance ID */
@@ -425,7 +426,7 @@ public final class PlatformRegistry
         this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
         this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
         this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
-        this.pendingPlatformServiceInstances = new ConcurrentHashMap<String, String>();
+        this.registrationTokenPerInstance = new ConcurrentHashMap<String, Object>();
 
         this.coalescingExecutor = this.context.getCoreExecutor_internalUseOnly();
         this.eventHandler = new EventHandler(this);
@@ -636,9 +637,10 @@ public final class PlatformRegistry
 
                 try
                 {
-                    PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(serviceFamily,
-                        redundancyMode, agentName, serviceInstanceId, redundancyModeEnum,
-                        TransportTechnologyEnum.valueOf(tte), serviceRecordStructure, args);
+                    PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(
+                        UUID.randomUUID(), serviceFamily, redundancyMode, agentName,
+                        serviceInstanceId, redundancyModeEnum, TransportTechnologyEnum.valueOf(tte),
+                        serviceRecordStructure, args);
                 }
                 catch (Exception e)
                 {
@@ -666,7 +668,7 @@ public final class PlatformRegistry
                     PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
                 try
                 {
-                    PlatformRegistry.this.eventHandler.executeDeregisterPlatformServiceInstance(serviceFamily,
+                    PlatformRegistry.this.eventHandler.executeDeregisterPlatformServiceInstance(null, serviceFamily,
                         serviceInstanceId);
                 }
                 catch (Exception e)
@@ -945,10 +947,10 @@ final class EventHandler
         });
     }
 
-    void executeRegisterServiceInstance(final String serviceFamily, final String redundancyMode,
-        final String agentName, final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
-        final TransportTechnologyEnum transportTechnology, final Map<String, IValue> serviceRecordStructure,
-        final IValue... args)
+    void executeRegisterServiceInstance(final Object registrationToken, final String serviceFamily,
+        final String redundancyMode, final String agentName, final String serviceInstanceId,
+        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
+        final Map<String, IValue> serviceRecordStructure, final IValue... args)
     {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<RuntimeException> registrationFail = new AtomicReference<RuntimeException>(null);
@@ -965,9 +967,9 @@ final class EventHandler
             {
                 try
                 {
-                    checkRegistrationDetailsForServiceInstance_callInFamilyScope(serviceFamily, redundancyMode,
-                        agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology,
-                        args);
+                    checkRegistrationDetailsForServiceInstance_callInFamilyScope(registrationToken, serviceFamily,
+                        redundancyMode, agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum,
+                        transportTechnology, args);
 
                     executeTaskWithIO(new Runnable()
                     {
@@ -976,14 +978,15 @@ final class EventHandler
                         {
                             try
                             {
-                                connectToServiceInstanceThenContinueRegistration(serviceFamily, redundancyMode,
-                                    agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum,
-                                    transportTechnology);
+                                connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily,
+                                    redundancyMode, agentName, serviceRecordStructure, serviceInstanceId,
+                                    redundancyModeEnum, transportTechnology);
                             }
                             catch (Exception e)
                             {
                                 Log.log(EventHandler.this.registry, "Could not connect to " + serviceInstanceId, e);
-                                executeDeregisterPlatformServiceInstance(serviceFamily, serviceInstanceId);
+                                executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily,
+                                    serviceInstanceId);
                             }
                         }
                     });
@@ -1020,8 +1023,22 @@ final class EventHandler
         }
     }
 
-    void executeDeregisterPlatformServiceInstance(final String serviceFamily, final String serviceInstanceId)
+    void executeDeregisterPlatformServiceInstance(Object registrationToken, final String serviceFamily,
+        final String serviceInstanceId)
     {
+        final Object _registrationToken;
+        if (registrationToken == null)
+        {
+            synchronized (this.registry.registrationTokenPerInstance)
+            {
+                _registrationToken = this.registry.registrationTokenPerInstance.get(serviceInstanceId);
+            }
+        }
+        else
+        {
+            _registrationToken = registrationToken;
+        }
+
         execute(new IDescriptiveRunnable()
         {
             @Override
@@ -1039,7 +1056,7 @@ final class EventHandler
             @Override
             public void run()
             {
-                deregisterPlatformServiceInstance_callInFamilyScope(serviceInstanceId);
+                deregisterPlatformServiceInstance_callInFamilyScope(_registrationToken, serviceInstanceId);
             }
         });
     }
@@ -1197,7 +1214,6 @@ final class EventHandler
     }
 
     /**
-     * @param serviceFamily
      * @return a future with the correct instance to use
      */
     private Future<String> selectNextInstance_callInFamilyScope(final String serviceFamily)
@@ -1256,9 +1272,24 @@ final class EventHandler
         return createStubFuture(null);
     }
 
-    private void deregisterPlatformServiceInstance_callInFamilyScope(final String serviceInstanceId)
+    private void deregisterPlatformServiceInstance_callInFamilyScope(final Object registrationToken,
+        final String serviceInstanceId)
     {
-        this.registry.pendingPlatformServiceInstances.remove(serviceInstanceId);
+        synchronized (this.registry.registrationTokenPerInstance)
+        {
+            // if the registration token is not ours or is not there, ignore the deregister
+            if (registrationToken == null
+                || !is.eq(registrationToken, this.registry.registrationTokenPerInstance.get(serviceInstanceId)))
+            {
+                Log.log(this.registry, "Ignoring deregister for service instance ", serviceInstanceId,
+                    " as the operation was completed earlier, token=", "" + registrationToken);
+                return;
+            }
+            else
+            {
+                this.registry.registrationTokenPerInstance.remove(serviceInstanceId);
+            }
+        }
 
         final ProxyContext proxy = this.registry.monitoredServiceInstances.remove(serviceInstanceId);
         if (proxy != null)
@@ -1268,7 +1299,7 @@ final class EventHandler
             final String serviceMember = serviceParts[1];
 
             Log.banner(this.registry, "Deregistering service instance " + serviceInstanceId + " (was monitored with "
-                + proxy.getChannelString() + ")");
+                + proxy.getChannelString() + ") token=" + registrationToken);
 
             executeTaskWithIO(new Runnable()
             {
@@ -1370,10 +1401,11 @@ final class EventHandler
      *             if the registration parameters clash with any in-flight registration
      */
     @SuppressWarnings("unused")
-    private void checkRegistrationDetailsForServiceInstance_callInFamilyScope(final String serviceFamily,
-        final String redundancyMode, final String agentName, final Map<String, IValue> serviceRecordStructure,
-        final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
-        final TransportTechnologyEnum transportTechnology, final IValue... args)
+    private void checkRegistrationDetailsForServiceInstance_callInFamilyScope(final Object registrationToken,
+        final String serviceFamily, final String redundancyMode, final String agentName,
+        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
+        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
+        final IValue... args)
     {
         if (this.registry.monitoredServiceInstances.containsKey(serviceInstanceId))
         {
@@ -1387,10 +1419,15 @@ final class EventHandler
             }
         }
 
-        if (this.registry.pendingPlatformServiceInstances.put(serviceInstanceId, serviceInstanceId) != null)
+        synchronized (this.registry.registrationTokenPerInstance)
         {
-            throw new IllegalStateException("[DUPLICATE INSTANCE] Platform service instance '" + serviceInstanceId
-                + "' is currently being registered or has registered already.");
+            final Object currentToken =
+                this.registry.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
+            if (currentToken != null)
+            {
+                throw new IllegalStateException("[DUPLICATE INSTANCE] Platform service instance " + serviceInstanceId
+                    + " is currently being registered or has registered already with token=" + currentToken);
+            }
         }
 
         // check if there is a conflict in service redundancy type for a pending registration
@@ -1426,10 +1463,10 @@ final class EventHandler
     }
 
     @SuppressWarnings("unused")
-    private void connectToServiceInstanceThenContinueRegistration(final String serviceFamily,
-        final String redundancyMode, final String agentName, final Map<String, IValue> serviceRecordStructure,
-        final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
-        final TransportTechnologyEnum transportTechnology)
+    private void connectToServiceInstanceThenContinueRegistration(final Object registrationToken,
+        final String serviceFamily, final String redundancyMode, final String agentName,
+        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
+        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology)
     {
         // NOTE: this is blocks for the TCP construction...
         // connect to the service using the service's transport technology
@@ -1449,7 +1486,7 @@ final class EventHandler
             @Override
             protected void onPlatformServiceDisconnected()
             {
-                executeDeregisterPlatformServiceInstance(serviceFamily, this.serviceInstanceId);
+                executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, this.serviceInstanceId);
             }
 
             @Override
@@ -1476,18 +1513,34 @@ final class EventHandler
                     {
                         try
                         {
+                            synchronized (registry.registrationTokenPerInstance)
+                            {
+                                final Object currentToken =
+                                    registry.registrationTokenPerInstance.get(serviceInstanceId);
+                                if (!is.eq(registrationToken, currentToken))
+                                {
+                                    Log.log(registry, "Registration token changed for ", serviceInstanceId,
+                                        ". Ignoring connect event, current token=", "" + currentToken,
+                                        ", previous token=", "" + registrationToken);
+                                    return;
+                                }
+                            }
+                            
                             registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(agentName,
                                 serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
 
-                            Log.banner(EventHandler.this.registry, "Registered " + redundancyMode + " service "
-                                + serviceInstanceId + " (monitoring with " + serviceProxy.getChannelString() + ")");
+                            Log.banner(EventHandler.this.registry,
+                                "Registered " + redundancyMode + " service " + serviceInstanceId + " (monitoring with "
+                                    + serviceProxy.getChannelString() + ") token=" + registrationToken);
                         }
                         catch (Exception e)
                         {
                             Log.log(EventHandler.this.registry,
-                                "Error registering service " + serviceInstanceId + ". Will now deregister service.", e);
+                                "Error registering service " + serviceInstanceId
+                                    + ". Will now deregister service, token=" + registrationToken,
+                                e);
 
-                            deregisterPlatformServiceInstance_callInFamilyScope(serviceInstanceId);
+                            deregisterPlatformServiceInstance_callInFamilyScope(registrationToken, serviceInstanceId);
                         }
                     }
                 });
@@ -1680,7 +1733,7 @@ final class EventHandler
         }
         catch (Exception e)
         {
-            executeDeregisterPlatformServiceInstance(serviceFamily, activeServiceInstanceId);
+            executeDeregisterPlatformServiceInstance(null, serviceFamily, activeServiceInstanceId);
             return false;
         }
         return true;
