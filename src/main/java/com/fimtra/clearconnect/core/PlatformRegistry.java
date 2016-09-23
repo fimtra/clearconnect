@@ -1477,8 +1477,14 @@ final class EventHandler
                 PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology,
                 PlatformRegistry.SERVICE_NAME);
 
-        this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
+        final ProxyContext previous = this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
         serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
+        
+        if (previous != null)
+        {
+            Log.log(this.registry, "Previous connection found for ", serviceInstanceId, "...destroying it...");
+            previous.destroy();
+        }
 
         // setup monitoring of the service instance via the proxy
         new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
@@ -1513,13 +1519,13 @@ final class EventHandler
                     {
                         try
                         {
-                            synchronized (registry.registrationTokenPerInstance)
+                            synchronized (EventHandler.this.registry.registrationTokenPerInstance)
                             {
                                 final Object currentToken =
-                                    registry.registrationTokenPerInstance.get(serviceInstanceId);
+                                    EventHandler.this.registry.registrationTokenPerInstance.get(serviceInstanceId);
                                 if (!is.eq(registrationToken, currentToken))
                                 {
-                                    Log.log(registry, "Registration token changed for ", serviceInstanceId,
+                                    Log.log(EventHandler.this.registry, "Registration token changed for ", serviceInstanceId,
                                         ". Ignoring connect event, current token=", "" + currentToken,
                                         ", previous token=", "" + registrationToken);
                                     return;
