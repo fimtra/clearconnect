@@ -1063,7 +1063,7 @@ public final class ProxyContext implements IObserverContext
             // update the connection status
             ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
 
-            final Set<String> recordNames = new HashSet<String>(ProxyContext.this.context.getSubscribedRecords());
+            final List<String> recordNames = ProxyContext.this.context.getSubscribedRecords();
 
             // remove any local system record subscriptions (the 'local' system records of
             // the remote context are subscribed for as RemoteContextXYZ, not ContextXYZ)
@@ -1513,7 +1513,7 @@ public final class ProxyContext implements IObserverContext
         }
 
         // NOTE: we need to process SUBSCRIBED records, not the records in the context
-        final Set<String> recordNames = new HashSet<String>(this.context.getSubscribedRecords());
+        final List<String> recordNames = this.context.getSubscribedRecords();
         recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
 
         Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
@@ -1611,7 +1611,7 @@ public final class ProxyContext implements IObserverContext
     }
 
     @Override
-    public Set<String> getSubscribedRecords()
+    public List<String> getSubscribedRecords()
     {
         return this.context.getSubscribedRecords();
     }

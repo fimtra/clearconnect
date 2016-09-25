@@ -106,12 +106,18 @@ public class SubscriptionManagerTest
         assertEquals(1, this.candidate.getSubscribersFor(K1).length);
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K1), (S1)));
 
+        assertEquals(1, this.candidate.subscribeOrder.size());
+        assertTrue(this.candidate.subscribeOrder.contains(K1));
+        
         // add K1->S1_AND2
         assertTrue(this.candidate.addSubscriberFor(K1, S1_AND_2));
         assertNotNull(this.candidate.getSubscribersFor(K1));
         assertEquals(2, this.candidate.getSubscribersFor(K1).length);
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K1), (S1)));
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K1), (S1_AND_2)));
+
+        assertEquals(1, this.candidate.subscribeOrder.size());
+        assertTrue(this.candidate.subscribeOrder.contains(K1));
 
         // add K2->S2
         assertTrue(this.candidate.addSubscriberFor(K2, S2));
@@ -120,6 +126,10 @@ public class SubscriptionManagerTest
         assertNotNull(this.candidate.getSubscribersFor(K2));
         assertEquals(1, this.candidate.getSubscribersFor(K2).length);
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K2), (S2)));
+
+        assertEquals(2, this.candidate.subscribeOrder.size());
+        assertEquals(K1, this.candidate.subscribeOrder.get(0));
+        assertEquals(K2, this.candidate.subscribeOrder.get(1));
      
         // add K2->S1_AND_2
         assertTrue(this.candidate.addSubscriberFor(K2, S1_AND_2));
@@ -127,6 +137,10 @@ public class SubscriptionManagerTest
         assertEquals(2, this.candidate.getSubscribersFor(K2).length);
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K2), (S2)));
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K2), (S1_AND_2)));
+
+        assertEquals(2, this.candidate.subscribeOrder.size());
+        assertEquals(K1, this.candidate.subscribeOrder.get(0));
+        assertEquals(K2, this.candidate.subscribeOrder.get(1));
         
         // remove K2->S1_AND_2
         assertTrue(this.candidate.removeSubscriberFor(K2, S1_AND_2));
@@ -135,6 +149,16 @@ public class SubscriptionManagerTest
         assertNotNull(this.candidate.getSubscribersFor(K2));
         assertEquals(1, this.candidate.getSubscribersFor(K2).length);
         assertTrue(ArrayUtils.containsInstance(this.candidate.getSubscribersFor(K2), (S2)));
+
+        assertEquals(2, this.candidate.subscribeOrder.size());
+        assertEquals(K1, this.candidate.subscribeOrder.get(0));
+        assertEquals(K2, this.candidate.subscribeOrder.get(1));
+        
+        assertTrue(this.candidate.removeSubscriberFor(K2, S2));
+        assertFalse(this.candidate.removeSubscriberFor(K2, S2));
+        
+        assertEquals("Got:" + this.candidate.subscribeOrder, 1, this.candidate.subscribeOrder.size());
+        assertTrue(this.candidate.subscribeOrder.contains(K1));
 
         // check K1 subscriptions
         assertNotNull(this.candidate.getSubscribersFor(K1));

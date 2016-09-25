@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -317,10 +318,11 @@ public interface IObserverContext
     ScheduledExecutorService getUtilityExecutor();
 
     /**
-     * @return the names of the records that are currently subscribed for via calls to
-     *         {@link #addObserver(IRecordListener, String...)}
+     * @return a <b>copy</b> of the list of the names of the records that are currently subscribed
+     *         for via calls to {@link #addObserver(IRecordListener, String...)}, order of list
+     *         entry reflects order of subscribe
      */
-    Set<String> getSubscribedRecords();
+    List<String> getSubscribedRecords();
 
     /**
      * Execute the {@link ISequentialRunnable} using the core {@link Executor} of the context

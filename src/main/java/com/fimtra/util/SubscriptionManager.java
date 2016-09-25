@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -40,6 +39,10 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
     /** Tracks the list of observers for a name. The list uses copy-on-write semantics */
     final ConcurrentMap<SUBSCRIPTION_KEY, SUBSCRIBER[]> subscribersPerKey =
         new ConcurrentHashMap<SUBSCRIPTION_KEY, SUBSCRIBER[]>(2);
+        
+    /** tracks subscribe order */
+    final List<SUBSCRIPTION_KEY> subscribeOrder =
+        Collections.synchronizedList(new ArrayList<SUBSCRIPTION_KEY>());
 
     /**
      * Construct the subscription manager passing in the class for the subscriber. This is required
@@ -100,6 +103,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         {
             current = (SUBSCRIBER[]) Array.newInstance(this.subscriberClass, 1);
             current[0] = subscriber;
+            this.subscribeOrder.add(key);
         }
         else
         {
@@ -147,6 +151,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         else
         {
             this.subscribersPerKey.remove(key);
+            this.subscribeOrder.remove(key);
         }
         return removed;
     }
@@ -169,19 +174,23 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      */
     public SUBSCRIBER[] removeSubscribersFor(SUBSCRIPTION_KEY key)
     {
+        this.subscribeOrder.remove(key);
         return this.subscribersPerKey.remove(key);
     }
 
     /**
-     * @return the set of subscription keys for this manager
+     * <b>Calls to this method should be synchronized.</b>
+     * 
+     * @return a new List with the subscription keys, in subscribe order, for this manager
      */
-    public Set<SUBSCRIPTION_KEY> getAllSubscriptionKeys()
+    public List<SUBSCRIPTION_KEY> getAllSubscriptionKeys()
     {
-        return Collections.unmodifiableSet(this.subscribersPerKey.keySet());
+        return new ArrayList<SUBSCRIPTION_KEY>(this.subscribeOrder);
     }
 
     public void destroy()
     {
         this.subscribersPerKey.clear();
+        this.subscribeOrder.clear();
     }
 }
