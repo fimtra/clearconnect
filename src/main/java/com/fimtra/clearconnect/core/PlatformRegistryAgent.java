@@ -783,7 +783,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
                 final TransportTechnologyEnum transportTechnology =
                     PlatformUtils.getTransportTechnologyFromServiceInfoRecord(serviceInfoRecord);
-                proxy = new PlatformServiceProxy(this, serviceInstanceId, codec, host, port, transportTechnology);
+                proxy = new PlatformServiceProxy(this, serviceFamily, codec, host, port, transportTechnology);
                 proxy.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
                     codec.getFrameEncodingFormat(), new IEndPointAddressFactory()
                     {
