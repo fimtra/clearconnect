@@ -1,6 +1,6 @@
 {
   "name": "ClearConnect",
   "tagline": "open-source micro services platform",
-  "body": "# ClearConnect\r\n> an open-source micro services platform written in Java.\r\n\r\nApplications built with ClearConnect instantly get these out-of-the-box features:\r\n* real-time data transfer\r\n* high-availability\r\n* real-time monitoring and data inspection\r\n\r\nClearConnect makes developing distributed applications quick and easy by providing a simple API and tools.",
+  "body": "# ClearConnect\r\n> an open-source micro services platform written in Java.\r\n\r\nFeatures:\r\n* real-time data transfer\r\n* high-availability\r\n* real-time monitoring and data inspection\r\n\r\nClearConnect makes developing distributed applications quick and easy by providing a simple API and tools.",
   "note": "Don't delete this file! It's used internally to help with page regeneration."
 }
