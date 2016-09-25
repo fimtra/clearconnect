@@ -363,6 +363,11 @@ public class TcpChannel implements ITransportChannel
     void readFrames()
     {
         long start = System.nanoTime();
+        long connected = 0;
+        long readFrames = 0;
+        long resolveFrames = 0;
+        long processFrames = 0;
+        int size = 0;
         try
         {
             final int readCount = this.socketChannel.read(this.rxFrames);
@@ -393,11 +398,13 @@ public class TcpChannel implements ITransportChannel
                         + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected", e);
                 }
             }
+            connected = System.nanoTime();
 
             this.readerWriter.readFrames(this.readFrames);
+            readFrames = System.nanoTime();
 
             byte[] data = null;
-            int size = this.readFrames.size();
+            size = this.readFrames.size();
             int i = 0;
             for (i = 0; i < size; i++)
             {
@@ -407,7 +414,8 @@ public class TcpChannel implements ITransportChannel
                     this.resolvedFrames.add(data);
                 }
             }
-
+            resolveFrames = System.nanoTime();
+            
             size = this.resolvedFrames.size();
             for (i = 0; i < size; i++)
             {
@@ -434,6 +442,7 @@ public class TcpChannel implements ITransportChannel
                         }
                 }
             }
+            processFrames = System.nanoTime();
         }
         catch (IOException e)
         {
@@ -445,7 +454,11 @@ public class TcpChannel implements ITransportChannel
             if (elapsedTimeNanos > Values.SLOW_RX_FRAME_THRESHOLD_NANOS)
             {
                 Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
-                    Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms");
+                    Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [connected=",
+                    Long.toString(((long) ((connected - start) * _INVERSE_1000000))), "ms, read(", Integer.toString(size), ")=",
+                    Long.toString(((long) ((readFrames - connected) * _INVERSE_1000000))), "ms, resolve=",
+                    Long.toString(((long) ((resolveFrames - readFrames) * _INVERSE_1000000))), "ms, process=",
+                    Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
             }
         }
     }
