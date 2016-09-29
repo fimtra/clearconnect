@@ -66,6 +66,7 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
+import com.fimtra.util.LazyObject.IDestructor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
@@ -184,11 +185,20 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services are discovered.
      */
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
-        final IObserverContext context, String servicesRecordName, final Object logContext)
+        final IObserverContext context, final String servicesRecordName, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
-            new NotifyingCache<IServiceAvailableListener, String>()
+            new NotifyingCache<IServiceAvailableListener, String>(
+                new IDestructor<NotifyingCache<IServiceAvailableListener, String>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IServiceAvailableListener, String> ref)
+                    {
+                        context.removeObserver(listenerReference.get(), servicesRecordName);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -202,7 +212,7 @@ public class PlatformUtils
                     listener.onServiceUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
@@ -233,7 +243,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, servicesRecordName);
+        };
+        listenerReference.set(observer);
+        context.addObserver(observer, servicesRecordName);
         awaitUpdateLatch(logContext, servicesRecordName, updateWaitLatch);
         return serviceAvailableListeners;
     }
@@ -242,11 +254,20 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services INSTANCES are discovered.
      */
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
-        final IObserverContext context, String serviceInstancesPerServiceRecordName, final Object logContext)
+        final IObserverContext context, final String serviceInstancesPerServiceRecordName, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
-            new NotifyingCache<IServiceInstanceAvailableListener, String>()
+            new NotifyingCache<IServiceInstanceAvailableListener, String>(
+                new IDestructor<NotifyingCache<IServiceInstanceAvailableListener, String>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IServiceInstanceAvailableListener, String> ref)
+                    {
+                        context.removeObserver(listenerReference.get(), serviceInstancesPerServiceRecordName);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -262,7 +283,7 @@ public class PlatformUtils
                     listener.onServiceInstanceUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
@@ -300,7 +321,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, serviceInstancesPerServiceRecordName);
+        };
+        listenerReference.set(observer);
+        context.addObserver(observer, serviceInstancesPerServiceRecordName);
         awaitUpdateLatch(logContext, serviceInstancesPerServiceRecordName, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
@@ -310,11 +333,20 @@ public class PlatformUtils
      * context.
      */
     static NotifyingCache<IRecordAvailableListener, String> createRecordAvailableNotifyingCache(
-        final IObserverContext context, String contextRecordsRecordName, final Object logContext)
+        final IObserverContext context, final String contextRecordsRecordName, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
-            new NotifyingCache<IRecordAvailableListener, String>()
+            new NotifyingCache<IRecordAvailableListener, String>(
+                new IDestructor<NotifyingCache<IRecordAvailableListener, String>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IRecordAvailableListener, String> ref)
+                    {
+                        context.removeObserver(listenerReference.get(), contextRecordsRecordName);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordAvailableListener listener, String key, String data)
@@ -328,7 +360,7 @@ public class PlatformUtils
                     listener.onRecordUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -345,7 +377,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextRecordsRecordName);
+        };
+        listenerReference.set(observer);
+        context.addObserver(observer, contextRecordsRecordName);
         awaitUpdateLatch(logContext, contextRecordsRecordName, updateWaitLatch);
         return recordAvailableNotifyingCache;
     }
@@ -355,11 +389,20 @@ public class PlatformUtils
      * context.
      */
     static NotifyingCache<IRpcAvailableListener, IRpcInstance> createRpcAvailableNotifyingCache(
-        final IObserverContext context, String contextRpcRecordName, final Object logContext)
+        final IObserverContext context, final String contextRpcRecordName, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
-            new NotifyingCache<IRpcAvailableListener, IRpcInstance>()
+            new NotifyingCache<IRpcAvailableListener, IRpcInstance>(
+                new IDestructor<NotifyingCache<IRpcAvailableListener, IRpcInstance>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IRpcAvailableListener, IRpcInstance> ref)
+                    {
+                        context.removeObserver(listenerReference.get(), contextRpcRecordName);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataAdded(IRpcAvailableListener listener, String key, IRpcInstance data)
@@ -373,7 +416,7 @@ public class PlatformUtils
                     listener.onRpcUnavailable(data);
                 }
             };
-        context.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -407,7 +450,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextRpcRecordName);
+        };
+        listenerReference.set(observer);
+        context.addObserver(observer, contextRpcRecordName);
         awaitUpdateLatch(logContext, contextRpcRecordName, updateWaitLatch);
         return rpcAvailableNotifyingCache;
     }
@@ -417,11 +462,20 @@ public class PlatformUtils
      * context.
      */
     static NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> createSubscriptionNotifyingCache(
-        final IObserverContext context, String contextSubscriptionsRecordName, final Object logContext)
+        final IObserverContext context, final String contextSubscriptionsRecordName, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
-            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>()
+            new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(
+                new IDestructor<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> ref)
+                    {
+                        context.removeObserver(listenerReference.get(), contextSubscriptionsRecordName);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordSubscriptionListener listener, String key,
@@ -437,7 +491,7 @@ public class PlatformUtils
                     // noop
                 }
             };
-        context.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -472,7 +526,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, contextSubscriptionsRecordName);
+        };
+        listenerReference.set(observer);
+        context.addObserver(observer, contextSubscriptionsRecordName);
         awaitUpdateLatch(logContext, contextSubscriptionsRecordName, updateWaitLatch);
         return subscriptionNotifyingCache;
     }
@@ -483,9 +539,19 @@ public class PlatformUtils
     static NotifyingCache<IRecordConnectionStatusListener, IValue> createRecordConnectionStatusNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
-            new NotifyingCache<IRecordConnectionStatusListener, IValue>()
+            new NotifyingCache<IRecordConnectionStatusListener, IValue>(
+                new IDestructor<NotifyingCache<IRecordConnectionStatusListener, IValue>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IRecordConnectionStatusListener, IValue> ref)
+                    {
+                        proxyContext.removeObserver(listenerReference.get(),
+                            ProxyContext.RECORD_CONNECTION_STATUS_NAME);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataRemoved(IRecordConnectionStatusListener listener, String key,
@@ -514,7 +580,7 @@ public class PlatformUtils
                     }
                 }
             };
-        proxyContext.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
@@ -532,7 +598,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
+        };
+        listenerReference.set(observer);
+        proxyContext.addObserver(observer, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
         awaitUpdateLatch(logContext, ProxyContext.RECORD_CONNECTION_STATUS_NAME, updateWaitLatch);
         return recordStatusNotifyingCache;
     }
@@ -543,9 +611,18 @@ public class PlatformUtils
     static NotifyingCache<IProxyConnectionListener, IValue> createProxyConnectionNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionNotifyingCache =
-            new NotifyingCache<IProxyConnectionListener, IValue>()
+            new NotifyingCache<IProxyConnectionListener, IValue>(
+                new IDestructor<NotifyingCache<IProxyConnectionListener, IValue>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IProxyConnectionListener, IValue> ref)
+                    {
+                        proxyContext.removeObserver(listenerReference.get(), ISystemRecordNames.CONTEXT_CONNECTIONS);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataRemoved(IProxyConnectionListener listener, String key, IValue data)
@@ -559,7 +636,7 @@ public class PlatformUtils
                     listener.onConnected(key);
                 }
             };
-        proxyContext.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             final Map<String, String> current = new HashMap<String, String>();
 
@@ -612,7 +689,9 @@ public class PlatformUtils
                 }
                 updateWaitLatch.countDown();
             }
-        }, ISystemRecordNames.CONTEXT_CONNECTIONS);
+        };
+        listenerReference.set(observer);
+        proxyContext.addObserver(observer, ISystemRecordNames.CONTEXT_CONNECTIONS);
         awaitUpdateLatch(logContext, ISystemRecordNames.CONTEXT_CONNECTIONS, updateWaitLatch);
         return proxyConnectionNotifyingCache;
     }
@@ -623,9 +702,18 @@ public class PlatformUtils
     static NotifyingCache<IServiceConnectionStatusListener, Connection> createServiceConnectionStatusNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
-            new NotifyingCache<IServiceConnectionStatusListener, Connection>()
+            new NotifyingCache<IServiceConnectionStatusListener, Connection>(
+                new IDestructor<NotifyingCache<IServiceConnectionStatusListener, Connection>>()
+                {
+                    @Override
+                    public void destroy(NotifyingCache<IServiceConnectionStatusListener, Connection> ref)
+                    {
+                        proxyContext.removeObserver(listenerReference.get(), ISystemRecordNames.CONTEXT_STATUS);
+                    }
+                })
             {
                 @Override
                 protected void notifyListenerDataRemoved(IServiceConnectionStatusListener listener, String key,
@@ -654,7 +742,7 @@ public class PlatformUtils
                     }
                 }
             };
-        proxyContext.addObserver(new IRecordListener()
+        final IRecordListener observer = new IRecordListener()
         {
             @Override
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
@@ -663,7 +751,9 @@ public class PlatformUtils
                 serviceStatusNotifyingCache.notifyListenersDataAdded(Connection.class.getSimpleName(), status);
                 updateWaitLatch.countDown();
             }
-        }, ISystemRecordNames.CONTEXT_STATUS);
+        };
+        listenerReference.set(observer);
+        proxyContext.addObserver(observer, ISystemRecordNames.CONTEXT_STATUS);
         awaitUpdateLatch(logContext, ISystemRecordNames.CONTEXT_STATUS, updateWaitLatch);
         return serviceStatusNotifyingCache;
     }
@@ -967,14 +1057,16 @@ public class PlatformUtils
         return ConfigUtils.getPlatformServiceInstance(serviceName, serviceMemberName, config, agent);
     }
 
-	/**
-	 * Checks if a record name is used by ClearConnect.
-	 * 
-	 * @param recordName
-	 *            the record name to check
-	 * @return true if the recordName is used by ClearConnect
-	 */
-	public static boolean isClearConnectRecord(String recordName) {
-		return (ContextUtils.isSystemRecordName(recordName)) || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName);
-	}
+    /**
+     * Checks if a record name is used by ClearConnect.
+     * 
+     * @param recordName
+     *            the record name to check
+     * @return true if the recordName is used by ClearConnect
+     */
+    public static boolean isClearConnectRecord(String recordName)
+    {
+        return (ContextUtils.isSystemRecordName(recordName))
+            || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName);
+    }
 }

@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.fimtra.util.LazyObject.IDestructor;
+
 /**
  * Utility that caches data and notifies listeners of a specific type when data is added or removed.
  * Listeners are notified either synchronously or asynchronously, depending on which constructor is
@@ -57,15 +59,31 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final Lock readLock;
     final Lock writeLock;
     List<LISTENER_CLASS> listeners;
+    final IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor;
 
     /**
      * Construct a <b>synchronously</b> updating instance
      */
     public NotifyingCache()
     {
-        this(SYNCHRONOUS_EXECUTOR);
+        this(new IDestructor<NotifyingCache<LISTENER_CLASS, DATA>>()
+        {
+            @Override
+            public void destroy(NotifyingCache<LISTENER_CLASS, DATA> ref)
+            {
+                // noop
+            }
+        }, SYNCHRONOUS_EXECUTOR);
     }
-
+    
+    /**
+     * Construct a <b>synchronously</b> updating instance
+     */
+    public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor)
+    {
+        this(destructor, SYNCHRONOUS_EXECUTOR);
+    }
+    
     /**
      * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
      * executor MUST be a single threaded executor. A multi-threaded executor may produce
@@ -73,6 +91,24 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     public NotifyingCache(Executor executor)
     {
+        this(new IDestructor<NotifyingCache<LISTENER_CLASS, DATA>>()
+        {
+            @Override
+            public void destroy(NotifyingCache<LISTENER_CLASS, DATA> ref)
+            {
+                // noop
+            }
+        }, executor);
+    }
+    
+    /**
+     * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
+     * executor MUST be a single threaded executor. A multi-threaded executor may produce
+     * out-of-sequence updates.</b>
+     */
+    public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor, Executor executor)
+    {
+        this.destructor = destructor;
         this.cache = new LinkedHashMap<String, DATA>(2);
         this.listeners = new ArrayList<LISTENER_CLASS>(1);
         this.executor = executor;
@@ -172,7 +208,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         {
                             return;
                         }
-                        
+
                         final Map<String, DATA> clone;
 
                         // hold the lock and add the listener in the task to ensure the listener is
@@ -232,6 +268,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
             if (this.executor == SYNCHRONOUS_EXECUTOR)
             {
+                // todo use an image notifying executor with 60 sec thread timeout, queue size=0
+
                 // create a new thread to handle initial image notification - prevents any chance of
                 // stalling due to any deadlock in the alien method notifyListenerDataAdded
                 ThreadUtils.newThread(addTask, "image-notifier-" + ObjectUtils.safeToString(listener)).start();
@@ -374,6 +412,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     public final void destroy()
     {
+        this.destructor.destroy(this);
         this.listeners.clear();
         this.cache.clear();
     }
