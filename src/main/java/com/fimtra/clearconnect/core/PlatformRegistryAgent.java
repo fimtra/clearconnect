@@ -861,21 +861,23 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         try
         {
             Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-            
+
             this.agentExecutor.shutdownNow();
+
+            try
+            {
+                this.serviceAvailableListeners.destroy();
+                this.serviceInstanceAvailableListeners.destroy();
+                this.registryAvailableListeners.destroy();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this, "Could not destroy listener notifiers", e);
+            }
             
             if (this.dynamicAttributeUpdateTask != null)
             {
                 this.dynamicAttributeUpdateTask.cancel(false);
-            }
-            try
-            {
-                this.registryProxy.destroy();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformRegistryAgent.this,
-                    "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
             }
 
             for (PlatformServiceInstance service : this.localPlatformServiceInstances.values())
@@ -912,9 +914,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 }
             }
 
-            this.serviceAvailableListeners.destroy();
-            this.serviceInstanceAvailableListeners.destroy();
-            this.registryAvailableListeners.destroy();
+            try
+            {
+                this.registryProxy.destroy();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this,
+                    "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
+            }
         }
         finally
         {
