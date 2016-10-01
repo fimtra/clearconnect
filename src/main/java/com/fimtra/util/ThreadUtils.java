@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -40,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class ThreadUtils
 {
+    final static ScheduledExecutorService UTILS_EXECUTOR = ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+    
     /**
      * Logs the exception generated in the run method of a delegate runnable.
      * 
@@ -186,11 +189,33 @@ public abstract class ThreadUtils
      */
     public static final ScheduledExecutorService newScheduledExecutorService(final String threadName, final int threadCount)
     {
+        return newScheduledExecutorService(threadName, threadCount, 0);
+    }
+    
+    /**
+     * Returns an executor service for scheduling tasks to be run in the future.
+     * <p>
+     * <b>NOTE:</b> all submitted {@link Runnable} tasks are wrapped in a
+     * {@link ExceptionLoggingRunnable} to log any exception
+     * 
+     * @see Executors#newScheduledThreadPool(int, ThreadFactory)
+     */
+    public static final ScheduledExecutorService newScheduledExecutorService(final String threadName,
+        final int threadCount, final int keepAliveTimeMillis)
+    {
         return new ScheduledExecutorService()
         {
-            final ScheduledExecutorService newScheduledThreadPool = Executors.newScheduledThreadPool(threadCount,
-                newDaemonThreadFactory(threadName));
-
+            final ScheduledExecutorService newScheduledThreadPool =
+                Executors.newScheduledThreadPool(threadCount, newDaemonThreadFactory(threadName));
+            {
+                if (keepAliveTimeMillis > 0)
+                {
+                    ((ScheduledThreadPoolExecutor) this.newScheduledThreadPool).setKeepAliveTime(keepAliveTimeMillis,
+                        TimeUnit.MILLISECONDS);
+                    ((ScheduledThreadPoolExecutor) this.newScheduledThreadPool).setCorePoolSize(0);
+                    ((ScheduledThreadPoolExecutor) this.newScheduledThreadPool).setMaximumPoolSize(threadCount);
+                }
+            }
             @Override
             public ScheduledFuture<?> schedule(final Runnable command, long delay, TimeUnit unit)
             {
@@ -368,9 +393,10 @@ public abstract class ThreadUtils
     {
         return new ScheduledExecutorService()
         {
+            // todo add keepAliveTimeMillis and remove ContextUtils RECONNECT_TASKS and UTILITY_SCHEDULER
             private final ScheduledExecutorService delegate = newScheduledExecutorService(threadName, threadCount);
             private final String name = threadName;
-
+            
             @Override
             public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit)
             {

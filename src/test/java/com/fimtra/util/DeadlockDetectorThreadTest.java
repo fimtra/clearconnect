@@ -15,6 +15,7 @@
  */
 package com.fimtra.util;
 
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
@@ -41,9 +42,9 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        final AtomicBoolean flag = DeadlockDetector.newDeadlockDetectorThread("lasers", 50, observer, false);
+        final Future<?> flag = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
-        flag.set(false);
+        flag.cancel(false);
         Thread.sleep(200);
 
         DeadlockDetectorTest.createDeadlock();
@@ -60,7 +61,7 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        DeadlockDetector.newDeadlockDetectorThread("lasers", 50, observer, false);
+        DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
         Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(Matchers.any(ThreadInfoWrapper[].class));
     }

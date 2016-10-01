@@ -95,7 +95,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     static
     {
-        DeadlockDetector.newDeadlockDetectorThread("deadlock-detector", 60000, new DeadlockObserver()
+        DeadlockDetector.newDeadlockDetectorTask(60000, new DeadlockObserver()
         {
             @Override
             public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)

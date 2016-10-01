@@ -18,7 +18,6 @@ package com.fimtra.util;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,11 +29,10 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ObjectPool<T>
 {
-    final static ScheduledExecutorService poolLogger = ThreadUtils.newScheduledExecutorService("object-pool-logger", 1);
     final static List<ObjectPool<?>> pools = new LowGcLinkedList<ObjectPool<?>>();
     static
     {
-        poolLogger.scheduleAtFixedRate(new Runnable()
+        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(new Runnable()
         {
             @Override
             public void run()

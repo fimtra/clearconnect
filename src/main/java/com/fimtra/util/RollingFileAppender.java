@@ -23,7 +23,6 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -82,9 +81,6 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
             throw new IOException("Cannot write to file: " + file);
         }
     }
-
-    private final static ScheduledExecutorService DELETE_EXECUTOR = ThreadUtils.newScheduledExecutorService(
-        "RollingFileAppender-delete", 1);
 
     /**
      * Combines the interfaces {@link Appendable}, {@link Flushable} and {@link Closeable}
@@ -304,7 +300,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
             throw new IOException("Cannot have negative or 0 maximum characters");
         }
 
-        this.logDeleteTask = DELETE_EXECUTOR.scheduleAtFixedRate(new Runnable()
+        this.logDeleteTask = ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(new Runnable()
         {
             @Override
             public void run()

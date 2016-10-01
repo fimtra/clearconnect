@@ -25,14 +25,14 @@ import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.Date;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Uses a {@link ThreadMXBean} to detect deadlocks.
  * <p>
- * Use {@link #newDeadlockDetectorThread(String, long, DeadlockObserver, boolean)} to create a
- * thread to check for deadlocks.
+ * Use {@link #newDeadlockDetectorTask(long, DeadlockObserver, boolean)} to create a
+ * task to check for deadlocks.
  * <p>
  * Also dumps all threads to a file.
  * 
@@ -42,7 +42,7 @@ public final class DeadlockDetector
 {
     /**
      * An observer that receives events when threads are deadlocked. Registered via
-     * {@link DeadlockDetector#newDeadlockDetectorThread(String, long, DeadlockObserver, boolean)}
+     * {@link DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)}
      * 
      * @author Ramon Servadei
      */
@@ -52,24 +52,21 @@ public final class DeadlockDetector
     }
 
     /**
-     * Create and start a <b>daemon</b> thread that checks for deadlocks at the specified period.
-     * Deadlocks are written to System.err first then passed to the deadlockObserver for handling.
+     * Start a task that checks for deadlocks at the specified period. Deadlocks are written to
+     * System.err first then passed to the deadlockObserver for handling.
      * <p>
-     * This thread will also dump the current active threads to a file. The file is either static or
+     * This task will also dump the current active threads to a file. The file is either static or
      * rolling.
      * 
      * @param rollingThreaddumpFile
      *            <code>true</code> to dump threads to a rolling log file, <code>false</code> for a
      *            static file
      * 
-     * @return an AtomicBoolean that can be set to false to stop the detection and terminate the
-     *         thread
+     * @return an Future that can terminate the task
      */
-    public static final AtomicBoolean newDeadlockDetectorThread(String threadName, final long checkPeriodMillis,
+    public static final Future<?> newDeadlockDetectorTask(final long checkPeriodMillis,
         final DeadlockObserver deadlockObserver, final boolean rollingThreaddumpFile)
     {
-        final AtomicBoolean active = new AtomicBoolean(true);
-
         final Runnable task = new Runnable()
         {
             final DeadlockDetector deadlockDetector = new DeadlockDetector();
@@ -113,82 +110,67 @@ public final class DeadlockDetector
                     staticFile = null;
                 }
 
-                while (active.get())
+                try
                 {
-                    try
+                    if (this.appender != null || staticFile != null)
                     {
-                        if (this.appender != null || staticFile != null)
+                        final ThreadInfoWrapper[] threads = this.deadlockDetector.getThreadInfoWrappers();
+                        if (threads != null)
                         {
-                            final ThreadInfoWrapper[] threads = this.deadlockDetector.getThreadInfoWrappers();
-                            if (threads != null)
+                            StringBuilder sb = new StringBuilder(1024);
+                            for (int i = 0; i < threads.length; i++)
                             {
-                                StringBuilder sb = new StringBuilder(1024);
-                                for (int i = 0; i < threads.length; i++)
+                                sb.append(threads[i].toString());
+                            }
+                            if (this.appender != null)
+                            {
+                                this.appender.append("========  ").append(new Date().toString()).append("  ======").append(
+                                    SystemUtils.lineSeparator());
+                                this.appender.append(sb);
+                                this.appender.flush();
+                            }
+                            else
+                            {
+                                if (staticFile != null)
                                 {
-                                    sb.append(threads[i].toString());
-                                }
-                                if (this.appender != null)
-                                {
-                                    this.appender.append("========  ").append(new Date().toString()).append("  ======").append(
-                                        SystemUtils.lineSeparator());
-                                    this.appender.append(sb);
-                                    this.appender.flush();
-                                }
-                                else
-                                {
-                                    if (staticFile != null)
+                                    PrintWriter staticThreadDump = new PrintWriter(staticFile);
+                                    try
                                     {
-                                        PrintWriter staticThreadDump = new PrintWriter(staticFile);
-                                        try
-                                        {
-                                            staticThreadDump.append("========  ").append(new Date().toString()).append(
-                                                "  ======").append(SystemUtils.lineSeparator());
-                                            staticThreadDump.append(sb);
-                                            staticThreadDump.flush();
-                                        }
-                                        finally
-                                        {
-                                            staticThreadDump.close();
-                                        }
+                                        staticThreadDump.append("========  ").append(new Date().toString()).append(
+                                            "  ======").append(SystemUtils.lineSeparator());
+                                        staticThreadDump.append(sb);
+                                        staticThreadDump.flush();
+                                    }
+                                    finally
+                                    {
+                                        staticThreadDump.close();
                                     }
                                 }
                             }
                         }
+                    }
 
-                        final ThreadInfoWrapper[] deadlocks = this.deadlockDetector.findDeadlocks();
-                        if (deadlocks != null)
+                    final ThreadInfoWrapper[] deadlocks = this.deadlockDetector.findDeadlocks();
+                    if (deadlocks != null)
+                    {
+                        StringBuilder sb = new StringBuilder(1024);
+                        sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
+                        for (int i = 0; i < deadlocks.length; i++)
                         {
-                            StringBuilder sb = new StringBuilder(1024);
-                            sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                            for (int i = 0; i < deadlocks.length; i++)
-                            {
-                                sb.append(deadlocks[i].toString());
-                            }
-                            Log.log(ThreadUtils.class, sb.toString());
-                            deadlockObserver.onDeadlockFound(deadlocks);
+                            sb.append(deadlocks[i].toString());
                         }
+                        Log.log(ThreadUtils.class, sb.toString());
+                        deadlockObserver.onDeadlockFound(deadlocks);
                     }
-                    catch (Exception e)
-                    {
-                        Log.log(this, "Exception during processing, will continue processing", e);
-                    }
-                    
-                    // sleep OUTSIDE the loop so we don't spam if there are continual exceptions!
-                    try
-                    {
-                        Thread.sleep(checkPeriodMillis);
-                    }
-                    catch (InterruptedException e)
-                    {
-                        // don't care
-                    }
+                }
+                catch (Exception e)
+                {
+                    Log.log(this, "Exception during processing, will continue processing", e);
                 }
             }
         };
-        Thread detectorThread = ThreadUtils.newThread(task, threadName);
-        detectorThread.setDaemon(true);
-        detectorThread.start();
-        return active;
+        return ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(task, checkPeriodMillis, checkPeriodMillis,
+            TimeUnit.MILLISECONDS);
     }
 
     final ThreadMXBean threadMxBean;
