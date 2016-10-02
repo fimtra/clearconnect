@@ -72,6 +72,7 @@ import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * A proxy context allows a local runtime to observe records from a single {@link Context} in a
@@ -1481,7 +1482,14 @@ public final class ProxyContext implements IObserverContext
                 @Override
                 public void run()
                 {
-                    reconnect();
+                    ThreadUtils.newDaemonThread(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            reconnect();
+                        }
+                    }, "reconnect-" + getName()).start();
                 }
             }, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
