@@ -1072,23 +1072,14 @@ public class Publisher
                 @Override
                 public void run()
                 {
-                    ContextUtils.CORE_EXECUTOR.execute(new Runnable()
+                    if (Publisher.this.pendingSubscribes.remove(key) == null)
                     {
-                        @Override
-                        public void run()
-                        {
-                            if (Publisher.this.pendingSubscribes.remove(key) == null)
-                            {
-                                // if it is null, an unsubscribe happened before the subscribe was
-                                // handled
-                                nokSubscribes.add(name);
-                                finallyTask.run();
-                                return;
-                            }
-                            proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes,
-                                finallyTask);
-                        }
-                    });
+                        // if it is null, an unsubscribe happened before the subscribe was handled
+                        nokSubscribes.add(name);
+                        finallyTask.run();
+                        return;
+                    }
+                    proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes, finallyTask);
                 }
             }, this.pendingSubscribes.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
                 TimeUnit.MICROSECONDS));
