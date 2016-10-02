@@ -55,6 +55,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -646,8 +647,8 @@ public class Publisher
         }
     }
 
-    final ConcurrentMap<String, Future<?>> pendingResyncs;
-    final ConcurrentMap<String, Future<?>> pendingSubscribes;
+    final ConcurrentMap<Pair<String, String>, Future<?>> pendingResyncs;
+    final ConcurrentMap<Pair<String, String>, Future<?>> pendingSubscribes;
     final Map<ITransportChannel, ProxyContextPublisher> proxyContextPublishers;
     final Context context;
     final ICodec mainCodec;
@@ -703,8 +704,8 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new ReentrantLock();
-        this.pendingResyncs = new ConcurrentHashMap<String, Future<?>>();
-        this.pendingSubscribes = new ConcurrentHashMap<String, Future<?>>();
+        this.pendingResyncs = new ConcurrentHashMap<Pair<String, String>, Future<?>>();
+        this.pendingSubscribes = new ConcurrentHashMap<Pair<String, String>, Future<?>>();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
@@ -975,10 +976,11 @@ public class Publisher
         Log.log(this, "(<-) unsubscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
         ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
+        final String clientString = client.toString();
         Future<?> future;
         for (String name : recordNames)
         {
-            future = this.pendingSubscribes.remove(name);
+            future = this.pendingSubscribes.remove(new Pair<String, String>(name, clientString));
             if (future != null)
             {
                 // even if there is a concurrent subscribe, the actions occur on a sequential
@@ -995,15 +997,17 @@ public class Publisher
         Log.log(this, "(<-) re-sync ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
+        final String clientString = client.toString();
         for (final String name : recordNames)
         {
             // this is a throttle to reduce image flooding on the network due to mass resyncs
-            this.pendingResyncs.put(name, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            final Pair<String, String> key = new Pair<String, String>(name, clientString);
+            this.pendingResyncs.put(key, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    Publisher.this.pendingResyncs.remove(name);
+                    Publisher.this.pendingResyncs.remove(key);
                     proxyContextPublisher.resync(name);
                 }
             }, this.pendingResyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
@@ -1016,34 +1020,73 @@ public class Publisher
         // the first item is always the permission token
         final String permissionToken = recordNames.remove(0);
 
-        Log.log(this, "(<-) subscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
-            ObjectUtils.safeToString(client));
+        // break up into batches
+        int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
+        int batchCounter = 0;
+        List<String> batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+        final int size = recordNames.size();
+        int i;
+        for (i = 0; i < size; i++)
+        {
+            batchSubscribeRecordNames.add(recordNames.get(i));
+            if (++batchCounter > batchSize)
+            {
+                subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
+                batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchCounter = 0;
+            }
+        }
+        subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
+    }
+
+    private void subscribeBatch(final List<String> recordNames, final ITransportChannel client,
+        final String permissionToken, int current, int total)
+    {
+        Log.log(this, "(<-) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
+            ObjectUtils.safeToString(recordNames.toString()), " from ", ObjectUtils.safeToString(client));
         
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new ArrayList<String>(recordNames.size());
         final List<String> nokSubscribes = new ArrayList<String>(recordNames.size());
-
+        final String clientString = client.toString();
+        final Runnable finallyTask = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
+                {
+                    sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                    sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                }
+            }
+        };
+        
         for (final String name : recordNames)
         {
             // this is a throttle for inbound subscribes, reduces initial image flooding on the
             // network due to mass subscription
-            // todo pendingSubscribes don't account for same record being subscribed from multiple clients
-            this.pendingSubscribes.put(name, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            final Pair<String, String> key = new Pair<String, String>(name, clientString);
+            this.pendingSubscribes.put(key, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    Publisher.this.pendingSubscribes.remove(name);
-                    proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes, new Runnable()
+                    ContextUtils.CORE_EXECUTOR.execute(new Runnable()
                     {
                         @Override
                         public void run()
                         {
-                            if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
+                            if (Publisher.this.pendingSubscribes.remove(key) == null)
                             {
-                                sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                                sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                                // if it is null, an unsubscribe happened before the subscribe was
+                                // handled
+                                nokSubscribes.add(name);
+                                finallyTask.run();
+                                return;
                             }
+                            proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes,
+                                finallyTask);
                         }
                     });
                 }

@@ -1637,6 +1637,29 @@ public final class ProxyContext implements IObserverContext
 
     void subscribe(final String permissionToken, final String[] recordsToSubscribeFor)
     {
+        final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
+        int batchCounter = 0;
+        List<String> batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+        final int size = recordsToSubscribeFor.length;
+        int i;
+        for (i = 0; i < size; i++)
+        {
+            batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
+            if (++batchCounter > batchSize)
+            {
+                subscribeBatch(permissionToken,
+                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchCounter = 0;
+            }
+        }
+        subscribeBatch(permissionToken,
+            batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+    }
+
+    private void subscribeBatch(final String permissionToken, final String[] recordsToSubscribeFor, int current,
+        int total)
+    {
         if (ProxyContext.this.channel instanceof ISubscribingChannel)
         {
             for (int i = 0; i < recordsToSubscribeFor.length; i++)
@@ -1646,7 +1669,8 @@ public final class ProxyContext implements IObserverContext
         }
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
-        Log.log(this, "(->) subscribe ", Arrays.toString(recordsToSubscribeFor));
+        Log.log(this, "(->) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
+            Arrays.toString(recordsToSubscribeFor));
     }
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
@@ -1676,10 +1700,9 @@ public final class ProxyContext implements IObserverContext
         {
             entry = it.next();
             token = entry.getKey();
-            records = entry.getValue();
+            records = entry.getValue();            
             subscribe(token, records.toArray(new String[records.size()]));
         }
-
     }
 
     void finalEncodeAndSendToPublisher(byte[] data)

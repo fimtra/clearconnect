@@ -167,7 +167,7 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.deltaCountLogThreshold=6</code>
          */
         String DELTA_COUNT_LOG_THRESHOLD = BASE + "deltaCountLogThreshold";
-
+        
         /**
          * The number of microseconds to delay the processing of each subscribe message. This
          * reduces image flooding when a {@link ProxyContext} reconnects to a bounced
@@ -175,6 +175,14 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.subscribeDelayMicros=100</code>
          */
         String SUBSCRIBE_DELAY_MICROS = BASE + "subscribeDelayMicros";
+
+        /**
+         * The batch size to break a mass subscribe into smaller parts for processing. This helps to
+         * reduce image flooding when a {@link ProxyContext} reconnects to a bounced
+         * {@link Context}. <br>
+         * E.g. <code>-DdataFission.subscribeBatchSize=50</code>
+         */
+        String SUBSCRIBE_BATCH_SIZE = BASE + "subscribeBatchSize";
     }
 
     /**
@@ -197,7 +205,7 @@ public abstract class DataFissionProperties
 
         /**
          * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all
-         * DataFission {@link Context} instances in the runtime. 
+         * DataFission {@link Context} instances in the runtime.
          * <p>
          * Default is minimum of 4 OR 1x available CPU cores in the host runtime.
          * 
@@ -351,7 +359,7 @@ public abstract class DataFissionProperties
          * @see Names#DELTA_COUNT_LOG_THRESHOLD
          */
         int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
-
+        
         /**
          * The delay between handling subsequent subscribe messages.
          * <p>
@@ -360,6 +368,15 @@ public abstract class DataFissionProperties
          * @see Names#SUBSCRIBE_DELAY_MICROS
          */
         int SUBSCRIBE_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_DELAY_MICROS, "100"));
+
+        /**
+         * The batch size for handling mass subscribes.
+         * <p>
+         * Default is 50.
+         * 
+         * @see Names#SUBSCRIBE_BATCH_SIZE
+         */
+        int SUBSCRIBE_BATCH_SIZE = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_BATCH_SIZE, "50"));
     }
 
     private DataFissionProperties()
