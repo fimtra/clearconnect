@@ -332,6 +332,7 @@ public final class PlatformRegistry
     final Publisher publisher;
     int reconnectPeriodMillis = DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS;
     final ConcurrentMap<String, ProxyContext> monitoredServiceInstances;
+    final ConcurrentMap<String, PlatformServiceConnectionMonitor> connectionMonitors;
     /** @see IRegistryRecordNames#SERVICES */
     final IRecord services;
     /** @see IRegistryRecordNames#SERVICE_INSTANCES_PER_SERVICE_FAMILY */
@@ -423,6 +424,7 @@ public final class PlatformRegistry
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
         this.monitoredServiceInstances = new ConcurrentHashMap<String, ProxyContext>();
+        this.connectionMonitors = new ConcurrentHashMap<String, PlatformServiceConnectionMonitor>();
         this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
         this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
         this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
@@ -736,6 +738,22 @@ public final class PlatformRegistry
         // NOTE: destroy proxies AFTER destroying the publisher and context - we don't want to tell
         // the agents that the services are de-registered - doing this when the publisher is dead
         // means we can't send any messages to the agents.
+        PlatformServiceConnectionMonitor monitor = null;
+        for (String serviceInstanceId : this.connectionMonitors.keySet())
+        {
+            try
+            {
+                monitor = this.connectionMonitors.remove(serviceInstanceId);
+                if (monitor != null)
+                {
+                    monitor.destroy();
+                }
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(monitor), e);
+            }
+        }
         ProxyContext proxy = null;
         for (String serviceInstanceId : this.monitoredServiceInstances.keySet())
         {
@@ -1278,8 +1296,8 @@ final class EventHandler
         synchronized (this.registry.registrationTokenPerInstance)
         {
             // if the registration token is not ours or is not there, ignore the deregister
-            if (registrationToken == null
-                || !is.eq(registrationToken, this.registry.registrationTokenPerInstance.get(serviceInstanceId)))
+            final Object currentToken = this.registry.registrationTokenPerInstance.get(serviceInstanceId);
+            if (registrationToken == null || (currentToken != null && !is.eq(registrationToken, currentToken)))
             {
                 Log.log(this.registry, "Ignoring deregister for service instance ", serviceInstanceId,
                     " as the operation was completed earlier, token=", "" + registrationToken);
@@ -1291,6 +1309,12 @@ final class EventHandler
             }
         }
 
+        final PlatformServiceConnectionMonitor connectionMonitor =
+            this.registry.connectionMonitors.remove(serviceInstanceId);
+        if (connectionMonitor != null)
+        {
+            connectionMonitor.destroy();
+        }
         final ProxyContext proxy = this.registry.monitoredServiceInstances.remove(serviceInstanceId);
         if (proxy != null)
         {
@@ -1301,14 +1325,7 @@ final class EventHandler
             Log.banner(this.registry, "Deregistering service instance " + serviceInstanceId + " (was monitored with "
                 + proxy.getChannelString() + ") token=" + registrationToken);
 
-            executeTaskWithIO(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    proxy.destroy();
-                }
-            });
+            proxy.destroy();
 
             // remove the service instance info record
             this.registry.context.removeRecord(
@@ -1462,7 +1479,6 @@ final class EventHandler
         }
     }
 
-    @SuppressWarnings("unused")
     private void connectToServiceInstanceThenContinueRegistration(final Object registrationToken,
         final String serviceFamily, final String redundancyMode, final String agentName,
         final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
@@ -1476,18 +1492,37 @@ final class EventHandler
                 PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
                 PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology,
                 PlatformRegistry.SERVICE_NAME);
+        serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
 
         final ProxyContext previous = this.registry.monitoredServiceInstances.put(serviceInstanceId, serviceProxy);
-        serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
-        
+
+        // setup monitoring of the service instance via the proxy
+        final PlatformServiceConnectionMonitor monitor = createConnectionMonitor(registrationToken, serviceFamily,
+            redundancyMode, agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, serviceProxy);
+
+        final PlatformServiceConnectionMonitor previousMonitor =
+            this.registry.connectionMonitors.put(serviceInstanceId, monitor);
+
+        // destroy the previous monitor first
+        if (previousMonitor != null)
+        {
+            Log.log(this.registry, "Previous connection monitor found for ", serviceInstanceId, "...destroying it...");
+            previousMonitor.destroy();
+        }
+
         if (previous != null)
         {
             Log.log(this.registry, "Previous connection found for ", serviceInstanceId, "...destroying it...");
             previous.destroy();
         }
+    }
 
-        // setup monitoring of the service instance via the proxy
-        new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
+    private PlatformServiceConnectionMonitor createConnectionMonitor(final Object registrationToken,
+        final String serviceFamily, final String redundancyMode, final String agentName,
+        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
+        final RedundancyModeEnum redundancyModeEnum, final ProxyContext serviceProxy)
+    {
+        return new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
         {
             @Override
             protected void onPlatformServiceDisconnected()
@@ -1525,13 +1560,13 @@ final class EventHandler
                                     EventHandler.this.registry.registrationTokenPerInstance.get(serviceInstanceId);
                                 if (!is.eq(registrationToken, currentToken))
                                 {
-                                    Log.log(EventHandler.this.registry, "Registration token changed for ", serviceInstanceId,
-                                        ". Ignoring connect event, current token=", "" + currentToken,
-                                        ", previous token=", "" + registrationToken);
+                                    Log.log(EventHandler.this.registry, "Registration token changed for ",
+                                        serviceInstanceId, ". Ignoring connect event, current token=",
+                                        "" + currentToken, ", previous token=", "" + registrationToken);
                                     return;
                                 }
                             }
-                            
+
                             registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(agentName,
                                 serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
 
@@ -1541,10 +1576,8 @@ final class EventHandler
                         }
                         catch (Exception e)
                         {
-                            Log.log(EventHandler.this.registry,
-                                "Error registering service " + serviceInstanceId
-                                    + ". Will now deregister service, token=" + registrationToken,
-                                e);
+                            Log.log(EventHandler.this.registry, "Error registering service " + serviceInstanceId
+                                + ". Will now deregister service, token=" + registrationToken, e);
 
                             deregisterPlatformServiceInstance_callInFamilyScope(registrationToken, serviceInstanceId);
                         }
@@ -1643,6 +1676,8 @@ final class EventHandler
             {
                 // ignore this update - the service has been de-registered and the connections
                 // update is from a late handled update
+                Log.log(this, "Ignoring connection update from de-registered instance: ", serviceFamily, "[",
+                    serviceMember,"]");
                 return;
             }
         }
@@ -1870,7 +1905,7 @@ final class EventHandler
         }
         catch (Exception e)
         {
-            Log.log(this.registry,
+            Log.log(this,
                 "Could not handle change for " + serviceInstanceId + ", " + ObjectUtils.safeToString(atomicChange), e);
         }
     }

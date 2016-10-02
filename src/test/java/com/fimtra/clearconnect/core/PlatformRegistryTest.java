@@ -134,6 +134,7 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.pendingMasterInstancePerFtService);
         checkZeroSize(this.candidate.confirmedMasterInstancePerFtService);
         checkZeroSize(this.candidate.pendingPlatformServices);
+        checkZeroSize(this.candidate.connectionMonitors);
 
         // the platform registry adds its records as a service instance
         checkSize(0, 1, this.candidate.recordsPerServiceInstance);
