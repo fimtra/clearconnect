@@ -769,23 +769,7 @@ public final class ProxyContext implements IObserverContext
                         @Override
                         public void run()
                         {
-                            int i = 0;
-                            if (ProxyContext.this.channel instanceof ISubscribingChannel)
-                            {
-                                for (i = 0; i < recordsToUnsubscribe.length; i++)
-                                {
-                                    ((ISubscribingChannel) ProxyContext.this.channel).contextUnsubscribed(
-                                        recordsToUnsubscribe[i]);
-                                }
-                            }
-                            finalEncodeAndSendToPublisher(
-                                ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
-
-                            for (i = 0; i < recordsToUnsubscribe.length; i++)
-                            {
-                                ProxyContext.this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
-                            }
-                            Log.log(ProxyContext.this, "(->) unsubscribe ", Arrays.toString(recordsToUnsubscribe));
+                            unsubscribe(recordsToUnsubscribe);
                         }
                     };
                     latch = executeTask(recordsToUnsubscribe, UNSUBSCRIBE, task, null, null);
@@ -1672,6 +1656,49 @@ public final class ProxyContext implements IObserverContext
         Log.log(this, "(->) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
             Arrays.toString(recordsToSubscribeFor));
     }
+    
+    void unsubscribe(final String[] recordsToUnsubscribe)
+    {
+        final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
+        int batchCounter = 0;
+        List<String> batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
+        final int size = recordsToUnsubscribe.length;
+        int i;
+        for (i = 0; i < size; i++)
+        {
+            batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
+            if (++batchCounter > batchSize)
+            {
+                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
+                    size);
+                batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchCounter = 0;
+            }
+        }
+        unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i, size);
+    }
+    
+    private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total)
+    {
+        int i = 0;
+        if (ProxyContext.this.channel instanceof ISubscribingChannel)
+        {
+            for (i = 0; i < recordsToUnsubscribe.length; i++)
+            {
+                ((ISubscribingChannel) ProxyContext.this.channel).contextUnsubscribed(
+                    recordsToUnsubscribe[i]);
+            }
+        }
+        finalEncodeAndSendToPublisher(
+            ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
+
+        for (i = 0; i < recordsToUnsubscribe.length; i++)
+        {
+            ProxyContext.this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
+        }
+        Log.log(ProxyContext.this, "(->) unsubscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
+            Arrays.toString(recordsToUnsubscribe));
+    }
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
     {
@@ -1709,5 +1736,4 @@ public final class ProxyContext implements IObserverContext
     {
         this.channel.sendAsync(this.codec.finalEncode(data));
     }
-
 }
