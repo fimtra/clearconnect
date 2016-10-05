@@ -267,7 +267,7 @@ public class PlatformTest
     private static final int VERIFY_TIMEOUT = 5000;
     private static final int STD_TIMEOUT = 30000;
     private static final int RECONNECT_PERIOD = 1000;
-    private static final String TEST_PLATFORM = "PlatformTestJUnit";
+    private static final String TEST_PLATFORM = "PlatformTestJUnit-";
 
     String registryHost = TcpChannelUtils.LOCALHOST_IP;
     String agentHost = TcpChannelUtils.LOCALHOST_IP;
@@ -284,6 +284,8 @@ public class PlatformTest
     @Before
     public void setup()
     {
+        Log.log(this, "============== START " + this.name.getMethodName() + " =============================");
+        
         ChannelUtils.WATCHDOG.configure(RECONNECT_PERIOD, 10);
 
         registryPort += 1;
@@ -291,7 +293,7 @@ public class PlatformTest
         servicePort2 += 1;
         servicePort3 += 1;
 
-        this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, registryPort);
+        this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
     }
@@ -314,7 +316,7 @@ public class PlatformTest
     @After
     public void teardown() throws InterruptedException
     {
-        Log.log(this, "============== START TEAR DOWN =============================");
+        Log.log(this, "============== START TEAR DOWN " + name.getMethodName() + " =============================");
 
         ThreadUtils.newThread(new Runnable()
         {
@@ -332,7 +334,8 @@ public class PlatformTest
                 }
             }
         }, "tearDown").start();
-        Log.log(this, "============== END TEAR DOWN =============================");
+        
+        Log.log(this, "============== END TEAR DOWN " + name.getMethodName() + " =============================");
 
         ChannelUtils.WATCHDOG.configure(5000);
     }
@@ -375,7 +378,7 @@ public class PlatformTest
         }
      
         // restart the registry, then check we get our services back
-        this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, registryPort);
+        this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
         
@@ -414,7 +417,7 @@ public class PlatformTest
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        assertEquals(TEST_PLATFORM, this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+        assertEquals(getPlatformName(), this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
     }
 
     @Test
@@ -439,6 +442,7 @@ public class PlatformTest
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+        // todo fails here 2x
         assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
             servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
     }
@@ -1105,7 +1109,7 @@ public class PlatformTest
         agentRegistryConnectedLatch.set(new CountDownLatch(1));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
-        PlatformRegistry otherRegistry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, newPort);
+        PlatformRegistry otherRegistry = new PlatformRegistry(getPlatformName(), this.registryHost, newPort);
         try
         {
             this.registry.destroy();
@@ -1119,7 +1123,7 @@ public class PlatformTest
             agentRegistryConnectedLatch.set(new CountDownLatch(1));
 
             // restart the old registry
-            this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, oldPort);
+            this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
 
             // destroy the other, check we connect to the new one
             otherRegistry.destroy();
@@ -1206,7 +1210,7 @@ public class PlatformTest
         agent008RegistryConnectedLatch.set(new CountDownLatch(1));
         agent008RegistryDisconnectedLatch.set(new CountDownLatch(1));
 
-        PlatformRegistry otherRegistry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, newPort);
+        PlatformRegistry otherRegistry = new PlatformRegistry(getPlatformName(), this.registryHost, newPort);
         try
         {
             TestServiceAvailableListener listener = new TestServiceAvailableListener();
@@ -1261,7 +1265,7 @@ public class PlatformTest
             assertNotNull(service1Proxy);
 
             // restart the old registry
-            this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, oldPort);
+            this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
 
             IPlatformServiceProxy oldP1 = service1Proxy;
             IPlatformServiceProxy oldP2 = service2Proxy;
@@ -1356,7 +1360,7 @@ public class PlatformTest
         agentRegistryConnectedLatch.set(new CountDownLatch(1));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
-        PlatformRegistry otherRegistry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, newPort);
+        PlatformRegistry otherRegistry = new PlatformRegistry(getPlatformName(), this.registryHost, newPort);
         try
         {
             TestServiceAvailableListener listener = new TestServiceAvailableListener();
@@ -1394,7 +1398,7 @@ public class PlatformTest
             assertNotNull(service1Proxy);
 
             // restart the old registry
-            this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost, oldPort);
+            this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
 
             IPlatformServiceProxy oldP2 = service1Proxy;
             this.agent.destroyPlatformServiceProxy(SERVICE1);
@@ -1434,7 +1438,7 @@ public class PlatformTest
         final String SERVICE1 = logStart();
 
         this.registry.destroy();
-        this.registry = new PlatformRegistry(TEST_PLATFORM, this.registryHost);
+        this.registry = new PlatformRegistry(getPlatformName(), this.registryHost);
 
         this.agent =
             new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
@@ -1444,7 +1448,12 @@ public class PlatformTest
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        assertEquals(TEST_PLATFORM, this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+        assertEquals(getPlatformName(), this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+    }
+
+    private String getPlatformName()
+    {
+        return TEST_PLATFORM + this.name.getMethodName();
     }
 
     @Test
@@ -2037,7 +2046,7 @@ public class PlatformTest
         });
     }
 
-    private static void verifyPlatformName(final PlatformRegistryAgent agent) throws EventFailedException,
+    private void verifyPlatformName(final PlatformRegistryAgent agent) throws EventFailedException,
         InterruptedException
     {
         waitForEvent(new EventChecker()
@@ -2045,7 +2054,7 @@ public class PlatformTest
             @Override
             public Object expect()
             {
-                return TEST_PLATFORM;
+                return getPlatformName();
             }
 
             @Override

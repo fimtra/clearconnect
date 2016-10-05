@@ -1447,16 +1447,6 @@ final class EventHandler
             }
         }
 
-        // check if there is a conflict in service redundancy type for a pending registration
-        final IValue pendingType = this.registry.pendingPlatformServices.get(serviceFamily);
-        if (pendingType != null && RedundancyModeEnum.valueOf(pendingType.textValue()) != redundancyModeEnum)
-        {
-            throw new IllegalStateException("Platform service '" + serviceFamily + "' is currently being registered as "
-                + RedundancyModeEnum.valueOf(pendingType.textValue()) + " so cannot be also registered as "
-                + redundancyMode + " for " + serviceInstanceId);
-        }
-        this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
-
         switch(redundancyModeEnum)
         {
             case FAULT_TOLERANT:
@@ -1477,6 +1467,9 @@ final class EventHandler
                 throw new IllegalArgumentException(
                     "Unhandled mode '" + redundancyMode + "' for service '" + serviceFamily + "'");
         }
+        
+        // add to pending AFTER checking 
+        this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
     }
 
     private void connectToServiceInstanceThenContinueRegistration(final Object registrationToken,
