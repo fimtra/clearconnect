@@ -15,7 +15,8 @@
  */
 package com.fimtra.clearconnect.core;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -28,12 +29,10 @@ import org.junit.Test;
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.TransportTechnologyEnum;
-import com.fimtra.clearconnect.WireProtocolEnum;
-import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
-import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
-import com.fimtra.tcpchannel.TcpChannel;
+import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 
 /**
@@ -60,19 +59,12 @@ public class PlatformRegistryAgentTest
     }
 
     @Test
-    public void test() throws RegistryNotAvailableException
+    public void testRetryForReRegistering() throws IOException, InterruptedException
     {
         this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),
             new EndPointAddress("localhost", 54321));
         assertTrue(this.candidate.registryProxy.isConnected());
-    }
-
-    @Test
-    public void testRetryForReRegistering() throws IOException, InterruptedException
-    {
-        this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),
-
-            new EndPointAddress("localhost", 54321));
+        
         final String serviceFamily = "family";
         final String serviceMember = "member";
         this.candidate.createPlatformServiceInstance(serviceFamily, serviceMember, TcpChannelUtils.LOCALHOST_IP,
