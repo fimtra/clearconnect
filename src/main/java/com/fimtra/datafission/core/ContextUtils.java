@@ -167,13 +167,6 @@ public class ContextUtils
     final static ScheduledExecutorService UTILITY_SCHEDULER =
         ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    /**
-     * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
-     * tasks
-     */
-    final static ScheduledExecutorService RECONNECT_TASKS = ThreadUtils.newPermanentScheduledExecutorService(
-        "fission-reconnect", DataFissionProperties.Values.RECONNECT_THREAD_COUNT);
-
     static Map<Object, TaskStatistics> coreSequentialStats;
     static RollingFileAppender statisticsLog =
         RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);

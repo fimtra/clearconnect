@@ -72,6 +72,7 @@ import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * A proxy context allows a local runtime to observe records from a single {@link Context} in a
@@ -131,6 +132,13 @@ public final class ProxyContext implements IObserverContext
      */
     public static boolean logRx = Boolean.getBoolean("logRx." + ProxyContext.class.getCanonicalName());
 
+    /**
+     * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
+     * tasks
+     */
+    private final static ScheduledExecutorService RECONNECT_TASKS = ThreadUtils.newPermanentScheduledExecutorService(
+        "fission-reconnect", DataFissionProperties.Values.RECONNECT_THREAD_COUNT);
+    
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
@@ -1101,7 +1109,10 @@ public final class ProxyContext implements IObserverContext
             {
                 if (log)
                 {
-                    Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                    if (!logRx)
+                    {
+                        Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                    }
                 }
 
                 final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
@@ -1149,7 +1160,10 @@ public final class ProxyContext implements IObserverContext
                         {
                             if (log)
                             {
-                                Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
+                                if (!logRx)
+                                {
+                                    Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
+                                }
                             }                      
                             final IRecordListener[] subscribersFor =
                                 ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
@@ -1293,8 +1307,6 @@ public final class ProxyContext implements IObserverContext
     {
         if (this.resyncs.add(name))
         {
-            Log.log(this, "Scheduling re-sync ", name);
-
             // mark the record as disconnected, then reconnecting
             final Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
             lock.lock();
@@ -1309,26 +1321,10 @@ public final class ProxyContext implements IObserverContext
             {
                 lock.unlock();
             }
-
-            ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    // todo when there is a re-sync command, we may not need to check if we are
-                    // subscribed as the receiver will know if there is a subscription to re-sync...
-                    if (ProxyContext.this.context.recordObservers.getSubscribersFor(name).length == 0)
-                    {
-                        Log.log(this, "No longer subscribed, CANCELLING re-sync ", name);
-                        return;
-                    }
-
-                    // todo need to batch up pending commands into a single send
-                    Log.log(this, "(->) re-sync ", name);
-                    final String[] recordNames = new String[] { substituteRemoteNameWithLocalName(name) };
-                    finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(recordNames));
-                }
-            }, this.resyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS, TimeUnit.MICROSECONDS);
+            
+            Log.log(this, "(->) re-sync ", name);
+            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
+                new String[] { substituteRemoteNameWithLocalName(name) }));
         }
         else
         {
@@ -1460,7 +1456,7 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "Resubscribing in ", Long.toString(this.reconnectPeriodMillis), "ms ",
                 ObjectUtils.safeToString(this));
 
-            this.reconnectTask = ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            this.reconnectTask = RECONNECT_TASKS.schedule(new Runnable()
             {
                 @Override
                 public void run()
