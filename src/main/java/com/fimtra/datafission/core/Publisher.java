@@ -18,19 +18,19 @@ package com.fimtra.datafission.core;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.EndPointAddress;
@@ -55,7 +55,6 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -127,8 +126,27 @@ public class Publisher
     static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
         ThreadUtils.newScheduledExecutorService("system-record-publisher", 1);
 
-    final Lock lock;
+    /**
+     * Single-thread executor for handling inbound subscriptions to throttle handling. This prevents
+     * flooding the network with images from a batch subscribe.
+     */
+    static final ScheduledExecutorService SUBSCRIBE_THROTTLE =
+        ThreadUtils.newScheduledExecutorService("subscribe-throttle", 1);
 
+
+    /**
+     * Marks a runnable as a subscribe task and thus a pause is made by the subscribe throttle after
+     * sending
+     * 
+     * @author Ramon Servadei
+     */
+    private static interface ISubscribeTask extends Runnable
+    {
+
+    }
+
+    final Lock lock;
+    
     /**
      * This converts each record's atomic change into the <code>byte[]</code> to transmit and
      * notifies the relevant {@link ProxyContextPublisher} objects that have subscribed for the
@@ -261,10 +279,11 @@ public class Publisher
                                     {
                                         ack = true;
                                     }
+                                    
                                 }
                                 catch (Exception e)
                                 {
-                                    Log.log(Publisher.this.context,
+                                    Log.log(ProxyContextMultiplexer.this,
                                         "Could not get result from addObserver call for permissionToken="
                                             + permissionToken + ", recordName=" + name, e);
                                 }
@@ -282,10 +301,15 @@ public class Publisher
                                         republishImage(name, publisher);
                                         ack = true;
                                     }
+                                    else
+                                    {
+                                        Log.log(ProxyContextMultiplexer.this, "Invalid permission token:",
+                                            permissionToken, " for ", name);
+                                    }
                                 }
                                 catch (Exception e)
                                 {
-                                    Log.log(Publisher.this.context, "Could not add subscriber for permissionToken="
+                                    Log.log(ProxyContextMultiplexer.this, "Could not add subscriber for permissionToken="
                                         + permissionToken + ", recordName=" + name, e);
                                     nokSubscribes.add(name);
                                 }
@@ -647,8 +671,6 @@ public class Publisher
         }
     }
 
-    final ConcurrentMap<Pair<String, String>, Future<?>> pendingResyncs;
-    final ConcurrentMap<Pair<String, String>, Future<?>> pendingSubscribes;
     final Map<ITransportChannel, ProxyContextPublisher> proxyContextPublishers;
     final Context context;
     final ICodec mainCodec;
@@ -660,6 +682,10 @@ public class Publisher
     ScheduledFuture contextConnectionsRecordPublishTask;
     volatile long messagesPublished;
     volatile long bytesPublished;
+
+    final List<Runnable> subscribeTasks;
+    final Runnable throttleTask;
+    volatile boolean throttleRunning;
 
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
@@ -704,10 +730,42 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new ReentrantLock();
-        this.pendingResyncs = new ConcurrentHashMap<Pair<String, String>, Future<?>>();
-        this.pendingSubscribes = new ConcurrentHashMap<Pair<String, String>, Future<?>>();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
+
+        this.subscribeTasks = new LinkedList<Runnable>();
+        this.throttleTask = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Publisher.this.throttleRunning = false;
+
+                Runnable task = null;
+                int size = 0;
+                do
+                {
+                    synchronized (Publisher.this.subscribeTasks)
+                    {
+                        size = Publisher.this.subscribeTasks.size();
+                        if (size > 0)
+                        {
+                            task = Publisher.this.subscribeTasks.remove(0);
+                        }
+                        size--;
+                    }
+                    if (task != null)
+                    {
+                        task.run();
+                    }
+                    if (task instanceof ISubscribeTask)
+                    {
+                        LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
+                    }
+                }
+                while (size > 0);
+            }
+        };
 
         // prepare to periodically publish status changes
         this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
@@ -786,19 +844,19 @@ public class Publisher
                                 {
                                     if (((char[]) decodedMessage).length < maxLogLength)
                                     {
-                                        Log.log(Publisher.class, "(<-) '", new String((char[]) decodedMessage),
+                                        Log.log(Publisher.this, "(<-) '", new String((char[]) decodedMessage),
                                             "' from ", ObjectUtils.safeToString(source));
                                     }
                                     else
                                     {
-                                        Log.log(Publisher.class, "(<-) '",
+                                        Log.log(Publisher.this, "(<-) '",
                                             new String((char[]) decodedMessage, 0, maxLogLength),
                                             "...(too long)' from ", ObjectUtils.safeToString(source));
                                     }
                                 }
                                 else
                                 {
-                                    Log.log(Publisher.class, "(<-) ", command.toString(), " from ",
+                                    Log.log(Publisher.this, "(<-) ", command.toString(), " from ",
                                         ObjectUtils.safeToString(source));
                                 }
                             }
@@ -975,20 +1033,24 @@ public class Publisher
     {
         Log.log(this, "(<-) unsubscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
-        ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-        final String clientString = client.toString();
-        Future<?> future;
-        for (String name : recordNames)
+        final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
+
+        synchronized (this.subscribeTasks)
         {
-            future = this.pendingSubscribes.remove(new Pair<String, String>(name, clientString));
-            if (future != null)
+            for (final String name : recordNames)
             {
-                // even if there is a concurrent subscribe, the actions occur on a sequential
-                // runnable bound to the name so the unsubscribe will happen after the subscribe
-                future.cancel(false);
+                this.subscribeTasks.add(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        proxyContextPublisher.unsubscribe(name);
+                    }
+                });
             }
-            proxyContextPublisher.unsubscribe(name);
         }
+        triggerThrottle();
+
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
     }
 
@@ -997,22 +1059,22 @@ public class Publisher
         Log.log(this, "(<-) re-sync ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-        final String clientString = client.toString();
-        for (final String name : recordNames)
+        
+        synchronized (this.subscribeTasks)
         {
-            // this is a throttle to reduce image flooding on the network due to mass resyncs
-            final Pair<String, String> key = new Pair<String, String>(name, clientString);
-            this.pendingResyncs.put(key, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            for (final String name : recordNames)
             {
-                @Override
-                public void run()
+                this.subscribeTasks.add(new ISubscribeTask()
                 {
-                    Publisher.this.pendingResyncs.remove(key);
-                    proxyContextPublisher.resync(name);
-                }
-            }, this.pendingResyncs.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
-                TimeUnit.MICROSECONDS));
+                    @Override
+                    public void run()
+                    {
+                        proxyContextPublisher.resync(name);
+                    }
+                });
+            }
         }
+        triggerThrottle();
     }
 
     void subscribe(final List<String> recordNames, final ITransportChannel client)
@@ -1044,11 +1106,10 @@ public class Publisher
     {
         Log.log(this, "(<-) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
             ObjectUtils.safeToString(recordNames.toString()), " from ", ObjectUtils.safeToString(client));
-        
+
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new ArrayList<String>(recordNames.size());
         final List<String> nokSubscribes = new ArrayList<String>(recordNames.size());
-        final String clientString = client.toString();
         final Runnable finallyTask = new Runnable()
         {
             @Override
@@ -1061,29 +1122,23 @@ public class Publisher
                 }
             }
         };
-        
-        for (final String name : recordNames)
+
+        synchronized (this.subscribeTasks)
         {
-            // this is a throttle for inbound subscribes, reduces initial image flooding on the
-            // network due to mass subscription
-            final Pair<String, String> key = new Pair<String, String>(name, clientString);
-            this.pendingSubscribes.put(key, ContextUtils.RECONNECT_TASKS.schedule(new Runnable()
+            for (final String name : recordNames)
             {
-                @Override
-                public void run()
+                this.subscribeTasks.add(new ISubscribeTask()
                 {
-                    if (Publisher.this.pendingSubscribes.remove(key) == null)
+                    @Override
+                    public void run()
                     {
-                        // if it is null, an unsubscribe happened before the subscribe was handled
-                        nokSubscribes.add(name);
-                        finallyTask.run();
-                        return;
+                        proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes,
+                            finallyTask);
                     }
-                    proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes, finallyTask);
-                }
-            }, this.pendingSubscribes.size() * DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS,
-                TimeUnit.MICROSECONDS));
+                });
+            }
         }
+        triggerThrottle();
     }
 
     void sendAck(List<String> recordNames, ITransportChannel client, ProxyContextPublisher proxyContextPublisher,
@@ -1098,14 +1153,14 @@ public class Publisher
         sendSubscribeResult(ProxyContext.NOK, recordNames, client, proxyContextPublisher, responseAction);
     }
 
-    private static void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
+    private void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
         ProxyContextPublisher proxyContextPublisher, String responseAction)
     {
         if (recordNames.size() == 0)
         {
             return;
         }
-        
+
         final Map<String, IValue> puts = new HashMap<String, IValue>(recordNames.size());
         final LongValue dummy = LongValue.valueOf(1);
         for (String recordName : recordNames)
@@ -1116,7 +1171,7 @@ public class Publisher
             new AtomicChange(action + responseAction, puts, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
         if (log)
         {
-            Log.log(Publisher.class, "(->) ", ObjectUtils.safeToString(atomicChange));
+            Log.log(Publisher.this, "(->) ", ObjectUtils.safeToString(atomicChange));
         }
         client.sendAsync(proxyContextPublisher.codec.finalEncode(
             proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange)));
@@ -1161,5 +1216,14 @@ public class Publisher
     public TransportTechnologyEnum getTransportTechnology()
     {
         return this.transportTechnology;
+    }
+    
+    private void triggerThrottle()
+    {
+        if (!this.throttleRunning)
+        {
+            this.throttleRunning = true;
+            SUBSCRIBE_THROTTLE.execute(this.throttleTask);
+        }
     }
 }
