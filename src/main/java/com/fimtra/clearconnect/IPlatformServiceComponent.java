@@ -277,6 +277,7 @@ public interface IPlatformServiceComponent
      * Get the executor for utility type tasks
      * 
      * @return a {@link ScheduledExecutorService} for utility tasks
+     * @deprecated do not use this executor 
      */
     ScheduledExecutorService getUtilityExecutor();
 }

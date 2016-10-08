@@ -124,14 +124,14 @@ public class Publisher
      * @see ISystemRecordNames
      */
     static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
-        ThreadUtils.newScheduledExecutorService("system-record-publisher", 1);
+        ThreadUtils.newPermanentScheduledExecutorService("system-record-publisher", 1);
 
     /**
      * Single-thread executor for handling inbound subscriptions to throttle handling. This prevents
      * flooding the network with images from a batch subscribe.
      */
     static final ScheduledExecutorService SUBSCRIBE_THROTTLE =
-        ThreadUtils.newScheduledExecutorService("subscribe-throttle", 1);
+        ThreadUtils.newPermanentScheduledExecutorService("subscribe-throttle", 1);
 
 
     /**
