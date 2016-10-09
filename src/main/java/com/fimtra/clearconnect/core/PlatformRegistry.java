@@ -1307,8 +1307,15 @@ final class EventHandler
     {
         Log.log(this, "Deregister '", serviceInstanceId, "', token=", ObjectUtils.safeToString(registrationToken));
 
-        // todo this is bust
-        removeUnregisteredProxiesAndMonitors();
+        try
+        {
+            removeUnregisteredProxiesAndMonitors();
+        }
+        catch (Exception e)
+        {
+            Log.log(this,
+                "Could not purge any unregistered connections, continuing with deregister of " + registrationToken, e);
+        }
 
         if (!this.registry.registrationTokenPerInstance.remove(serviceInstanceId, registrationToken))
         {
@@ -1361,9 +1368,16 @@ final class EventHandler
                 registrationToken = entry.getKey();
                 if (!registrationTokens.contains(registrationToken))
                 {
-                    it.remove();
                     Log.log(this, "Destroying UNREGISTERED proxy ", ObjectUtils.safeToString(registrationToken));
-                    destroyProxy(registrationToken, entry.getValue());
+                    try
+                    {
+                        destroyProxy(registrationToken, entry.getValue());
+                        it.remove();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(this, "Could not destroy UNREGISTERED proxy " + registrationToken, e);
+                    }
                 }
             }
         }
@@ -1376,10 +1390,17 @@ final class EventHandler
                 registrationToken = entry.getKey();
                 if (!registrationTokens.contains(registrationToken))
                 {
-                    it.remove();
                     Log.log(this, "Destroying UNREGISTERED connection monitor for ",
                         ObjectUtils.safeToString(registrationToken));
-                    entry.getValue().destroy();
+                    try
+                    {
+                        entry.getValue().destroy();
+                        it.remove();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(this, "Could not destroy UNREGISTERED connection monitor for " + registrationToken, e);
+                    }
                 }
             }
         }
@@ -2081,9 +2102,6 @@ final class EventHandler
     private void registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
         final String serviceInstanceId, final ProxyContext serviceProxy)
     {
-        // todo there is a big scaling problem here - for multiple services in the same family, this
-        // will back up the registry as its all done in the "family context"
-
         // add a listener to get the service-level statistics
         serviceProxy.addObserver(new IRecordListener()
         {
