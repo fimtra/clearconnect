@@ -594,12 +594,15 @@ public class PlatformTest
                 
             verify(ftStatusListener3, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             // note: standby may or may not be called - depends on timings
-            verify(ftStatusListener3, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener3, atMost(2)).onStandby(eq(SERVICE1), eq(this.primary));
 
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY (AGAIN)");
             // destroy it (again!)
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
+            verify(ftStatusListener1, times(2)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener2, times(2)).onStandby(eq(SERVICE1), eq(this.secondary));
+            
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
 
@@ -1884,7 +1887,7 @@ public class PlatformTest
         this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
         verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
         // when adding a listener, we are not guaranteed to be standby 
-        verify(ftStatusListener1, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
+        verify(ftStatusListener1, atMost(2)).onStandby(eq(SERVICE1), eq(this.primary));
     }
 
     @Test

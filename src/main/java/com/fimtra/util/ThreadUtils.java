@@ -47,11 +47,11 @@ public abstract class ThreadUtils
      * 
      * @author Ramon Servadei
      */
-    private static final class ExceptionLoggingRunnable implements Runnable
+    public static final class ExceptionLoggingRunnable implements Runnable
     {
         private final Runnable command;
 
-        ExceptionLoggingRunnable(Runnable command)
+        public ExceptionLoggingRunnable(Runnable command)
         {
             this.command = command;
         }
