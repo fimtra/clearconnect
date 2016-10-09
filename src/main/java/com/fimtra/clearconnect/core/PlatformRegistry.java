@@ -2085,7 +2085,7 @@ final class EventHandler
         // will back up the registry as its all done in the "family context"
 
         // add a listener to get the service-level statistics
-        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        serviceProxy.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
@@ -2121,12 +2121,11 @@ final class EventHandler
                     }
                 });
             }
-        }, serviceInstanceId + "-" + PlatformServiceInstance.SERVICE_STATS_RECORD_NAME),
-            PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
+        }, PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
 
         // add a listener to cache the context connections record of the service locally in
         // the platformConnections record
-        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        serviceProxy.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -2152,10 +2151,10 @@ final class EventHandler
                     }
                 });
             }
-        }, serviceInstanceId + "-" + REMOTE_CONTEXT_CONNECTIONS), REMOTE_CONTEXT_CONNECTIONS);
+        }, REMOTE_CONTEXT_CONNECTIONS);
 
         // add listeners to handle platform objects published by this instance
-        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        serviceProxy.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -2192,9 +2191,9 @@ final class EventHandler
                     }
                 });
             }
-        }, serviceInstanceId + "-" + REMOTE_CONTEXT_RECORDS), REMOTE_CONTEXT_RECORDS);
+        }, REMOTE_CONTEXT_RECORDS);
 
-        serviceProxy.addObserver(new CoalescingRecordListener(this.registry.coalescingExecutor, new IRecordListener()
+        serviceProxy.addObserver(new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
@@ -2231,7 +2230,7 @@ final class EventHandler
                     }
                 });
             }
-        }, serviceInstanceId + "-" + REMOTE_CONTEXT_RPCS), REMOTE_CONTEXT_RPCS);
+        }, REMOTE_CONTEXT_RPCS);
     }
 
     @SuppressWarnings("unchecked")
