@@ -334,8 +334,6 @@ public final class PlatformRegistry
     final String platformName;
     final Publisher publisher;
     int reconnectPeriodMillis = DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS;
-    final ConcurrentMap<RegistrationToken, ProxyContext> monitoredServiceInstances;
-    final ConcurrentMap<RegistrationToken, PlatformServiceConnectionMonitor> connectionMonitors;
     /** @see IRegistryRecordNames#SERVICES */
     final IRecord services;
     /** @see IRegistryRecordNames#SERVICE_INSTANCES_PER_SERVICE_FAMILY */
@@ -358,22 +356,6 @@ public final class PlatformRegistry
     final IRecord runtimeStatus;
     /** @see IRegistryRecordNames#PLATFORM_SUMMARY */
     final IRecord platformSummary;
-
-    /**
-     * Tracks services that are pending registration completion
-     * 
-     * @see IRegistryRecordNames#SERVICES
-     */
-    final Map<String, IValue> pendingPlatformServices;
-    /**
-     * Key=service instance ID, Value=Registration token; tracks pending service instances to
-     * prevent duplicates
-     */
-    final ConcurrentMap<String, RegistrationToken> registrationTokenPerInstance;
-    /** Key=service family, Value=PENDING master service instance ID */
-    final ConcurrentMap<String, String> pendingMasterInstancePerFtService;
-    /** Key=service family, Value=Future with the actual master service instance ID */
-    final ConcurrentMap<String, FutureTask<String>> confirmedMasterInstancePerFtService;
 
     final ThimbleExecutor coalescingExecutor;
     final EventHandler eventHandler;
@@ -429,12 +411,6 @@ public final class PlatformRegistry
         this.platformName = platformName;
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
-        this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
-        this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
-        this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
-        this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
-        this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
-        this.registrationTokenPerInstance = new ConcurrentHashMap<String, RegistrationToken>();
 
         this.coalescingExecutor = this.context.getCoreExecutor_internalUseOnly();
         this.eventHandler = new EventHandler(this);
@@ -738,44 +714,13 @@ public final class PlatformRegistry
     public void destroy()
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-        this.eventHandler.destroy();
         this.publisher.destroy();
         this.context.destroy();
-        // NOTE: destroy proxies AFTER destroying the publisher and context - we don't want to tell
-        // the agents that the services are de-registered - doing this when the publisher is dead
-        // means we can't send any messages to the agents.
-        PlatformServiceConnectionMonitor monitor = null;
-        for (RegistrationToken registrationToken : this.connectionMonitors.keySet())
-        {
-            try
-            {
-                monitor = this.connectionMonitors.remove(registrationToken);
-                if (monitor != null)
-                {
-                    monitor.destroy();
-                }
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(monitor), e);
-            }
-        }
-        ProxyContext proxy = null;
-        for (RegistrationToken registrationToken : this.monitoredServiceInstances.keySet())
-        {
-            try
-            {
-                proxy = this.monitoredServiceInstances.remove(registrationToken);
-                if (proxy != null)
-                {
-                    proxy.destroy();
-                }
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(proxy), e);
-            }
-        }
+
+        // NOTE: destroy event handler AFTER destroying the publisher and context - we don't want to
+        // tell the agents that the services are de-registered - doing this when the publisher is
+        // dead means we can't send any messages to the agents.
+        this.eventHandler.destroy();
     }
 
     /**
@@ -858,11 +803,36 @@ final class EventHandler
     final ScheduledExecutorService publishExecutor;
     final ExecutorService ioExecutor;
     final ThimbleExecutor coreExecutor_internalUseOnly;
+    /**
+     * Tracks services that are pending registration completion
+     * 
+     * @see IRegistryRecordNames#SERVICES
+     */
+    final ConcurrentMap<String, IValue> pendingPlatformServices;
+    /**
+     * Key=service instance ID, Value=Registration token; tracks pending service instances to
+     * prevent duplicates
+     */
+    final ConcurrentMap<String, RegistrationToken> registrationTokenPerInstance;
+    /** Key=service family, Value=PENDING master service instance ID */
+    final ConcurrentMap<String, String> pendingMasterInstancePerFtService;
+    /** Key=service family, Value=Future with the actual master service instance ID */
+    final ConcurrentMap<String, FutureTask<String>> confirmedMasterInstancePerFtService;
+    final ConcurrentMap<RegistrationToken, ProxyContext> monitoredServiceInstances;
+    final ConcurrentMap<RegistrationToken, PlatformServiceConnectionMonitor> connectionMonitors;
 
     EventHandler(final PlatformRegistry registry)
     {
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
+
+        this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
+        this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
+        this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
+        this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
+        this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
+        this.registrationTokenPerInstance = new ConcurrentHashMap<String, RegistrationToken>();
+
         this.pendingPublish = new HashSet<String>();
         this.eventCount = new AtomicInteger(0);
         this.coreExecutor_internalUseOnly = registry.context.getCoreExecutor_internalUseOnly();
@@ -922,6 +892,38 @@ final class EventHandler
     void destroy()
     {
         this.publishExecutor.shutdown();
+        PlatformServiceConnectionMonitor monitor = null;
+        for (RegistrationToken registrationToken : this.connectionMonitors.keySet())
+        {
+            try
+            {
+                monitor = this.connectionMonitors.remove(registrationToken);
+                if (monitor != null)
+                {
+                    monitor.destroy();
+                }
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(monitor), e);
+            }
+        }
+        ProxyContext proxy = null;
+        for (RegistrationToken registrationToken : this.monitoredServiceInstances.keySet())
+        {
+            try
+            {
+                proxy = this.monitoredServiceInstances.remove(registrationToken);
+                if (proxy != null)
+                {
+                    proxy.destroy();
+                }
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(proxy), e);
+            }
+        }
     }
 
     void executeRpcRuntimeDynamic(final IValue... args)
@@ -1058,7 +1060,7 @@ final class EventHandler
         final RegistrationToken _registrationToken;
         if (registrationToken == null)
         {
-            _registrationToken = this.registry.registrationTokenPerInstance.get(serviceInstanceId);
+            _registrationToken = this.registrationTokenPerInstance.get(serviceInstanceId);
             Log.log(this, "Found ", ObjectUtils.safeToString(_registrationToken));
         }
         else
@@ -1292,7 +1294,7 @@ final class EventHandler
                 }
                 else
                 {
-                    result = verifyNewMasterInstance(this.registry.registrationTokenPerInstance.get(serviceInstanceId),
+                    result = verifyNewMasterInstance(this.registrationTokenPerInstance.get(serviceInstanceId),
                         serviceFamily, serviceInstanceId);
                 }
 
@@ -1317,17 +1319,16 @@ final class EventHandler
                 "Could not purge any unregistered connections, continuing with deregister of " + registrationToken, e);
         }
 
-        if (!this.registry.registrationTokenPerInstance.remove(serviceInstanceId, registrationToken))
+        if (!this.registrationTokenPerInstance.remove(serviceInstanceId, registrationToken))
         {
             Log.log(this, "Ignoring deregister for service instance '", serviceInstanceId,
                 "' as the operation was completed earlier, registrationToken=",
                 ObjectUtils.safeToString(registrationToken), " currentToken=",
-                ObjectUtils.safeToString(this.registry.registrationTokenPerInstance.get(serviceInstanceId)));
+                ObjectUtils.safeToString(this.registrationTokenPerInstance.get(serviceInstanceId)));
             return;
         }
 
-        final PlatformServiceConnectionMonitor connectionMonitor =
-            this.registry.connectionMonitors.remove(registrationToken);
+        final PlatformServiceConnectionMonitor connectionMonitor = this.connectionMonitors.remove(registrationToken);
         if (connectionMonitor != null)
         {
             Log.log(this, "Destroying connection monitor for ", ObjectUtils.safeToString(registrationToken));
@@ -1337,7 +1338,7 @@ final class EventHandler
         {
             Log.log(this, "No connection monitor to destroy for ", ObjectUtils.safeToString(registrationToken));
         }
-        final ProxyContext proxy = this.registry.monitoredServiceInstances.remove(registrationToken);
+        final ProxyContext proxy = this.monitoredServiceInstances.remove(registrationToken);
         if (proxy != null)
         {
             destroyProxy(registrationToken, proxy);
@@ -1356,13 +1357,13 @@ final class EventHandler
     void removeUnregisteredProxiesAndMonitors()
     {
         // todo try-catch
-        final Collection<RegistrationToken> registrationTokens = this.registry.registrationTokenPerInstance.values();
+        final Collection<RegistrationToken> registrationTokens = this.registrationTokenPerInstance.values();
         RegistrationToken registrationToken = null;
 
         {
             Map.Entry<RegistrationToken, ProxyContext> entry = null;
             for (Iterator<Map.Entry<RegistrationToken, ProxyContext>> it =
-                this.registry.monitoredServiceInstances.entrySet().iterator(); it.hasNext();)
+                this.monitoredServiceInstances.entrySet().iterator(); it.hasNext();)
             {
                 entry = it.next();
                 registrationToken = entry.getKey();
@@ -1384,7 +1385,7 @@ final class EventHandler
         {
             Map.Entry<RegistrationToken, PlatformServiceConnectionMonitor> entry = null;
             for (Iterator<Map.Entry<RegistrationToken, PlatformServiceConnectionMonitor>> it =
-                this.registry.connectionMonitors.entrySet().iterator(); it.hasNext();)
+                this.connectionMonitors.entrySet().iterator(); it.hasNext();)
             {
                 entry = it.next();
                 registrationToken = entry.getKey();
@@ -1475,8 +1476,8 @@ final class EventHandler
             if (this.registry.services.remove(serviceFamily) != null)
             {
                 Log.log(this, "Removing service '", serviceFamily, "' from registry");
-                this.registry.pendingMasterInstancePerFtService.remove(serviceFamily);
-                this.registry.confirmedMasterInstancePerFtService.remove(serviceFamily);
+                this.pendingMasterInstancePerFtService.remove(serviceFamily);
+                this.confirmedMasterInstancePerFtService.remove(serviceFamily);
                 publishTimed(this.registry.services);
             }
         }
@@ -1516,9 +1517,9 @@ final class EventHandler
         final IValue... args)
     {
         Log.log(this, "CHECK ", ObjectUtils.safeToString(registrationToken));
-        if (this.registry.monitoredServiceInstances.containsKey(registrationToken))
+        if (this.monitoredServiceInstances.containsKey(registrationToken))
         {
-            final ProxyContext proxy = this.registry.monitoredServiceInstances.get(registrationToken);
+            final ProxyContext proxy = this.monitoredServiceInstances.get(registrationToken);
             if (proxy.isConnected())
             {
                 throw new AlreadyRegisteredException(serviceInstanceId, agentName, proxy.getEndPointAddress().getNode(),
@@ -1529,7 +1530,7 @@ final class EventHandler
         }
 
         final RegistrationToken currentToken =
-            this.registry.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
+            this.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
         if (currentToken != null)
         {
             throw new IllegalStateException("[DUPLICATE INSTANCE] Platform service instance " + serviceInstanceId
@@ -1558,7 +1559,7 @@ final class EventHandler
         }
 
         // add to pending AFTER checking
-        this.registry.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
+        this.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
     }
 
     private void connectToServiceInstanceThenContinueRegistration(final RegistrationToken registrationToken,
@@ -1577,13 +1578,13 @@ final class EventHandler
                 PlatformRegistry.SERVICE_NAME);
         serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
 
-        this.registry.monitoredServiceInstances.put(registrationToken, serviceProxy);
+        this.monitoredServiceInstances.put(registrationToken, serviceProxy);
 
         // setup monitoring of the service instance via the proxy
         final PlatformServiceConnectionMonitor monitor = createConnectionMonitor(registrationToken, serviceFamily,
             redundancyMode, agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, serviceProxy);
 
-        this.registry.connectionMonitors.put(registrationToken, monitor);
+        this.connectionMonitors.put(registrationToken, monitor);
     }
 
     private PlatformServiceConnectionMonitor createConnectionMonitor(final RegistrationToken registrationToken,
@@ -1625,7 +1626,7 @@ final class EventHandler
                         try
                         {
                             final Object currentToken =
-                                EventHandler.this.registry.registrationTokenPerInstance.get(serviceInstanceId);
+                                EventHandler.this.registrationTokenPerInstance.get(serviceInstanceId);
                             if (!is.eq(registrationToken, currentToken))
                             {
                                 Log.log(EventHandler.this, "Registration token changed for '", serviceInstanceId,
@@ -1680,11 +1681,11 @@ final class EventHandler
         this.registry.services.put(serviceFamily, redundancyModeEnum.name());
         // as the service has now been declared to be of a specific redundancy type, it does not
         // matter if duplicate instances of the same family are registering simultaneously
-        this.registry.pendingPlatformServices.remove(serviceFamily);
+        this.pendingPlatformServices.remove(serviceFamily);
 
         publishTimed(this.registry.services);
 
-        final ProxyContext serviceProxy = this.registry.monitoredServiceInstances.get(registrationToken);
+        final ProxyContext serviceProxy = this.monitoredServiceInstances.get(registrationToken);
 
         registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
 
@@ -1795,7 +1796,7 @@ final class EventHandler
         // first check if the master instance changes
         if (!is.eq(
             (previousMasterInstance =
-                this.registry.pendingMasterInstancePerFtService.put(serviceFamily, activeServiceInstanceId)),
+                this.pendingMasterInstancePerFtService.put(serviceFamily, activeServiceInstanceId)),
             activeServiceInstanceId))
         {
             final AtomicReference<FutureTask<String>> futureTaskRef = new AtomicReference<FutureTask<String>>();
@@ -1809,7 +1810,7 @@ final class EventHandler
                         if (previousMasterInstance != null)
                         {
                             final RegistrationToken previousInstanceRegistrationToken =
-                                EventHandler.this.registry.registrationTokenPerInstance.get(previousMasterInstance);
+                                EventHandler.this.registrationTokenPerInstance.get(previousMasterInstance);
                             if (previousInstanceRegistrationToken != null)
                             {
                                 callFtServiceStatusRpc(previousInstanceRegistrationToken, serviceFamily,
@@ -1842,23 +1843,23 @@ final class EventHandler
 
                     if (!signalMasterInstanceResult)
                     {
-                        EventHandler.this.registry.pendingMasterInstancePerFtService.remove(serviceFamily,
+                        EventHandler.this.pendingMasterInstancePerFtService.remove(serviceFamily,
                             activeServiceInstanceId);
-                        EventHandler.this.registry.confirmedMasterInstancePerFtService.remove(serviceFamily,
+                        EventHandler.this.confirmedMasterInstancePerFtService.remove(serviceFamily,
                             futureTaskRef.get());
                     }
                 }
             }, activeServiceInstanceId);
             futureTaskRef.set(futureTask);
 
-            this.registry.confirmedMasterInstancePerFtService.put(serviceFamily, futureTask);
+            this.confirmedMasterInstancePerFtService.put(serviceFamily, futureTask);
 
             executeTaskWithIO(futureTask);
 
             return futureTask;
         }
 
-        return this.registry.confirmedMasterInstancePerFtService.get(serviceFamily);
+        return this.confirmedMasterInstancePerFtService.get(serviceFamily);
     }
 
     /**
@@ -1874,7 +1875,7 @@ final class EventHandler
         Log.log(this, "Signalling ", (active ? "MASTER" : "STANDBY"), " FT service ",
             ObjectUtils.safeToString(registrationToken));
 
-        final ProxyContext proxy = this.registry.monitoredServiceInstances.get(registrationToken);
+        final ProxyContext proxy = this.monitoredServiceInstances.get(registrationToken);
 
         // HOW CAN THE PROXY BE NULL?
         // ANSWER: if a FAULT_TOLERANT service is destroyed before the registry has called the
@@ -1905,7 +1906,7 @@ final class EventHandler
     private boolean checkServiceType(final String serviceFamily, final RedundancyModeEnum type)
     {
         // check pending services first
-        IValue iValue = this.registry.pendingPlatformServices.get(serviceFamily);
+        IValue iValue = this.pendingPlatformServices.get(serviceFamily);
         if (iValue != null)
         {
             return RedundancyModeEnum.valueOf(iValue.textValue()) == type;
