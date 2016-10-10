@@ -521,10 +521,7 @@ public final class PlatformRegistry
                 try
                 {
                     final String nextInstance =
-                        PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue())
-                            // todo this could block the RPC thread for FT service lookup for a new
-                            // master
-                            .get();
+                        PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue()).get();
 
                     if (nextInstance == null)
                     {
@@ -825,7 +822,7 @@ final class EventHandler
     {
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
-
+        
         this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
         this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
         this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
@@ -838,15 +835,17 @@ final class EventHandler
         this.coreExecutor_internalUseOnly = registry.context.getCoreExecutor_internalUseOnly();
         this.publishExecutor =
             new ScheduledThreadPoolExecutor(1, PUBLISH_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
-        this.ioExecutor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
+        this.ioExecutor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS,
             new SynchronousQueue<Runnable>(), IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
     }
 
     void execute(final IDescriptiveRunnable runnable)
     {
-        if (this.eventCount.incrementAndGet() > 10)
+        final int eventCountLogThreshold = 10;
+        if (this.eventCount.incrementAndGet() > eventCountLogThreshold)
         {
             Log.log(this, "*** Event queue: " + this.eventCount.get());
+            Log.log(this, "*** Event queue latest: ", runnable.getDescription());
         }
 
         this.coreExecutor_internalUseOnly.execute(new IDescriptiveRunnable()
@@ -858,6 +857,10 @@ final class EventHandler
                 long time = System.currentTimeMillis();
                 try
                 {
+                    if (EventHandler.this.eventCount.get() > eventCountLogThreshold)
+                    {
+                        Log.log(EventHandler.this, "Running: ", this.getDescription());
+                    }
                     runnable.run();
                 }
                 catch (Exception e)
@@ -979,76 +982,27 @@ final class EventHandler
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
         final Map<String, IValue> serviceRecordStructure, final IValue... args)
     {
-        Log.log(this, "PREPARE ", ObjectUtils.safeToString(registrationToken));
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<RuntimeException> registrationFail = new AtomicReference<RuntimeException>(null);
-        execute(new IDescriptiveRunnable()
-        {
-            @Override
-            public String getDescription()
-            {
-                return "registerServiceInstance: " + serviceInstanceId;
-            }
+        checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, redundancyMode, agentName,
+            serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
 
+        executeTaskWithIO(new Runnable()
+        {
             @Override
             public void run()
             {
                 try
                 {
-                    checkRegistrationDetailsForServiceInstance_callInFamilyScope(registrationToken, serviceFamily,
-                        redundancyMode, agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum,
-                        transportTechnology, args);
-
-                    executeTaskWithIO(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            try
-                            {
-                                connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily,
-                                    redundancyMode, agentName, serviceRecordStructure, serviceInstanceId,
-                                    redundancyModeEnum, transportTechnology);
-                            }
-                            catch (Exception e)
-                            {
-                                Log.log(EventHandler.this, "Could not connect to '" + serviceInstanceId + "'", e);
-                                executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily,
-                                    serviceInstanceId, "Could not connect");
-                            }
-                        }
-                    });
+                    connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily, redundancyMode,
+                        agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology);
                 }
-                catch (RuntimeException e)
+                catch (Exception e)
                 {
-                    registrationFail.set(e);
+                    Log.log(EventHandler.this, "Could not connect to '" + serviceInstanceId + "'", e);
+                    executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, serviceInstanceId,
+                        "Could not connect");
                 }
-                finally
-                {
-                    latch.countDown();
-                }
-            }
-
-            @Override
-            public Object context()
-            {
-                return serviceFamily;
             }
         });
-
-        try
-        {
-            latch.await();
-        }
-        catch (InterruptedException e)
-        {
-            Log.log(this,
-                "Interrupted waiting on latch for registerPlatformServiceInstance: '" + serviceInstanceId + "'", e);
-        }
-        if (registrationFail.get() != null)
-        {
-            throw registrationFail.get();
-        }
     }
 
     void executeDeregisterPlatformServiceInstance(RegistrationToken registrationToken, final String serviceFamily,
@@ -1356,7 +1310,6 @@ final class EventHandler
      */
     void removeUnregisteredProxiesAndMonitors()
     {
-        // todo try-catch
         final Collection<RegistrationToken> registrationTokens = this.registrationTokenPerInstance.values();
         RegistrationToken registrationToken = null;
 
@@ -1497,8 +1450,7 @@ final class EventHandler
 
     private void executeTaskWithIO(Runnable runnable)
     {
-        // coreExecutor_internalUseOnly.execute(runnable);
-        this.ioExecutor.execute(new ThreadUtils.ExceptionLoggingRunnable(runnable));
+         this.ioExecutor.execute(new ThreadUtils.ExceptionLoggingRunnable(runnable));
     }
 
     /**
@@ -1510,31 +1462,32 @@ final class EventHandler
      *             if the registration parameters clash with any in-flight registration
      */
     @SuppressWarnings("unused")
-    private void checkRegistrationDetailsForServiceInstance_callInFamilyScope(final RegistrationToken registrationToken,
+    private void checkRegistrationDetailsForServiceInstance(final RegistrationToken registrationToken,
         final String serviceFamily, final String redundancyMode, final String agentName,
         final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
         final IValue... args)
     {
         Log.log(this, "CHECK ", ObjectUtils.safeToString(registrationToken));
-        if (this.monitoredServiceInstances.containsKey(registrationToken))
+        
+        // check if already registered/being registered
+        final RegistrationToken currentToken =
+            this.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
+        if (currentToken != null)
         {
-            final ProxyContext proxy = this.monitoredServiceInstances.get(registrationToken);
-            if (proxy.isConnected())
+            final ProxyContext proxy = this.monitoredServiceInstances.get(currentToken);
+
+            if (proxy != null && proxy.isConnected())
             {
                 throw new AlreadyRegisteredException(serviceInstanceId, agentName, proxy.getEndPointAddress().getNode(),
                     proxy.getEndPointAddress().getPort(),
                     checkServiceType(serviceFamily, RedundancyModeEnum.FAULT_TOLERANT)
                         ? RedundancyModeEnum.FAULT_TOLERANT.toString() : RedundancyModeEnum.LOAD_BALANCED.toString());
             }
-        }
 
-        final RegistrationToken currentToken =
-            this.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
-        if (currentToken != null)
-        {
-            throw new IllegalStateException("[DUPLICATE INSTANCE] Platform service instance " + serviceInstanceId
-                + " is currently being registered or has registered already with " + currentToken);
+            // no connection, so its an in-flight registration
+            throw new IllegalStateException("[DUPLICATE INSTANCE] Platform service instance '" + serviceInstanceId
+                + "' is currently being registered with " + currentToken);
         }
 
         switch(redundancyModeEnum)
@@ -1558,8 +1511,14 @@ final class EventHandler
                     "Unhandled mode '" + redundancyMode + "' for service '" + serviceFamily + "'");
         }
 
-        // add to pending AFTER checking
-        this.pendingPlatformServices.put(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
+        // add to pending AFTER checking services
+        final IValue current =
+            this.pendingPlatformServices.putIfAbsent(serviceFamily, TextValue.valueOf(redundancyModeEnum.name()));
+        if (current != null && RedundancyModeEnum.valueOf(current.textValue()) != redundancyModeEnum)
+        {
+            throw new IllegalArgumentException("Platform service '" + serviceFamily
+                + "' is currently being registered as " + RedundancyModeEnum.valueOf(current.textValue()));
+        }
     }
 
     private void connectToServiceInstanceThenContinueRegistration(final RegistrationToken registrationToken,
@@ -1687,19 +1646,42 @@ final class EventHandler
 
         final ProxyContext serviceProxy = this.monitoredServiceInstances.get(registrationToken);
 
-        registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
-
         executeTaskWithIO(new Runnable()
         {
             @Override
             public void run()
             {
-                // always trigger standby first
-                callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false);
+                registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
             }
         });
-        // this will ensure the service FT signals are triggered
-        selectNextInstance_callInFamilyScope(serviceFamily, "register " + registrationToken);
+
+        if (RedundancyModeEnum.FAULT_TOLERANT == redundancyModeEnum)
+        {
+            final CountDownLatch rpcStarted = new CountDownLatch(1);
+            executeTaskWithIO(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    rpcStarted.countDown();
+                    // always trigger standby first
+                    callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false);
+                }
+            });
+
+            // ensure we have started the standby FT status RPC before continuing
+            try
+            {
+                rpcStarted.await();
+            }
+            catch (InterruptedException e)
+            {
+                Log.log(this, "Interrupted whilst waiting for FT service status RPC for " + registrationToken, e);
+            }
+
+            // this will ensure the service FT signals are triggered
+            selectNextInstance_callInFamilyScope(serviceFamily, "register " + registrationToken);
+        }
     }
 
     private void handleRpcStaticRuntime(final IValue... args)
@@ -1905,14 +1887,7 @@ final class EventHandler
 
     private boolean checkServiceType(final String serviceFamily, final RedundancyModeEnum type)
     {
-        // check pending services first
-        IValue iValue = this.pendingPlatformServices.get(serviceFamily);
-        if (iValue != null)
-        {
-            return RedundancyModeEnum.valueOf(iValue.textValue()) == type;
-        }
-        // check registered services
-        iValue = this.registry.services.get(serviceFamily);
+        final IValue iValue = this.registry.services.get(serviceFamily);
         if (iValue == null)
         {
             return false;
@@ -2114,7 +2089,7 @@ final class EventHandler
                     @Override
                     public String getDescription()
                     {
-                        return "handle service stats record change: " + ObjectUtils.safeToString(serviceProxy);
+                        return "handle service stats record change: " + serviceProxy.getName();
                     }
 
                     @Override
@@ -2154,7 +2129,7 @@ final class EventHandler
                     @Override
                     public String getDescription()
                     {
-                        return "handleConnectionsUpdate: " + ObjectUtils.safeToString(serviceProxy);
+                        return "handleConnectionsUpdate: " + serviceProxy.getName();
                     }
 
                     @Override
@@ -2183,7 +2158,7 @@ final class EventHandler
                     @Override
                     public String getDescription()
                     {
-                        return "handle RemoteContextRecords record change: " + ObjectUtils.safeToString(serviceProxy);
+                        return "handle RemoteContextRecords record change: " + serviceProxy.getName();
                     }
 
                     @Override
@@ -2222,7 +2197,7 @@ final class EventHandler
                     @Override
                     public String getDescription()
                     {
-                        return "handle RemoteContextRpcs record change: " + ObjectUtils.safeToString(serviceProxy);
+                        return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
                     }
 
                     @Override
