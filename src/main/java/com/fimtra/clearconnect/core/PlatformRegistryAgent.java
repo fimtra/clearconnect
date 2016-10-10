@@ -642,6 +642,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
+        Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
+        
         try
         {
             this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
@@ -1159,7 +1161,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 Log.log(PlatformRegistryAgent.this,
                     " (" + Integer.toString(tries) + "/" + Integer.toString(maxTries) + ") Failed attempt registering "
                         + ObjectUtils.safeToString(platformServiceInstance)
-                        + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"));
+                        + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"), e);
             }
         }
 
