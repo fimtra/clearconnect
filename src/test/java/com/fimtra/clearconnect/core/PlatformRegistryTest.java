@@ -130,11 +130,11 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.serviceInstanceStats);
         // the platform registry adds itself as a service
         checkSize(1, 0, this.candidate.services);
-        checkZeroSize(this.candidate.monitoredServiceInstances);
-        checkZeroSize(this.candidate.pendingMasterInstancePerFtService);
-        checkZeroSize(this.candidate.confirmedMasterInstancePerFtService);
-        checkZeroSize(this.candidate.pendingPlatformServices);
-        checkZeroSize(this.candidate.connectionMonitors);
+        checkZeroSize(this.candidate.eventHandler.monitoredServiceInstances);
+        checkZeroSize(this.candidate.eventHandler.pendingMasterInstancePerFtService);
+        checkZeroSize(this.candidate.eventHandler.confirmedMasterInstancePerFtService);
+        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
+        checkZeroSize(this.candidate.eventHandler.connectionMonitors);
 
         // the platform registry adds its records as a service instance
         checkSize(0, 1, this.candidate.recordsPerServiceInstance);
