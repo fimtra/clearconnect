@@ -982,7 +982,7 @@ final class EventHandler
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
         final Map<String, IValue> serviceRecordStructure, final IValue... args)
     {
-        checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, redundancyMode, agentName,
+        registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, redundancyMode, agentName,
             serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
 
         executeTaskWithIO(new Runnable()
@@ -992,7 +992,7 @@ final class EventHandler
             {
                 try
                 {
-                    connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily, redundancyMode,
+                    registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily, redundancyMode,
                         agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology);
                 }
                 catch (Exception e)
@@ -1462,7 +1462,7 @@ final class EventHandler
      *             if the registration parameters clash with any in-flight registration
      */
     @SuppressWarnings("unused")
-    private void checkRegistrationDetailsForServiceInstance(final RegistrationToken registrationToken,
+    private void registerStep1_checkRegistrationDetailsForServiceInstance(final RegistrationToken registrationToken,
         final String serviceFamily, final String redundancyMode, final String agentName,
         final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
@@ -1521,7 +1521,7 @@ final class EventHandler
         }
     }
 
-    private void connectToServiceInstanceThenContinueRegistration(final RegistrationToken registrationToken,
+    private void registerStep2_connectToServiceInstanceThenContinueRegistration(final RegistrationToken registrationToken,
         final String serviceFamily, final String redundancyMode, final String agentName,
         final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology)
@@ -1594,7 +1594,7 @@ final class EventHandler
                                 return;
                             }
 
-                            registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(registrationToken,
+                            registerStep3_registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(registrationToken,
                                 agentName, serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
 
                             Log.banner(EventHandler.this,
@@ -1615,7 +1615,7 @@ final class EventHandler
         };
     }
 
-    private void registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(
+    private void registerStep3_registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(
         final RegistrationToken registrationToken, final String agentName, final String serviceInstanceId,
         final Map<String, IValue> serviceRecordStructure, final RedundancyModeEnum redundancyModeEnum)
     {
@@ -1651,7 +1651,7 @@ final class EventHandler
             @Override
             public void run()
             {
-                registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
+                registerStep4_registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
             }
         });
 
@@ -2075,7 +2075,7 @@ final class EventHandler
             this.registry.rpcsPerServiceInstance, this.registry.rpcsPerServiceFamily, false);
     }
 
-    private void registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
+    private void registerStep4_registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
         final String serviceInstanceId, final ProxyContext serviceProxy)
     {
         // add a listener to get the service-level statistics

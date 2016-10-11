@@ -121,7 +121,7 @@ public class PlatformRegistryTest
 
     void checkEmpty() throws InterruptedException
     {
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         
         checkZeroSize(this.candidate.platformConnections);
         checkZeroSize(this.candidate.serviceInstancesPerAgent);
