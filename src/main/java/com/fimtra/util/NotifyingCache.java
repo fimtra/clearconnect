@@ -24,6 +24,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -45,6 +48,10 @@ import com.fimtra.util.LazyObject.IDestructor;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
+    final static Executor IMAGE_NOTIFIER =
+        new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+            ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
+    
     static final Executor SYNCHRONOUS_EXECUTOR = new Executor()
     {
         @Override
@@ -268,11 +275,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
             if (this.executor == SYNCHRONOUS_EXECUTOR)
             {
-                // todo use an image notifying executor with 60 sec thread timeout, queue size=0
-
-                // create a new thread to handle initial image notification - prevents any chance of
-                // stalling due to any deadlock in the alien method notifyListenerDataAdded
-                ThreadUtils.newThread(addTask, "image-notifier-" + ObjectUtils.safeToString(listener)).start();
+                // use the image-notifier executor (unbounded threads) to handle initial image
+                // notification - prevents any chance of stalling due to any deadlock in the alien
+                // method notifyListenerDataAdded
+                IMAGE_NOTIFIER.execute(addTask);
             }
             else
             {
