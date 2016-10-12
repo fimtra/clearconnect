@@ -1367,8 +1367,8 @@ final class EventHandler
         final String serviceFamily = serviceParts[0];
         final String serviceMember = serviceParts[1];
 
-        Log.banner(this, "Deregistering service instance '" + serviceInstanceId + "' (was monitored with "
-            + proxy.getChannelString() + ") token=" + registrationToken);
+        Log.banner(this,
+            "Deregistering " + registrationToken + " (was monitored with " + proxy.getChannelString() + ")");
 
         proxy.destroy();
 
@@ -1597,10 +1597,8 @@ final class EventHandler
                             registerStep3_registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(registrationToken,
                                 agentName, serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
 
-                            Log.banner(EventHandler.this,
-                                "Registered " + redundancyMode + " service '" + serviceInstanceId
-                                    + "' (monitoring with " + serviceProxy.getChannelString() + ") token="
-                                    + registrationToken);
+                            Log.banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyMode
+                                + " (monitoring with " + serviceProxy.getChannelString() + ")");
                         }
                         catch (Exception e)
                         {
@@ -2357,7 +2355,7 @@ final class RegistrationToken implements Serializable
     @Override
     public String toString()
     {
-        return "RegistrationToken [" + this.token + ", " + this.serviceInstanceId + "]";
+        return "[" + this.token + ", " + this.serviceInstanceId + "]";
     }
 
     Serializable getToken()
