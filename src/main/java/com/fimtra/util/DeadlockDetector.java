@@ -67,67 +67,69 @@ public final class DeadlockDetector
     public static final Future<?> newDeadlockDetectorTask(final long checkPeriodMillis,
         final DeadlockObserver deadlockObserver, final boolean rollingThreaddumpFile)
     {
+        final RollingFileAppender appender;
+        {
+            if (rollingThreaddumpFile)
+            {
+                appender =
+                    RollingFileAppender.createStandardRollingFileAppender("threadDump",
+                        UtilProperties.Values.LOG_DIR);
+            }
+            else
+            {
+                appender = null;
+            }
+        }
+        
+        // prepare a static file for logging threaddumps if the rolling option is not used
+        final File staticFile;
+        if (appender == null)
+        {
+            final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDump";
+            // delete old files
+            FileUtils.deleteFiles(new File(UtilProperties.Values.LOG_DIR),
+                TimeUnit.MINUTES.convert(1, TimeUnit.DAYS), filePrefix);
+            staticFile = FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
+            try
+            {
+                staticFile.createNewFile();
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Could not create " + ObjectUtils.safeToString(staticFile), e);
+            }
+        }
+        else
+        {
+            staticFile = null;
+        }
+
+        
         final Runnable task = new Runnable()
         {
             final DeadlockDetector deadlockDetector = new DeadlockDetector();
-            final RollingFileAppender appender;
-            {
-                if (rollingThreaddumpFile)
-                {
-                    this.appender =
-                        RollingFileAppender.createStandardRollingFileAppender("threadDump",
-                            UtilProperties.Values.LOG_DIR);
-                }
-                else
-                {
-                    this.appender = null;
-                }
-            }
-
+            
             @Override
             public void run()
             {
-                // prepare a static file for logging threaddumps if the rolling option is not used
-                final File staticFile;
-                if (this.appender == null)
-                {
-                    final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDump";
-                    // delete old files
-                    FileUtils.deleteFiles(new File(UtilProperties.Values.LOG_DIR),
-                        TimeUnit.MINUTES.convert(1, TimeUnit.DAYS), filePrefix);
-                    staticFile = FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
-                    try
-                    {
-                        staticFile.createNewFile();
-                    }
-                    catch (IOException e)
-                    {
-                        Log.log(DeadlockDetector.class, "Could not create " + ObjectUtils.safeToString(staticFile), e);
-                    }
-                }
-                else
-                {
-                    staticFile = null;
-                }
-
                 try
                 {
-                    if (this.appender != null || staticFile != null)
+                    if (appender != null || staticFile != null)
                     {
                         final ThreadInfoWrapper[] threads = this.deadlockDetector.getThreadInfoWrappers();
                         if (threads != null)
                         {
-                            StringBuilder sb = new StringBuilder(1024);
+                            final StringBuilder sb = new StringBuilder(1024);
                             for (int i = 0; i < threads.length; i++)
                             {
                                 sb.append(threads[i].toString());
                             }
-                            if (this.appender != null)
+                            if (appender != null)
                             {
-                                this.appender.append("========  ").append(new Date().toString()).append("  ======").append(
+                                appender.append("========  ").append(new Date().toString()).append("  ======").append(
                                     SystemUtils.lineSeparator());
-                                this.appender.append(sb);
-                                this.appender.flush();
+                                appender.append(sb);
+                                appender.flush();
                             }
                             else
                             {
@@ -136,9 +138,11 @@ public final class DeadlockDetector
                                     PrintWriter staticThreadDump = new PrintWriter(staticFile);
                                     try
                                     {
-                                        staticThreadDump.append("========  ").append(new Date().toString()).append(
+                                        final StringBuilder header = new StringBuilder();
+                                        header.append("========  ").append(new Date().toString()).append(
                                             "  ======").append(SystemUtils.lineSeparator());
-                                        staticThreadDump.append(sb);
+                                        staticThreadDump.print(header);
+                                        staticThreadDump.print(sb);
                                         staticThreadDump.flush();
                                     }
                                     finally
@@ -153,7 +157,7 @@ public final class DeadlockDetector
                     final ThreadInfoWrapper[] deadlocks = this.deadlockDetector.findDeadlocks();
                     if (deadlocks != null)
                     {
-                        StringBuilder sb = new StringBuilder(1024);
+                        final StringBuilder sb = new StringBuilder(1024);
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
                         for (int i = 0; i < deadlocks.length; i++)
                         {
