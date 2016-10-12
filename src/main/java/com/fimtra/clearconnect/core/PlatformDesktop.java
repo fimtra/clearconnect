@@ -720,8 +720,10 @@ class PlatformDesktop
 
         RuntimeSummaryPanel(String platformVersion)
         {
-            this.version = new JLabel("Registry Version: " + platformVersion);
+            this.version = new JLabel(" Registry Version: " + platformVersion + " ");
+            this.version.setBorder(BorderFactory.createEtchedBorder());
             this.memory = new JLabel();
+            this.memory.setBorder(BorderFactory.createEtchedBorder());
             final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
             layout.setHgap(0);
             setLayout(layout);
@@ -736,7 +738,7 @@ class PlatformDesktop
                     while (true)
                     {
                         final String text =
-                            "Memory: " + (long) (Runtime.getRuntime().totalMemory() * inverse_1MB) + "M ";
+                            " Desktop Memory: " + (long) (Runtime.getRuntime().totalMemory() * inverse_1MB) + "M ";
                         SwingUtilities.invokeLater(new Runnable()
                         {
                             @Override
