@@ -547,7 +547,11 @@ public class PlatformTest
             
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
             verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
-            
+
+            // check primary is active
+            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
+
+            // create secondary after primary is confirmed (so we know that secondary is standby for the test)
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
                     1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));            
 
@@ -563,9 +567,6 @@ public class PlatformTest
             this.agent.addServiceAvailableListener(serviceListener);
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
-
-            // check primary is active
-            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             
             this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
             verify(ftStatusListener2, timeout(activateTimeout).times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
