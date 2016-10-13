@@ -1617,16 +1617,19 @@ public final class ProxyContext implements IObserverContext
         for (i = 0; i < size; i++)
         {
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
-            if (++batchCounter > batchSize)
+            if (++batchCounter == batchSize)
             {
                 subscribeBatch(permissionToken,
-                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i + 1, size);
                 batchSubscribeRecordNames = new ArrayList<String>(batchSize);
                 batchCounter = 0;
             }
         }
-        subscribeBatch(permissionToken,
-            batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+        if (batchSubscribeRecordNames.size() > 0)
+        {
+            subscribeBatch(permissionToken,
+                batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+        }
     }
 
     private void subscribeBatch(final String permissionToken, final String[] recordsToSubscribeFor, int current,

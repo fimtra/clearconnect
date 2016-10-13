@@ -1091,14 +1091,17 @@ public class Publisher
         for (i = 0; i < size; i++)
         {
             batchSubscribeRecordNames.add(recordNames.get(i));
-            if (++batchCounter > batchSize)
+            if (++batchCounter == batchSize)
             {
-                subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
+                subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i + 1, size);
                 batchSubscribeRecordNames = new ArrayList<String>(batchSize);
                 batchCounter = 0;
             }
         }
-        subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
+        if (batchSubscribeRecordNames.size() > 0)
+        {
+            subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
+        }
     }
 
     private void subscribeBatch(final List<String> recordNames, final ITransportChannel client,
