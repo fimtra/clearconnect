@@ -619,8 +619,8 @@ public final class PlatformRegistry
                 try
                 {
                     PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(
-                        new RegistrationToken(UUID.randomUUID(), serviceInstanceId), serviceFamily, redundancyMode,
-                        agentName, serviceInstanceId, redundancyModeEnum, TransportTechnologyEnum.valueOf(tte),
+                        new RegistrationToken(UUID.randomUUID(), serviceInstanceId), serviceFamily, agentName,
+                        serviceInstanceId, redundancyModeEnum, TransportTechnologyEnum.valueOf(tte),
                         serviceRecordStructure, args);
                 }
                 catch (Exception e)
@@ -822,7 +822,7 @@ final class EventHandler
     {
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
-        
+
         this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
         this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
         this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
@@ -978,11 +978,11 @@ final class EventHandler
     }
 
     void executeRegisterServiceInstance(final RegistrationToken registrationToken, final String serviceFamily,
-        final String redundancyMode, final String agentName, final String serviceInstanceId,
-        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
-        final Map<String, IValue> serviceRecordStructure, final IValue... args)
+        final String agentName, final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
+        final TransportTechnologyEnum transportTechnology, final Map<String, IValue> serviceRecordStructure,
+        final IValue... args)
     {
-        registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, redundancyMode, agentName,
+        registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, agentName,
             serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
 
         executeTaskWithIO(new Runnable()
@@ -992,13 +992,12 @@ final class EventHandler
             {
                 try
                 {
-                    registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily, redundancyMode,
+                    registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily,
                         agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology);
                 }
                 catch (Exception e)
                 {
-                    Log.log(EventHandler.this, "Could not connect to '" + serviceInstanceId + "'", e);
-                    executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, serviceInstanceId,
+                    logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
                         "Could not connect");
                 }
             }
@@ -1450,7 +1449,7 @@ final class EventHandler
 
     private void executeTaskWithIO(Runnable runnable)
     {
-         this.ioExecutor.execute(new ThreadUtils.ExceptionLoggingRunnable(runnable));
+        this.ioExecutor.execute(new ThreadUtils.ExceptionLoggingRunnable(runnable));
     }
 
     /**
@@ -1463,13 +1462,12 @@ final class EventHandler
      */
     @SuppressWarnings("unused")
     private void registerStep1_checkRegistrationDetailsForServiceInstance(final RegistrationToken registrationToken,
-        final String serviceFamily, final String redundancyMode, final String agentName,
-        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
-        final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
-        final IValue... args)
+        final String serviceFamily, final String agentName, final Map<String, IValue> serviceRecordStructure,
+        final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum,
+        final TransportTechnologyEnum transportTechnology, final IValue... args)
     {
         Log.log(this, "CHECK ", ObjectUtils.safeToString(registrationToken));
-        
+
         // check if already registered/being registered
         final RegistrationToken currentToken =
             this.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
@@ -1508,7 +1506,7 @@ final class EventHandler
                 break;
             default :
                 throw new IllegalArgumentException(
-                    "Unhandled mode '" + redundancyMode + "' for service '" + serviceFamily + "'");
+                    "Unhandled mode '" + redundancyModeEnum + "' for service '" + serviceFamily + "'");
         }
 
         // add to pending AFTER checking services
@@ -1521,8 +1519,8 @@ final class EventHandler
         }
     }
 
-    private void registerStep2_connectToServiceInstanceThenContinueRegistration(final RegistrationToken registrationToken,
-        final String serviceFamily, final String redundancyMode, final String agentName,
+    private void registerStep2_connectToServiceInstanceThenContinueRegistration(
+        final RegistrationToken registrationToken, final String serviceFamily, final String agentName,
         final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
         final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology)
     {
@@ -1541,15 +1539,14 @@ final class EventHandler
 
         // setup monitoring of the service instance via the proxy
         final PlatformServiceConnectionMonitor monitor = createConnectionMonitor(registrationToken, serviceFamily,
-            redundancyMode, agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, serviceProxy);
+            agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, serviceProxy);
 
         this.connectionMonitors.put(registrationToken, monitor);
     }
 
     private PlatformServiceConnectionMonitor createConnectionMonitor(final RegistrationToken registrationToken,
-        final String serviceFamily, final String redundancyMode, final String agentName,
-        final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
-        final RedundancyModeEnum redundancyModeEnum, final ProxyContext serviceProxy)
+        final String serviceFamily, final String agentName, final Map<String, IValue> serviceRecordStructure,
+        final String serviceInstanceId, final RedundancyModeEnum redundancyModeEnum, final ProxyContext serviceProxy)
     {
         return new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
         {
@@ -1594,18 +1591,13 @@ final class EventHandler
                                 return;
                             }
 
-                            registerStep3_registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(registrationToken,
-                                agentName, serviceInstanceId, serviceRecordStructure, redundancyModeEnum);
-
-                            Log.banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyMode
-                                + " (monitoring with " + serviceProxy.getChannelString() + ")");
+                            registerStep3_continueRegistrationWhenConnectionEstablished_callInFamilyScope(
+                                registrationToken, agentName, serviceInstanceId, serviceRecordStructure,
+                                redundancyModeEnum);
                         }
                         catch (Exception e)
                         {
-                            Log.log(EventHandler.this, "Error registering service '" + serviceInstanceId
-                                + "'. Will now deregister service, token=" + registrationToken, e);
-
-                            deregisterPlatformServiceInstance_callInFamilyScope(registrationToken, serviceInstanceId);
+                            logExceptionAndDeregister_familyScope(registrationToken, serviceInstanceId, e);
                         }
                     }
                 });
@@ -1613,7 +1605,7 @@ final class EventHandler
         };
     }
 
-    private void registerStep3_registerServiceInstanceWhenConnectionEstablished_callInFamilyScope(
+    private void registerStep3_continueRegistrationWhenConnectionEstablished_callInFamilyScope(
         final RegistrationToken registrationToken, final String agentName, final String serviceInstanceId,
         final Map<String, IValue> serviceRecordStructure, final RedundancyModeEnum redundancyModeEnum)
     {
@@ -1621,6 +1613,141 @@ final class EventHandler
         final String serviceFamily = serviceParts[0];
         final String serviceMember = serviceParts[1];
 
+        final ProxyContext serviceProxy = this.monitoredServiceInstances.get(registrationToken);
+
+        if (RedundancyModeEnum.FAULT_TOLERANT == redundancyModeEnum)
+        {
+            executeTaskWithIO(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    // always trigger standby first
+                    if (callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false))
+                    {
+                        // after calling standby, continue with the rest of the registration
+                        execute(new IDescriptiveRunnable()
+                        {
+                            @Override
+                            public String getDescription()
+                            {
+                                return "publishServiceDetails:" + serviceInstanceId;
+                            }
+
+                            @Override
+                            public Object context()
+                            {
+                                return serviceFamily;
+                            }
+
+                            @Override
+                            public void run()
+                            {
+                                try
+                                {
+                                    registerStep4_publishServiceDetails(agentName, serviceInstanceId,
+                                        serviceRecordStructure, redundancyModeEnum, serviceFamily, serviceMember);
+
+                                    executeTaskWithIO(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            try
+                                            {
+                                                registerStep5_registerListenersForServiceInstance(serviceFamily,
+                                                    serviceMember, serviceInstanceId, serviceProxy);
+
+                                                // this will ensure the service FT signals are
+                                                // triggered
+                                                execute(new IDescriptiveRunnable()
+                                                {
+                                                    @Override
+                                                    public String getDescription()
+                                                    {
+                                                        return "ftService_selectNextInstance:" + serviceInstanceId;
+                                                    }
+
+                                                    @Override
+                                                    public Object context()
+                                                    {
+                                                        return serviceFamily;
+                                                    }
+
+                                                    @Override
+                                                    public void run()
+                                                    {
+                                                        try
+                                                        {
+                                                            selectNextInstance_callInFamilyScope(serviceFamily,
+                                                                "register " + registrationToken);
+
+                                                            Log.banner(EventHandler.this,
+                                                                "Registered " + registrationToken + " "
+                                                                    + redundancyModeEnum + " (monitoring with "
+                                                                    + serviceProxy.getChannelString() + ")");
+                                                        }
+                                                        catch (Exception e)
+                                                        {
+                                                            logExceptionAndDeregister_familyScope(registrationToken,
+                                                                serviceInstanceId, e);
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                logExceptionAndExecuteDeregister(registrationToken, serviceFamily,
+                                                    serviceInstanceId, e,
+                                                    "Could not register service record listeners");
+                                            }
+                                        }
+                                    });
+                                }
+                                catch (Exception e)
+                                {
+                                    logExceptionAndDeregister_familyScope(registrationToken, serviceInstanceId, e);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        else
+        {
+            // load balanced services are simple to register, just 2 steps
+
+            registerStep4_publishServiceDetails(agentName, serviceInstanceId, serviceRecordStructure,
+                redundancyModeEnum, serviceFamily, serviceMember);
+
+            executeTaskWithIO(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        registerStep5_registerListenersForServiceInstance(serviceFamily, serviceMember,
+                            serviceInstanceId, serviceProxy);
+
+                        Log.banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyModeEnum
+                            + " (monitoring with " + serviceProxy.getChannelString() + ")");
+                    }
+                    catch (Exception e)
+                    {
+                        logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
+                            "Could not register service record listeners");
+                    }
+                }
+            });
+        }
+    }
+
+    private void registerStep4_publishServiceDetails(final String agentName, final String serviceInstanceId,
+        final Map<String, IValue> serviceRecordStructure, final RedundancyModeEnum redundancyModeEnum,
+        final String serviceFamily, final String serviceMember)
+    {
         this.registry.context.createRecord(
             PlatformRegistry.ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
             serviceRecordStructure);
@@ -1641,45 +1768,6 @@ final class EventHandler
         this.pendingPlatformServices.remove(serviceFamily);
 
         publishTimed(this.registry.services);
-
-        final ProxyContext serviceProxy = this.monitoredServiceInstances.get(registrationToken);
-
-        executeTaskWithIO(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                registerStep4_registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId, serviceProxy);
-            }
-        });
-
-        if (RedundancyModeEnum.FAULT_TOLERANT == redundancyModeEnum)
-        {
-            final CountDownLatch rpcStarted = new CountDownLatch(1);
-            executeTaskWithIO(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    rpcStarted.countDown();
-                    // always trigger standby first
-                    callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false);
-                }
-            });
-
-            // ensure we have started the standby FT status RPC before continuing
-            try
-            {
-                rpcStarted.await();
-            }
-            catch (InterruptedException e)
-            {
-                Log.log(this, "Interrupted whilst waiting for FT service status RPC for " + registrationToken, e);
-            }
-
-            // this will ensure the service FT signals are triggered
-            selectNextInstance_callInFamilyScope(serviceFamily, "register " + registrationToken);
-        }
     }
 
     private void handleRpcStaticRuntime(final IValue... args)
@@ -2073,8 +2161,8 @@ final class EventHandler
             this.registry.rpcsPerServiceInstance, this.registry.rpcsPerServiceFamily, false);
     }
 
-    private void registerStep4_registerListenersForServiceInstance(final String serviceFamily, final String serviceMember,
-        final String serviceInstanceId, final ProxyContext serviceProxy)
+    private void registerStep5_registerListenersForServiceInstance(final String serviceFamily,
+        final String serviceMember, final String serviceInstanceId, final ProxyContext serviceProxy)
     {
         // add a listener to get the service-level statistics
         serviceProxy.addObserver(new IRecordListener()
@@ -2276,6 +2364,23 @@ final class EventHandler
         atomicChange.applyTo(this.registry.recordsPerServiceInstance.getOrCreateSubMap(registryInstanceName));
         publishTimed(this.registry.recordsPerServiceInstance);
     }
+
+    private void logExceptionAndDeregister_familyScope(final RegistrationToken registrationToken,
+        final String serviceInstanceId, Exception e)
+    {
+        Log.log(EventHandler.this, "*** Error registering " + registrationToken + ", deregistering...", e);
+
+        deregisterPlatformServiceInstance_callInFamilyScope(registrationToken, serviceInstanceId);
+    }
+
+    private void logExceptionAndExecuteDeregister(final RegistrationToken registrationToken, final String serviceFamily,
+        final String serviceInstanceId, Exception e, final String reason)
+    {
+        Log.log(EventHandler.this, "*** " + reason + " " + registrationToken + ", deregistering...", e);
+
+        executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, serviceInstanceId, reason);
+    }
+
 }
 
 /**

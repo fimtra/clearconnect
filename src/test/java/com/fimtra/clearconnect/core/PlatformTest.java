@@ -541,39 +541,39 @@ public class PlatformTest
             IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
             IFtStatusListener ftStatusListener2 = mock(IFtStatusListener.class);
 
+            
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort +=
                 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-
+            
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
             verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
-            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
-                1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));            
-            
-            this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
+                    1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));            
 
             // wait for both instances to be registered - otherwise we can get interleaving
             // available-unavailable-available signals in the test which causes false failures
-            IServiceInstanceAvailableListener l2 = mock(IServiceInstanceAvailableListener.class);
-            this.agent.addServiceInstanceAvailableListener(l2);
-            verify(l2, timeout(STD_TIMEOUT)).onServiceInstanceAvailable(
-                eq(PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)));
-            verify(l2, timeout(STD_TIMEOUT)).onServiceInstanceAvailable(
-                eq(PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)));
+            TestServiceInstanceAvailableListener serviceInstanceListener = new TestServiceInstanceAvailableListener();
+            this.agent.addServiceInstanceAvailableListener(serviceInstanceListener);
+            final String serviceInstance1 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
+            final String serviceInstance2 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
+            serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1, serviceInstance2);            
 
             TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
             this.agent.addServiceAvailableListener(serviceListener);
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
 
-            this.agent.waitForPlatformService(SERVICE1);
-
+            // check primary is active
+            verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
+            
+            this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
             verify(ftStatusListener2, timeout(activateTimeout).times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
             
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY");
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
+            // check secondary is now active
             verify(ftStatusListener2, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.secondary));
 
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.secondary);
@@ -601,7 +601,7 @@ public class PlatformTest
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
             verify(ftStatusListener1, times(2)).onStandby(eq(SERVICE1), eq(this.primary));
-            verify(ftStatusListener2, times(2)).onStandby(eq(SERVICE1), eq(this.secondary));
+            verify(ftStatusListener2, times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
             
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
