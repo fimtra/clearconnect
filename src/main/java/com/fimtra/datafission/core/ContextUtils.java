@@ -123,9 +123,11 @@ public class ContextUtils
             }
         }
     }
-
-    static final String FISSION_RPC = "fission-rpc";
-    static final String FISSION_CORE = "fission-core";
+    
+    static final String FISSION = "fission";
+    static final String FISSION_RPC = FISSION + "-rpc";
+    static final String FISSION_CORE = FISSION + "-core";
+    static final String FISSION_SYSTEM = FISSION + "-system";
 
     private static final String RECORD_FILE_EXTENSION_NAME = "record";
     static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
@@ -146,6 +148,14 @@ public class ContextUtils
         set.add(ISystemRecordNames.CONTEXT_CONNECTIONS);
         SYSTEM_RECORDS = Collections.unmodifiableSet(set);
     }
+    
+    /**
+     * This is the default shared {@link ThimbleExecutor} used for <b>system record</b> event
+     * handling.
+     * 
+     * @see #SYSTEM_RECORDS
+     */
+    final static ThimbleExecutor SYSTEM_RECORD_EXECUTOR = new ThimbleExecutor(FISSION_SYSTEM, SYSTEM_RECORDS.size());
 
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
@@ -728,6 +738,14 @@ public class ContextUtils
             record.clear();
             context.publishAtomicChange(record);
         }
+    }
+    
+    /**
+     * @return <code>true</code> if the thread is a core thread
+     */
+    public static boolean isSystemThread()
+    {
+        return Thread.currentThread().getName().startsWith(FISSION_SYSTEM, 0);
     }
 
     /**

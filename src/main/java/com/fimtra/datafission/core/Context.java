@@ -296,6 +296,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final String name;
     final ThimbleExecutor rpcExecutor;
     final ThimbleExecutor coreExecutor;
+    final ThimbleExecutor systemExecutor;
     final ScheduledExecutorService utilityExecutor;
     final Lock recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
@@ -339,6 +340,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.noopChangeManager = new NoopAtomicChangeManager(this.name);
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
+        this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
         this.utilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
         this.recordCreateLock = new ReentrantLock();
         this.recordObservers = new SubscriptionManager<String, IRecordListener>(IRecordListener.class);
@@ -495,7 +497,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 // create and trigger the image publish whilst holding the record's lock - prevents
                 // (however unlikely) concurrent publishing occurring whilst creating
-                this.coreExecutor.execute(new ISequentialRunnable()
+                executeSequentialCoreTask(new ISequentialRunnable()
                 {
                     @Override
                     public void run()
@@ -766,8 +768,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             }
                             catch (Exception e)
                             {
-                                Log.log(Context.this, "Could not notify " + iAtomicChangeObserver + " with "
-                                    + atomicChange, e);
+                                Log.log(Context.this,
+                                    "Could not notify " + iAtomicChangeObserver + " with " + atomicChange, e);
                             }
                         }
                     }
@@ -783,7 +785,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     return name;
                 }
             };
-            this.coreExecutor.execute(notifyTask);
+            executeSequentialCoreTask(notifyTask);
             return latch;
         }
         finally
@@ -852,7 +854,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // cache, see javadocs on the method - we only want to know if there is an image
                 if (getLastPublishedImage(name) != null)
                 {
-                    this.coreExecutor.execute(new ISequentialRunnable()
+                    executeSequentialCoreTask(new ISequentialRunnable()
                     {
                         @Override
                         public void run()
@@ -865,7 +867,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             final long start = System.nanoTime();
                             final IRecord imageSnapshot = getLastPublishedImage(name);
                             // this can be null if there is a concurrent delete
-                            // ... nothing we can do about this, the subscription is still valid though
+                            // ... nothing we can do about this, the subscription is still valid
+                            // though
                             if (imageSnapshot != null)
                             {
                                 observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
@@ -951,7 +954,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
          * using a sequential runnable and submit the tasks whilst holding the record name lock to
          * ensure ordering
          */
-        this.coreExecutor.execute(new ISequentialRunnable()
+        executeSequentialCoreTask(new ISequentialRunnable()
         {
             @Override
             public void run()
@@ -1089,7 +1092,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public void createRpc(IRpcInstance rpc)
     {
         final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
-        if(isSystemRecordReady(contextRpcs))
+        if (isSystemRecordReady(contextRpcs))
         {
             contextRpcs.getWriteLock().lock();
             try
@@ -1114,7 +1117,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public void removeRpc(String rpcName)
     {
         final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
-        if(isSystemRecordReady(contextRpcs))
+        if (isSystemRecordReady(contextRpcs))
         {
             contextRpcs.getWriteLock().lock();
             try
@@ -1196,7 +1199,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final Set<String> recordNames = this.imageCache.keySet();
         for (final String name : recordNames)
         {
-            this.coreExecutor.execute(new ISequentialRunnable()
+            executeSequentialCoreTask(new ISequentialRunnable()
             {
                 @Override
                 public void run()
@@ -1252,7 +1255,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
-        this.coreExecutor.execute(sequentialRunnable);
+        final Object context = sequentialRunnable.context();
+        if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
+        {
+            this.systemExecutor.execute(sequentialRunnable);
+        }
+        else
+        {
+            this.coreExecutor.execute(sequentialRunnable);
+        }
     }
 
     void executeRpcTask(ISequentialRunnable sequentialRunnable)
@@ -1293,8 +1304,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         return this.coreExecutor;
     }
-    
-    
+
     final boolean isSystemRecordReady(IRecord systemRecord)
     {
         if (systemRecord == null || !this.active)

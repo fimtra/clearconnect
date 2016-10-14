@@ -61,7 +61,7 @@ public final class RpcInstance implements IRpcInstance
     
     static final String RPC_RECORD_RESULT_PREFIX = ContextUtils.PROTOCOL_PREFIX + "RPC_";
     static final TextValue NO_ACK = TextValue.valueOf(RPC_RECORD_RESULT_PREFIX);
-
+    
     /**
      * Handles the execution of the RPC.
      * <p>
@@ -237,6 +237,9 @@ public final class RpcInstance implements IRpcInstance
          */
         static class Caller implements IRpcExecutionHandler
         {
+            private static final char FISSION_THREADS_FIRST_CHAR = ContextUtils.FISSION.charAt(0);
+            private static final char FISSION_THREADS_SECOND_CHAR = ContextUtils.FISSION.charAt(1);
+
             private final String rpcName;
             private final ICodec codec;
             private final ITransportChannel callReceiver;
@@ -316,11 +319,17 @@ public final class RpcInstance implements IRpcInstance
                         {
                             Log.log(Caller.class, "(->) ", resultMapName);
                         }
-                        if (ContextUtils.isCoreThread() || ContextUtils.isRpcThread())
+                        
+                        final String currentThreadName = Thread.currentThread().getName();
+                        if (currentThreadName.charAt(0) == FISSION_THREADS_FIRST_CHAR
+                            && currentThreadName.charAt(1) == FISSION_THREADS_SECOND_CHAR
+                            && (ContextUtils.isCoreThread() || ContextUtils.isRpcThread()
+                                || ContextUtils.isSystemThread()))
                         {
                             Log.log(this, "*** WARNING *** RPC ", this.rpcName,
-                                " is being called using a core/RPC thread - this can lead to a stall.");
+                                " is being called using a core/system/RPC thread - this can lead to a stall.");
                         }
+                        
                         this.callReceiver.sendAsync(
                             this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, args, resultMapName)));
 

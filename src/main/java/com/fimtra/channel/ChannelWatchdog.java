@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -51,7 +50,7 @@ public final class ChannelWatchdog implements Runnable
 {
     int heartbeatPeriodMillis;
     int missedHeartbeatCount;
-    final Set<ITransportChannel> channels;
+    volatile Set<ITransportChannel> channels;
     /** Tracks channels that receive a HB */
     final Set<ITransportChannel> channelsReceivingHeartbeat;
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
@@ -74,7 +73,7 @@ public final class ChannelWatchdog implements Runnable
     public ChannelWatchdog()
     {
         super();
-        this.channels = new CopyOnWriteArraySet<ITransportChannel>();
+        this.channels = new HashSet<ITransportChannel>();
         this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
         this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
         configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "6000")),
@@ -119,9 +118,8 @@ public final class ChannelWatchdog implements Runnable
         }
         this.heartbeatPeriodMillis = periodMillis;
         this.missedHeartbeatCount = missedHeartbeats;
-        this.current =
-            this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis, this.heartbeatPeriodMillis,
-                TimeUnit.MILLISECONDS);
+        this.current = this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis,
+            this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
         Log.log(this, "Heartbeat period is ", Integer.toString(this.heartbeatPeriodMillis),
             "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
     }
@@ -132,7 +130,12 @@ public final class ChannelWatchdog implements Runnable
      */
     public void addChannel(final ITransportChannel channel)
     {
-        this.channels.add(channel);
+        synchronized (this)
+        {
+            final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
+            copy.add(channel);
+            this.channels = copy;
+        }
         this.executor.execute(new Runnable()
         {
             @Override
@@ -169,8 +172,8 @@ public final class ChannelWatchdog implements Runnable
                         Integer missedCount = this.channelsMissingHeartbeat.get(channel);
                         if (missedCount != null && missedCount.intValue() > this.missedHeartbeatCount)
                         {
-                            channel.destroy("Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount
-                                + " heartbeats");
+                            channel.destroy(
+                                "Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount + " heartbeats");
                             stopMonitoring(channel);
                         }
 
@@ -209,7 +212,14 @@ public final class ChannelWatchdog implements Runnable
      */
     private void stopMonitoring(ITransportChannel channel)
     {
-        if (this.channels.remove(channel))
+        final boolean remove;
+        synchronized (this)
+        {
+            final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
+            remove = copy.remove(channel);
+            this.channels = copy;
+        }
+        if (remove)
         {
             ChannelWatchdog.this.channelsReceivingHeartbeat.remove(channel);
             ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel);
