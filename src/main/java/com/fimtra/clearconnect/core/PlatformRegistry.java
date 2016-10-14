@@ -1007,8 +1007,8 @@ final class EventHandler
     void executeDeregisterPlatformServiceInstance(RegistrationToken registrationToken, final String serviceFamily,
         final String serviceInstanceId, String cause)
     {
-        Log.log(this, "PREPARE deregister '", serviceInstanceId, "' (", cause, ") token=",
-            ObjectUtils.safeToString(registrationToken));
+        Log.log(this, "PREPARE deregister ", (registrationToken == null ? "'" + serviceInstanceId + "' token=null "
+            : ObjectUtils.safeToString(registrationToken)), " (", cause, ")");
 
         final RegistrationToken _registrationToken;
         if (registrationToken == null)
@@ -1964,7 +1964,7 @@ final class EventHandler
         }
         catch (Exception e)
         {
-            executeDeregisterPlatformServiceInstance(null, serviceFamily, activeServiceInstanceId,
+            executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, activeServiceInstanceId,
                 "could not signal " + (active ? "MASTER" : "STANDBY") + " FT status:" + e.toString());
             return false;
         }
