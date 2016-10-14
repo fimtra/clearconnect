@@ -370,7 +370,6 @@ public abstract class ThreadUtils
     {
         return new ScheduledExecutorService()
         {
-            // todo add keepAliveTimeMillis and remove ContextUtils RECONNECT_TASKS and UTILITY_SCHEDULER
             private final ScheduledExecutorService delegate = newScheduledExecutorService(threadName, threadCount);
             private final String name = threadName;
             

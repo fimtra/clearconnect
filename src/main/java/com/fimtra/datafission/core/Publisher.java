@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -133,7 +133,6 @@ public class Publisher
     static final ScheduledExecutorService SUBSCRIBE_THROTTLE =
         ThreadUtils.newPermanentScheduledExecutorService("subscribe-throttle", 1);
 
-
     /**
      * Marks a runnable as a subscribe task and thus a pause is made by the subscribe throttle after
      * sending
@@ -146,7 +145,7 @@ public class Publisher
     }
 
     final Lock lock;
-    
+
     /**
      * This converts each record's atomic change into the <code>byte[]</code> to transmit and
      * notifies the relevant {@link ProxyContextPublisher} objects that have subscribed for the
@@ -232,6 +231,7 @@ public class Publisher
 
         void handleRecordChange(IRecordChange atomicChange)
         {
+            // todo need some timings for this
             final AtomicChange[] parts = this.teleporter.split((AtomicChange) atomicChange);
             byte[] txMessage;
             final ProxyContextPublisher[] clients = this.subscribers.getSubscribersFor(atomicChange.getName());
@@ -279,7 +279,7 @@ public class Publisher
                                     {
                                         ack = true;
                                     }
-                                    
+
                                 }
                                 catch (Exception e)
                                 {
@@ -443,7 +443,7 @@ public class Publisher
     private final class ProxyContextPublisher implements ITransportChannel
     {
         final ITransportChannel channel;
-        final CopyOnWriteArraySet<String> subscriptions = new CopyOnWriteArraySet<String>();
+        final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<String>());
         final long start;
         /**
          * NOTE: this is only used for handling subscribe and RPC commands. The
@@ -613,7 +613,12 @@ public class Publisher
             this.active = false;
             this.codec.getSessionProtocol().destroy();
             this.statsUpdateTask.cancel(false);
-            for (String name : this.subscriptions)
+            Set<String> copy;
+            synchronized(this.subscriptions)
+            {
+                copy = new HashSet<String>(this.subscriptions);
+            }
+            for (String name : copy)
             {
                 unsubscribe(name);
             }
@@ -835,7 +840,7 @@ public class Publisher
                                 }
                                 return;
                             }
-                            Object decodedMessage = channelsCodec.decode(data);
+                            final Object decodedMessage = channelsCodec.decode(data);
                             final CommandEnum command = channelsCodec.getCommand(decodedMessage);
                             if (log)
                             {
@@ -1059,7 +1064,7 @@ public class Publisher
         Log.log(this, "(<-) re-sync ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-        
+
         synchronized (this.subscribeTasks)
         {
             for (final String name : recordNames)
@@ -1130,7 +1135,7 @@ public class Publisher
         {
             for (final String name : recordNames)
             {
-                this.subscribeTasks.add(new ISubscribeTask()
+                final ISubscribeTask subscribeTask = new ISubscribeTask()
                 {
                     @Override
                     public void run()
@@ -1138,7 +1143,17 @@ public class Publisher
                         proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes,
                             finallyTask);
                     }
-                });
+                };
+                
+                // ensure system records are handled immediately
+                if (ContextUtils.isSystemRecordName(name))
+                {
+                    subscribeTask.run();
+                }
+                else
+                {
+                    this.subscribeTasks.add(subscribeTask);
+                }
             }
         }
         triggerThrottle();
@@ -1220,7 +1235,7 @@ public class Publisher
     {
         return this.transportTechnology;
     }
-    
+
     private void triggerThrottle()
     {
         if (!this.throttleRunning)
