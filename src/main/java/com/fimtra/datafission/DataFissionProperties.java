@@ -361,13 +361,13 @@ public abstract class DataFissionProperties
         int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
         
         /**
-         * The delay between handling subsequent subscribe messages.
+         * The delay, in micro seconds, between handling subsequent subscribe messages.
          * <p>
-         * Default is 100.
+         * Default is 0 (no delay).
          * 
          * @see Names#SUBSCRIBE_DELAY_MICROS
          */
-        int SUBSCRIBE_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_DELAY_MICROS, "100"));
+        int SUBSCRIBE_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_DELAY_MICROS, "0"));
 
         /**
          * The batch size for handling mass subscribes.

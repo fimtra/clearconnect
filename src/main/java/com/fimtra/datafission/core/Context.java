@@ -1300,11 +1300,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.permissionFilter = filter;
     }
 
-    public ThimbleExecutor getCoreExecutor_internalUseOnly()
-    {
-        return this.coreExecutor;
-    }
-
     final boolean isSystemRecordReady(IRecord systemRecord)
     {
         if (systemRecord == null || !this.active)

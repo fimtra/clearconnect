@@ -412,7 +412,7 @@ public final class PlatformRegistry
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
 
-        this.coalescingExecutor = this.context.getCoreExecutor_internalUseOnly();
+        this.coalescingExecutor = new ThimbleExecutor("registry-status", 1);
         this.eventHandler = new EventHandler(this);
 
         this.services = this.context.createRecord(IRegistryRecordNames.SERVICES);
@@ -799,7 +799,6 @@ final class EventHandler
     final Set<String> pendingPublish;
     final ScheduledExecutorService publishExecutor;
     final ExecutorService ioExecutor;
-    final ThimbleExecutor coreExecutor_internalUseOnly;
     /**
      * Tracks services that are pending registration completion
      * 
@@ -832,7 +831,6 @@ final class EventHandler
 
         this.pendingPublish = new HashSet<String>();
         this.eventCount = new AtomicInteger(0);
-        this.coreExecutor_internalUseOnly = registry.context.getCoreExecutor_internalUseOnly();
         this.publishExecutor =
             new ScheduledThreadPoolExecutor(1, PUBLISH_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
         this.ioExecutor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS,
@@ -841,14 +839,12 @@ final class EventHandler
 
     void execute(final IDescriptiveRunnable runnable)
     {
-        final int eventCountLogThreshold = 10;
-        if (this.eventCount.incrementAndGet() > eventCountLogThreshold)
+        if (this.eventCount.incrementAndGet() % 50 == 0)
         {
             Log.log(this, "*** Event queue: " + this.eventCount.get());
-            Log.log(this, "*** Event queue latest: ", runnable.getDescription());
         }
 
-        this.coreExecutor_internalUseOnly.execute(new IDescriptiveRunnable()
+        this.registry.context.executeSequentialCoreTask(new IDescriptiveRunnable()
         {
             @Override
             public void run()
@@ -857,10 +853,6 @@ final class EventHandler
                 long time = System.currentTimeMillis();
                 try
                 {
-                    if (EventHandler.this.eventCount.get() > eventCountLogThreshold)
-                    {
-                        Log.log(EventHandler.this, "Running: ", this.getDescription());
-                    }
                     runnable.run();
                 }
                 catch (Exception e)

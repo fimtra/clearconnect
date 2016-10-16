@@ -763,7 +763,7 @@ public class Publisher
                     {
                         task.run();
                     }
-                    if (task instanceof ISubscribeTask)
+                    if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
                     {
                         LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
                     }
