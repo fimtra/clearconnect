@@ -458,9 +458,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public String toString()
     {
-        // todo pipes confuse tings - member can have pipes
-        return "PlatformServiceInstance [" + this.platformName + "|" + this.serviceFamily + "|" + this.serviceMember
-            + "] " + getEndPointAddress();
+        return "PlatformServiceInstance [platform{" + this.platformName + "} service{" + this.serviceFamily
+            + "} member{" + this.serviceMember + "}] " + getEndPointAddress();
     }
 
     @Override

@@ -317,8 +317,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public String toString()
     {
-        // todo pipes confuse things
-        return "PlatformServiceProxy [" + this.platformName + "|" + this.serviceFamily + "] "
+        return "PlatformServiceProxy [platform{" + this.platformName + "} service{" + this.serviceFamily + "}] "
             + this.proxyContext.getChannelString();
     }
 
