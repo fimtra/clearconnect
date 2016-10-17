@@ -15,24 +15,22 @@ import com.fimtra.util.Log;
 
 public class ConfigPersistFactory {
 
-	private final File configDir;
 	private static ConfigPersistFactory instance;
-	private static IConfigPersist configPersist;
+	private final IConfigPersist configPersist;
 
 	private ConfigPersistFactory(File configDir) {
-		this.configDir = configDir;
 
 		String customPersistClassname = ConfigServiceProperties.Values.CONFIG_PERSIST_CLASS;
 		if (customPersistClassname != null) {
 			try {
-				configPersist = (IConfigPersist) Class.forName(customPersistClassname).newInstance();
+				this.configPersist = (IConfigPersist) Class.forName(customPersistClassname).newInstance();
 			} catch (Exception e) {
 				Log.log(this, "It's not possible to construct custom persistence [", customPersistClassname,
 						"]. A public no argument constructor is required.");
 				throw new RuntimeException(e);
 			}
 		} else {
-			configPersist = new FileSystemConfigPersist(new ConfigDirReader(configDir));
+			this.configPersist = new FileSystemConfigPersist(new ConfigDirReader(configDir));
 		}
 	}
 
@@ -55,8 +53,7 @@ public class ConfigPersistFactory {
 		instance = null;
 	}
 
-	@SuppressWarnings("static-method")
 	IConfigPersist getIConfigPersist() {
-		return configPersist;
+		return this.configPersist;
 	}
 }
