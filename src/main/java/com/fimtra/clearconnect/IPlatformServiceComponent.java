@@ -277,7 +277,8 @@ public interface IPlatformServiceComponent
      * Get the executor for utility type tasks
      * 
      * @return a {@link ScheduledExecutorService} for utility tasks
-     * @deprecated do not use this executor 
+     * @deprecated do not use this - this will be removed in ClearConnect 4.0.0
      */
+    @Deprecated
     ScheduledExecutorService getUtilityExecutor();
 }

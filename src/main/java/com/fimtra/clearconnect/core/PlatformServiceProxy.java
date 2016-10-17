@@ -317,6 +317,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public String toString()
     {
+        // todo pipes confuse things
         return "PlatformServiceProxy [" + this.platformName + "|" + this.serviceFamily + "] "
             + this.proxyContext.getChannelString();
     }
@@ -363,6 +364,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
         return this.proxyContext.getShortSocketDescription();
     }
 
+    @Deprecated
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {

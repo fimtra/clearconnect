@@ -458,6 +458,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public String toString()
     {
+        // todo pipes confuse tings - member can have pipes
         return "PlatformServiceInstance [" + this.platformName + "|" + this.serviceFamily + "|" + this.serviceMember
             + "] " + getEndPointAddress();
     }
@@ -561,6 +562,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.context.executeSequentialCoreTask(sequentialRunnable);
     }
 
+    @Deprecated
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {
