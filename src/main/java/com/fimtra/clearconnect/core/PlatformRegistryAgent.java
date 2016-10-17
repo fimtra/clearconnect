@@ -92,7 +92,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             && rpcNames.contains(PlatformRegistry.GET_PLATFORM_NAME)
             && rpcNames.contains(PlatformRegistry.GET_HEARTBEAT_CONFIG);
     }
+    
+    private final static class RegisterRpcNotAvailableException extends RuntimeException
+    {
+        private static final long serialVersionUID = 1L;
 
+        RegisterRpcNotAvailableException()
+        {
+        }
+    }
+    
     final long startTime;
     final String agentName;
     final String hostQualifiedAgentName;
@@ -245,7 +254,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 PlatformRegistryAgent.this.localPlatformServiceInstances.get(serviceInstanceId);
                             if (serviceInstance != null)
                             {
-                                Log.log(PlatformRegistryAgent.this, "*** RE-REGISTERING ", serviceInstanceId);
+                                Log.log(PlatformRegistryAgent.this, "Re-registering ", serviceInstanceId);
                                 registerServiceWithRetry(serviceInstance, null);
                             }
                         }
@@ -642,11 +651,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
+        final IRpcInstance registerRpc = this.registryProxy.getRpc(PlatformRegistry.REGISTER);
+        if (registerRpc == null)
+        {
+            throw new RegisterRpcNotAvailableException();
+        }
+
         Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
-        
+
         try
         {
-            this.registryProxy.getRpc(PlatformRegistry.REGISTER).execute(
+                registerRpc.execute(
                 TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
                 TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
                 TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
@@ -1132,6 +1147,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
     }
 
+    @Deprecated
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {
@@ -1155,6 +1171,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 registerService(platformServiceInstance);
                 registered = true;
+            }
+            catch (RegisterRpcNotAvailableException e)
+            {
+                Log.log(PlatformRegistryAgent.this,
+                    "Register RPC not available (is the registry disconnected?), aborting registration of "
+                        + ObjectUtils.safeToString(platformServiceInstance)
+                        + ", if the registry reconnects this service will be re-registered",
+                    e);
+                return;
             }
             catch (Exception e)
             {
