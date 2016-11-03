@@ -112,7 +112,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         {
             this.currentFile = file;
             this.name = this.currentFile.getName();
-            this.parent = this.currentFile.getParentFile().getAbsolutePath();
+            this.parent = this.currentFile.getAbsoluteFile().getParentFile().getAbsolutePath();
             checkFileWriteable(this.currentFile);
             this.maxChars = maximumCharacters;
             this.writer = new BufferedWriter(new FileWriter(file));
