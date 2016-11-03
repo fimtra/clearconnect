@@ -644,29 +644,28 @@ public class PlatformUtils
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
             {
                 final Set<String> subMapKeys = atomicChange.getSubMapKeys();
+                final Set<String> currentConnections = imageCopy.getSubMapKeys();
 
                 final Set<String> added = new HashSet<String>();
                 final Set<String> removed = new HashSet<String>();
-                IRecordChange subMapAtomicChange;
+                IValue proxyId;
                 for (String connectionId : subMapKeys)
                 {
-                    subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
-                    if (subMapAtomicChange.getOverwrittenEntries().isEmpty())
+                    if (!currentConnections.contains(connectionId))
                     {
-                        // if removed is empty, then put must NOT be empty
-                        if (subMapAtomicChange.getRemovedEntries().isEmpty())
+                        removed.add(connectionId);
+                    }
+                    else
+                    {
+                        if (!this.current.containsKey(connectionId))
                         {
-                            if (subMapAtomicChange.getPutEntries().get(
-                                IContextConnectionsRecordFields.PROXY_ID) != null)
+                            proxyId = atomicChange.getSubMapAtomicChange(connectionId).getPutEntries().get(
+                                IContextConnectionsRecordFields.PROXY_ID);
+                            if (proxyId != null)
                             {
+                                this.current.put(connectionId, proxyId.textValue());
                                 added.add(connectionId);
-                                this.current.put(connectionId, subMapAtomicChange.getPutEntries().get(
-                                    IContextConnectionsRecordFields.PROXY_ID).textValue());
                             }
-                        }
-                        else
-                        {
-                            removed.add(connectionId);
                         }
                     }
                 }
