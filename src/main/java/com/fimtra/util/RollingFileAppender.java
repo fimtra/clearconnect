@@ -112,7 +112,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         {
             this.currentFile = file;
             this.name = this.currentFile.getName();
-            this.parent = this.currentFile.getParent();
+            this.parent = this.currentFile.getParentFile().getAbsolutePath();
             checkFileWriteable(this.currentFile);
             this.maxChars = maximumCharacters;
             this.writer = new BufferedWriter(new FileWriter(file));
@@ -192,14 +192,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         @Override
         public String toString()
         {
-            try
-            {
-                return this.currentFile.getCanonicalPath();
-            }
-            catch (IOException e)
-            {
-                return this.currentFile.toString();
-            }
+            return this.currentFile.getAbsolutePath();
         }
 
         private void checkSize(int charCount) throws IOException
