@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
@@ -241,7 +240,7 @@ public class ImmutableRecord implements IRecord
     }
 
     @Override
-    public Lock getWriteLock()
+    public Object getWriteLock()
     {
         return this.backingRecord.getWriteLock();
     }
@@ -258,7 +257,7 @@ public class ImmutableRecord implements IRecord
         return ContextUtils.mergeMaps(this.backingRecord.data, this.backingRecord.subMaps);
     }
 
-    @Override
+    @Override   
     public long getSequence()
     {
         return this.backingRecord.getSequence();

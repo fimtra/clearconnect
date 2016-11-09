@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
@@ -138,8 +136,6 @@ public final class AtomicChange implements IRecordChange
     Map<String, IValue> removedEntries;
     Map<String, AtomicChange> subMapAtomicChanges;
 
-    final Lock lock;
-
     /**
      * Construct the atomic change to represent the record.
      * <p>
@@ -165,8 +161,6 @@ public final class AtomicChange implements IRecordChange
         this.putEntries = putEntries;
         this.overwrittenEntries = overwrittenEntries;
         this.removedEntries = removedEntries;
-
-        this.lock = new ReentrantLock();
     }
 
     AtomicChange(String name)
@@ -348,17 +342,11 @@ public final class AtomicChange implements IRecordChange
             overwrittenEntries.remove(removedKey);
         }
 
-        final Lock lock = getLock();
-        lock.lock();
-        try
+        synchronized (this)
         {
             this.putEntries = putEntries;
             this.overwrittenEntries = overwrittenEntries;
             this.removedEntries = removedEntries;
-        }
-        finally
-        {
-            lock.unlock();
         }
 
         setScope(isImage ? IRecordChange.IMAGE_SCOPE_CHAR : IRecordChange.DELTA_SCOPE_CHAR);
@@ -402,11 +390,6 @@ public final class AtomicChange implements IRecordChange
         return this.sequence.get().longValue();
     }
 
-    Lock getLock()
-    {
-        return this.lock;
-    }
-
     void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
     {
         internalGetPutEntries().put(key, current);
@@ -443,20 +426,14 @@ public final class AtomicChange implements IRecordChange
         {
             return this.putEntries;
         }
-        final Lock lock = getLock();
-        lock.lock();
-        try
+        synchronized (this)
         {
             if (this.putEntries == null)
             {
                 this.putEntries = new HashMap<String, IValue>(2);
             }
             return this.putEntries;
-        }
-        finally
-        {
-            lock.unlock();
-        }
+        }        
     }
 
     Map<String, IValue> internalGetRemovedEntries()
@@ -465,19 +442,13 @@ public final class AtomicChange implements IRecordChange
         {
             return this.removedEntries;
         }
-        final Lock lock = getLock();
-        lock.lock();
-        try
+        synchronized (this)
         {
             if (this.removedEntries == null)
             {
                 this.removedEntries = new HashMap<String, IValue>(2);
             }
             return this.removedEntries;
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 
@@ -487,9 +458,7 @@ public final class AtomicChange implements IRecordChange
         {
             return this.overwrittenEntries;
         }
-        final Lock lock = getLock();
-        lock.lock();
-        try
+        synchronized (this)
         {
             if (this.overwrittenEntries == null)
             {
@@ -497,17 +466,11 @@ public final class AtomicChange implements IRecordChange
             }
             return this.overwrittenEntries;
         }
-        finally
-        {
-            lock.unlock();
-        }
     }
 
     AtomicChange internalGetSubMapAtomicChange(String subMapKey)
     {
-        Lock lock = getLock();
-        lock.lock();
-        try
+        synchronized (this)
         {
             if (this.subMapAtomicChanges == null)
             {
@@ -522,10 +485,6 @@ public final class AtomicChange implements IRecordChange
                 this.subMapAtomicChanges.put(subMapKey, subMapAtomicChange);
             }
             return subMapAtomicChange;
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 

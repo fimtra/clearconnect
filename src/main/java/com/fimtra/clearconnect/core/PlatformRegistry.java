@@ -1369,7 +1369,7 @@ final class EventHandler
 
         // remove connections - we need to scan the entire platform connections to find
         // matching connections from the publisher that is now dead
-        for (String connection : this.registry.platformConnections.getSubMapKeys())
+        for (String connection : new HashSet<String>(this.registry.platformConnections.getSubMapKeys()))
         {
             final Map<String, IValue> subMap = this.registry.platformConnections.getOrCreateSubMap(connection);
             final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);

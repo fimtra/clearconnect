@@ -21,17 +21,14 @@ import java.io.Writer;
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
@@ -52,20 +49,14 @@ import com.fimtra.util.is;
  */
 final class Record implements IRecord, Cloneable
 {
-    private static final float LOAD_FACTOR = .75f;
-
-    static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(int size)
+    static <K, V> Map<K, V> newMap(int size)
     {
-        ConcurrentHashMap<K, V> map = new ConcurrentHashMap<K, V>(size, LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
-        return map;
+        return Collections.synchronizedMap(new HashMap<K, V>(size));
     }
 
-    static <K, V> ConcurrentHashMap<K, V> newConcurrentHashMap(Map<K, V> data)
+    static <K, V> Map<K, V> newMap(Map<K, V> data)
     {
-        ConcurrentHashMap<K, V> map =
-            new ConcurrentHashMap<K, V>(data.size(), LOAD_FACTOR, Values.MAX_RECORD_CONCURRENCY);
-        map.putAll(data);
-        return map;
+        return Collections.synchronizedMap(new HashMap<K, V>(data));
     }
 
     static String toString(String contextName, String recordName, long sequence, Map<String, IValue> data,
@@ -100,9 +91,8 @@ final class Record implements IRecord, Cloneable
         }
 
         final String dataString = ContextUtils.mapToString(data);
-        final StringBuilder sb =
-            new StringBuilder(dataString.length() + subMapString.length() + contextName.length() + recordName.length()
-                + 30);
+        final StringBuilder sb = new StringBuilder(
+            dataString.length() + subMapString.length() + contextName.length() + recordName.length() + 30);
         sb.append(contextName).append("|").append(recordName).append("|").append(sequence).append("|").append(
             dataString).append("|subMaps").append(subMapString);
         return sb.toString();
@@ -120,32 +110,27 @@ final class Record implements IRecord, Cloneable
         }
     }
 
-    private static final ConcurrentMap<String, Map<String, IValue>> EMPTY_SUBMAP = newConcurrentHashMap(1);
+    private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = newMap(1);
     /**
      * A pool for the keys. Keys across records stand a VERY good chance of being repeated many
      * times so this is a valuable memory optimisation.
      */
-    static final ObjectPool<String> keysPool = new ObjectPool<String>("record-keys",
-        DataFissionProperties.Values.KEYS_POOL_MAX);
+    static final ObjectPool<String> keysPool =
+        new ObjectPool<String>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
     final AtomicLong sequence;
     final String name;
     final IAtomicChangeManager context;
-    final ConcurrentMap<String, IValue> data;
-    ConcurrentMap<String, Map<String, IValue>> subMaps;
-    final Lock readLock;
-    final Lock writeLock;
+    final Map<String, IValue> data;
+    Map<String, Map<String, IValue>> subMaps;
 
     Record(String name, Map<String, IValue> data, IAtomicChangeManager context)
     {
         super();
         this.name = keysPool.intern(name);
-        this.data = newConcurrentHashMap(data);
+        this.data = newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
-        final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
-        this.readLock = reentrantReadWriteLock.readLock();
-        this.writeLock = reentrantReadWriteLock.writeLock();
         this.sequence = new AtomicLong(0);
     }
 
@@ -153,157 +138,103 @@ final class Record implements IRecord, Cloneable
      * Clone constructor for providing pre-sized subMaps to prevent re-hashing
      */
     Record(String name, Map<String, IValue> data, IAtomicChangeManager context,
-        ConcurrentMap<String, Map<String, IValue>> subMaps)
+        Map<String, Map<String, IValue>> subMaps)
     {
         super();
         this.name = keysPool.intern(name);
-        this.data = newConcurrentHashMap(data);
+        this.data = newMap(data);
         this.subMaps = subMaps;
         this.context = context;
-        final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
-        this.readLock = reentrantReadWriteLock.readLock();
-        this.writeLock = reentrantReadWriteLock.writeLock();
         this.sequence = new AtomicLong(0);
     }
 
     @Override
     public IRecord getImmutableInstance()
     {
-        this.readLock.lock();
-        try
-        {
-            return new ImmutableRecord(this);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return new ImmutableRecord(this);
     }
 
     @Override
     public void clear()
     {
-        this.writeLock.lock();
-        try
+        synchronized(this.data)
         {
-            for (Iterator<Map.Entry<String, IValue>> it = this.data.entrySet().iterator(); it.hasNext();)
+            for (Iterator<Map.Entry<String, IValue>> it =
+                new HashMap<String, IValue>(this.data).entrySet().iterator(); it.hasNext();)
             {
                 remove(it.next().getKey());
             }
 
-            for (Iterator<Map.Entry<String, Map<String, IValue>>> it = this.subMaps.entrySet().iterator(); it.hasNext();)
+            for (Iterator<Map.Entry<String, Map<String, IValue>>> it =
+                this.subMaps.entrySet().iterator(); it.hasNext();)
             {
                 it.next().getValue().clear();
             }
-        }
-        finally
-        {
-            this.writeLock.unlock();
+            this.subMaps.clear();
         }
     }
 
     @Override
     public boolean containsKey(Object key)
     {
-        this.readLock.lock();
-        try
-        {
-            return this.data.containsKey(key);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.data.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        this.readLock.lock();
-        try
-        {
-            return this.data.containsValue(value);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.data.containsValue(value);
     }
 
     @Override
     public Set<Entry<String, IValue>> entrySet()
     {
-        this.readLock.lock();
-        try
+        return new AbstractSet<Entry<String, IValue>>()
         {
-            return new AbstractSet<Entry<String, IValue>>()
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
+            @Override
+            public Iterator<Entry<String, IValue>> iterator()
             {
-                final Set<java.util.Map.Entry<String, IValue>> backingEntrySet =
-                    Record.this.getSnapshotOfBackingEntrySet();
+                return new EntrySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
 
-                @Override
-                public Iterator<Entry<String, IValue>> iterator()
-                {
-                    return new EntrySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
-                }
-
-                @Override
-                public int size()
-                {
-                    return this.backingEntrySet.size();
-                }
-            };
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
+            }
+        };
     }
 
     @Override
     public boolean equals(Object o)
     {
-        this.readLock.lock();
-        try
+        if (is.same(o, this))
         {
-            if (is.same(o, this))
-            {
-                return true;
-            }
-            if (!(o instanceof IRecord))
-            {
-                return false;
-            }
-            final Record other;
-            if (o instanceof ImmutableRecord)
-            {
-                other = ((ImmutableRecord) o).backingRecord;
-            }
-            else
-            {
-                other = (Record) o;
-            }
-            return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
-                && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
+            return true;
         }
-        finally
+        if (!(o instanceof IRecord))
         {
-            this.readLock.unlock();
+            return false;
         }
+        final Record other;
+        if (o instanceof ImmutableRecord)
+        {
+            other = ((ImmutableRecord) o).backingRecord;
+        }
+        else
+        {
+            other = (Record) o;
+        }        
+        return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
+            && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
     }
 
     @Override
     public IValue get(Object key)
     {
-        this.readLock.lock();
-        try
-        {
-            return this.data.get(key);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.data.get(key);
     }
 
     @Override
@@ -315,45 +246,28 @@ final class Record implements IRecord, Cloneable
     @Override
     public boolean isEmpty()
     {
-        this.readLock.lock();
-        try
-        {
-            return this.data.isEmpty();
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.data.isEmpty();
     }
 
     @Override
     public Set<String> keySet()
     {
-        this.readLock.lock();
-        try
+        return new AbstractSet<String>()
         {
-            return new AbstractSet<String>()
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
+            @Override
+            public Iterator<String> iterator()
             {
-                final Set<java.util.Map.Entry<String, IValue>> backingEntrySet =
-                    Record.this.getSnapshotOfBackingEntrySet();
+                return new KeySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
 
-                @Override
-                public Iterator<String> iterator()
-                {
-                    return new KeySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
-                }
-
-                @Override
-                public int size()
-                {
-                    return this.backingEntrySet.size();
-                }
-            };
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
+            }
+        };
     }
 
     @Override
@@ -363,14 +277,9 @@ final class Record implements IRecord, Cloneable
         {
             throw new NullPointerException("null keys are not allowed");
         }
-        this.writeLock.lock();
-        try
+        synchronized (this.data)
         {
             return corePut_callWithWriteLock(key, value);
-        }
-        finally
-        {
-            this.writeLock.unlock();
         }
     }
 
@@ -411,8 +320,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public void putAll(Map<? extends String, ? extends IValue> t)
     {
-        this.writeLock.lock();
-        try
+        synchronized (this.data)
         {
             Map.Entry<String, IValue> entry = null;
             String key = null;
@@ -425,10 +333,6 @@ final class Record implements IRecord, Cloneable
                 corePut_callWithWriteLock(key, value);
             }
         }
-        finally
-        {
-            this.writeLock.unlock();
-        }
     }
 
     @Override
@@ -436,17 +340,12 @@ final class Record implements IRecord, Cloneable
     {
         if (key instanceof String)
         {
-            this.writeLock.lock();
-            try
+            synchronized (this.data)
             {
                 if (this.data.containsKey(key))
                 {
                     return coreRemove_callWithWriteLock(key);
                 }
-            }
-            finally
-            {
-                this.writeLock.unlock();
             }
         }
         return null;
@@ -455,59 +354,34 @@ final class Record implements IRecord, Cloneable
     @Override
     public int size()
     {
-        this.readLock.lock();
-        try
-        {
-            return this.data.size();
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.data.size();
     }
 
     @Override
     public Collection<IValue> values()
     {
-        this.readLock.lock();
-        try
+        return new AbstractCollection<IValue>()
         {
-            return new AbstractCollection<IValue>()
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
+            @Override
+            public Iterator<IValue> iterator()
             {
-                final Set<java.util.Map.Entry<String, IValue>> backingEntrySet =
-                    Record.this.getSnapshotOfBackingEntrySet();
+                return new ValuesIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
 
-                @Override
-                public Iterator<IValue> iterator()
-                {
-                    return new ValuesIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
-                }
-
-                @Override
-                public int size()
-                {
-                    return this.backingEntrySet.size();
-                }
-            };
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
+            }
+        };
     }
 
     @Override
     public String toString()
     {
-        this.readLock.lock();
-        try
-        {
-            return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data, this.subMaps);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data, this.subMaps);
     }
 
     @Override
@@ -530,28 +404,19 @@ final class Record implements IRecord, Cloneable
     public Map<String, IValue> getOrCreateSubMap(String key)
     {
         final String internKey = keysPool.intern(key);
-        this.readLock.lock();
-        try
+        if (this.subMaps != EMPTY_SUBMAP)
         {
-            if (this.subMaps != EMPTY_SUBMAP)
+            Map<String, IValue> submap = this.subMaps.get(internKey);
+            if (submap != null)
             {
-                Map<String, IValue> submap = this.subMaps.get(internKey);
-                if (submap != null)
-                {
-                    return submap;
-                }
+                return submap;
             }
         }
-        finally
-        {
-            this.readLock.unlock();
-        }
-        this.writeLock.lock();
-        try
+        synchronized (this.data)
         {
             if (this.subMaps == EMPTY_SUBMAP)
             {
-                this.subMaps = newConcurrentHashMap(1);
+                this.subMaps = newMap(1);
             }
             final SubMap newSubMap = new SubMap(this, internKey);
             // put if absent to handle multiple writers running concurrently but blocked by the lock
@@ -559,18 +424,13 @@ final class Record implements IRecord, Cloneable
             final Map<String, IValue> previous = this.subMaps.putIfAbsent(internKey, newSubMap);
             return previous == null ? newSubMap : previous;
         }
-        finally
-        {
-            this.writeLock.unlock();
-        }
     }
 
     @Override
     public Map<String, IValue> removeSubMap(String key)
     {
         final Map<String, IValue> subMap;
-        this.writeLock.lock();
-        try
+        synchronized (this.data)
         {
             subMap = this.subMaps.remove(key);
             if (subMap == null)
@@ -582,39 +442,19 @@ final class Record implements IRecord, Cloneable
             subMap.clear();
             return previous;
         }
-        finally
-        {
-            this.writeLock.unlock();
-        }
     }
 
     @Override
     public Set<String> getSubMapKeys()
     {
-        this.readLock.lock();
-        try
-        {
-            return this.subMaps.keySet();
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return this.subMaps.keySet();
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T extends IValue> T get(String key)
     {
-        this.readLock.lock();
-        try
-        {
-            return (T) this.data.get(key);
-        }
-        finally
-        {
-            this.readLock.unlock();
-        }
+        return (T) this.data.get(key);
     }
 
     @SuppressWarnings("unchecked")
@@ -624,8 +464,7 @@ final class Record implements IRecord, Cloneable
         final HashMap<String, IValue> flattenedMap = new HashMap<String, IValue>();
         ContextUtils.resolveRecordMapFromStream(reader, flattenedMap);
         final Map<?, ?>[] demergeMaps = ContextUtils.demergeMaps(flattenedMap);
-        this.writeLock.lock();
-        try
+        synchronized (this.data)
         {
             // trigger an atomic change by adding to self
             putAll((Map<String, IValue>) demergeMaps[0]);
@@ -642,30 +481,21 @@ final class Record implements IRecord, Cloneable
                 getOrCreateSubMap(key).putAll(value);
             }
         }
-        finally
-        {
-            this.writeLock.unlock();
-        }
     }
 
     @Override
     public void serializeToStream(Writer writer) throws IOException
     {
-        this.readLock.lock();
-        try
+        synchronized (this.data)
         {
             ContextUtils.serializeRecordMapToStream(writer, asFlattenedMap());
-        }
-        finally
-        {
-            this.readLock.unlock();
         }
     }
 
     @Override
-    public Lock getWriteLock()
+    public Object getWriteLock()
     {
-        return this.writeLock;
+        return this.data;
     }
 
     /**
@@ -675,21 +505,20 @@ final class Record implements IRecord, Cloneable
     protected Record clone()
     {
         // this is a deep copy of the record internal maps
-        this.readLock.lock();
-        try
+        synchronized (this.data)
         {
             final Record cloneRecord;
             if (this.subMaps.size() == 0)
             {
-                cloneRecord = new Record(this.name, newConcurrentHashMap(this.data), this.context);
+                cloneRecord = new Record(this.name, newMap(this.data), this.context);
             }
             else
             {
-                final ConcurrentMap<String, Map<String, IValue>> cloneSubMaps =
-                    newConcurrentHashMap(this.subMaps.size());
-                cloneRecord = new Record(this.name, newConcurrentHashMap(this.data), this.context, cloneSubMaps);
+                final Map<String, Map<String, IValue>> cloneSubMaps = newMap(this.subMaps.size());
+                cloneRecord = new Record(this.name, newMap(this.data), this.context, cloneSubMaps);
                 Map.Entry<String, Map<String, IValue>> entry = null;
-                for (final Iterator<Map.Entry<String, Map<String, IValue>>> it = this.subMaps.entrySet().iterator(); it.hasNext();)
+                for (final Iterator<Map.Entry<String, Map<String, IValue>>> it =
+                    this.subMaps.entrySet().iterator(); it.hasNext();)
                 {
                     entry = it.next();
                     cloneSubMaps.put(entry.getKey(), ((SubMap) entry.getValue()).clone(cloneRecord));
@@ -698,25 +527,15 @@ final class Record implements IRecord, Cloneable
             cloneRecord.sequence.set(this.sequence.get());
             return cloneRecord;
         }
-        finally
-        {
-            this.readLock.unlock();
-        }
     }
 
     @Override
     public Map<String, IValue> asFlattenedMap()
     {
-        this.readLock.lock();
-        try
+        synchronized (this.data)
         {
             return ContextUtils.mergeMaps(this.data, this.subMaps);
         }
-        finally
-        {
-            this.readLock.unlock();
-        }
-
     }
 
     @Override
@@ -728,7 +547,6 @@ final class Record implements IRecord, Cloneable
     IValue corePut_callWithWriteLock(String key, IValue value)
     {
         final String internKey = keysPool.intern(key);
-        // concurrent maps don't allow nulls
         if (value != null)
         {
             final IValue previous = this.data.put(internKey, value);
@@ -766,14 +584,9 @@ final class Record implements IRecord, Cloneable
 
     Set<Entry<String, IValue>> getSnapshotOfBackingEntrySet()
     {
-        this.readLock.lock();
-        try
+        synchronized (this.data)
         {
             return new HashSet<Entry<String, IValue>>(this.data.entrySet());
-        }
-        finally
-        {
-            this.readLock.unlock();
         }
     }
 
@@ -863,45 +676,30 @@ final class SubMap implements Map<String, IValue>
         return null;
     }
 
-    final String prefix;
     final Record record;
     final String subMapKey;
-    final ConcurrentMap<String, IValue> subMap;
+    final Map<String, IValue> subMap;
 
     SubMap(Record record, String subMapKey)
     {
         this.subMapKey = subMapKey;
         this.record = record;
-        this.prefix = SubMap.encodeSubMapKey(subMapKey);
-        this.subMap = Record.newConcurrentHashMap(2);
-        Map.Entry<String, IValue> entry;
-        String key;
-        IValue value;
-        for (Iterator<Map.Entry<String, IValue>> it = this.record.data.entrySet().iterator(); it.hasNext();)
-        {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            if (key.startsWith(this.prefix, 0))
-            {
-                this.subMap.put(key.substring(this.prefix.length()), value);
-            }
-        }
+        this.subMap = Record.newMap(2);
     }
 
-    private SubMap(Record record, String subMapKey, String prefix, ConcurrentMap<String, IValue> subMap)
+    private SubMap(Record record, String subMapKey, Map<String, IValue> subMap)
     {
         this.record = record;
         this.subMapKey = subMapKey;
-        this.prefix = prefix;
         this.subMap = subMap;
     }
 
     SubMap clone(Record cloneRecord)
     {
-        final ConcurrentHashMap<String, IValue> clonedSubMap = Record.newConcurrentHashMap(this.subMap.size());
-        clonedSubMap.putAll(this.subMap);
-        return new SubMap(cloneRecord, this.subMapKey, this.prefix, clonedSubMap);
+        synchronized (this.record.data)
+        {
+            return new SubMap(cloneRecord, this.subMapKey, Record.newMap(this.subMap));
+        }
     }
 
     @Override
@@ -945,91 +743,45 @@ final class SubMap implements Map<String, IValue>
     @Override
     public int size()
     {
-        this.record.readLock.lock();
-        try
-        {
-            return this.subMap.size();
-        }
-        finally
-        {
-            this.record.readLock.unlock();
-        }
+        return this.subMap.size();
     }
 
     @Override
     public boolean isEmpty()
     {
-        this.record.readLock.lock();
-        try
-        {
-            return this.subMap.isEmpty();
-        }
-        finally
-        {
-            this.record.readLock.unlock();
-        }
+        return this.subMap.isEmpty();
     }
 
     @Override
     public boolean containsKey(Object key)
     {
-        this.record.readLock.lock();
-        try
-        {
-            return this.subMap.containsKey(key);
-        }
-        finally
-        {
-            this.record.readLock.unlock();
-        }
+        return this.subMap.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        this.record.readLock.lock();
-        try
-        {
-            return this.subMap.containsValue(value);
-        }
-        finally
-        {
-            this.record.readLock.unlock();
-        }
+        return this.subMap.containsValue(value);
     }
 
     @Override
     public IValue get(Object key)
     {
-        this.record.readLock.lock();
-        try
-        {
-            return this.subMap.get(key);
-        }
-        finally
-        {
-            this.record.readLock.unlock();
-        }
+        return this.subMap.get(key);
     }
 
     @Override
     public IValue put(String key, IValue value)
     {
-        this.record.writeLock.lock();
-        try
+        synchronized (this.record.data)
         {
             return corePut_callWithWriteLock(key, value);
-        }
-        finally
-        {
-            this.record.writeLock.unlock();
         }
     }
 
     IValue corePut_callWithWriteLock(String key, IValue value)
     {
         final String internKey = Record.keysPool.intern(key);
-        // concurrent maps don't allow nulls
         if (value != null)
         {
             final IValue previous = this.subMap.put(internKey, value);
@@ -1050,24 +802,18 @@ final class SubMap implements Map<String, IValue>
     @Override
     public IValue remove(Object key)
     {
-        this.record.writeLock.lock();
-        try
+        synchronized (this.record.data)
         {
             final IValue previous = this.subMap.remove(key);
             this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
             return previous;
-        }
-        finally
-        {
-            this.record.writeLock.unlock();
         }
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        this.record.writeLock.lock();
-        try
+        synchronized (this.record.data)
         {
             Map.Entry<?, ?> entry = null;
             String key = null;
@@ -1080,17 +826,12 @@ final class SubMap implements Map<String, IValue>
                 corePut_callWithWriteLock(key, value);
             }
         }
-        finally
-        {
-            this.record.writeLock.unlock();
-        }
     }
 
     @Override
     public void clear()
     {
-        this.record.writeLock.lock();
-        try
+        synchronized (this.record.data)
         {
             Set<Map.Entry<String, IValue>> entrySet = entrySet();
             for (Iterator<Map.Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext();)
@@ -1098,10 +839,6 @@ final class SubMap implements Map<String, IValue>
                 iterator.next();
                 iterator.remove();
             }
-        }
-        finally
-        {
-            this.record.writeLock.unlock();
         }
     }
 
@@ -1195,43 +932,30 @@ final class SubMap implements Map<String, IValue>
     @Override
     public boolean equals(Object o)
     {
-        this.record.readLock.lock();
-        try
+        if (is.same(o, this))
         {
-            if (is.same(o, this))
-            {
-                return true;
-            }
-            if (is.differentClass(this, o))
-            {
-                return false;
-            }
-            SubMap other = (SubMap) o;
-            return is.eq(this.prefix, other.prefix) && is.eq(this.record.getName(), other.record.getName())
-                && is.eq(this.subMap, other.subMap);
+            return true;
         }
-        finally
+        if (is.differentClass(this, o))
         {
-            this.record.readLock.unlock();
+            return false;
         }
+        SubMap other = (SubMap) o;
+        return is.eq(this.subMapKey, other.subMapKey) && is.eq(this.record.getName(), other.record.getName())
+            && is.eq(this.subMap, other.subMap);
     }
 
     @Override
     public int hashCode()
     {
-        return this.prefix.hashCode();
+        return this.subMapKey.hashCode();
     }
 
     Set<Map.Entry<String, IValue>> getSnapshotOfBackingEntrySet()
     {
-        this.record.readLock.lock();
-        try
+        synchronized (this.record.data)
         {
             return new HashSet<Map.Entry<String, IValue>>(this.subMap.entrySet());
-        }
-        finally
-        {
-            this.record.readLock.unlock();
         }
     }
 }
@@ -1290,16 +1014,11 @@ abstract class AbstractNotifyingIterator<IteratorType> implements Iterator<Itera
     @Override
     public void remove()
     {
-        this.record.getWriteLock().lock();
-        try
+        synchronized (this.record.data)
         {
             this.snapshotEntryIterator.remove();
             this.target.remove(this.current.getKey());
             remove_callWithWriteLock(this.current.getKey(), this.current.getValue());
-        }
-        finally
-        {
-            this.record.getWriteLock().unlock();
         }
     }
 

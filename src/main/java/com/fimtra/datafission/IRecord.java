@@ -20,7 +20,6 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
 
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 
@@ -42,12 +41,11 @@ import com.fimtra.datafission.core.ImmutableSnapshotRecord;
  * <p>
  * <b>Storing a <code>null</code> value against a key is the same as removing the key.</b>
  * <p>
- * <h2>Atomic changes</h2>
- * All <code>put</code> calls that change the record are grouped into an "atomic change". This
- * atomic change is published to {@link IRecordListener} instances only when the record is
- * "published" by a call to {@link IPublisherContext#publishAtomicChange(IRecord)}. Atomic changes
- * allow a publisher to define what constitues an atomic change to a record for viewing by
- * observers.
+ * <h2>Atomic changes</h2> All <code>put</code> calls that change the record are grouped into an
+ * "atomic change". This atomic change is published to {@link IRecordListener} instances only when
+ * the record is "published" by a call to {@link IPublisherContext#publishAtomicChange(IRecord)}.
+ * Atomic changes allow a publisher to define what constitues an atomic change to a record for
+ * viewing by observers.
  * <p>
  * <h2>Internal maps</h2> A record can hold maps associated with a key in the record - these are
  * called 'sub-maps'. A sub-map can be used in the same way as using a standard {@link Map}. This is
@@ -55,11 +53,10 @@ import com.fimtra.datafission.core.ImmutableSnapshotRecord;
  * than a depth of 2 for nested maps is uncommon). See {@link #getOrCreateSubMap(String)} and
  * {@link #getSubMapKeys()}.
  * <p>
- * <h2>Concurrency</h2>
- * A record is thread-safe. The "reader" methods use an internal read-lock and the "writer" methods
- * use an internal write-lock. When iterating over the keys, values, entrySet ({@link #keySet()},
- * {@link #values()}, {@link #entrySet()}), a <b>snapshot</b> of the appropriate collection is taken
- * and no thread co-ordination is needed.
+ * <h2>Concurrency</h2> A record is thread-safe. When iterating over the keys, values, entrySet
+ * ({@link #keySet()}, {@link #values()}, {@link #entrySet()}), a <b>snapshot</b> of the appropriate
+ * collection is taken and no thread co-ordination is needed. <b>Changes to the keys, values and
+ * entrySet will only affect the record if made using the iterator of the relevant collection.</b>
  * 
  * @author Ramon Servadei
  */
@@ -73,7 +70,7 @@ public interface IRecord extends Map<String, IValue>
      * 
      * @return the record write lock
      */
-    Lock getWriteLock();
+    Object getWriteLock();
 
     /**
      * @return the name of the record

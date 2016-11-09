@@ -467,8 +467,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new IllegalStateException(
                 "Cannot create new record [" + name + "] in shutdown context " + ObjectUtils.safeToString(this));
         }
-        contextRecords.getWriteLock().lock();
-        try
+        synchronized (contextRecords.getWriteLock())
         {
             // important to access subscriptions whilst holding the write lock of CONTEXT_RECORDS -
             // see addDeltaToSubscriptionCount - this ensures we create the record with the correct
@@ -477,10 +476,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final IValue subscriptionCount = contextSubscriptions.get(name);
             contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
-        }
-        finally
-        {
-            contextRecords.getWriteLock().unlock();
         }
 
         // now notify observers of the record with its initial image
@@ -492,8 +487,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     " for created record [", name, "]");
             }
 
-            record.getWriteLock().lock();
-            try
+            synchronized (record.getWriteLock())
             {
                 // create and trigger the image publish whilst holding the record's lock - prevents
                 // (however unlikely) concurrent publishing occurring whilst creating
@@ -521,10 +515,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         return name;
                     }
                 });
-            }
-            finally
-            {
-                record.getWriteLock().unlock();
             }
         }
         return record;
@@ -582,8 +572,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final IRecord removed = this.records.remove(name);
         if (removed != null)
         {
-            removed.getWriteLock().lock();
-            try
+            synchronized (removed.getWriteLock())
             {
                 // NOTE: do not remove subscribers - they are INDEPENDENT of record existence
                 // this.recordObservers.removeSubscribersFor(name);
@@ -624,18 +613,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
                         if (isSystemRecordReady(contextRecords))
                         {
-                            contextRecords.getWriteLock().lock();
-                            try
+                            synchronized (contextRecords.getWriteLock())
                             {
                                 for (String name : recordsToProcess)
                                 {
                                     contextRecords.remove(name);
                                 }
                                 publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
-                            }
-                            finally
-                            {
-                                contextRecords.getWriteLock().unlock();
                             }
                         }
                     }
@@ -646,10 +630,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         return Context.this.recordsToRemoveContext;
                     }
                 });
-            }
-            finally
-            {
-                removed.getWriteLock().unlock();
             }
         }
         return removed;
@@ -715,9 +695,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return latch;
         }
 
-        final Lock writeLock = record.getWriteLock();
-        writeLock.lock();
-        try
+        synchronized (record.getWriteLock())
         {
             final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
             if (atomicChange == null || atomicChange.isEmpty())
@@ -787,10 +765,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             };
             executeSequentialCoreTask(notifyTask);
             return latch;
-        }
-        finally
-        {
-            writeLock.unlock();
         }
     }
 
@@ -963,8 +937,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
                 if (isSystemRecordReady(contextSubscriptions))
                 {
-                    contextSubscriptions.getWriteLock().lock();
-                    try
+                    synchronized (contextSubscriptions.getWriteLock())
                     {
                         LongValue observerCount = (LongValue) contextSubscriptions.get(recordName);
                         if (observerCount == null)
@@ -984,26 +957,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         }
                         publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
                     }
-                    finally
-                    {
-                        contextSubscriptions.getWriteLock().unlock();
-                    }
                 }
                 final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
                 if (isSystemRecordReady(contextRecords))
                 {
-                    contextRecords.getWriteLock().lock();
-                    try
+                    synchronized (contextRecords.getWriteLock())
                     {
                         if (contextRecords.containsKey(recordName))
                         {
                             contextRecords.put(recordName, LongValue.valueOf(count));
                             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
                         }
-                    }
-                    finally
-                    {
-                        contextRecords.getWriteLock().unlock();
                     }
                 }
             }
@@ -1075,15 +1039,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final IRecord contextStatus = this.records.get(ISystemRecordNames.CONTEXT_STATUS);
         if (isSystemRecordReady(contextStatus))
         {
-            contextStatus.getWriteLock().lock();
-            try
+            synchronized (contextStatus.getWriteLock())
             {
                 IStatusAttribute.Utils.setStatus(statusAttribute, contextStatus);
                 publishAtomicChange(ISystemRecordNames.CONTEXT_STATUS);
-            }
-            finally
-            {
-                contextStatus.getWriteLock().unlock();
             }
         }
     }
@@ -1094,8 +1053,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
-            contextRpcs.getWriteLock().lock();
-            try
+            synchronized (contextRpcs.getWriteLock())
             {
                 if (this.rpcInstances.containsKey(rpc.getName()))
                 {
@@ -1106,10 +1064,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
                 Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc), " in ", getName());
             }
-            finally
-            {
-                contextRpcs.getWriteLock().unlock();
-            }
         }
     }
 
@@ -1119,8 +1073,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
-            contextRpcs.getWriteLock().lock();
-            try
+            synchronized (contextRpcs.getWriteLock())
             {
                 final IRpcInstance rpc = this.rpcInstances.remove(rpcName);
                 if (rpc != null)
@@ -1129,10 +1082,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     this.records.get(ISystemRecordNames.CONTEXT_RPCS).remove(rpcName);
                     publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
                 }
-            }
-            finally
-            {
-                contextRpcs.getWriteLock().unlock();
             }
         }
     }

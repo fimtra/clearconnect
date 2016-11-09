@@ -799,9 +799,7 @@ public final class ProxyContext implements IObserverContext
                 }
 
                 // mark the records as disconnected
-                final Lock recordConnectionLock = this.remoteConnectionStatusRecord.getWriteLock();
-                recordConnectionLock.lock();
-                try
+                synchronized (this.remoteConnectionStatusRecord.getWriteLock())
                 {
                     for (int i = 0; i < recordsToUnsubscribe.length; i++)
                     {
@@ -809,10 +807,6 @@ public final class ProxyContext implements IObserverContext
                         this.remoteConnectionStatusRecord.put(recordName, RECORD_DISCONNECTED);
                     }
                     this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
-                }
-                finally
-                {
-                    recordConnectionLock.unlock();
                 }
             }
         }
@@ -1245,9 +1239,7 @@ public final class ProxyContext implements IObserverContext
                         }
                     }
 
-                    final Lock lock = record.getWriteLock();
-                    lock.lock();
-                    try
+                    synchronized (record.getWriteLock())
                     {
                         switch(ProxyContext.this.imageDeltaProcessor.processRxChange(changeToApply, name, record))
                         {
@@ -1271,10 +1263,6 @@ public final class ProxyContext implements IObserverContext
                                 resync(name);
                                 break;
                         }
-                    }
-                    finally
-                    {
-                        lock.unlock();
                     }
                 }
                 catch (Exception e)
@@ -1308,18 +1296,12 @@ public final class ProxyContext implements IObserverContext
         if (this.resyncs.add(name))
         {
             // mark the record as disconnected, then reconnecting
-            final Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
-            lock.lock();
-            try
+            synchronized (this.remoteConnectionStatusRecord.getWriteLock())
             {
                 this.remoteConnectionStatusRecord.put(name, RECORD_DISCONNECTED);
                 this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
                 this.remoteConnectionStatusRecord.put(name, RECORD_CONNECTING);
                 this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
-            }
-            finally
-            {
-                lock.unlock();
             }
             
             Log.log(this, "(->) re-sync ", name);
@@ -1440,16 +1422,10 @@ public final class ProxyContext implements IObserverContext
             {
                 Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord), " from ",
                     ObjectUtils.safeToString(this));
-                final Lock lock = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock();
-                lock.lock();
-                try
+                synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())
                 {
                     rpcRecord.clear();
                     this.context.publishAtomicChange(rpcRecord);
-                }
-                finally
-                {
-                    lock.unlock();
                 }
             }
 
@@ -1496,9 +1472,7 @@ public final class ProxyContext implements IObserverContext
         final List<String> recordNames = this.context.getSubscribedRecords();
         recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
 
-        Lock lock = this.remoteConnectionStatusRecord.getWriteLock();
-        lock.lock();
-        try
+        synchronized (this.remoteConnectionStatusRecord.getWriteLock())
         {
             for (String recordName : recordNames)
             {
@@ -1513,10 +1487,6 @@ public final class ProxyContext implements IObserverContext
                 }
             }
             this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 
