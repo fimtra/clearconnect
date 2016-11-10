@@ -254,7 +254,10 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> asFlattenedMap()
     {
-        return ContextUtils.mergeMaps(this.backingRecord.data, this.backingRecord.subMaps);
+        synchronized (this.backingRecord.getWriteLock())
+        {
+            return ContextUtils.mergeMaps(this.backingRecord.data, this.backingRecord.subMaps);
+        }
     }
 
     @Override   
