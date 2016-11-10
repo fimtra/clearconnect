@@ -189,9 +189,12 @@ public final class ChannelWatchdog implements Runnable
                             {
                                 count = Integer.valueOf(count.intValue() + 1);
                             }
-                            Log.log(this, "Missed heartbeat ", count.toString(), "/",
-                                Integer.toString(this.missedHeartbeatCount), " from ",
-                                ObjectUtils.safeToString(channel));
+                            if (count.intValue() > 1)
+                            {
+                                Log.log(this, "Missed heartbeat ", count.toString(), "/",
+                                    Integer.toString(this.missedHeartbeatCount), " from ",
+                                    ObjectUtils.safeToString(channel));
+                            }
                             this.channelsMissingHeartbeat.put(channel, count);
                         }
                     }
@@ -244,9 +247,13 @@ public final class ChannelWatchdog implements Runnable
 
     void checkHeartbeatRecovered(ITransportChannel channel)
     {
-        if (ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel) != null)
+        final Integer removed = ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel);
+        if (removed != null)
         {
-            Log.log(this, "Heartbeat recovered for ", ObjectUtils.safeToString(channel));
+            if (removed.intValue() > 1)
+            {
+                Log.log(this, "Heartbeat recovered for ", ObjectUtils.safeToString(channel));
+            }
         }
     }
 }
