@@ -46,6 +46,7 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.PlatformCoreProperties;
+import com.fimtra.clearconnect.PlatformCoreProperties.Values;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
@@ -649,7 +650,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
     }
 
-    void registerService(PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
+    void registerService(final PlatformServiceInstance serviceInstance) throws TimeOutException, ExecutionException
     {
         final IRpcInstance registerRpc = this.registryProxy.getRpc(PlatformRegistry.REGISTER);
         if (registerRpc == null)
@@ -657,6 +658,29 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             throw new RegisterRpcNotAvailableException();
         }
 
+        final CountDownLatch latch = new CountDownLatch(1);
+        final IServiceInstanceAvailableListener listener = new IServiceInstanceAvailableListener()
+        {
+
+            @Override
+            public void onServiceInstanceAvailable(String serviceInstanceId)
+            {
+                final String registeredServiceInstanceId = serviceInstance.context.getName();
+                if(is.eq(serviceInstanceId, registeredServiceInstanceId))
+                {
+                    removeServiceInstanceAvailableListener(this);
+                    latch.countDown();
+                }
+            }
+
+            @Override
+            public void onServiceInstanceUnavailable(String serviceInstanceId)
+            {
+            }
+           
+        };
+        addServiceInstanceAvailableListener(listener);
+        
         Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
 
         try
@@ -687,6 +711,30 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             throw e;
         }
+        // now setup an "expectation" that the service will become registered - if the service
+        // is not registered in 30 secs, say, then something has gone wrong and a re-register is
+        // needed
+        try
+        {
+            try
+            {
+                if (!latch.await(Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+                {
+                    throw new TimeOutException("Did not get confirmation of registration of " + serviceInstance
+                        + " after waiting " + Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS + "ms");
+                }
+            }
+            catch (InterruptedException e)
+            {
+                throw new ExecutionException(
+                    "Interrupted whilst waiting for registration confirmation of " + serviceInstance);
+            }
+        }
+        finally
+        {
+            removeServiceInstanceAvailableListener(listener);
+        }
+        
     }
 
     @Override
@@ -753,6 +801,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     Log.log(PlatformRegistryAgent.this, "No service info record available for ", serviceFamily);
                     return null;
                 }
+                
+                Log.log(PlatformRegistryAgent.this, "getPlatformServiceProxy serviceInfoRecord is ", serviceInfoRecord.toString());
+                
                 final ICodec<?> codec = PlatformUtils.getCodecFromServiceInfoRecord(serviceInfoRecord);
                 final String host = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
                 final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);

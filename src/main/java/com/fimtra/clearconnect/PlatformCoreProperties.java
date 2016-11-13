@@ -78,6 +78,14 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.rpcFtServiceStatusTimeoutMillis=5000</code><br>
          */
         String REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS = BASE + "rpcFtServiceStatusTimeoutMillis";
+
+        /**
+         * The system property name to define the period in milliseconds that an agent will wait for
+         * a service to be confirmed as registered<br>
+         * E.g. <code>-Dplatform.agentServiceRegistrationTimeoutMillis=30000</code><br>
+         * 
+         */
+        String PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS = "agentServiceRegistrationTimeoutMillis";
     }
 
     /**
@@ -151,6 +159,17 @@ public abstract class PlatformCoreProperties
          */
         long REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
             Names.REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS, "5000"));
+
+        /**
+         * The period in milliseconds that an agent will wait for a service to be confirmed as
+         * registered<br>
+         * <p>
+         * Default is: 30000
+         * 
+         * @see Names#PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS
+         */
+        long PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS =
+            Long.parseLong(System.getProperty(Names.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS, "30000"));
     }
 
     private PlatformCoreProperties()

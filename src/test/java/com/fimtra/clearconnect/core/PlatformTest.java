@@ -546,7 +546,7 @@ public class PlatformTest
                 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
             
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
-            verify(ftStatusListener1, timeout(activateTimeout)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener1, timeout(activateTimeout).atLeast(1)).onStandby(eq(SERVICE1), eq(this.primary));
 
             // check primary is active
             verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
@@ -601,7 +601,7 @@ public class PlatformTest
             // destroy it (again!)
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
-            verify(ftStatusListener1, times(2)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener1, times(1)).onStandby(eq(SERVICE1), eq(this.primary));
             verify(ftStatusListener2, times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
             
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
