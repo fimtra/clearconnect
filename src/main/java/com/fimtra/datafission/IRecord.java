@@ -67,6 +67,9 @@ public interface IRecord extends Map<String, IValue>
      * <p>
      * The record's context will lock this lock when executing
      * {@link IPublisherContext#publishAtomicChange(IRecord)}
+     * <p>
+     * <b>This lock is also used internally to ensure thread-safe mutation of the internal state,
+     * typically (but not only) during calls to {@link #put(String, IValue)}</b>
      * 
      * @return the record write lock
      */
@@ -119,7 +122,7 @@ public interface IRecord extends Map<String, IValue>
      * Calling {@link #getOrCreateSubMap(String)} with each key returned from this method will
      * retrieve the sub-map for the associated key.
      * 
-     * @return the set of keys for each internal sub-map held in the record
+     * @return a <b>copy</b> of the set of keys for each internal sub-map held in the record
      */
     Set<String> getSubMapKeys();
 

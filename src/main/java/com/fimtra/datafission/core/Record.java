@@ -110,7 +110,7 @@ final class Record implements IRecord, Cloneable
     final AtomicLong sequence;
     final String name;
     final IAtomicChangeManager context;
-    final Map<String, IValue> data;
+    Map<String, IValue> data;
     Map<String, Map<String, IValue>> subMaps;
 
     Record(String name, Map<String, IValue> data, IAtomicChangeManager context)
@@ -146,8 +146,8 @@ final class Record implements IRecord, Cloneable
     @Override
     public void clear()
     {
-        synchronized(this.data)
-        {            
+        synchronized (this)
+        {
             for (Iterator<Map.Entry<String, IValue>> it =
                 new HashMap<String, IValue>(this.data).entrySet().iterator(); it.hasNext();)
             {
@@ -159,11 +159,8 @@ final class Record implements IRecord, Cloneable
             {
                 it.next().getValue().clear();
             }
-            // todo ideally make the data map 0 size
-            data.clear();
-            
-            // todo ideally make the map 0 size 
-            this.subMaps.clear();
+            this.data = CollectionUtils.newMap(2);
+            this.subMaps = EMPTY_SUBMAP;
         }
     }
 
@@ -219,7 +216,7 @@ final class Record implements IRecord, Cloneable
         else
         {
             other = (Record) o;
-        }        
+        }
         return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
             && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
     }
@@ -270,7 +267,7 @@ final class Record implements IRecord, Cloneable
         {
             throw new NullPointerException("null keys are not allowed");
         }
-        synchronized (this.data)
+        synchronized (this)
         {
             return corePut_callWithWriteLock(key, value);
         }
@@ -313,7 +310,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public void putAll(Map<? extends String, ? extends IValue> t)
     {
-        synchronized (this.data)
+        synchronized (this)
         {
             Map.Entry<String, IValue> entry = null;
             String key = null;
@@ -333,7 +330,7 @@ final class Record implements IRecord, Cloneable
     {
         if (key instanceof String)
         {
-            synchronized (this.data)
+            synchronized (this)
             {
                 if (this.data.containsKey(key))
                 {
@@ -405,7 +402,7 @@ final class Record implements IRecord, Cloneable
                 return submap;
             }
         }
-        synchronized (this.data)
+        synchronized (this)
         {
             if (this.subMaps == EMPTY_SUBMAP)
             {
@@ -423,7 +420,7 @@ final class Record implements IRecord, Cloneable
     public Map<String, IValue> removeSubMap(String key)
     {
         final Map<String, IValue> subMap;
-        synchronized (this.data)
+        synchronized (this)
         {
             subMap = this.subMaps.remove(key);
             if (subMap == null)
@@ -440,7 +437,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public Set<String> getSubMapKeys()
     {
-        synchronized (this.data)
+        synchronized (this)
         {
             return CollectionUtils.newHashSet(this.subMaps.keySet());
         }
@@ -460,7 +457,7 @@ final class Record implements IRecord, Cloneable
         final HashMap<String, IValue> flattenedMap = new HashMap<String, IValue>();
         ContextUtils.resolveRecordMapFromStream(reader, flattenedMap);
         final Map<?, ?>[] demergeMaps = ContextUtils.demergeMaps(flattenedMap);
-        synchronized (this.data)
+        synchronized (this)
         {
             // trigger an atomic change by adding to self
             putAll((Map<String, IValue>) demergeMaps[0]);
@@ -482,7 +479,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public void serializeToStream(Writer writer) throws IOException
     {
-        synchronized (this.data)
+        synchronized (this)
         {
             ContextUtils.serializeRecordMapToStream(writer, asFlattenedMap());
         }
@@ -491,7 +488,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public Object getWriteLock()
     {
-        return this.data;
+        return this;
     }
 
     /**
@@ -501,7 +498,7 @@ final class Record implements IRecord, Cloneable
     protected Record clone()
     {
         // this is a deep copy of the record internal maps
-        synchronized (this.data)
+        synchronized (this)
         {
             final Record cloneRecord;
             if (this.subMaps.size() == 0)
@@ -528,7 +525,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public Map<String, IValue> asFlattenedMap()
     {
-        synchronized (this.data)
+        synchronized (this)
         {
             return ContextUtils.mergeMaps(this.data, this.subMaps);
         }
@@ -580,7 +577,7 @@ final class Record implements IRecord, Cloneable
 
     Set<Entry<String, IValue>> getSnapshotOfBackingEntrySet()
     {
-        synchronized (this.data)
+        synchronized (this)
         {
             return CollectionUtils.newHashSet(this.data.entrySet());
         }
@@ -692,7 +689,7 @@ final class SubMap implements Map<String, IValue>
 
     SubMap clone(Record cloneRecord)
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             return new SubMap(cloneRecord, this.subMapKey, CollectionUtils.newMap(this.subMap));
         }
@@ -769,7 +766,7 @@ final class SubMap implements Map<String, IValue>
     @Override
     public IValue put(String key, IValue value)
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             return corePut_callWithWriteLock(key, value);
         }
@@ -798,7 +795,7 @@ final class SubMap implements Map<String, IValue>
     @Override
     public IValue remove(Object key)
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             final IValue previous = this.subMap.remove(key);
             this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
@@ -809,7 +806,7 @@ final class SubMap implements Map<String, IValue>
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             Map.Entry<?, ?> entry = null;
             String key = null;
@@ -827,7 +824,7 @@ final class SubMap implements Map<String, IValue>
     @Override
     public void clear()
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             Set<Map.Entry<String, IValue>> entrySet = entrySet();
             for (Iterator<Map.Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext();)
@@ -949,7 +946,7 @@ final class SubMap implements Map<String, IValue>
 
     Set<Map.Entry<String, IValue>> getSnapshotOfBackingEntrySet()
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             return CollectionUtils.newHashSet(this.subMap.entrySet());
         }
@@ -1010,7 +1007,7 @@ abstract class AbstractNotifyingIterator<IteratorType> implements Iterator<Itera
     @Override
     public void remove()
     {
-        synchronized (this.record.data)
+        synchronized (this.record)
         {
             this.snapshotEntryIterator.remove();
             this.target.remove(this.current.getKey());
