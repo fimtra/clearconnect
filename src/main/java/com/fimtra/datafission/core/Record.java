@@ -21,9 +21,7 @@ import java.io.Writer;
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -37,6 +35,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
@@ -49,16 +48,6 @@ import com.fimtra.util.is;
  */
 final class Record implements IRecord, Cloneable
 {
-    static <K, V> Map<K, V> newMap(int size)
-    {
-        return Collections.synchronizedMap(new HashMap<K, V>(size));
-    }
-
-    static <K, V> Map<K, V> newMap(Map<K, V> data)
-    {
-        return Collections.synchronizedMap(new HashMap<K, V>(data));
-    }
-
     static String toString(String contextName, String recordName, long sequence, Map<String, IValue> data,
         Map<String, Map<String, IValue>> subMaps)
     {
@@ -110,7 +99,7 @@ final class Record implements IRecord, Cloneable
         }
     }
 
-    private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = newMap(1);
+    private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = CollectionUtils.newMap(1);
     /**
      * A pool for the keys. Keys across records stand a VERY good chance of being repeated many
      * times so this is a valuable memory optimisation.
@@ -128,7 +117,7 @@ final class Record implements IRecord, Cloneable
     {
         super();
         this.name = keysPool.intern(name);
-        this.data = newMap(data);
+        this.data = CollectionUtils.newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
         this.sequence = new AtomicLong(0);
@@ -142,7 +131,7 @@ final class Record implements IRecord, Cloneable
     {
         super();
         this.name = keysPool.intern(name);
-        this.data = newMap(data);
+        this.data = CollectionUtils.newMap(data);
         this.subMaps = subMaps;
         this.context = context;
         this.sequence = new AtomicLong(0);
@@ -158,7 +147,7 @@ final class Record implements IRecord, Cloneable
     public void clear()
     {
         synchronized(this.data)
-        {
+        {            
             for (Iterator<Map.Entry<String, IValue>> it =
                 new HashMap<String, IValue>(this.data).entrySet().iterator(); it.hasNext();)
             {
@@ -170,6 +159,10 @@ final class Record implements IRecord, Cloneable
             {
                 it.next().getValue().clear();
             }
+            // todo ideally make the data map 0 size
+            data.clear();
+            
+            // todo ideally make the map 0 size 
             this.subMaps.clear();
         }
     }
@@ -416,7 +409,7 @@ final class Record implements IRecord, Cloneable
         {
             if (this.subMaps == EMPTY_SUBMAP)
             {
-                this.subMaps = newMap(1);
+                this.subMaps = CollectionUtils.newMap(1);
             }
             final SubMap newSubMap = new SubMap(this, internKey);
             // put if absent to handle multiple writers running concurrently but blocked by the lock
@@ -447,7 +440,10 @@ final class Record implements IRecord, Cloneable
     @Override
     public Set<String> getSubMapKeys()
     {
-        return this.subMaps.keySet();
+        synchronized (this.data)
+        {
+            return CollectionUtils.newHashSet(this.subMaps.keySet());
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -510,12 +506,12 @@ final class Record implements IRecord, Cloneable
             final Record cloneRecord;
             if (this.subMaps.size() == 0)
             {
-                cloneRecord = new Record(this.name, newMap(this.data), this.context);
+                cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context);
             }
             else
             {
-                final Map<String, Map<String, IValue>> cloneSubMaps = newMap(this.subMaps.size());
-                cloneRecord = new Record(this.name, newMap(this.data), this.context, cloneSubMaps);
+                final Map<String, Map<String, IValue>> cloneSubMaps = CollectionUtils.newMap(this.subMaps.size());
+                cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context, cloneSubMaps);
                 Map.Entry<String, Map<String, IValue>> entry = null;
                 for (final Iterator<Map.Entry<String, Map<String, IValue>>> it =
                     this.subMaps.entrySet().iterator(); it.hasNext();)
@@ -586,7 +582,7 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this.data)
         {
-            return new HashSet<Entry<String, IValue>>(this.data.entrySet());
+            return CollectionUtils.newHashSet(this.data.entrySet());
         }
     }
 
@@ -684,7 +680,7 @@ final class SubMap implements Map<String, IValue>
     {
         this.subMapKey = subMapKey;
         this.record = record;
-        this.subMap = Record.newMap(2);
+        this.subMap = CollectionUtils.newMap(2);
     }
 
     private SubMap(Record record, String subMapKey, Map<String, IValue> subMap)
@@ -698,7 +694,7 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record.data)
         {
-            return new SubMap(cloneRecord, this.subMapKey, Record.newMap(this.subMap));
+            return new SubMap(cloneRecord, this.subMapKey, CollectionUtils.newMap(this.subMap));
         }
     }
 
@@ -955,7 +951,7 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record.data)
         {
-            return new HashSet<Map.Entry<String, IValue>>(this.subMap.entrySet());
+            return CollectionUtils.newHashSet(this.subMap.entrySet());
         }
     }
 }

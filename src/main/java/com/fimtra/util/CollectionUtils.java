@@ -16,8 +16,10 @@
 package com.fimtra.util;
 
 import java.util.AbstractSet;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -34,13 +36,15 @@ import com.fimtra.util.UtilProperties.Values;
  */
 public abstract class CollectionUtils
 {
+    private static final float LOAD_FACTOR = 1 / .75f;
+
     /**
      * An unmodifiable set of Map.Entry objects that are themselves unmodifiable (
      * {@link Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
      * 
      * @author Ramon Servadei
      */
-    static final class UnmodifiableEntrySet<K,V> extends AbstractSet<Map.Entry<K,V>>
+    static final class UnmodifiableEntrySet<K, V> extends AbstractSet<Map.Entry<K, V>>
     {
         private final static class UnmodifiableEntry<K, V> implements Entry<K, V>
         {
@@ -94,7 +98,7 @@ public abstract class CollectionUtils
                 @Override
                 public java.util.Map.Entry<K, V> next()
                 {
-                    return new UnmodifiableEntry<K,V>(this.backingIterator.next());
+                    return new UnmodifiableEntry<K, V>(this.backingIterator.next());
                 }
 
                 @Override
@@ -165,5 +169,43 @@ public abstract class CollectionUtils
         final Set<java.util.Map.Entry<K, V>> entrySet)
     {
         return new UnmodifiableEntrySet(entrySet);
+    }
+
+    /**
+     * Creates a new {@link HashSet} wrapping the collection
+     * 
+     * @param c
+     *            the collection to wrap
+     * @return a {@link HashSet}
+     */
+    public static <T> Set<T> newHashSet(Collection<T> c)
+    {
+        final Set<T> s = new HashSet<T>(Math.max((int) (c.size() * LOAD_FACTOR) + 1, 2));
+        s.addAll(c);
+        return s;
+    }
+
+    /**
+     * Creates a synchronized map initialised with the given size
+     * 
+     * @param size
+     *            the size
+     * @return a synchronized {@link HashMap}
+     */
+    public static <K, V> Map<K, V> newMap(int size)
+    {
+        return Collections.synchronizedMap(new HashMap<K, V>(size));
+    }
+
+    /**
+     * Creates a synchronized map initialised with the given map
+     * 
+     * @param data
+     *            the map data to use for initialisation
+     * @return a synchronized {@link HashMap}
+     */
+    public static <K, V> Map<K, V> newMap(Map<K, V> data)
+    {
+        return Collections.synchronizedMap(new HashMap<K, V>(data));
     }
 }
