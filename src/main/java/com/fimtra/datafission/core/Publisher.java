@@ -54,6 +54,7 @@ import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
@@ -633,7 +634,7 @@ public class Publisher
             Set<String> copy;
             synchronized(this.subscriptions)
             {
-                copy = new HashSet<String>(this.subscriptions);
+                copy = CollectionUtils.newHashSet(this.subscriptions);
             }
             unsubscribe(copy);
             Log.log(this, "Destroyed");

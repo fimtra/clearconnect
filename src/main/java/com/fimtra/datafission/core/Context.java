@@ -53,6 +53,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
@@ -604,7 +605,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         final Set<String> recordsToProcess;
                         synchronized (Context.this.recordsToRemoveFromSystemRecords)
                         {
-                            recordsToProcess = new HashSet<String>(Context.this.recordsToRemoveFromSystemRecords);
+                            recordsToProcess = CollectionUtils.newHashSet(Context.this.recordsToRemoveFromSystemRecords);
                             Context.this.recordsToRemoveFromSystemRecords.clear();
                         }
 

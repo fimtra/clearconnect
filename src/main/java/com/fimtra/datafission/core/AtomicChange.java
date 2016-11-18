@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.is;
 
 /**
@@ -493,7 +494,7 @@ public final class AtomicChange implements IRecordChange
     {
         if (this.subMapAtomicChanges != null)
         {
-            return Collections.unmodifiableSet(new HashSet<String>(this.subMapAtomicChanges.keySet()));
+            return Collections.unmodifiableSet(CollectionUtils.newHashSet(this.subMapAtomicChanges.keySet()));
         }
         else
         {

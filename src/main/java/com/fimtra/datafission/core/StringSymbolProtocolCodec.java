@@ -31,6 +31,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.AbstractValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -483,7 +484,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
             int i;
             txString.append(changeType);
 
-            final Set<String> definitionNeeded = new HashSet<String>(entries.keySet());
+            final Set<String> definitionNeeded = CollectionUtils.newHashSet(entries.keySet());
 
             if (!isProtocolMessage)
             {
