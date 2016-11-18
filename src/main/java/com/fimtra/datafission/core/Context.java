@@ -18,9 +18,11 @@ package com.fimtra.datafission.core;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -298,6 +300,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final ThimbleExecutor coreExecutor;
     final ThimbleExecutor systemExecutor;
     final ScheduledExecutorService utilityExecutor;
+    // todo should this be replaced with simple synchronized blocks...
     final Lock recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
     /**
@@ -789,12 +792,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             @Override
             public void run()
             {
+                final List<String> permissionedRecords = new LinkedList<String>();
                 for (int i = 0; i < recordNames.length; i++)
                 {
                     if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
                     {
+                        permissionedRecords.add(recordNames[i]);
                         Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
-                        doAddSingleObserver(recordNames[i], observer);
                         resultMap.put(recordNames[i], Boolean.TRUE);
                     }
                     else
@@ -802,6 +806,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         resultMap.put(recordNames[i], Boolean.FALSE);
                     }
                 }
+
+                // perform the add for the records with valid permission tokens
+                doAddSingleObserver(observer, permissionedRecords);
             }
         }, resultMap);
 
@@ -809,65 +816,71 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return futureResult;
     }
 
-    void doAddSingleObserver(final String name, final IRecordListener observer)
+    void doAddSingleObserver(final IRecordListener observer, Collection<String> recordNames)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
         final Lock lock = this.recordCreateLock;
         lock.lock();
         try
         {
-            if (this.recordObservers.addSubscriberFor(name, observer))
+            final List<String> subscriberAdded = new LinkedList<String>();
+            for (final String name : recordNames)
             {
-                if (log)
+                if (this.recordObservers.addSubscriberFor(name, observer))
                 {
-                    Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
-                }
-
-                // Check if there is an image before creating a task to notify with the image.
-                // Don't try an optimise by re-use the published image we get here - its not safe to
-                // cache, see javadocs on the method - we only want to know if there is an image
-                if (getLastPublishedImage(name) != null)
-                {
-                    executeSequentialCoreTask(new ISequentialRunnable()
+                    if (log)
                     {
-                        @Override
-                        public void run()
+                        Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
+                    }
+                    subscriberAdded.add(name);
+                    
+                    // Check if there is an image before creating a task to notify with the image.
+                    // Don't try an optimise by re-use the published image we get here - its not
+                    // safe to cache, see javadocs on the method - we only want to know if there is
+                    // an image
+                    if (getLastPublishedImage(name) != null)
+                    {
+                        executeSequentialCoreTask(new ISequentialRunnable()
                         {
-                            if (log)
-                            {
-                                Log.log(this, "Notifying initial image [", name, "], listener=",
-                                    ObjectUtils.safeToString(observer));
-                            }
-                            final long start = System.nanoTime();
-                            final IRecord imageSnapshot = getLastPublishedImage(name);
-                            // this can be null if there is a concurrent delete
-                            // ... nothing we can do about this, the subscription is still valid
-                            // though
-                            if (imageSnapshot != null)
-                            {
-                                observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
-                                ContextUtils.measureTask(name, "record image-on-subscribe", observer,
-                                    (System.nanoTime() - start));
-                            }
-                            else
+                            @Override
+                            public void run()
                             {
                                 if (log)
                                 {
-                                    Log.log(this, "No initial image available [", name, "], listener=",
+                                    Log.log(this, "Notifying initial image [", name, "], listener=",
                                         ObjectUtils.safeToString(observer));
                                 }
+                                final long start = System.nanoTime();
+                                final IRecord imageSnapshot = getLastPublishedImage(name);
+                                // this can be null if there is a concurrent delete
+                                // ... nothing we can do about this, the subscription is still valid
+                                // though
+                                if (imageSnapshot != null)
+                                {
+                                    observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
+                                    ContextUtils.measureTask(name, "record image-on-subscribe", observer,
+                                        (System.nanoTime() - start));
+                                }
+                                else
+                                {
+                                    if (log)
+                                    {
+                                        Log.log(this, "No initial image available [", name, "], listener=",
+                                            ObjectUtils.safeToString(observer));
+                                    }
+                                }
                             }
-                        }
 
-                        @Override
-                        public Object context()
-                        {
-                            return name;
-                        }
-                    });
+                            @Override
+                            public Object context()
+                            {
+                                return name;
+                            }
+                        });
+                    }
                 }
-                addDeltaToSubscriptionCount(name, 1);
             }
+            addDeltaToSubscriptionCount(1, subscriberAdded);
         }
         finally
         {
@@ -878,31 +891,31 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch removeObserver(IRecordListener observer, String... recordNames)
     {
-        for (int i = 0; i < recordNames.length; i++)
-        {
-            if (recordNames[i] != null)
-            {
-                doRemoveSingleObserver(recordNames[i], observer);
-            }
-        }
+        doRemoveSingleObserver(observer, recordNames);
         return new CountDownLatch(0);
     }
 
-    private void doRemoveSingleObserver(final String name, IRecordListener observer)
+
+    private void doRemoveSingleObserver(IRecordListener observer, String... names)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
         final Lock lock = this.recordCreateLock;
         lock.lock();
         try
         {
-            if (this.recordObservers.removeSubscriberFor(name, observer))
+            final List<String> toRemove = new LinkedList<String>();
+            for (String name : names)
             {
-                if (log)
+                if (this.recordObservers.removeSubscriberFor(name, observer))
                 {
-                    Log.log(this, "Removed listener from [", name, "] listener=", ObjectUtils.safeToString(observer));
+                    if (log)
+                    {
+                        Log.log(this, "Removed listener from [", name, "] listener=", ObjectUtils.safeToString(observer));
+                    }
+                    toRemove.add(name);
                 }
-                addDeltaToSubscriptionCount(name, -1);
             }
+            addDeltaToSubscriptionCount(-1, toRemove);
         }
         finally
         {
@@ -917,67 +930,53 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         destroy();
     }
 
-    void addDeltaToSubscriptionCount(final String recordName, final int delta)
+    void addDeltaToSubscriptionCount(final int delta, final Collection<String> recordNames)
     {
-        /*
-         * There is a danger that a remove and add observer could run concurrently and we could get
-         * deltas out of sequence...e.g. if the count was initially 0 and we added then removed the
-         * observer, instead of a sequence 0, 1, 0 we could get 0, -1, 0....but we don't want to
-         * lock the record name, then lock the context_subscriptions record within the other lock
-         * (could open up deadlocks), therefore, we do the delta updates on the thimble threads
-         * using a sequential runnable and submit the tasks whilst holding the record name lock to
-         * ensure ordering
-         */
-        executeSequentialCoreTask(new ISequentialRunnable()
+        final Map<String, LongValue> countsPerRecord = new HashMap<String, LongValue>(recordNames.size());
+        final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+        if (isSystemRecordReady(contextSubscriptions))
         {
-            @Override
-            public void run()
+            synchronized (contextSubscriptions.getWriteLock())
             {
-                long count = 0;
-                final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-                if (isSystemRecordReady(contextSubscriptions))
+                LongValue observerCount;
+                for (String recordName : recordNames)
                 {
-                    synchronized (contextSubscriptions.getWriteLock())
+                    observerCount = (LongValue) contextSubscriptions.get(recordName);
+                    if (observerCount == null)
                     {
-                        LongValue observerCount = (LongValue) contextSubscriptions.get(recordName);
-                        if (observerCount == null)
-                        {
-                            observerCount = LongValue.valueOf(0);
-                        }
-                        count = observerCount.longValue() + delta;
-                        if (count <= 0)
-                        {
-                            contextSubscriptions.remove(recordName);
-                            Context.this.tokenPerRecord.remove(recordName);
-                            count = 0;
-                        }
-                        else
-                        {
-                            contextSubscriptions.put(recordName, LongValue.valueOf(count));
-                        }
-                        publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+                        observerCount = LongValue.valueOf(0);
+                    }
+                    observerCount = LongValue.valueOf(observerCount.longValue() + delta);
+                    if (observerCount.longValue() <= 0)
+                    {
+                        observerCount = LongValue.valueOf(0);
+                        contextSubscriptions.remove(recordName);
+                        Context.this.tokenPerRecord.remove(recordName);
+                    }
+                    else
+                    {
+                        contextSubscriptions.put(recordName, observerCount);
+                    }
+                    countsPerRecord.put(recordName, observerCount);
+                }
+                publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+            }
+        }
+        final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
+        if (isSystemRecordReady(contextRecords))
+        {
+            synchronized (contextRecords.getWriteLock())
+            {
+                for (String recordName : recordNames)
+                {
+                    if (contextRecords.containsKey(recordName))
+                    {
+                        contextRecords.put(recordName, countsPerRecord.get(recordName));
                     }
                 }
-                final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
-                if (isSystemRecordReady(contextRecords))
-                {
-                    synchronized (contextRecords.getWriteLock())
-                    {
-                        if (contextRecords.containsKey(recordName))
-                        {
-                            contextRecords.put(recordName, LongValue.valueOf(count));
-                            publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
-                        }
-                    }
-                }
+                publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
             }
-
-            @Override
-            public Object context()
-            {
-                return recordName;
-            }
-        });
+        }
     }
 
     private AtomicChange getPendingAtomicChangesForWrite(String name)

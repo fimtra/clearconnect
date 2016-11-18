@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -253,134 +254,150 @@ public class Publisher
             }
         }
 
-        void addSubscriberFor(final String name, final ProxyContextPublisher publisher, final String permissionToken,
+        void addSubscriberFor(final Collection<String> names, final ProxyContextPublisher publisher, final String permissionToken,
             final List<String> ackSubscribes, final List<String> nokSubscribes, final Runnable task)
         {
-            Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
+            Publisher.this.lock.lock();
+            try
             {
-                @Override
-                public void run()
+                final List<String> increment = new LinkedList<String>();
+                for (final String name : names)
                 {
-                    Publisher.this.lock.lock();
                     try
                     {
-                        if (ProxyContextMultiplexer.this.subscribers.addSubscriberFor(name, publisher))
+                        if (Publisher.this.context.permissionTokenValidForRecord(permissionToken, name))
                         {
-                            boolean ack = false;
-
-                            if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
+                            if (ProxyContextMultiplexer.this.subscribers.addSubscriberFor(name, publisher))
                             {
-                                try
+                                if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
                                 {
                                     // NOTE: adding the observer ends up calling
                                     // addDeltaToSubscriptionCount which publishes the image
-                                    if (Publisher.this.context.addObserver(permissionToken,
-                                        ProxyContextMultiplexer.this, name).get().get(name).booleanValue())
+                                    if (!Publisher.this.context.addObserver(
+                                        // todo NOTE: we need to actually use a system-level
+                                        // token here - the permission check has already been
+                                        // done at the start of the for loop - need to find a way to
+                                        // pass in a system-level permission
+                                        permissionToken, ProxyContextMultiplexer.this, name).get().get(
+                                            name).booleanValue())
                                     {
-                                        ack = true;
-                                    }
-
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(ProxyContextMultiplexer.this,
-                                        "Could not get result from addObserver call for permissionToken="
-                                            + permissionToken + ", recordName=" + name, e);
-                                }
-                            }
-                            else
-                            {
-                                try
-                                {
-                                    if (Publisher.this.context.permissionTokenValidForRecord(permissionToken, name))
-                                    {
-                                        Publisher.this.context.addDeltaToSubscriptionCount(name, 1);
-
-                                        // we must send an initial image to the new client if it is
-                                        // not the first one to register
-                                        republishImage(name, publisher);
-                                        ack = true;
-                                    }
-                                    else
-                                    {
-                                        Log.log(ProxyContextMultiplexer.this, "Invalid permission token:",
-                                            permissionToken, " for ", name);
+                                        throw new IllegalStateException(
+                                            "Could not add ProxyContextMultiplexer as a listener for recordName=" + name
+                                                + " using permissionToken=" + permissionToken);
                                     }
                                 }
-                                catch (Exception e)
+                                else
                                 {
-                                    Log.log(ProxyContextMultiplexer.this, "Could not add subscriber for permissionToken="
-                                        + permissionToken + ", recordName=" + name, e);
-                                    nokSubscribes.add(name);
+                                    increment.add(name);
                                 }
-                            }
 
-                            if (ack)
-                            {
                                 ackSubscribes.add(name);
                             }
                             else
                             {
+                                Log.log(ProxyContextMultiplexer.this, "Ignoring duplicate subscribe for recordName=",
+                                    name);
+
                                 nokSubscribes.add(name);
-                                // the subscribe was not completed, so remove the subscriber registration
-                                ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
                             }
                         }
                         else
                         {
+                            Log.log(ProxyContextMultiplexer.this, "Invalid permission token=", permissionToken,
+                                " for recordName=", name);
+
                             nokSubscribes.add(name);
                         }
-                        task.run();
                     }
-                    finally
+                    catch (Exception e)
                     {
-                        Publisher.this.lock.unlock();
+                        Log.log(ProxyContextMultiplexer.this, "Could not add subscriber using permissionToken="
+                            + permissionToken + " for recordName=" + name, e);
+
+                        nokSubscribes.add(name);
+
+                        // the subscribe was not completed, so remove the subscriber registration
+                        ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
                     }
                 }
 
-                @Override
-                public Object context()
-                {
-                    return name;
-                }
-            });
-        }
+                Publisher.this.context.addDeltaToSubscriptionCount(1, increment);
 
-        void removeSubscriberFor(final String name, final ProxyContextPublisher publisher)
-        {
-            Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-            {
-                @Override
-                public void run()
+                for (final String name : increment)
                 {
-                    Publisher.this.lock.lock();
                     try
                     {
-                        if (ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
+                        // we must send an initial image to the new client if it is
+                        // not the first one to register
+                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                         {
-                            if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 0)
+                            @Override
+                            public void run()
                             {
-                                Publisher.this.context.removeObserver(ProxyContextMultiplexer.this, name);
-                                ProxyContextMultiplexer.this.service.endBroadcast(name);
+                                Publisher.this.multiplexer.republishImage(name, publisher);
                             }
-                            else
+
+                            @Override
+                            public Object context()
                             {
-                                Publisher.this.context.addDeltaToSubscriptionCount(name, -1);
+                                return name;
                             }
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(ProxyContextMultiplexer.this,
+                            "Could not setup initial image publish for recordName=" + name, e);
+                    }
+                }
+            }
+            finally
+            {
+                try
+                {
+                    task.run();
+                }
+                finally
+                {
+                    Publisher.this.lock.unlock();
+                }
+            }
+        }
+
+        void removeSubscriberFor(final Collection<String> names, final ProxyContextPublisher publisher)
+        {
+            Publisher.this.lock.lock();
+            try
+            {
+                final List<String> decrement = new LinkedList<String>();
+                final List<String> remove = new LinkedList<String>();
+                for (String name : names)
+                {
+                    if (ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
+                    {
+                        if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 0)
+                        {
+                            remove.add(name);
+                        }
+                        else
+                        {
+                            decrement.add(name);
                         }
                     }
-                    finally
-                    {
-                        Publisher.this.lock.unlock();
-                    }
                 }
+                Publisher.this.context.addDeltaToSubscriptionCount(-1, decrement);
+                Publisher.this.context.removeObserver(ProxyContextMultiplexer.this,
+                    remove.toArray(new String[remove.size()]));
 
-                @Override
-                public Object context()
+                for (String name : remove)
                 {
-                    return name;
+                    ProxyContextMultiplexer.this.service.endBroadcast(name);
                 }
-            });
+            }
+            finally
+            {
+                Publisher.this.lock.unlock();
+            }
         }
 
         /**
@@ -555,31 +572,31 @@ public class Publisher
             this.messagesPublished++;
         }
 
-        void subscribe(String name, String permissionToken, List<String> ackSubscribes, List<String> nokSubscribes,
-            Runnable task)
+        void subscribe(Collection<String> names, String permissionToken, List<String> ackSubscribes,
+            List<String> nokSubscribes, Runnable task)
         {
             try
             {
-                this.subscriptions.add(name);
-                Publisher.this.multiplexer.addSubscriberFor(name, this, permissionToken, ackSubscribes, nokSubscribes,
-                    task);
+                this.subscriptions.addAll(names);
+                Publisher.this.multiplexer.addSubscriberFor(names, this, permissionToken, ackSubscribes,
+                    nokSubscribes, task);
             }
             catch (Exception e)
             {
-                Log.log(ProxyContextPublisher.this, "Could not subscribe " + name, e);
+                Log.log(ProxyContextPublisher.this, "Could not subscribe " + names, e);
             }
         }
-
-        void unsubscribe(String name)
+        
+        void unsubscribe(Collection<String> names)
         {
             try
             {
-                this.subscriptions.remove(name);
-                Publisher.this.multiplexer.removeSubscriberFor(name, this);
+                this.subscriptions.removeAll(names);
+                Publisher.this.multiplexer.removeSubscriberFor(names, this);
             }
             catch (Exception e)
             {
-                Log.log(ProxyContextPublisher.this, "Could not unsubscribe " + name, e);
+                Log.log(ProxyContextPublisher.this, "Could not unsubscribe " + names, e);
             }
         }
 
@@ -618,10 +635,7 @@ public class Publisher
             {
                 copy = new HashSet<String>(this.subscriptions);
             }
-            for (String name : copy)
-            {
-                unsubscribe(name);
-            }
+            unsubscribe(copy);
             Log.log(this, "Destroyed");
         }
 
@@ -1039,23 +1053,7 @@ public class Publisher
         Log.log(this, "(<-) unsubscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
             ObjectUtils.safeToString(client));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-
-        synchronized (this.subscribeTasks)
-        {
-            for (final String name : recordNames)
-            {
-                this.subscribeTasks.add(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        proxyContextPublisher.unsubscribe(name);
-                    }
-                });
-            }
-        }
-        triggerThrottle();
-
+        proxyContextPublisher.unsubscribe(recordNames);
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
     }
 
@@ -1116,8 +1114,8 @@ public class Publisher
             ObjectUtils.safeToString(recordNames.toString()), " from ", ObjectUtils.safeToString(client));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-        final List<String> ackSubscribes = new ArrayList<String>(recordNames.size());
-        final List<String> nokSubscribes = new ArrayList<String>(recordNames.size());
+        final List<String> ackSubscribes = new LinkedList<String>();
+        final List<String> nokSubscribes = new LinkedList<String>();
         final Runnable finallyTask = new Runnable()
         {
             @Override
@@ -1131,32 +1129,7 @@ public class Publisher
             }
         };
 
-        synchronized (this.subscribeTasks)
-        {
-            for (final String name : recordNames)
-            {
-                final ISubscribeTask subscribeTask = new ISubscribeTask()
-                {
-                    @Override
-                    public void run()
-                    {
-                        proxyContextPublisher.subscribe(name, permissionToken, ackSubscribes, nokSubscribes,
-                            finallyTask);
-                    }
-                };
-                
-                // ensure system records are handled immediately
-                if (ContextUtils.isSystemRecordName(name))
-                {
-                    subscribeTask.run();
-                }
-                else
-                {
-                    this.subscribeTasks.add(subscribeTask);
-                }
-            }
-        }
-        triggerThrottle();
+        proxyContextPublisher.subscribe(recordNames, permissionToken, ackSubscribes, nokSubscribes, finallyTask);
     }
 
     void sendAck(List<String> recordNames, ITransportChannel client, ProxyContextPublisher proxyContextPublisher,
