@@ -72,31 +72,31 @@ public class ImmutableRecord implements IRecord
     @Override
     public int size()
     {
-        return this.backingRecord.data.size();
+        return this.backingRecord.size();
     }
 
     @Override
     public boolean isEmpty()
     {
-        return this.backingRecord.data.isEmpty();
+        return this.backingRecord.isEmpty();
     }
 
     @Override
     public boolean containsKey(Object key)
     {
-        return this.backingRecord.data.containsKey(key);
+        return this.backingRecord.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        return this.backingRecord.data.containsValue(value);
+        return this.backingRecord.containsValue(value);
     }
 
     @Override
     public IValue get(Object key)
     {
-        return this.backingRecord.data.get(key);
+        return this.backingRecord.get(key);
     }
 
     @Override
@@ -130,19 +130,19 @@ public class ImmutableRecord implements IRecord
     @Override
     public Set<String> keySet()
     {
-        return Collections.unmodifiableSet(this.backingRecord.data.keySet());
+        return Collections.unmodifiableSet(this.backingRecord.keySet());
     }
 
     @Override
     public Collection<IValue> values()
     {
-        return Collections.unmodifiableCollection(this.backingRecord.data.values());
+        return Collections.unmodifiableCollection(this.backingRecord.values());
     }
 
     @Override
     public Set<java.util.Map.Entry<String, IValue>> entrySet()
     {
-        return CollectionUtils.unmodifiableEntrySet(this.backingRecord.data.entrySet());
+        return CollectionUtils.unmodifiableEntrySet(this.backingRecord.entrySet());
     }
 
     @Override
@@ -193,7 +193,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public Set<String> getSubMapKeys()
     {
-        return Collections.unmodifiableSet(this.backingRecord.subMaps.keySet());
+        return Collections.unmodifiableSet(this.backingRecord.getSubMapKeys());
     }
 
     @Override
@@ -223,7 +223,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public <T extends IValue> T get(String key)
     {
-        return (T) this.backingRecord.data.get(key);
+        return (T) this.backingRecord.get(key);
     }
 
     @Override
@@ -254,10 +254,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> asFlattenedMap()
     {
-        synchronized (this.backingRecord.getWriteLock())
-        {
-            return ContextUtils.mergeMaps(this.backingRecord.data, this.backingRecord.subMaps);
-        }
+        return this.backingRecord.asFlattenedMap();
     }
 
     @Override   
