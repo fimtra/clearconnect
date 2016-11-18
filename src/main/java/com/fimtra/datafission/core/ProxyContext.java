@@ -1219,8 +1219,8 @@ public final class ProxyContext implements IObserverContext
                         ProxyContext.this.context.recordObservers.getSubscribersFor(name).length > 0;
                     if (!recordIsSubscribed)
                     {
-                        Log.log(ProxyContext.this, "Received record but no subscription exists - ignoring ",
-                            ObjectUtils.safeToString(changeToApply));
+                        Log.log(ProxyContext.this, "Received record but no subscription exists - ignoring record=",
+                            changeName, " seq=", (isImage ? "i" : "d"), Long.toString(changeToApply.getSequence()));
                         return;
                     }
 
@@ -1586,14 +1586,15 @@ public final class ProxyContext implements IObserverContext
         int i;
         for (i = 0; i < size; i++)
         {
-            batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
-            if (++batchCounter == batchSize)
+            if (batchCounter == batchSize)
             {
                 subscribeBatch(permissionToken,
                     batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i + 1, size);
                 batchSubscribeRecordNames = new ArrayList<String>(batchSize);
                 batchCounter = 0;
             }
+            batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
+            batchCounter++;
         }
         if (batchSubscribeRecordNames.size() > 0)
         {
@@ -1627,14 +1628,15 @@ public final class ProxyContext implements IObserverContext
         int i;
         for (i = 0; i < size; i++)
         {
-            batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
-            if (++batchCounter > batchSize)
+            if (batchCounter == batchSize)
             {
                 unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
                     size);
                 batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
                 batchCounter = 0;
             }
+            batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
+            batchCounter++;
         }
         unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i, size);
     }
