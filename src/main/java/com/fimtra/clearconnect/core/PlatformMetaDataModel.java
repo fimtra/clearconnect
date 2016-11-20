@@ -1301,6 +1301,9 @@ public final class PlatformMetaDataModel
 
     static void removeRecords(final Context context)
     {
-        ContextUtils.removeRecords(context);
+        if (context != null)
+        {
+            ContextUtils.removeRecords(context);
+        }
     }
 }
