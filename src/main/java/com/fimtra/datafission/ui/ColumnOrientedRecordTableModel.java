@@ -70,7 +70,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
 
     // these members handle batching up of updates and removes
     final AtomicBoolean batchUpdateScheduled;
-    final AtomicBoolean batchRemoveScheduled;
 
     /**
      * Record updates keyed by {recordname,context}
@@ -84,8 +83,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
      * @see {@link #getRecordLookupKey(String, String)}
      */
     final Map<Pair<String, String>, IRecordChange> pendingBatchAtomicChanges;
-    /** list of records to remove identified by name and keyed per context */
-    final Map<String, List<String>> pendingBatchRemoves;
 
     public ColumnOrientedRecordTableModel()
     {
@@ -96,10 +93,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
 
         this.batchUpdateScheduled = new AtomicBoolean();
-        this.batchRemoveScheduled = new AtomicBoolean();
         this.pendingBatchUpdates = new HashMap<Pair<String, String>, IRecord>();
         this.pendingBatchAtomicChanges = new HashMap<Pair<String, String>, IRecordChange>();
-        this.pendingBatchRemoves = new HashMap<String, List<String>>();
 
         final ArrayList<Integer> inserts = new ArrayList<Integer>();
         checkAddFieldRow(RecordTableUtils.CONTEXT, inserts);
