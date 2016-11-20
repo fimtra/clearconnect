@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission.core;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,8 +34,10 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
+import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.Log;
+import com.fimtra.util.SerializationUtils;
 
 /**
  * The standard implementation of an {@link IRpcInstance}
@@ -206,7 +209,16 @@ public final class RpcInstance implements IRpcInstance
                     }
                     catch (Exception e)
                     {
-                        resultEntries.put(EXCEPTION, TextValue.valueOf(e.toString()));
+                        try
+                        {
+                            resultEntries.put(EXCEPTION, BlobValue.valueOf(SerializationUtils.toByteArray(e)));
+                        }
+                        catch (IOException e1)
+                        {
+                            // NOTE: this should never happen as an exception is fully serializable
+                            resultEntries.put(EXCEPTION, TextValue.valueOf(e.getMessage()));
+                            Log.log(CallReceiver.class, "Could not write full exception for RPC", e1);
+                        }
                         Log.log(CallReceiver.class, "Exception handling RPC: " + callDetails, e);
                     }
 
@@ -365,7 +377,24 @@ public final class RpcInstance implements IRpcInstance
                         IValue exception = resultMap.get(EXCEPTION);
                         if (exception != null)
                         {
-                            throw new ExecutionException(exception.textValue());
+                            if (exception instanceof BlobValue)
+                            {
+                                Exception cause;
+                                try
+                                {
+                                    cause = SerializationUtils.fromByteArray(exception.byteValue());
+                                }
+                                catch (Exception e1)
+                                {
+                                    Log.log(Caller.class, "Could not deserialise ExecutionException cause", e1);
+                                    cause = e1;
+                                }
+                                throw new ExecutionException((Exception) cause.getCause());
+                            }
+                            else
+                            {
+                                throw new ExecutionException(exception.textValue());
+                            }
                         }
                         if (logVerbose)
                         {
@@ -638,7 +667,14 @@ public final class RpcInstance implements IRpcInstance
         {
             Log.log(RpcInstance.class,
                 "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
-            throw new ExecutionException(e.getMessage());
+            if (e instanceof ExecutionException)
+            {
+                throw e;
+            }
+            else
+            {
+                throw new ExecutionException(e);
+            }
         }
     }
 

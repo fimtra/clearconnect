@@ -1846,12 +1846,13 @@ public class ProxyContextTest
     public void testRpcExecutionException() throws InterruptedException, TimeOutException, IOException
     {
         createComponents();
+        final String message = "Something bad happened!";
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                throw new RuntimeException("Something bad happened!");
+                throw new RuntimeException(message);
             }
         }, TypeEnum.TEXT, "rpcException");
         this.context.createRpc(rpc);
@@ -1865,6 +1866,8 @@ public class ProxyContextTest
         }
         catch (ExecutionException e)
         {
+            assertEquals(RuntimeException.class, e.getCause().getClass());
+            assertEquals(message, e.getCause().getMessage());
         }
     }
 
