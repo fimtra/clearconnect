@@ -103,8 +103,7 @@ public final class ThimbleExecutor implements Executor
                     {
                         this.task = null;
 
-                        ThimbleExecutor.this.taskQueue.lock.lock();
-                        try
+                        synchronized (ThimbleExecutor.this.taskQueue.lock)
                         {
                             ThimbleExecutor.this.stats.itemExecuted();
                             
@@ -114,10 +113,6 @@ public final class ThimbleExecutor implements Executor
                                 // no more tasks so place back into the runners list
                                 ThimbleExecutor.this.taskRunners.offer(TaskRunner.this);
                             }
-                        }
-                        finally
-                        {
-                            ThimbleExecutor.this.taskQueue.lock.unlock();
                         }
                     }
                 }
@@ -219,8 +214,7 @@ public final class ThimbleExecutor implements Executor
         final Runnable task;
         TaskRunner runner = null; 
         
-        this.taskQueue.lock.lock();
-        try
+        synchronized (this.taskQueue.lock)
         {
             this.taskQueue.offer_callWhilstHoldingLock(command);
             this.stats.itemSubmitted();
@@ -238,10 +232,6 @@ public final class ThimbleExecutor implements Executor
             {
                 runner = this.taskRunners.poll();
             }
-        }
-        finally
-        {
-            this.taskQueue.lock.unlock();
         }
         
         // do the runner execute outside of the task queue lock
@@ -287,8 +277,7 @@ public final class ThimbleExecutor implements Executor
 
     public void destroy()
     {
-        this.taskQueue.lock.lock();
-        try
+        synchronized (this.taskQueue.lock)
         {
             for (TaskRunner taskRunner : this.taskRunnersRef)
             {
@@ -299,10 +288,6 @@ public final class ThimbleExecutor implements Executor
             {
                 // noop - drain the queue
             }
-        }
-        finally
-        {
-            this.taskQueue.lock.unlock();
         }
     }
 

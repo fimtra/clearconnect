@@ -24,12 +24,9 @@ import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.LowGcLinkedList;
 
 /**
  * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted
@@ -65,7 +62,8 @@ final class TaskQueue
      */
     final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
     {
-        private final Deque<ISequentialRunnable> sequentialTasks = new LinkedBlockingDeque<ISequentialRunnable>();
+        private final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<ISequentialRunnable>(2);
+        private int size;
         private final Object context;
         private final TaskStatistics stats;
 
@@ -84,7 +82,14 @@ final class TaskQueue
             {
                 try
                 {
-                    item = this.sequentialTasks.removeFirst();
+                    synchronized (this.sequentialTasks)
+                    {
+                        item = this.sequentialTasks.removeFirst();
+                        if (item != null)
+                        {
+                            this.size--;
+                        }
+                    }
                 }
                 catch (NoSuchElementException e)
                 {
@@ -97,11 +102,10 @@ final class TaskQueue
             }
             finally
             {
-                TaskQueue.this.lock.lock();
-                try
+                synchronized (TaskQueue.this.lock)
                 {
-                    this.stats.itemExecuted();
-                    if (this.sequentialTasks.size() > 0)
+                    this.stats.itemExecuted();            
+                    if (this.size > 0)
                     {
                         TaskQueue.this.queue.offer(this);
                     }
@@ -111,24 +115,28 @@ final class TaskQueue
                         TaskQueue.this.sequentialTasksPerContext.remove(this.context);
                     }
                 }
-                finally
-                {
-                    TaskQueue.this.lock.unlock();
-                }
             }
         }
 
+        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
         @Override
         public void offer(ISequentialRunnable latest)
         {
             this.stats.itemSubmitted();
-            this.sequentialTasks.offer(latest);
+            synchronized (this.sequentialTasks)
+            {
+                this.sequentialTasks.offer(latest);
+                this.size++;
+            }
         }
 
         @Override
         public String toString()
         {
-            return "SequentialTasks [" + this.context + ", size=" + this.sequentialTasks.size() + "]";
+            synchronized (this.sequentialTasks)
+            {
+                return "SequentialTasks [" + this.context + ", size=" + this.size + "]";
+            }
         }
     }
 
@@ -140,7 +148,7 @@ final class TaskQueue
      */
     final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
     {
-        private final AtomicReference<ICoalescingRunnable> latestTask;
+        private ICoalescingRunnable latestTask;
         private final Object context;
         private final TaskStatistics stats;
 
@@ -148,7 +156,6 @@ final class TaskQueue
         {
             this.context = context;
             this.stats = stats;
-            this.latestTask = new AtomicReference<ICoalescingRunnable>();
         }
 
         @Override
@@ -156,15 +163,20 @@ final class TaskQueue
         {
             try
             {
-                this.latestTask.getAndSet(null).run();
+                ICoalescingRunnable task;
+                synchronized(this)
+                {
+                    task = this.latestTask;
+                    this.latestTask = null;
+                }
+                task.run();
             }
             finally
             {
-                TaskQueue.this.lock.lock();
-                try
+                synchronized (TaskQueue.this.lock)
                 {
                     this.stats.itemExecuted();
-                    if (this.latestTask.get() != null)
+                    if (this.latestTask != null)
                     {
                         TaskQueue.this.queue.offer(this);
                     }
@@ -174,18 +186,18 @@ final class TaskQueue
                         TaskQueue.this.coalescingTasksPerContext.remove(this.context);
                     }
                 }
-                finally
-                {
-                    TaskQueue.this.lock.unlock();
-                }
             }
         }
 
+        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
         @Override
         public void offer(ICoalescingRunnable latest)
         {
             this.stats.itemSubmitted();
-            this.latestTask.set(latest);
+            synchronized (this)
+            {
+                this.latestTask = latest;
+            }
         }
 
         @Override
@@ -204,7 +216,7 @@ final class TaskQueue
     final Set<CoalescingTasks> coalesingTasksInQueue = new HashSet<CoalescingTasks>();
     final TaskStatistics allCoalescingStats;
     final TaskStatistics allSequentialStats;
-    final Lock lock = new ReentrantLock();
+    final Object lock = new Object();
 
     {
 
