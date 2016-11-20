@@ -30,9 +30,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointService;
@@ -146,7 +144,7 @@ public class Publisher
 
     }
 
-    final Lock lock;
+    final Object lock;
 
     /**
      * This converts each record's atomic change into the <code>byte[]</code> to transmit and
@@ -258,117 +256,112 @@ public class Publisher
         void addSubscriberFor(final Collection<String> names, final ProxyContextPublisher publisher, final String permissionToken,
             final List<String> ackSubscribes, final List<String> nokSubscribes, final Runnable task)
         {
-            Publisher.this.lock.lock();
             try
             {
-                final List<String> increment = new LinkedList<String>();
-                for (final String name : names)
+                synchronized (Publisher.this.lock)
                 {
-                    try
+                    final List<String> increment = new LinkedList<String>();
+                    for (final String name : names)
                     {
-                        if (Publisher.this.context.permissionTokenValidForRecord(permissionToken, name))
+                        try
                         {
-                            if (ProxyContextMultiplexer.this.subscribers.addSubscriberFor(name, publisher))
+                            if (Publisher.this.context.permissionTokenValidForRecord(permissionToken, name))
                             {
-                                if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
+                                if (ProxyContextMultiplexer.this.subscribers.addSubscriberFor(name, publisher))
                                 {
-                                    // NOTE: adding the observer ends up calling
-                                    // addDeltaToSubscriptionCount which publishes the image
-                                    if (!Publisher.this.context.addObserver(
-                                        // todo NOTE: we need to actually use a system-level
-                                        // token here - the permission check has already been
-                                        // done at the start of the for loop - need to find a way to
-                                        // pass in a system-level permission
-                                        permissionToken, ProxyContextMultiplexer.this, name).get().get(
-                                            name).booleanValue())
+                                    if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
                                     {
-                                        throw new IllegalStateException(
-                                            "Could not add ProxyContextMultiplexer as a listener for recordName=" + name
-                                                + " using permissionToken=" + permissionToken);
+                                        // NOTE: adding the observer ends up calling
+                                        // addDeltaToSubscriptionCount which publishes the image
+                                        if (!Publisher.this.context.addObserver(
+                                            // todo NOTE: we need to actually use a system-level
+                                            // token here - the permission check has already been
+                                            // done at the start of the for loop - need to find a
+                                            // way to pass in a system-level permission
+                                            permissionToken, ProxyContextMultiplexer.this, name).get().get(
+                                                name).booleanValue())
+                                        {
+                                            throw new IllegalStateException(
+                                                "Could not add ProxyContextMultiplexer as a listener for recordName="
+                                                    + name + " using permissionToken=" + permissionToken);
+                                        }
                                     }
+                                    else
+                                    {
+                                        increment.add(name);
+                                    }
+
+                                    ackSubscribes.add(name);
                                 }
                                 else
                                 {
-                                    increment.add(name);
-                                }
+                                    Log.log(ProxyContextMultiplexer.this,
+                                        "Ignoring duplicate subscribe for recordName=", name);
 
-                                ackSubscribes.add(name);
+                                    nokSubscribes.add(name);
+                                }
                             }
                             else
                             {
-                                Log.log(ProxyContextMultiplexer.this, "Ignoring duplicate subscribe for recordName=",
-                                    name);
+                                Log.log(ProxyContextMultiplexer.this, "Invalid permission token=", permissionToken,
+                                    " for recordName=", name);
 
                                 nokSubscribes.add(name);
                             }
                         }
-                        else
+                        catch (Exception e)
                         {
-                            Log.log(ProxyContextMultiplexer.this, "Invalid permission token=", permissionToken,
-                                " for recordName=", name);
+                            Log.log(ProxyContextMultiplexer.this, "Could not add subscriber using permissionToken="
+                                + permissionToken + " for recordName=" + name, e);
 
                             nokSubscribes.add(name);
+
+                            // the subscribe was not completed, so remove the subscriber
+                            // registration
+                            ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
                         }
                     }
-                    catch (Exception e)
+
+                    Publisher.this.context.addDeltaToSubscriptionCount(1, increment);
+
+                    for (final String name : increment)
                     {
-                        Log.log(ProxyContextMultiplexer.this, "Could not add subscriber using permissionToken="
-                            + permissionToken + " for recordName=" + name, e);
-
-                        nokSubscribes.add(name);
-
-                        // the subscribe was not completed, so remove the subscriber registration
-                        ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher);
-                    }
-                }
-
-                Publisher.this.context.addDeltaToSubscriptionCount(1, increment);
-
-                for (final String name : increment)
-                {
-                    try
-                    {
-                        // we must send an initial image to the new client if it is
-                        // not the first one to register
-                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
+                        try
                         {
-                            @Override
-                            public void run()
+                            // we must send an initial image to the new client if it is
+                            // not the first one to register
+                            Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                             {
-                                Publisher.this.multiplexer.republishImage(name, publisher);
-                            }
+                                @Override
+                                public void run()
+                                {
+                                    Publisher.this.multiplexer.republishImage(name, publisher);
+                                }
 
-                            @Override
-                            public Object context()
-                            {
-                                return name;
-                            }
-                        });
-                    }
-                    catch (Exception e)
-                    {
-                        Log.log(ProxyContextMultiplexer.this,
-                            "Could not setup initial image publish for recordName=" + name, e);
+                                @Override
+                                public Object context()
+                                {
+                                    return name;
+                                }
+                            });
+                        }
+                        catch (Exception e)
+                        {
+                            Log.log(ProxyContextMultiplexer.this,
+                                "Could not setup initial image publish for recordName=" + name, e);
+                        }
                     }
                 }
             }
             finally
             {
-                try
-                {
-                    task.run();
-                }
-                finally
-                {
-                    Publisher.this.lock.unlock();
-                }
+                task.run();
             }
         }
 
         void removeSubscriberFor(final Collection<String> names, final ProxyContextPublisher publisher)
         {
-            Publisher.this.lock.lock();
-            try
+            synchronized (Publisher.this.lock)
             {
                 final List<String> decrement = new LinkedList<String>();
                 final List<String> remove = new LinkedList<String>();
@@ -394,10 +387,6 @@ public class Publisher
                 {
                     ProxyContextMultiplexer.this.service.endBroadcast(name);
                 }
-            }
-            finally
-            {
-                Publisher.this.lock.unlock();
             }
         }
 
@@ -751,7 +740,7 @@ public class Publisher
         super();
         this.context = context;
         this.transportTechnology = transportTechnology;
-        this.lock = new ReentrantLock();
+        this.lock = new Object();
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 

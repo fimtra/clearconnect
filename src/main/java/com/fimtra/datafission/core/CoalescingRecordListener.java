@@ -25,8 +25,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
@@ -247,14 +245,9 @@ public class CoalescingRecordListener implements IRecordListener
             if (image != null || CoalescingRecordListener.this.cachePolicy == CachePolicyEnum.NO_IMAGE_NEEDED)
             {
                 final List<IRecordChange> changes;
-                CoalescingRecordListener.this.lock.lock();
-                try
+                synchronized (CoalescingRecordListener.this.lock)
                 {
                     changes = CoalescingRecordListener.this.cachedAtomicChanges.remove(this.name);
-                }
-                finally
-                {
-                    CoalescingRecordListener.this.lock.unlock();
                 }
                 if (changes != null)
                 {
@@ -279,7 +272,7 @@ public class CoalescingRecordListener implements IRecordListener
         }
     }
 
-    final Lock lock;
+    final Object lock;
     final IRecordListener delegate;
     final CachePolicyEnum cachePolicy;
     final ICoalescingStrategy strategy;
@@ -384,15 +377,14 @@ public class CoalescingRecordListener implements IRecordListener
         this.delegate = delegate;
         this.strategy = strategy;
         this.cachePolicy = cachePolicy;
-        this.lock = new ReentrantLock();
+        this.lock = new Object();
     }
 
     @Override
     public void onChange(final IRecord imageCopy, final IRecordChange atomicChange)
     {
         final String name = imageCopy.getName();
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             List<IRecordChange> list = this.cachedAtomicChanges.get(name);
             if (list == null)
@@ -402,10 +394,6 @@ public class CoalescingRecordListener implements IRecordListener
             }
             list.add(atomicChange);
             this.cachePolicy.storeImage(this.cachedImages, name, imageCopy);
-        }
-        finally
-        {
-            this.lock.unlock();
         }
         this.strategy.handle(name, this);
     }

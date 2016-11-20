@@ -36,8 +36,6 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPermissionFilter;
@@ -75,7 +73,7 @@ import com.fimtra.util.UtilProperties;
  * To publish changes to remote observers, a {@link Publisher} must be created and attached to the
  * context. The publisher can then publish changes to one or more {@link ProxyContext} instances.
  * <p>
- * Operations that mutate any record are performed using a {@link Lock} associated with the name of
+ * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()} associated with the name of
  * the record. This allows operations on different records to run in parallel.
  * 
  * @see IRecord
@@ -301,8 +299,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final ThimbleExecutor coreExecutor;
     final ThimbleExecutor systemExecutor;
     final ScheduledExecutorService utilityExecutor;
-    // todo should this be replaced with simple synchronized blocks...
-    final Lock recordCreateLock;
+    final Object recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
     /**
      * Tracks what records have been deleted and need to be removed from system records - this is an
@@ -346,7 +343,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
         this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
         this.utilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
-        this.recordCreateLock = new ReentrantLock();
+        this.recordCreateLock = new Object();
         this.recordObservers = new SubscriptionManager<String, IRecordListener>(IRecordListener.class);
         this.recordsToRemoveFromSystemRecords = new HashSet<String>();
         this.recordsToRemoveContext = "recordsToRemoveFromSystemRecords:" + name
@@ -452,15 +449,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         final Record record;
         final IRecordListener[] subscribersForInstance;
-        this.recordCreateLock.lock();
-        try
+        synchronized (this.recordCreateLock)
         {
             record = createRecordInternal_callWithLock(name, initialData);
             subscribersForInstance = this.recordObservers.getSubscribersFor(name);
-        }
-        finally
-        {
-            this.recordCreateLock.unlock();
         }
 
         // publish the update to the ContextRecords before publishing to observers - one of the
@@ -530,14 +522,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      */
     IRecord createRecordSilently(String name)
     {
-        this.recordCreateLock.lock();
-        try
+        synchronized (this.recordCreateLock)
         {
             return createRecordInternal_callWithLock(name, ContextUtils.EMPTY_MAP);
-        }
-        finally
-        {
-            this.recordCreateLock.unlock();
         }
     }
 
@@ -656,8 +643,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         IRecord record = getRecord(name);
         if (record == null)
         {
-            this.recordCreateLock.lock();
-            try
+            synchronized (this.recordCreateLock)
             {
                 // another thread may have created it, so check once we hold the lock
                 record = getRecord(name);
@@ -665,10 +651,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     return createRecord(name);
                 }
-            }
-            finally
-            {
-                this.recordCreateLock.unlock();
             }
         }
         return record;
@@ -820,9 +802,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     void doAddSingleObserver(final IRecordListener observer, Collection<String> recordNames)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
-        final Lock lock = this.recordCreateLock;
-        lock.lock();
-        try
+        synchronized (this.recordCreateLock)
         {
             final List<String> subscriberAdded = new LinkedList<String>();
             for (final String name : recordNames)
@@ -883,10 +863,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
             addDeltaToSubscriptionCount(1, subscriberAdded);
         }
-        finally
-        {
-            lock.unlock();
-        }
     }
 
     @Override
@@ -900,9 +876,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     private void doRemoveSingleObserver(IRecordListener observer, String... names)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
-        final Lock lock = this.recordCreateLock;
-        lock.lock();
-        try
+        synchronized (this.recordCreateLock)
         {
             final List<String> toRemove = new LinkedList<String>();
             for (String name : names)
@@ -917,10 +891,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
             }
             addDeltaToSubscriptionCount(-1, toRemove);
-        }
-        finally
-        {
-            lock.unlock();
         }
     }
 
@@ -1190,14 +1160,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public List<String> getSubscribedRecords()
     {
-        this.recordCreateLock.lock();
-        try
+        synchronized (this.recordCreateLock)
         {
             return this.recordObservers.getAllSubscriptionKeys();
-        }
-        finally
-        {
-            this.recordCreateLock.unlock();
         }
     }
 

@@ -37,8 +37,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IReceiver;
@@ -318,7 +316,7 @@ public final class ProxyContext implements IObserverContext
         return permissionAndRecords;
     }
 
-    final Lock lock;
+    final Object lock;
     volatile boolean active;
     volatile boolean connected;
     final Context context;
@@ -471,7 +469,7 @@ public final class ProxyContext implements IObserverContext
             }
         };
         this.context = new Context(name);
-        this.lock = new ReentrantLock();
+        this.lock = new Object();
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
         this.actionSubscribeResults = new ConcurrentHashMap<CountDownLatch, Map<String, Boolean>>();
         this.actionResponseLatches = new ConcurrentHashMap<String, List<CountDownLatch>>();
@@ -660,15 +658,10 @@ public final class ProxyContext implements IObserverContext
     @Override
     public void resubscribe(String... recordNames)
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             ContextUtils.resubscribeRecordsForContext(this, this.context.recordObservers, this.tokenPerRecord,
                 recordNames);
-        }
-        finally
-        {
-            this.lock.unlock();
         }
     }
 
@@ -698,8 +691,7 @@ public final class ProxyContext implements IObserverContext
             }
         }, subscribeResults);
 
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             // find records that have 0 observers - these are the ones that will need a subscription
             // message sent to the remote
@@ -747,10 +739,6 @@ public final class ProxyContext implements IObserverContext
                 executeTask(recordsToSubscribeFor, SUBSCRIBE, task, futureResult, subscribeResults);
             }
         }
-        finally
-        {
-            this.lock.unlock();
-        }
         return futureResult;
 
     }
@@ -760,8 +748,7 @@ public final class ProxyContext implements IObserverContext
     {
         CountDownLatch latch = DEFAULT_COUNT_DOWN_LATCH;
 
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             this.context.removeObserver(observer, recordNames);
 
@@ -810,10 +797,6 @@ public final class ProxyContext implements IObserverContext
                 }
             }
         }
-        finally
-        {
-            this.lock.unlock();
-        }
 
         return latch;
     }
@@ -827,8 +810,7 @@ public final class ProxyContext implements IObserverContext
     @Override
     public void destroy()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             if (this.active)
             {
@@ -842,10 +824,6 @@ public final class ProxyContext implements IObserverContext
                     this.channel.destroy("ProxyContext destroyed");
                 }
             }
-        }
-        finally
-        {
-            this.lock.unlock();
         }
     }
 
@@ -1029,8 +1007,7 @@ public final class ProxyContext implements IObserverContext
 
     void onChannelConnected()
     {
-        ProxyContext.this.lock.lock();
-        try
+        synchronized (ProxyContext.this.lock)
         {
             cancelReconnectTask();
 
@@ -1072,10 +1049,6 @@ public final class ProxyContext implements IObserverContext
             }
 
             ProxyContext.this.connected = true;
-        }
-        finally
-        {
-            ProxyContext.this.lock.unlock();
         }
     }
 
@@ -1382,8 +1355,7 @@ public final class ProxyContext implements IObserverContext
 
     void cancelReconnectTask()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             if (this.reconnectTask != null)
             {
@@ -1391,16 +1363,11 @@ public final class ProxyContext implements IObserverContext
                 ProxyContext.this.reconnectTask = null;
             }
         }
-        finally
-        {
-            this.lock.unlock();
-        }
     }
 
     void setupReconnectTask()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             if (!this.active)
             {
@@ -1440,10 +1407,6 @@ public final class ProxyContext implements IObserverContext
                     reconnect();
                 }
             }, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
-        }
-        finally
-        {
-            this.lock.unlock();
         }
     }
 
@@ -1492,8 +1455,7 @@ public final class ProxyContext implements IObserverContext
 
     void reconnect()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             updateConnectionStatus(Connection.RECONNECTING);
 
@@ -1517,10 +1479,6 @@ public final class ProxyContext implements IObserverContext
                 Log.log(ProxyContext.class, "Could not reconnect ", endPoint, " (", e.getMessage(), ")");
                 onChannelClosed();
             }
-        }
-        finally
-        {
-            this.lock.unlock();
         }
     }
 
