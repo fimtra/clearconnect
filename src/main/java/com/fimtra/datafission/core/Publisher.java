@@ -628,16 +628,18 @@ public class Publisher
 
         void destroy()
         {
+            long time = System.currentTimeMillis();
             this.active = false;
             this.codec.getSessionProtocol().destroy();
             this.statsUpdateTask.cancel(false);
             Set<String> copy;
-            synchronized(this.subscriptions)
+            synchronized (this.subscriptions)
             {
                 copy = CollectionUtils.newHashSet(this.subscriptions);
             }
             unsubscribe(copy);
-            Log.log(this, "Destroyed");
+            Log.log(this, "Destroyed ", this.identity, ", removed ", Integer.toString(copy.size()), " subscriptions (",
+                Long.toString(System.currentTimeMillis() - time), "ms)");
         }
 
         @Override
