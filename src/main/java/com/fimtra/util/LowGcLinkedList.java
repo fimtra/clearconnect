@@ -28,12 +28,17 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
+import com.fimtra.util.UtilProperties.Values;
+
 /**
  * A version of the standard {@link LinkedList} that uses an internal pool of objects to wrap and
  * hold entries added to the list. This technique reduces garbage churn at the expense of a higher
  * memory footprint and some extra (minor) processing.
  * <p>
- * This is not thread-safe.
+ * The size of the internal pool size can be set to not exceed a specific value. By default this is
+ * {@link Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}
+ * <p>
+ * <b>This is not thread-safe.</b>
  * 
  * @author Ramon Servadei
  */
@@ -57,14 +62,23 @@ public class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deq
     transient Node<E> last;
 
     Node<E> spare;
+    int spareCount;
+
+    private final int maxInternalSparePoolSize;
+    
+    public LowGcLinkedList(int maxInternalSparePoolSize)
+    {
+        this.maxInternalSparePoolSize = maxInternalSparePoolSize;
+    }
     
     public LowGcLinkedList()
     {
+        this(Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);
     }
 
     public LowGcLinkedList(Collection<? extends E> c)
     {
-        this();
+        this(Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);
         addAll(c);
     }
 
@@ -778,16 +792,26 @@ public class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deq
         }
     }
 
+    public int getSpareCount()
+    {
+        return this.spareCount;
+    }
+    
     private void release(Node<E> node)
     {
         if (this.spare == null)
         {
             this.spare = node;
+            this.spareCount++;
         }
         else
         {
-            node.prev = this.spare;
-            this.spare = node;
+            if (this.spareCount < this.maxInternalSparePoolSize)
+            {
+                node.prev = this.spare;
+                this.spare = node;
+                this.spareCount++;
+            }
         }
     }
 
@@ -796,6 +820,7 @@ public class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deq
         Node<E> node = null;
         if (this.spare != null)
         {
+            this.spareCount--;
             node = this.spare;
             this.spare = this.spare.prev;
         }

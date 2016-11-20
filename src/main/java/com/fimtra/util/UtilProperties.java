@@ -68,6 +68,14 @@ public abstract class UtilProperties
         String USE_LOW_GC_LINKEDLIST = BASE + "useLowGcLinkedList";
 
         /**
+         * The system property name that defines the size of the internal spare nodes pool of the {@link LowGcLinkedList}.<br>
+         * E.g. <code>-Dutil.logGcLinkedListInternalSparePoolSize=50</code>
+         * 
+         * @see Names#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE
+         */
+        String LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE = BASE + "logGcLinkedListInternalSparePoolSize";
+        
+        /**
          * The system property name to define if the thread dumps use the same file or a rolling
          * file.<br>
          * E.g. <code>-Dutil.useRollingThreaddumpFile=true</code>
@@ -123,6 +131,14 @@ public abstract class UtilProperties
          * @see Names#ARCHIVE_DIR
          */
         String ARCHIVE_DIR = System.getProperty(UtilProperties.Names.ARCHIVE_DIR, LOG_DIR + "/archive");
+        
+        /**
+         * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is <code>50</code>
+         * 
+         * @see Names#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE
+         */
+        int LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE =
+            Integer.parseInt(System.getProperty(Names.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE, "50"));
 
         /**
          * Determines if the {@link LowGcLinkedList} is used. Default is <code>true</code>
