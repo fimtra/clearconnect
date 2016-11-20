@@ -669,7 +669,7 @@ public final class RpcInstance implements IRpcInstance
                 "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
             if (e instanceof ExecutionException)
             {
-                throw e;
+                throw (ExecutionException) e;
             }
             else
             {
