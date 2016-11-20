@@ -76,7 +76,7 @@ public final class ChannelWatchdog implements Runnable
         this.channels = new HashSet<ITransportChannel>();
         this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
         this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
-        configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "6000")),
+        configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "30000")),
             Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
     }
 
