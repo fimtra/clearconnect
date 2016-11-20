@@ -1580,21 +1580,18 @@ public final class ProxyContext implements IObserverContext
     void subscribe(final String permissionToken, final String[] recordsToSubscribeFor)
     {
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
-        int batchCounter = 0;
         List<String> batchSubscribeRecordNames = new ArrayList<String>(batchSize);
         final int size = recordsToSubscribeFor.length;
         int i;
         for (i = 0; i < size; i++)
         {
-            if (batchCounter == batchSize)
+            if (batchSubscribeRecordNames.size() == batchSize)
             {
                 subscribeBatch(permissionToken,
-                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i + 1, size);
+                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
                 batchSubscribeRecordNames = new ArrayList<String>(batchSize);
-                batchCounter = 0;
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
-            batchCounter++;
         }
         if (batchSubscribeRecordNames.size() > 0)
         {
@@ -1622,23 +1619,23 @@ public final class ProxyContext implements IObserverContext
     void unsubscribe(final String[] recordsToUnsubscribe)
     {
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
-        int batchCounter = 0;
         List<String> batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
         final int size = recordsToUnsubscribe.length;
         int i;
         for (i = 0; i < size; i++)
         {
-            if (batchCounter == batchSize)
+            if (batchUnsubscribeRecordNames.size() == batchSize)
             {
                 unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
                     size);
                 batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
-                batchCounter = 0;
             }
             batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
-            batchCounter++;
         }
-        unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i, size);
+        if (batchUnsubscribeRecordNames.size() > 0)
+        {
+            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i, size);
+        }
     }
     
     private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total)
