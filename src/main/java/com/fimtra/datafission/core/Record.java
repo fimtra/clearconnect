@@ -393,41 +393,34 @@ final class Record implements IRecord, Cloneable
     @Override
     public Map<String, IValue> getOrCreateSubMap(String key)
     {
-        final String internKey = keysPool.intern(key);
-        if (this.subMaps != EMPTY_SUBMAP)
-        {
-            Map<String, IValue> submap = this.subMaps.get(internKey);
-            if (submap != null)
-            {
-                return submap;
-            }
-        }
         synchronized (this)
         {
-            if (this.subMaps == EMPTY_SUBMAP)
+            Map<String, IValue> submap = this.subMaps.get(key);
+            if (submap == null)
             {
-                this.subMaps = CollectionUtils.newMap(1);
+                if (this.subMaps == EMPTY_SUBMAP)
+                {
+                    this.subMaps = CollectionUtils.newMap(1);
+                }
+                final String internKey = keysPool.intern(key);
+                submap = new SubMap(this, internKey);
+                this.subMaps.put(internKey, submap);
             }
-            final SubMap newSubMap = new SubMap(this, internKey);
-            // put if absent to handle multiple writers running concurrently but blocked by the lock
-            // this ensures only the first added one is used
-            final Map<String, IValue> previous = this.subMaps.putIfAbsent(internKey, newSubMap);
-            return previous == null ? newSubMap : previous;
+            return submap;
         }
     }
 
     @Override
     public Map<String, IValue> removeSubMap(String key)
     {
-        final Map<String, IValue> subMap;
         synchronized (this)
         {
-            subMap = this.subMaps.remove(key);
+            final Map<String, IValue> subMap = this.subMaps.remove(key);
             if (subMap == null)
             {
                 return ContextUtils.EMPTY_MAP;
             }
-            Map<String, IValue> previous = new HashMap<String, IValue>(subMap);
+            final Map<String, IValue> previous = new HashMap<String, IValue>(subMap);
             // this call adds the remove to the atomic change
             subMap.clear();
             return previous;

@@ -226,7 +226,17 @@ public class ConfigService {
                     }
                     finally
                     {
-                        FileUtils.safeClose(configJar);
+                        if (configJar != null)
+                        {
+                            try
+                            {
+                                configJar.close();
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(FileUtils.class, "Could not close " + ObjectUtils.safeToString(configJar), e);
+                            }
+                        }
                     }
                 }
                 else
