@@ -186,26 +186,26 @@ public abstract class CollectionUtils
     }
 
     /**
-     * Creates a synchronized map initialised with the given size
+     * Creates a map initialised with the given size
      * 
      * @param size
      *            the size
-     * @return a synchronized {@link HashMap}
+     * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap(int size)
     {
-        return Collections.synchronizedMap(new HashMap<K, V>(size));
+        return new HashMap<K, V>(size);
     }
 
     /**
-     * Creates a synchronized map initialised with the given map
+     * Creates a map initialised with the given map
      * 
      * @param data
      *            the map data to use for initialisation
-     * @return a synchronized {@link HashMap}
+     * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap(Map<K, V> data)
     {
-        return Collections.synchronizedMap(new HashMap<K, V>(data));
+        return new HashMap<K, V>(data);
     }
 }

@@ -167,13 +167,19 @@ final class Record implements IRecord, Cloneable
     @Override
     public boolean containsKey(Object key)
     {
-        return this.data.containsKey(key);
+        synchronized (this)
+        {
+            return this.data.containsKey(key);
+        }
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        return this.data.containsValue(value);
+        synchronized (this)
+        {
+            return this.data.containsValue(value);
+        }
     }
 
     @Override
@@ -217,14 +223,23 @@ final class Record implements IRecord, Cloneable
         {
             other = (Record) o;
         }
-        return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
-            && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
+        synchronized (this)
+        {
+            synchronized (other)
+            {
+                return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
+                    && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
+            }
+        }
     }
 
     @Override
     public IValue get(Object key)
     {
-        return this.data.get(key);
+        synchronized (this)
+        {
+            return this.data.get(key);
+        }
     }
 
     @Override
@@ -236,7 +251,10 @@ final class Record implements IRecord, Cloneable
     @Override
     public boolean isEmpty()
     {
-        return this.data.isEmpty();
+        synchronized (this)
+        {
+            return this.data.isEmpty();
+        }
     }
 
     @Override
@@ -344,7 +362,10 @@ final class Record implements IRecord, Cloneable
     @Override
     public int size()
     {
-        return this.data.size();
+        synchronized (this)
+        {
+            return this.data.size();
+        }
     }
 
     @Override
@@ -371,7 +392,10 @@ final class Record implements IRecord, Cloneable
     @Override
     public String toString()
     {
-        return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data, this.subMaps);
+        synchronized (this)
+        {
+            return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data, this.subMaps);
+        }
     }
 
     @Override
@@ -440,7 +464,10 @@ final class Record implements IRecord, Cloneable
     @Override
     public <T extends IValue> T get(String key)
     {
-        return (T) this.data.get(key);
+        synchronized (this)
+        {
+            return (T) this.data.get(key);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -691,7 +718,10 @@ final class SubMap implements Map<String, IValue>
     @Override
     public String toString()
     {
-        return ContextUtils.mapToString(this.subMap);
+        synchronized (this.record)
+        {
+            return ContextUtils.mapToString(this.subMap);
+        }
     }
 
     static Iterator<Map.Entry<String, IValue>> subMapIterator(final Iterator<Map.Entry<String, IValue>> subMapIterator)
@@ -729,31 +759,46 @@ final class SubMap implements Map<String, IValue>
     @Override
     public int size()
     {
-        return this.subMap.size();
+        synchronized (this.record)
+        {
+            return this.subMap.size();
+        }
     }
 
     @Override
     public boolean isEmpty()
     {
-        return this.subMap.isEmpty();
+        synchronized (this.record)
+        {
+            return this.subMap.isEmpty();
+        }
     }
 
     @Override
     public boolean containsKey(Object key)
     {
-        return this.subMap.containsKey(key);
+        synchronized (this.record)
+        {
+            return this.subMap.containsKey(key);
+        }
     }
 
     @Override
     public boolean containsValue(Object value)
     {
-        return this.subMap.containsValue(value);
+        synchronized (this.record)
+        {
+            return this.subMap.containsValue(value);
+        }
     }
 
     @Override
     public IValue get(Object key)
     {
-        return this.subMap.get(key);
+        synchronized (this.record)
+        {
+            return this.subMap.get(key);
+        }
     }
 
     @Override
@@ -927,8 +972,14 @@ final class SubMap implements Map<String, IValue>
             return false;
         }
         SubMap other = (SubMap) o;
-        return is.eq(this.subMapKey, other.subMapKey) && is.eq(this.record.getName(), other.record.getName())
-            && is.eq(this.subMap, other.subMap);
+        synchronized (this.record)
+        {
+            synchronized (other.record)
+            {
+                return is.eq(this.subMapKey, other.subMapKey) && is.eq(this.record.getName(), other.record.getName())
+                    && is.eq(this.subMap, other.subMap);
+            }
+        }
     }
 
     @Override
