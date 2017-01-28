@@ -322,6 +322,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
         if (this.platformName == null)
         {
+            destroy();
             throw new RegistryNotAvailableException("Registry name has not been received from " + registryAddresses[0]);
         }
 
@@ -930,7 +931,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
 
-            this.agentExecutor.shutdownNow();
+            try
+            {
+                this.agentExecutor.shutdownNow();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this, "Could not shutdown executor", e);
+            }
 
             try
             {
@@ -945,7 +953,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             
             if (this.dynamicAttributeUpdateTask != null)
             {
-                this.dynamicAttributeUpdateTask.cancel(false);
+                try
+                {
+                    this.dynamicAttributeUpdateTask.cancel(false);
+                }
+                catch (Exception e)
+                {
+                    Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
+                }
             }
 
             for (PlatformServiceInstance service : this.localPlatformServiceInstances.values())
