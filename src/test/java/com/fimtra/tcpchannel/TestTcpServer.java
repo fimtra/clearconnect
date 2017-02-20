@@ -43,14 +43,10 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import org.omg.CORBA.Environment;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
-import com.fimtra.tcpchannel.TcpChannel;
-import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
@@ -158,7 +154,7 @@ public class TestTcpServer
         System.err.println(this.name.getMethodName());
         Log.log(this, ">>> START ", this.name.getMethodName());
         PORT += 1;
-        // to speed up tests, this is commented out - we assume free ports from 
+        // to speed up tests, this is commented out - we assume free ports from
         // PORT = TcpChannelUtils.getNextFreeTcpServerPort(null, PORT, PORT + 100);
         Log.log(this, this.name.getMethodName() + ", port=" + PORT);
     }
@@ -231,6 +227,86 @@ public class TestTcpServer
         assertFalse(client2.send("sdf3".getBytes()));
     }
 
+    @Test
+    public void testShortLivedSocketAttackServer() throws IOException, InterruptedException
+    {
+        FrameEncodingFormatEnum inverseFrameEncodingFormat =
+            this.frameEncodingFormat == FrameEncodingFormatEnum.LENGTH_BASED ? FrameEncodingFormatEnum.TERMINATOR_BASED
+                : FrameEncodingFormatEnum.LENGTH_BASED;
+
+        this.server = new TcpServer(LOCALHOST, PORT, new EchoReceiver(), this.frameEncodingFormat);
+        List<TcpChannel> clients = new ArrayList<TcpChannel>();
+        for (int i = 0; i < 20; i++)
+        {
+            final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
+            clients.add(client);
+        }
+        Thread.sleep(2000);
+        for (int i = 0; i < 20; i++)
+        {
+            final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
+            clients.add(client);
+        }
+        String hostname = LOCALHOST;
+
+        Thread.sleep(2000);
+
+        for (TcpChannel client : clients)
+        {
+            assertFalse(client.isConnected());
+        }
+        
+        assertTrue(this.server.blacklistHosts.containsKey(hostname));
+        
+        Log.log(this, "**** STARTING TEST CONNECTIONS");
+     
+        // fake that the blacklist time has expired
+        this.server.blacklistHosts.put(hostname, this.server.blacklistHosts.get(hostname).longValue()
+            - (TcpChannelProperties.Values.SLS_BLACKLIST_TIME_MILLIS));
+    
+        // attempt connection
+
+        final CountDownLatch latch = new CountDownLatch(4);
+        final List<String> expected1 = new ArrayList<String>();
+        final List<String> received1 = new ArrayList<String>();
+        final List<String> expected2 = new ArrayList<String>();
+        final List<String> received2 = new ArrayList<String>();
+        final String message1 = "hello1";
+        final String message2 = "hello2";
+        expected1.add(message1);
+        expected1.add(message2);
+        expected2.add(message1);
+        expected2.add(message2);
+
+        final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
+        {
+            @Override
+            public void onDataReceived(byte[] data, ITransportChannel source)
+            {
+                received1.add(new String(data));
+                latch.countDown();
+            }
+        }, this.frameEncodingFormat);
+
+        final TcpChannel client2 = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
+        {
+            @Override
+            public void onDataReceived(byte[] data, ITransportChannel source)
+            {
+                received2.add(new String(data));
+                latch.countDown();
+            }
+        }, this.frameEncodingFormat);
+        assertTrue(client.send(message1.getBytes()));
+        assertTrue(client.send(message2.getBytes()));
+        assertTrue(client2.send(message1.getBytes()));
+        assertTrue(client2.send(message2.getBytes()));
+        final boolean result = latch.await(STD_TIMEOUT, TimeUnit.SECONDS);
+        assertTrue("onDataReceived only called " + (4 - latch.getCount()) + " times", result);
+        assertEquals(expected1, received1);
+        assertEquals(expected2, received2);
+    }
+
     @Test(expected = ConnectException.class)
     public void testAttemptConnectionWhenServerIsShutDown() throws IOException, InterruptedException
     {
@@ -247,7 +323,8 @@ public class TestTcpServer
             int j = 0;
             while (j++ < 10)
             {
-                new Socket(this.server.getEndPointAddress().getNode(), this.server.getEndPointAddress().getPort()).close();
+                new Socket(this.server.getEndPointAddress().getNode(),
+                    this.server.getEndPointAddress().getPort()).close();
                 try
                 {
                     Thread.sleep(100);
@@ -294,8 +371,8 @@ public class TestTcpServer
         final String loopback = "127.0.0.1";
         String allowed = "127\\.0\\.0\\.1";
         // use totally invalid IP addresses
-        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, "999.3.*;945.*;" + allowed
-            + ";3453.23.45.5");
+        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL,
+            "999.3.*;945.*;" + allowed + ";3453.23.45.5");
         this.server = new TcpServer(loopback, PORT, new EchoReceiver(), this.frameEncodingFormat);
 
         final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()
@@ -317,8 +394,8 @@ public class TestTcpServer
         String allowed = "127\\..*";
 
         // use totally invalid IP addresses
-        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, "999.3.*; 945.*;" + allowed
-            + ";3453.23.45.5");
+        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL,
+            "999.3.*; 945.*;" + allowed + ";3453.23.45.5");
         this.server = new TcpServer(loopback, PORT, new EchoReceiver(), this.frameEncodingFormat);
 
         final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()

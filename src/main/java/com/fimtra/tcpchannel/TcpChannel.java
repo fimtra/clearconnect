@@ -31,6 +31,7 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelProperties.Values;
+import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -249,11 +250,26 @@ public class TcpChannel implements ITransportChannel
         {
             TcpChannelUtils.READER.register(this.socketChannel, new Runnable()
             {
-
                 @Override
                 public void run()
                 {
-                    readFrames();
+                    try
+                    {
+                        readFrames();
+                    }
+                    catch (BufferOverflowException e)
+                    {
+                        try
+                        {
+                            TcpChannel.this.socketChannel.close();
+                        }
+                        catch (IOException e2)
+                        {
+                            Log.log(this, "Error closing " + ObjectUtils.safeToString(TcpChannel.this.socketChannel),
+                                e2);
+                        }
+                        throw e;
+                    }
                 }
             });
         }

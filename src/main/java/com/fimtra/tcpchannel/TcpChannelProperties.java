@@ -67,11 +67,30 @@ public abstract class TcpChannelProperties
          */
         String SERVER_SOCKET_REUSE_ADDR = BASE + "serverSocketReuseAddr";
         /**
-         * The system property name to define the threshold, in nanos, for defining slow RX frame handling (and
-         * thus logging a message indicating the RX frame handling was slow).<br>
-         * E.g. <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
+         * The system property name to define the threshold, in nanos, for defining slow RX frame
+         * handling (and thus logging a message indicating the RX frame handling was slow).<br>
+         * E.g. <code>-DtcpChannel.slowTaskThresholdNanos=50000000</code>
          */
         String SLOW_RX_FRAME_THRESHOLD_NANOS = BASE + "slowRxFrameThresholdNanos";
+        /**
+         * The system property name to define the minimum alive time, in milliseconds, for a socket
+         * before it is classified as a "short-lived" socket and increases the short-lived socket
+         * count for the IP.<br>
+         * E.g. <code>-DtcpChannel.slsMinSocketAliveTimeMillis=100</code>
+         */
+        String SLS_MIN_SOCKET_ALIVE_TIME_MILLIS = BASE + "slsMinSocketAliveTimeMillis";
+        /**
+         * The system property name to define the blacklist timeout, in milliseconds, for an IP
+         * after it has exceeded the number of short-lived sockets.<br>
+         * E.g. <code>-DtcpChannel.slsBlacklistTimeMillis=300000</code>
+         */
+        String SLS_BLACKLIST_TIME_MILLIS = BASE + "slsBlacklistTimeMillis";
+        /**
+         * The system property name to define the maximum short-lived sockets from an IP before it
+         * is blacklisted.<br>
+         * E.g. <code>-DtcpChannel.slsMaxShortLivedSocketTries=3</code>
+         */
+        String SLS_MAX_SHORT_LIVED_SOCKET_TRIES = BASE + "slsMaxShortLivedSocketTries";
     }
 
     /**
@@ -122,6 +141,32 @@ public abstract class TcpChannelProperties
          */
         long SLOW_RX_FRAME_THRESHOLD_NANOS =
             Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
+        
+        /**
+         * The value for the minimum alive time, in milliseconds, for a socket before it is
+         * classified as a "short-lived socket" and increases the short-lived socket count for the
+         * IP.
+         * <p>
+         * Default is: 100
+         */
+        long SLS_MIN_SOCKET_ALIVE_TIME_MILLIS =
+            Long.parseLong(System.getProperty(Names.SLS_MIN_SOCKET_ALIVE_TIME_MILLIS, "100"));
+
+        /**
+         * The blacklist timeout, in milliseconds, for an IP after it has exceeded the number of
+         * short-lived sockets.<br>
+         * <p>
+         * Default is: 300000 (5 minutes)
+         */
+        int SLS_BLACKLIST_TIME_MILLIS = Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "300000"));
+
+        /**
+         * The maximum short-lived sockets from an IP before it is blacklisted.
+         * <p>
+         * Default is: 3
+         */
+        int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
+            Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
     }
 
     private TcpChannelProperties()
