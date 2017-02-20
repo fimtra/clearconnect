@@ -114,6 +114,7 @@ public class TcpChannel implements ITransportChannel
      * Tracks which channels have TX frames to send. This is used as an equal-sending-opportunity
      * mechanism.
      */
+    // todo is Copy on write the best option?
     static final List<TcpChannel> channelsWithTxFrames = new CopyOnWriteArrayList<TcpChannel>();
 
     int rxData;
@@ -286,11 +287,26 @@ public class TcpChannel implements ITransportChannel
         {
             TcpChannelUtils.READER.register(this.socketChannel, new Runnable()
             {
-
                 @Override
                 public void run()
                 {
-                    readFrames();
+                    try
+                    {
+                        readFrames();
+                    }
+                    catch (RuntimeException e)
+                    {
+                        try
+                        {
+                            TcpChannel.this.socketChannel.close();
+                        }
+                        catch (IOException e2)
+                        {
+                            // TODO Auto-generated catch block
+                            e2.printStackTrace();
+                        }
+                        throw e;
+                    }
                 }
             });
         }

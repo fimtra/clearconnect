@@ -22,10 +22,13 @@ import java.net.SocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.fimtra.channel.EndPointAddress;
@@ -36,6 +39,7 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 
 /**
  * A TCP server socket component. A TcpServer is constructed with an {@link IReceiver} that will be
@@ -53,9 +57,20 @@ public class TcpServer implements IEndPointService
 {
     final static int DEFAULT_SERVER_RX_BUFFER_SIZE = 65535;
 
+    final static long MIN_SOCKET_ALIVE_TIME_MILLIS = 1000;
+    final static int BLACKLIST_TIME_MILLIS = 300000;
+    final static int MAX_SHORT_LIVED_SOCKET_TRIES = 5;
+
     final ServerSocketChannel serverSocketChannel;
 
-    final List<ITransportChannel> clients = new CopyOnWriteArrayList<ITransportChannel>();
+    final Map<ITransportChannel, Pair<String, Long>> clients =
+        Collections.synchronizedMap(new HashMap<ITransportChannel, Pair<String, Long>>());
+
+    /** Key=host IP, value=Pair<number of short-lived socket connections, last short-lived time> */
+    final Map<String, Pair<Long, Long>> potentialBlacklistHosts =
+        Collections.synchronizedMap(new HashMap<String, Pair<Long, Long>>());
+    /** Key=host IP, value=system time IP was blacklisted */
+    final Map<String, Long> blacklistHosts = Collections.synchronizedMap(new HashMap<String, Long>());
 
     final InetSocketAddress localSocketAddress;
 
@@ -141,34 +156,47 @@ public class TcpServer implements IEndPointService
                         }
                         Log.log(this, ObjectUtils.safeToString(TcpServer.this), " (<-) accepted inbound ",
                             ObjectUtils.safeToString(socketChannel));
+                        String hostAddress = null;
                         if (TcpServer.this.aclPatterns.size() > 0)
                         {
                             final SocketAddress remoteAddress = socketChannel.socket().getRemoteSocketAddress();
                             if (remoteAddress instanceof InetSocketAddress)
                             {
+                                hostAddress = ((InetSocketAddress) remoteAddress).getAddress().getHostAddress();
                                 boolean matched = false;
-                                String hostAddress = ((InetSocketAddress) remoteAddress).getAddress().getHostAddress();
+                                if (isBlacklistedHost(hostAddress))
+                                {
+                                    socketChannel.close();
+                                    return;
+                                }
                                 for (Pattern pattern : TcpServer.this.aclPatterns)
                                 {
                                     if (pattern.matcher(hostAddress).matches())
                                     {
-                                        Log.log(this, "IP address ", hostAddress, " matches ACL entry ",
+                                        Log.log(TcpServer.this, "IP address ", hostAddress, " matches ACL entry ",
                                             pattern.toString());
                                         matched = true;
                                     }
                                 }
                                 if (!matched)
                                 {
-                                    Log.log(this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
+                                    Log.log(TcpServer.this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
                                         " does not match any ACL pattern");
                                     socketChannel.close();
                                     return;
                                 }
                             }
+                            else
+                            {
+                                Log.log(TcpServer.this,
+                                    "*** WARNING *** rejecting connection, unhandled socket type (this should never happen!)");
+                                socketChannel.close();
+                                return;
+                            }
                         }
 
                         socketChannel.configureBlocking(false);
-                        TcpServer.this.clients.add(new TcpChannel(socketChannel, new IReceiver()
+                        TcpServer.this.clients.put(new TcpChannel(socketChannel, new IReceiver()
                         {
                             @Override
                             public void onDataReceived(byte[] data, ITransportChannel source)
@@ -185,10 +213,48 @@ public class TcpServer implements IEndPointService
                             @Override
                             public void onChannelClosed(ITransportChannel tcpChannel)
                             {
-                                TcpServer.this.clients.remove(tcpChannel);
-                                clientSocketReceiver.onChannelClosed(tcpChannel);
+                                final Pair<String, Long> hostAndStartTime = TcpServer.this.clients.remove(tcpChannel);
+                                try
+                                {
+                                    clientSocketReceiver.onChannelClosed(tcpChannel);
+                                }
+                                finally
+                                {
+                                    if (System.currentTimeMillis()
+                                        - hostAndStartTime.getSecond().longValue() < MIN_SOCKET_ALIVE_TIME_MILLIS)
+                                    {
+                                        Pair<Long, Long> shortLivedCountAndLastTime =
+                                            TcpServer.this.potentialBlacklistHosts.get(hostAndStartTime.getFirst());
+                                        if (shortLivedCountAndLastTime == null)
+                                        {
+                                            shortLivedCountAndLastTime = new Pair<Long, Long>(0l, 0l);
+                                        }
+                                        shortLivedCountAndLastTime = new Pair<Long, Long>(
+                                            Long.valueOf(shortLivedCountAndLastTime.getFirst().longValue() + 1),
+                                            Long.valueOf(System.currentTimeMillis()));
+                                        TcpServer.this.potentialBlacklistHosts.put(hostAndStartTime.getFirst(),
+                                            shortLivedCountAndLastTime);
+
+                                        if (shortLivedCountAndLastTime.getFirst().intValue() > MAX_SHORT_LIVED_SOCKET_TRIES)
+                                        {
+                                            Log.log(TcpServer.this,
+                                                "*** WARNING *** too many short-lived connections, blacklisting ",
+                                                hostAndStartTime.getFirst(), " for the next ",
+                                                Long.toString(TimeUnit.MINUTES.convert(BLACKLIST_TIME_MILLIS,
+                                                    TimeUnit.MILLISECONDS)),
+                                                " mins");
+                                            TcpServer.this.blacklistHosts.put(hostAndStartTime.getFirst(),
+                                                Long.valueOf(System.currentTimeMillis()));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // todo can we clear the potential blacklisting?
+                                    }
+                                }
                             }
-                        }, clientSocketRxBufferSize, frameEncodingFormat));
+                        }, clientSocketRxBufferSize, frameEncodingFormat),
+                            new Pair<String, Long>(hostAddress, Long.valueOf(System.currentTimeMillis())));
                     }
                     catch (Exception e)
                     {
@@ -202,9 +268,34 @@ public class TcpServer implements IEndPointService
         }
         catch (Exception e)
         {
-            throw new RuntimeException("Could not create " + ObjectUtils.safeToString(this) + " at " + address + ":"
-                + port, e);
+            throw new RuntimeException(
+                "Could not create " + ObjectUtils.safeToString(this) + " at " + address + ":" + port, e);
         }
+    }
+
+    boolean isBlacklistedHost(String hostAddress)
+    {
+        synchronized (this.blacklistHosts)
+        {
+            Long blacklistStartTimeMillis = this.blacklistHosts.get(hostAddress);
+            {
+                if (blacklistStartTimeMillis != null)
+                {
+                    if (System.currentTimeMillis() - blacklistStartTimeMillis.longValue() < BLACKLIST_TIME_MILLIS)
+                    {
+                        Log.log(this, "*** WARNING *** rejected connection from blacklisted ", hostAddress);
+                        return true;
+                    }
+                    else
+                    {
+                        Log.log(this, "Clearing blacklist status for ", hostAddress);
+                        this.blacklistHosts.remove(hostAddress);
+                        this.potentialBlacklistHosts.remove(hostAddress);
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static Set<? extends Pattern> constructPatterns(Set<String> set)
@@ -236,7 +327,12 @@ public class TcpServer implements IEndPointService
 
         TcpChannelUtils.ACCEPT_PROCESSOR.cancel(this.serverSocketChannel);
 
-        for (ITransportChannel client : this.clients)
+        final Set<ITransportChannel> connections;
+        synchronized (this.clients)
+        {
+            connections = new HashSet<ITransportChannel>(this.clients.keySet());
+        }
+        for (ITransportChannel client : connections)
         {
             client.destroy("TcpServer shutting down");
         }
@@ -253,9 +349,8 @@ public class TcpServer implements IEndPointService
                     Socket socket = null;
                     try
                     {
-                        socket =
-                            new Socket(TcpServer.this.localSocketAddress.getAddress(),
-                                TcpServer.this.localSocketAddress.getPort());
+                        socket = new Socket(TcpServer.this.localSocketAddress.getAddress(),
+                            TcpServer.this.localSocketAddress.getPort());
                     }
                     catch (Exception e)
                     {
@@ -276,7 +371,8 @@ public class TcpServer implements IEndPointService
                         }
                     }
                 }
-            }, "socket-destroy-" + this.localSocketAddress.getAddress() + ":" + this.localSocketAddress.getPort()).start();
+            }, "socket-destroy-" + this.localSocketAddress.getAddress() + ":"
+                + this.localSocketAddress.getPort()).start();
         }
         catch (Exception e)
         {
