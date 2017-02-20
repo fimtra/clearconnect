@@ -231,6 +231,72 @@ public class TestTcpServer
         assertFalse(client2.sendAsync("sdf3".getBytes()));
     }
 
+    @Test
+    public void testDosAttackServer() throws IOException, InterruptedException
+    {
+        FrameEncodingFormatEnum inverseFrameEncodingFormat =
+            this.frameEncodingFormat == FrameEncodingFormatEnum.LENGTH_BASED ? FrameEncodingFormatEnum.TERMINATOR_BASED
+                : FrameEncodingFormatEnum.LENGTH_BASED;
+
+        this.server = new TcpServer(LOCALHOST, PORT, new EchoReceiver(), this.frameEncodingFormat);
+        for (int i = 0; i < 20; i++)
+        {
+            final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
+        }
+        Thread.sleep(2000);
+        for (int i = 0; i < 20; i++)
+        {
+            final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
+        }
+        String hostname = LOCALHOST;
+
+        Thread.sleep(2000);
+        Log.log(this, "**** STARTING TEST CONNECTIONS");
+        // fake over 5 mins passed
+        this.server.blacklistHosts.put(hostname, System.currentTimeMillis() - 900000);
+        // attempt connection
+
+        final CountDownLatch latch = new CountDownLatch(4);
+        final List<String> expected1 = new ArrayList<String>();
+        final List<String> received1 = new ArrayList<String>();
+        final List<String> expected2 = new ArrayList<String>();
+        final List<String> received2 = new ArrayList<String>();
+        final String message1 = "hello1";
+        final String message2 = "hello2";
+        expected1.add(message1);
+        expected1.add(message2);
+        expected2.add(message1);
+        expected2.add(message2);
+
+        final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
+        {
+            @Override
+            public void onDataReceived(byte[] data, ITransportChannel source)
+            {
+                received1.add(new String(data));
+                latch.countDown();
+            }
+        }, this.frameEncodingFormat);
+
+        final TcpChannel client2 = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
+        {
+            @Override
+            public void onDataReceived(byte[] data, ITransportChannel source)
+            {
+                received2.add(new String(data));
+                latch.countDown();
+            }
+        }, this.frameEncodingFormat);
+        assertTrue(client.sendAsync(message1.getBytes()));
+        assertTrue(client.sendAsync(message2.getBytes()));
+        assertTrue(client2.sendAsync(message1.getBytes()));
+        assertTrue(client2.sendAsync(message2.getBytes()));
+        final boolean result = latch.await(STD_TIMEOUT, TimeUnit.SECONDS);
+        assertTrue("onDataReceived only called " + (4 - latch.getCount()) + " times", result);
+        assertEquals(expected1, received1);
+        assertEquals(expected2, received2);
+    }
+    
     @Test(expected = ConnectException.class)
     public void testAttemptConnectionWhenServerIsShutDown() throws IOException, InterruptedException
     {
