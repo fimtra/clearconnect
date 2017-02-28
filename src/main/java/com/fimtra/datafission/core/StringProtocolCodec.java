@@ -241,6 +241,9 @@ public class StringProtocolCodec implements ICodec<char[]>
             final char[][] tokens = findTokens(decodedMessage);
             final String name = stringFromCharBuffer(tokens[1]);
             final AtomicChange atomicChange = new AtomicChange(name);
+            // prepare the put and remove maps
+            atomicChange.internalGetPutEntries();
+            atomicChange.internalGetRemovedEntries();
 
             // set the scope and sequence
             final char[] sequenceToken = tokens[2];
@@ -314,15 +317,17 @@ public class StringProtocolCodec implements ICodec<char[]>
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeEntryUpdatedChange(
+                                                atomicChange.addEntry_onlyCallFromCodec(
                                                     decodeKey(currentTokenChars, 0, j, true, tempArr),
                                                     decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr),
-                                                    null);
+                                                        tempArr));
                                             }
                                             else
                                             {
-                                                atomicChange.mergeEntryRemovedChange(
+                                                // todo removing does not need to send the value -
+                                                // but requires a protocol spec change - new major
+                                                // version
+                                                atomicChange.removeEntry_onlyCallFromCodec(
                                                     decodeKey(currentTokenChars, 0, j, true, tempArr), decodeValue(
                                                         currentTokenChars, j + 1, currentTokenChars.length, tempArr));
                                             }
@@ -352,6 +357,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         final Map<String, IValue> putEntries = atomicChange.getPutEntries();
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
         final Set<String> subMapKeys = atomicChange.getSubMapKeys();
+        // todo replace string builder with char[] mechanics - reduces method calls
         final StringBuilder sb =
             new StringBuilder(30 * (putEntries.size() + removedEntries.size() + subMapKeys.size()));
         sb.append(preamble);
