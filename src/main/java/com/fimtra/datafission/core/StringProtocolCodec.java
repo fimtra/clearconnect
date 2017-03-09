@@ -107,7 +107,6 @@ public class StringProtocolCodec implements ICodec<char[]>
      * This is the ASCII code for STX (0x2). This allows cut-n-paste of text using editors as using
      * the ASCII code for NULL=0x0 causes problems.
      */
-    // todo use chars
     static final String NULL_VALUE = new String(new char[] { 0x2 });
     static final char[] NULL_VALUE_CHARS = NULL_VALUE.toCharArray();
     static final String KEY_PREAMBLE = NULL_VALUE;
@@ -393,6 +392,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         char charAt;
         char[] cbuf;
         char[] escapedChars = new char[2];
+        escapedChars[0] = CHAR_ESCAPE;
         boolean needToEscape;
         String valueAsString;
         if (entries != null && entries.size() > 0)
@@ -442,14 +442,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                             {
                                 case CR:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = CHAR_r;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
                                 case LF:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = CHAR_n;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
@@ -458,7 +456,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                                 case CHAR_TOKEN_DELIM:
                                 case CHAR_KEY_VALUE_SEPARATOR:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = charAt;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
@@ -518,6 +515,8 @@ public class StringProtocolCodec implements ICodec<char[]>
 
             final char[] chars = charsRef.ref;
             final char[] escapedChars = new char[2];
+            
+            escapedChars[0] = CHAR_ESCAPE;
 
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
 
@@ -530,14 +529,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                 {
                     case CR:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = CHAR_r;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     case LF:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = CHAR_n;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
@@ -547,7 +544,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                     case CHAR_KEY_VALUE_SEPARATOR:
                     case CHAR_SYMBOL_PREFIX:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = charAt;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
