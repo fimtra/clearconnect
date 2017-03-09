@@ -407,6 +407,7 @@ public final class AtomicChange implements IRecordChange
     void addEntry_onlyCallFromCodec(String key, IValue current)
     {
         this.putEntries.put(key, current);
+        this.removedEntries.remove(key);
     }
 
     void mergeEntryRemovedChange(String key, IValue value)
@@ -419,6 +420,7 @@ public final class AtomicChange implements IRecordChange
     void removeEntry_onlyCallFromCodec(String key, IValue value)
     {
         this.removedEntries.put(key, value);
+        this.putEntries.remove(key);
     }
 
     void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
