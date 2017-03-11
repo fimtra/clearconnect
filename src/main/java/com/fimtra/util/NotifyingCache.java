@@ -17,8 +17,8 @@ package com.fimtra.util;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +42,10 @@ import com.fimtra.util.LazyObject.IDestructor;
  * {@link #getCacheSnapshot()} method returns a <b>clone</b> of the cache data so is expensive to
  * call.
  * <p>
+ * <b>Threading:</b> all listeners are notified with initial images using an internal
+ * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the
+ * cache are notified using the respective thread model used for ache construction.
+ * <p>
  * A notifying cache should be equal by object reference only.
  * 
  * @author Ramon Servadei
@@ -51,7 +55,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final static Executor IMAGE_NOTIFIER =
         new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
             ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
-    
+
     static final Executor SYNCHRONOUS_EXECUTOR = new Executor()
     {
         @Override
@@ -82,7 +86,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             }
         }, SYNCHRONOUS_EXECUTOR);
     }
-    
+
     /**
      * Construct a <b>synchronously</b> updating instance
      */
@@ -90,7 +94,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     {
         this(destructor, SYNCHRONOUS_EXECUTOR);
     }
-    
+
     /**
      * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
      * executor MUST be a single threaded executor. A multi-threaded executor may produce
@@ -107,7 +111,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             }
         }, executor);
     }
-    
+
     /**
      * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
      * executor MUST be a single threaded executor. A multi-threaded executor may produce
@@ -211,12 +215,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 {
                     try
                     {
-                        if (listener == null || NotifyingCache.this.listeners.contains(listener))
-                        {
-                            return;
-                        }
-
-                        final Map<String, DATA> clone;
+                        final Runnable command;
+                        final Set<String> keysSnapshot;
 
                         // hold the lock and add the listener in the task to ensure the listener is
                         // added and notified without clashing with a concurrent update - this is
@@ -224,6 +224,11 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         NotifyingCache.this.writeLock.lock();
                         try
                         {
+                            if (listener == null || NotifyingCache.this.listeners.contains(listener))
+                            {
+                                return;
+                            }
+
                             final List<LISTENER_CLASS> copy =
                                 new ArrayList<LISTENER_CLASS>(NotifyingCache.this.listeners);
                             result.set(copy.add(listener));
@@ -231,40 +236,42 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
                             latch.countDown();
 
-                            if (result.get())
+                            keysSnapshot = new LinkedHashSet<String>(NotifyingCache.this.cache.keySet());
+                            command = new Runnable()
                             {
-                                clone = new LinkedHashMap<String, DATA>(NotifyingCache.this.cache);
-                            }
-                            else
-                            {
-                                clone = null;
-                            }
-
-                            if (result.get())
-                            {
-                                Map.Entry<String, DATA> entry = null;
-                                for (@SuppressWarnings("null")
-                                Iterator<Map.Entry<String, DATA>> it = clone.entrySet().iterator(); it.hasNext();)
+                                @Override
+                                public void run()
                                 {
-                                    entry = it.next();
-                                    try
+                                    DATA data;
+                                    for (String key : keysSnapshot)
                                     {
-                                        notifyListenerDataAdded(listener, entry.getKey(), entry.getValue());
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        Log.log(NotifyingCache.this,
-                                            "Could not notify " + ObjectUtils.safeToString(listener)
-                                                + " with initial image " + ObjectUtils.safeToString(entry),
-                                            e);
+                                        // given the snapshot of the keys, get the "live" data
+                                        data = get(key);
+                                        if (data != null)
+                                        {
+                                            try
+                                            {
+                                                notifyListenerDataAdded(listener, key, data);
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                Log.log(NotifyingCache.this,
+                                                    "Could not notify " + ObjectUtils.safeToString(listener)
+                                                        + " with initial image " + key + "="
+                                                        + ObjectUtils.safeToString(data),
+                                                    e);
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                            };
                         }
                         finally
                         {
                             NotifyingCache.this.writeLock.unlock();
                         }
+
+                        command.run();
                     }
                     finally
                     {
@@ -273,17 +280,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 }
             };
 
-            if (this.executor == SYNCHRONOUS_EXECUTOR)
-            {
-                // use the image-notifier executor (unbounded threads) to handle initial image
-                // notification - prevents any chance of stalling due to any deadlock in the alien
-                // method notifyListenerDataAdded
-                IMAGE_NOTIFIER.execute(addTask);
-            }
-            else
-            {
-                this.executor.execute(addTask);
-            }
+            // use the image-notifier executor (unbounded threads) to handle initial image
+            // notification - prevents any chance of stalling due to any deadlock in the alien
+            // method notifyListenerDataAdded
+            IMAGE_NOTIFIER.execute(addTask);
 
             latch.await();
         }
@@ -330,6 +330,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     {
         final boolean added;
         final List<LISTENER_CLASS> listenersToNotify;
+        Runnable command = null;
         this.writeLock.lock();
         try
         {
@@ -337,7 +338,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             listenersToNotify = this.listeners;
             if (added)
             {
-                this.executor.execute(new Runnable()
+                command = new Runnable()
                 {
                     @Override
                     public void run()
@@ -355,12 +356,24 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                             }
                         }
                     }
-                });
+                };
+
+                // if asynchronous execution, add to the executor whilst holding the lock to ensure
+                // order of execution
+                if (this.executor != SYNCHRONOUS_EXECUTOR)
+                {
+                    this.executor.execute(command);
+                }
             }
         }
         finally
         {
             this.writeLock.unlock();
+        }
+
+        if (added && this.executor == SYNCHRONOUS_EXECUTOR)
+        {
+            this.executor.execute(command);
         }
 
         return added;
@@ -379,6 +392,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     {
         final boolean removed;
         final List<LISTENER_CLASS> listenersToNotify;
+        Runnable command = null;
         this.writeLock.lock();
         try
         {
@@ -387,7 +401,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             listenersToNotify = this.listeners;
             if (removed)
             {
-                this.executor.execute(new Runnable()
+                command = new Runnable()
                 {
                     @Override
                     public void run()
@@ -405,12 +419,24 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                             }
                         }
                     }
-                });
+                };
+
+                // if asynchronous execution, add to the executor whilst holding the lock to ensure
+                // order of execution
+                if (this.executor != SYNCHRONOUS_EXECUTOR)
+                {
+                    this.executor.execute(command);
+                }
             }
         }
         finally
         {
             this.writeLock.unlock();
+        }
+
+        if (removed && this.executor == SYNCHRONOUS_EXECUTOR)
+        {
+            this.executor.execute(command);
         }
 
         return removed;

@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -214,7 +216,7 @@ public class NotifyingCacheTest
                 + fails);
         }
     }
-    
+
     @Test
     public void testContainsKeyAndKeySet()
     {
@@ -229,7 +231,6 @@ public class NotifyingCacheTest
         expected.add("1");
         assertEquals(expected, candidate.keySet());
     }
-    
 
     @Test
     public void testgetCacheSnapshot()
@@ -247,18 +248,17 @@ public class NotifyingCacheTest
         assertFalse(this.candidate.notifyListenersDataRemoved(null));
         assertFalse(this.candidate.notifyListenersDataAdded("null", null));
         assertFalse(this.candidate.notifyListenersDataRemoved("null"));
-        
+
         assertTrue(this.candidate.notifyListenersDataAdded(null, "1"));
         assertFalse(this.candidate.notifyListenersDataAdded(null, "1"));
         assertTrue(this.candidate.notifyListenersDataRemoved(null));
         assertFalse(this.candidate.notifyListenersDataRemoved(null));
-        
 
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertFalse(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataRemoved("1"));
         assertFalse(this.candidate.notifyListenersDataRemoved("1"));
-        
+
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("1", null));
         assertFalse(this.candidate.notifyListenersDataAdded("1", null));
@@ -382,9 +382,96 @@ public class NotifyingCacheTest
     {
         assertFalse(this.candidate.addListener(null));
     }
+    
+    @Test
+    public void testNoDeadlock() throws InterruptedException
+    {
+        final NotifyingCache<Observer, String> candidate = new NotifyingCache<Observer, String>()
+        {
+            @Override
+            protected void notifyListenerDataRemoved(Observer listener, String key, String data)
+            {
+                listener.update(null, data);
+            }
+            
+            @Override
+            protected void notifyListenerDataAdded(Observer listener, String key, String data)
+            {
+                listener.update(null, data);
+            }
+        };
+        candidate.notifyListenersDataAdded("key", "data1");
+        
+        doDeadlockTest(candidate);
+    }
 
     @Test
-    public void testListenerNotificationOrder()
+    public void testNoDeadlockAsync() throws InterruptedException
+    {
+        final NotifyingCache<Observer, String> candidate = new NotifyingCache<Observer, String>(ThreadUtils.newSingleThreadExecutorService("testNoDeadlockAsync"))
+        {
+            @Override
+            protected void notifyListenerDataRemoved(Observer listener, String key, String data)
+            {
+                listener.update(null, data);
+            }
+
+            @Override
+            protected void notifyListenerDataAdded(Observer listener, String key, String data)
+            {
+                listener.update(null, data);
+            }
+        };
+        candidate.notifyListenersDataAdded("key", "data1");
+
+        doDeadlockTest(candidate);
+    }
+
+    static void doDeadlockTest(final NotifyingCache<Observer, String> candidate) throws InterruptedException
+    {
+        final CountDownLatch latch1 = new CountDownLatch(1);
+        final CountDownLatch latch2 = new CountDownLatch(1);
+
+        candidate.addListener(new Observer()
+        {
+            @Override
+            public void update(Observable o, Object arg)
+            {
+                latch1.countDown();
+                try
+                {
+                    latch2.await();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        assertTrue(latch1.await(1, TimeUnit.SECONDS));
+        
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                candidate.addListener(new Observer()
+                {
+                    @Override
+                    public void update(Observable o, Object arg)
+                    {
+                        latch2.countDown();
+                    }
+                });
+            }
+        }).start();
+        
+        assertTrue(latch2.await(1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testListenerNotificationOrder() throws InterruptedException
     {
         final List<Object> notifiedAdded = new ArrayList<Object>();
         final List<Object> notifiedRemoved = new ArrayList<Object>();
