@@ -385,7 +385,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                     {
                         scheduleHandlePendingRemoves();
                     }
-                }, 250, TimeUnit.MILLISECONDS);
+                }, RecordTableUtils.RECORD_DELETE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
     }

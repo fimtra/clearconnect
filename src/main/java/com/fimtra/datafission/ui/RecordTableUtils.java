@@ -60,6 +60,10 @@ import com.fimtra.util.ThreadUtils;
  */
 abstract class RecordTableUtils
 {
+    private static final int RECORD_UPDATE_PERIOD_MILLIS = 250;
+    // double the update period to help ensure we don't update-delete-update
+    static final int RECORD_DELETE_PERIOD_MILLIS = RECORD_UPDATE_PERIOD_MILLIS * 2;
+    
     static final TextValue SUBMAP = TextValue.valueOf("SUB-MAP...");
     static final IValue BLANK = TextValue.valueOf("");
     static final ScheduledExecutorService cellUpdater = ThreadUtils.newScheduledExecutorService(
@@ -220,7 +224,7 @@ abstract class RecordTableUtils
                             }
                         });
                     }
-                }, 250, TimeUnit.MILLISECONDS);
+                }, RECORD_UPDATE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
     }
