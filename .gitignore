@@ -4,3 +4,5 @@
 .settings
 *.ini
 logs/
+ipc-tests/
+*.out
