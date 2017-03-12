@@ -269,6 +269,12 @@ public final class BlobValue extends AbstractValue
     @Override
     public String textValue()
     {
+        // note: a full array copy happens when constructing the string
+        return new String(charArrValue());
+    }
+
+    char[] charArrValue()
+    {
         final char[] cbuf = new char[this.value.length * 2];
         char[] code;
         byte val;
@@ -289,10 +295,17 @@ public final class BlobValue extends AbstractValue
                 cbuf[bufPtr++] = code[1];
             }
         }
-        // note: a full array copy happens when constructing the string
-        return new String(cbuf);
+        return cbuf;
     }
 
+    @Override
+    public StringBuilder toStringBuilder()
+    {
+        final String type = getType().toString();
+        final char[] charArrValue = charArrValue();
+        return new StringBuilder(charArrValue.length + 1).append(type).append(charArrValue);
+    }
+    
     void fromChars(char[] chars, int start, int len)
     {
         if (len % 2 != 0)

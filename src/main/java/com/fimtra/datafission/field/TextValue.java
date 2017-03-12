@@ -133,6 +133,12 @@ public final class TextValue extends AbstractValue
     {
         return this.value;
     }
+    
+    @Override
+    public final StringBuilder toStringBuilder()
+    {
+        return new StringBuilder(this.value.length() + 1).append(getType().toString()).append(this.value);
+    }
 
     @Override
     public int hashCode()

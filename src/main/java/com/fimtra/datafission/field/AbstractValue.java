@@ -119,13 +119,13 @@ public abstract class AbstractValue implements IValue
                     + new String(chars, 1, len - 1));
         }
     }
+    
+    public abstract StringBuilder toStringBuilder();
 
     @Override
     public final String toString()
     {
-        final String type = getType().toString();
-        final String textValue = textValue();
-        return new StringBuilder(textValue.length() + type.length()).append(type).append(textValue).toString();
+        return toStringBuilder().toString();
     }
 
     @Override

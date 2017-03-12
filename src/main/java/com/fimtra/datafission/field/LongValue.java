@@ -110,7 +110,13 @@ public final class LongValue extends AbstractValue
     {
         return Long.toString(this.value);
     }
-
+    
+    @Override
+    public final StringBuilder toStringBuilder()
+    {
+        return new StringBuilder().append(getType().toString()).append(this.value);
+    }
+    
     @Override
     public int hashCode()
     {

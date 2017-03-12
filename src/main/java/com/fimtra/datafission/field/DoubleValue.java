@@ -91,7 +91,13 @@ public final class DoubleValue extends AbstractValue
     {
         return Double.toString(this.value);
     }
-
+    
+    @Override
+    public final StringBuilder toStringBuilder()
+    {
+        return new StringBuilder().append(getType().toString()).append(this.value);
+    }
+    
     @Override
     public int hashCode()
     {
