@@ -114,7 +114,7 @@ public final class LongValue extends AbstractValue
     @Override
     public final StringBuilder toStringBuilder()
     {
-        return new StringBuilder().append(getType().toString()).append(this.value);
+        return appendTo(new StringBuilder());
     }
     
     @Override
@@ -219,5 +219,11 @@ public final class LongValue extends AbstractValue
             throw new NumberFormatException(new String(chars, start, len));
         }
         return negative ? result : -result;
+    }
+
+    @Override
+    public StringBuilder appendTo(StringBuilder stringBuilder)
+    {
+        return stringBuilder.append(getType().toString()).append(this.value);
     }
 }

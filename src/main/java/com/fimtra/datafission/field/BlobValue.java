@@ -301,9 +301,7 @@ public final class BlobValue extends AbstractValue
     @Override
     public StringBuilder toStringBuilder()
     {
-        final String type = getType().toString();
-        final char[] charArrValue = charArrValue();
-        return new StringBuilder(charArrValue.length + 1).append(type).append(charArrValue);
+        return appendTo(new StringBuilder((this.value.length * 2) + 1));
     }
     
     void fromChars(char[] chars, int start, int len)
@@ -343,5 +341,13 @@ public final class BlobValue extends AbstractValue
         }
         BlobValue other = (BlobValue) obj;
         return is.eq(this.value, other.value);
+    }
+
+    @Override
+    public StringBuilder appendTo(StringBuilder stringBuilder)
+    {
+        final String type = getType().toString();
+        final char[] charArrValue = charArrValue();
+        return stringBuilder.append(type).append(charArrValue);
     }
 }

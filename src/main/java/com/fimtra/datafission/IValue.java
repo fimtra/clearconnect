@@ -114,4 +114,12 @@ public interface IValue extends Comparable<IValue>
      *         {@link IValue}
      */
     StringBuilder toStringBuilder();
+    
+    /**
+     * Append the {@link #toString()} of this {@link IValue} to the {@link StringBuilder}.
+     * 
+     * @param stringBuilder
+     * @return the passed in string builder
+     */
+    StringBuilder appendTo(StringBuilder stringBuilder);
 }

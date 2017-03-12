@@ -137,7 +137,7 @@ public final class TextValue extends AbstractValue
     @Override
     public final StringBuilder toStringBuilder()
     {
-        return new StringBuilder(this.value.length() + 1).append(getType().toString()).append(this.value);
+        return appendTo(new StringBuilder());
     }
 
     @Override
@@ -164,4 +164,9 @@ public final class TextValue extends AbstractValue
         return is.eq(this.value, other.value);
     }
 
+    @Override
+    public StringBuilder appendTo(StringBuilder stringBuilder)
+    {
+        return stringBuilder.append(getType().toString()).append(this.value);
+    }
 }

@@ -95,7 +95,7 @@ public final class DoubleValue extends AbstractValue
     @Override
     public final StringBuilder toStringBuilder()
     {
-        return new StringBuilder().append(getType().toString()).append(this.value);
+        return appendTo(new StringBuilder());
     }
     
     @Override
@@ -122,5 +122,11 @@ public final class DoubleValue extends AbstractValue
         }
         DoubleValue other = (DoubleValue) obj;
         return is.eq(this.value, other.value);
+    }
+
+    @Override
+    public StringBuilder appendTo(StringBuilder stringBuilder)
+    {
+        return stringBuilder.append(getType().toString()).append(this.value);
     }
 }
