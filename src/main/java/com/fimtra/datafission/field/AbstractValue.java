@@ -119,8 +119,6 @@ public abstract class AbstractValue implements IValue
                     + new String(chars, 1, len - 1));
         }
     }
-    
-    public abstract StringBuilder toStringBuilder();
 
     @Override
     public final String toString()

@@ -108,4 +108,10 @@ public interface IValue extends Comparable<IValue>
     
     /** @return the byte[] representation of this value. */
     byte[] byteValue();
+
+    /**
+     * @return a {@link StringBuilder} initialised with the {@link #toString()} contents of this
+     *         {@link IValue}
+     */
+    StringBuilder toStringBuilder();
 }
