@@ -378,19 +378,19 @@ public class StringProtocolCodec implements ICodec<char[]>
     private static void addEntriesToTxString(char[] changeType, Map<String, IValue> entries, StringBuilder txString,
         CharArrayReference chars)
     {
-        Map.Entry<String, IValue> entry;
-        String key;
-        IValue value;
-        int i = 0;
-        int last;
-        int length;
-        char charAt;
-        char[] cbuf;
-        char[] escapedChars = new char[2];
-        boolean needToEscape;
-        String valueAsString;
         if (entries != null && entries.size() > 0)
         {
+            Map.Entry<String, IValue> entry;
+            String key;
+            IValue value;
+            int i = 0;
+            int last;
+            int length;
+            char charAt;
+            char[] cbuf;
+            char[] escapedChars = new char[2];
+            escapedChars[0] = CHAR_ESCAPE;
+            boolean needToEscape;
             txString.append(changeType);
             for (Iterator<Map.Entry<String, IValue>> it = entries.entrySet().iterator(); it.hasNext();)
             {
@@ -436,14 +436,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                             {
                                 case CR:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = CHAR_r;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
                                 case LF:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = CHAR_n;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
@@ -452,7 +450,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                                 case CHAR_TOKEN_DELIM:
                                 case CHAR_KEY_VALUE_SEPARATOR:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[0] = CHAR_ESCAPE;
                                     escapedChars[1] = charAt;
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
@@ -475,7 +472,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
                 else
                 {
-                    valueAsString = value.toString();
                     switch(value.getType())
                     {
                         case DOUBLE:
@@ -483,11 +479,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                         case BLOB:
                             // longs, doubles and blobs do not need escaping
                             // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
-                            txString.append(valueAsString);
+                            value.appendTo(txString);
                             break;
                         case TEXT:
                         default :
-                            escape(valueAsString, txString, chars);
+                            txString.append(IValue.TEXT_CODE);
+                            escape(value.textValue(), txString, chars);
                             break;
                     }
                 }
@@ -509,12 +506,13 @@ public class StringProtocolCodec implements ICodec<char[]>
                 // resize
                 charsRef.ref = (new char[length]);
             }
-
+            
             final char[] chars = charsRef.ref;
             final char[] escapedChars = new char[2];
-
+            
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
-
+            
+            escapedChars[0] = CHAR_ESCAPE;
             char charAt;
             int last = 0;
             for (int i = 0; i < length; i++)
@@ -524,14 +522,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                 {
                     case CR:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = CHAR_r;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     case LF:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = CHAR_n;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
@@ -541,7 +537,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                     case CHAR_KEY_VALUE_SEPARATOR:
                     case CHAR_SYMBOL_PREFIX:
                         dest.append(chars, last, i - last);
-                        escapedChars[0] = CHAR_ESCAPE;
                         escapedChars[1] = charAt;
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
@@ -556,7 +551,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             Log.log(StringProtocolCodec.class, "Could not append for " + ObjectUtils.safeToString(valueToSend), e);
         }
     }
-
+    
     /**
      * Parse the chars and performs unescaping copying into the destination char[]
      * <p>
