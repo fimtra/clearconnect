@@ -151,4 +151,19 @@ public class ByteBufferUtilsTest
         assertEquals(0, result.array()[2]);
         assertEquals(4, result.array()[3]);
     }
+    
+    @Test
+    public void testPutLongResizes()
+    {
+        int i = 8;
+        ByteBuffer result = ByteBufferUtils.putLong(i, ByteBuffer.allocate(1));
+        assertEquals(0, result.array()[0]);
+        assertEquals(0, result.array()[1]);
+        assertEquals(0, result.array()[2]);
+        assertEquals(0, result.array()[3]);
+        assertEquals(0, result.array()[4]);
+        assertEquals(0, result.array()[5]);
+        assertEquals(0, result.array()[6]);
+        assertEquals(8, result.array()[7]);
+    }
 }

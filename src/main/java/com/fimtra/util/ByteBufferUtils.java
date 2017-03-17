@@ -137,7 +137,7 @@ public abstract class ByteBufferUtils
         localBuf.put(b);
         return localBuf;
     }
-
+    
     /**
      * Add the int to the buffer, extending the buffer if needed
      * 
@@ -151,6 +151,22 @@ public abstract class ByteBufferUtils
             localBuf = extendBuffer(buffer, BLOCK_SIZE);
         }
         localBuf.putInt(i);
+        return localBuf;
+    }
+
+    /**
+     * Add the long to the buffer, extending the buffer if needed
+     * 
+     * @return the same buffer if not extended, a new buffer if extended
+     */
+    public static final ByteBuffer putLong(long l, ByteBuffer buffer)
+    {
+        ByteBuffer localBuf = buffer;
+        if (capacityRemaining(buffer) < 8)
+        {
+            localBuf = extendBuffer(buffer, BLOCK_SIZE);
+        }
+        localBuf.putLong(l);
         return localBuf;
     }
 
