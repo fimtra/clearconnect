@@ -20,6 +20,7 @@ import java.nio.charset.Charset;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.IValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.GZipUtils;
@@ -33,7 +34,17 @@ import com.fimtra.util.GZipUtils;
 public class GZipProtocolCodec extends StringProtocolCodec
 {
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
-    
+ 
+    public GZipProtocolCodec()
+    {
+        super();
+    }
+
+    protected GZipProtocolCodec(ISessionProtocol sessionSyncProtocol)
+    {
+        super(sessionSyncProtocol);
+    }
+
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {

@@ -24,12 +24,12 @@ import com.fimtra.util.AsymmetricCipher;
 import com.fimtra.util.SymmetricCipher;
 
 /**
- * Extension of the {@link StringProtocolCodec} that uses an {@link AsymmetricCipher} and
+ * Extension of the {@link GZipProtocolCodec} that uses an {@link AsymmetricCipher} and
  * {@link SymmetricCipher} to encrypt/decrypt data sent/received from another codec.
  * 
  * @author Ramon Servadei
  */
-public final class CipherProtocolCodec extends StringProtocolCodec
+public final class CipherProtocolCodec extends GZipProtocolCodec
 {
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
