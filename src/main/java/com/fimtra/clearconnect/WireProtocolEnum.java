@@ -32,6 +32,10 @@ public enum WireProtocolEnum
      */
     @Deprecated
     HYBRID("com.fimtra.datafission.core.HybridProtocolCodec"),    
+    /**
+     * @deprecated this will not be supported any longer and removed in version 4.0.0
+     */
+    @Deprecated
     SYMBOL("com.fimtra.datafission.core.StringSymbolProtocolCodec"),
     CIPHER("com.fimtra.datafission.core.CipherProtocolCodec"),
     ;

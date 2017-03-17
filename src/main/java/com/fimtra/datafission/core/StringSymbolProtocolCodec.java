@@ -65,7 +65,9 @@ import com.fimtra.util.ObjectUtils;
  * </pre>
  * 
  * @author Ramon Servadei
+ * @deprecated Will be removed in version 4.0.0
  */
+@Deprecated
 public final class StringSymbolProtocolCodec extends StringProtocolCodec
 {
     public static final class MissingKeySymbolMappingException extends RuntimeException
