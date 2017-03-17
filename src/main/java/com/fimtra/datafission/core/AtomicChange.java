@@ -390,7 +390,7 @@ public final class AtomicChange implements IRecordChange
     {
         return this.sequence.get().longValue();
     }
-
+    
     void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
     {
         internalGetPutEntries().put(key, current);
@@ -404,11 +404,23 @@ public final class AtomicChange implements IRecordChange
         internalGetRemovedEntries().remove(key);
     }
 
+    void addEntry_onlyCallFromCodec(String key, IValue current)
+    {
+        this.putEntries.put(key, current);
+        this.removedEntries.remove(key);
+    }
+
     void mergeEntryRemovedChange(String key, IValue value)
     {
         internalGetPutEntries().remove(key);
         internalGetOverwrittenEntries().remove(key);
         internalGetRemovedEntries().put(key, value);
+    }
+    
+    void removeEntry_onlyCallFromCodec(String key, IValue value)
+    {
+        this.removedEntries.put(key, value);
+        this.putEntries.remove(key);
     }
 
     void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
