@@ -46,17 +46,17 @@ import com.fimtra.util.ObjectUtils;
  * <pre>
  *  preamble name seq [puts] [removes] [sub-map]
  *  
- *  preamble = 0*ALPHA
- *  name = "|" 1*ALPHA ; the name of the notifying record instance
- *  seq = "|" scope seq_num
- *  scope = "i" | "d" ; identifies either an image or delta
- *  seq_num = 1*DIGIT ; the sequency number
- *  puts = "|p" 1*key-value-pair
- *  removes = "|r" 1*key-value-pair
- *  sub-map = "|:|" name [puts] [removes]
+ *  preamble       = 0*ALPHA
+ *  name           = "|" 1*ALPHA ; the name of the notifying record instance
+ *  seq            = "|" scope seq_num
+ *  scope          = "i" | "d" ; identifies either an image or delta
+ *  seq_num        = 1*DIGIT ; the sequency number
+ *  puts           = "|p" 1*key-value-pair
+ *  removes        = "|r" 1*key-value-pair
+ *  sub-map        = "|:|" name [puts] [removes]
  *  key-value-pair = "|" key "=" value
- *  key = 1*ALPHA
- *  value = 1*ALPHA
+ *  key            = 1*ALPHA
+ *  value          = 1*ALPHA
  *  
  *  e.g. |record_name|d322234|p|key1=value1|key2=value2|r|key_5=value5|:|subMap1|p|key1=value1
  * </pre>
@@ -107,13 +107,9 @@ public class StringProtocolCodec implements ICodec<char[]>
      * This is the ASCII code for STX (0x2). This allows cut-n-paste of text using editors as using
      * the ASCII code for NULL=0x0 causes problems.
      */
-    // todo use chars
-    static final String NULL_VALUE = new String(new char[] { 0x2 });
-    static final char[] NULL_VALUE_CHARS = NULL_VALUE.toCharArray();
-    static final String KEY_PREAMBLE = NULL_VALUE;
-    static final char[] KEY_PREAMBLE_CHARS = KEY_PREAMBLE.toCharArray();
-    static final String DOUBLE_KEY_PREAMBLE = KEY_PREAMBLE + KEY_PREAMBLE;
-    static final int DOUBLE_KEY_PREAMBLE_LENGTH = DOUBLE_KEY_PREAMBLE.length();
+    static final char NULL_CHAR = 0x2;
+    static final String NULL_VALUE = new String(new char[] { NULL_CHAR });
+    static final int DOUBLE_KEY_PREAMBLE_LENGTH = 2;
 
     final ISessionProtocol sessionSyncProtocol;
 
@@ -154,11 +150,6 @@ public class StringProtocolCodec implements ICodec<char[]>
         throw new IllegalArgumentException("Could not interpret command '" + new String(decodedMessage) + "'");
     }
 
-    /**
-     * @param message
-     * @param commandChars
-     * @return
-     */
     private static boolean isCommand(char[] message, char[] commandChars)
     {
         if (message.length < commandChars.length)
@@ -400,12 +391,13 @@ public class StringProtocolCodec implements ICodec<char[]>
                 txString.append(DELIMITER);
                 if (key == null)
                 {
-                    txString.append(KEY_PREAMBLE_CHARS);
+                    txString.append(NULL_CHAR);
                 }
                 else
                 {
                     cbuf = new char[key.length() + DOUBLE_KEY_PREAMBLE_LENGTH];
-                    DOUBLE_KEY_PREAMBLE.getChars(0, DOUBLE_KEY_PREAMBLE_LENGTH, cbuf, 0);
+                    cbuf[0] = NULL_CHAR;
+                    cbuf[1] = NULL_CHAR;
                     key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
 
                     // NOTE: for efficiency, we have *almost* inlined versions of the same escape
@@ -468,7 +460,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                 txString.append(CHAR_KEY_VALUE_SEPARATOR);
                 if (value == null)
                 {
-                    txString.append(NULL_VALUE);
+                    txString.append(NULL_CHAR);
                 }
                 else
                 {
@@ -607,21 +599,9 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         final int unescapedPtr = doUnescape(chars, start, end, unescaped);
 
-        if (KEY_PREAMBLE_CHARS.length == unescapedPtr)
+        if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
         {
-            boolean isNull = true;
-            for (int i = 0; i < unescapedPtr; i++)
-            {
-                if (KEY_PREAMBLE_CHARS[i] != unescaped[i])
-                {
-                    isNull = false;
-                    break;
-                }
-            }
-            if (isNull)
-            {
-                return null;
-            }
+            return null;
         }
 
         return hasPreamble
@@ -641,21 +621,9 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         final int unescapedPtr = doUnescape(chars, start, end, unescaped);
 
-        if (NULL_VALUE_CHARS.length == unescapedPtr)
+        if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
         {
-            boolean isNull = true;
-            for (int i = 0; i < unescapedPtr; i++)
-            {
-                if (NULL_VALUE_CHARS[i] != unescaped[i])
-                {
-                    isNull = false;
-                    break;
-                }
-            }
-            if (isNull)
-            {
-                return AbstractValue.constructFromCharValue(null, 0);
-            }
+            return AbstractValue.constructFromCharValue(null, 0);
         }
 
         return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);

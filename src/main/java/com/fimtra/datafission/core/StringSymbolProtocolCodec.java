@@ -94,7 +94,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     static final char START_SYMBOL = '!';
     static final char END_SYMBOL = '}';
     private static final char CHAR_DEFINITION_PREFIX = 'n';
-
+    
+    private static final String KEY_PREAMBLE = NULL_VALUE;
+    
     /**
      * Stores the mappings of all string-to-symbol sent from this VM
      */
@@ -522,7 +524,7 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
                 txString.append(CHAR_KEY_VALUE_SEPARATOR);
                 if (value == null)
                 {
-                    txString.append(NULL_VALUE);
+                    txString.append(NULL_CHAR);
                 }
                 else
                 {
@@ -612,21 +614,9 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
     {
         final int unescapedPtr = doUnescape(chars, start, end, unescaped);
 
-        if (NULL_VALUE_CHARS.length == unescapedPtr)
+        if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
         {
-            boolean isNull = true;
-            for (int i = 0; i < unescapedPtr; i++)
-            {
-                if (NULL_VALUE_CHARS[i] != unescaped[i])
-                {
-                    isNull = false;
-                    break;
-                }
-            }
-            if (isNull)
-            {
-                return AbstractValue.constructFromCharValue(null, 0);
-            }
+            return AbstractValue.constructFromCharValue(null, 0);
         }
 
         int i = 0;
@@ -708,22 +698,11 @@ public final class StringSymbolProtocolCodec extends StringProtocolCodec
      */
     String decodeStringFromSymbol(char[] chars, int start, int end)
     {
-        if (end - start == KEY_PREAMBLE_CHARS.length)
+        if (end - start == 1 && chars[start] == NULL_CHAR)
         {
-            boolean isNull = true;
-            for (int i = start; i < end; i++)
-            {
-                if (chars[i] != KEY_PREAMBLE_CHARS[i - start])
-                {
-                    isNull = false;
-                    break;
-                }
-            }
-            if (isNull)
-            {
-                return null;
-            }
+            return null;
         }
+
         String key = null;
         switch(chars[0])
         {
