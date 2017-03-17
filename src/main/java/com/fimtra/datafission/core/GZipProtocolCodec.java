@@ -67,7 +67,7 @@ public class GZipProtocolCodec extends StringProtocolCodec
     @Override
     public char[] decode(byte[] data)
     {
-        return ISO_8859_1.decode(ByteBuffer.wrap(GZipUtils.uncompress(data))).array();
+        return ISO_8859_1.decode(ByteBuffer.wrap(GZipUtils.uncompress(this.sessionSyncProtocol.decode(data)))).array();
     }
 
     @Override
