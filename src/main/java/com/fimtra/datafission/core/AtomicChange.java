@@ -531,12 +531,12 @@ public final class AtomicChange implements IRecordChange
     @Override
     public void applyTo(Map<String, IValue> target)
     {
-        Set<String> removed = getRemovedEntries().keySet();
+        final Set<String> removed = this.removedEntries == null ? EMPTY_MAP.keySet() : this.removedEntries.keySet();
         for (String objectName : removed)
         {
             target.remove(objectName);
         }
-        target.putAll(getPutEntries());
+        target.putAll(this.putEntries == null ? EMPTY_MAP : this.putEntries);
     }
 
     @Override
@@ -549,7 +549,8 @@ public final class AtomicChange implements IRecordChange
         }
         applyTo(record);
         Map<String, IValue> subMap;
-        for (String subMapKey : getSubMapKeys())
+        final Set<String> subMapKeys = this.subMapAtomicChanges == null ? ContextUtils.EMPTY_STRING_SET :  this.subMapAtomicChanges.keySet();
+        for (String subMapKey : subMapKeys)
         {
             subMap = record.getOrCreateSubMap(subMapKey);
             getSubMapAtomicChange(subMapKey).applyTo(subMap);
