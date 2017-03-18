@@ -315,12 +315,8 @@ public class StringProtocolCodec implements ICodec<char[]>
                                             }
                                             else
                                             {
-                                                // todo removing does not need to send the value -
-                                                // but requires a protocol spec change - new major
-                                                // version
                                                 atomicChange.removeEntry_onlyCallFromCodec(
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), decodeValue(
-                                                        currentTokenChars, j + 1, currentTokenChars.length, tempArr));
+                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), null);
                                             }
                                         }
                                         j = chars.length;
@@ -372,8 +368,8 @@ public class StringProtocolCodec implements ICodec<char[]>
         return sb.toString().getBytes(charSet);
     }
 
-    private static void addEntriesToTxString(char[] changeType, Map<String, IValue> entries, StringBuilder txString,
-        CharArrayReference chars)
+    private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
+        final StringBuilder txString, final CharArrayReference chars)
     {
         if (entries != null && entries.size() > 0)
         {
@@ -464,7 +460,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
 
                 txString.append(CHAR_KEY_VALUE_SEPARATOR);
-                if (value == null)
+                if (value == null || changeType == DELIMITER_REMOVE_CODE)
                 {
                     txString.append(NULL_CHAR);
                 }

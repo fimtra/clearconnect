@@ -298,7 +298,7 @@ public abstract class CodecBaseTest
     {
         assertEquals(name, changeFromRxData.getName());
         assertEquals(addedEntries, changeFromRxData.getPutEntries());
-        assertEquals(removedEntries, changeFromRxData.getRemovedEntries());
+        assertEquals(removedEntries.keySet(), changeFromRxData.getRemovedEntries().keySet());
     }
 
     private IRecordChange performTxRxAndGetChange(String name, Map<String, IValue> putEntries,
@@ -385,8 +385,8 @@ public abstract class CodecBaseTest
                 changeFromRxData.getSubMapAtomicChange(smk).getPutEntries());
             assertEquals(atomicChange.getSubMapAtomicChange(smk).getOverwrittenEntries(),
                 changeFromRxData.getSubMapAtomicChange(smk).getOverwrittenEntries());
-            assertEquals(atomicChange.getSubMapAtomicChange(smk).getRemovedEntries(),
-                changeFromRxData.getSubMapAtomicChange(smk).getRemovedEntries());
+            assertEquals(atomicChange.getSubMapAtomicChange(smk).getRemovedEntries().keySet(),
+                changeFromRxData.getSubMapAtomicChange(smk).getRemovedEntries().keySet());
         }
     }
 }

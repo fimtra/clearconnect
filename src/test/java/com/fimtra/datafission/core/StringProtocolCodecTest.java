@@ -20,11 +20,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 
 import com.fimtra.datafission.ICodec;
+import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.BlobValue;
@@ -168,7 +171,24 @@ public class StringProtocolCodecTest extends CodecBaseTest
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange("|".toCharArray(),
                 change, new StringProtocolCodec().getCharset())).toCharArray());
 
-        assertEquals(change.toString(), result.toString());
+        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        map1.put(k1, v3);
+        map1.put(k3, v3);
+        map1.put(k4, v4);
+        
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        rec1.putAll(map1);     
+        rec1.getOrCreateSubMap("subMap1").putAll(map1);
+        
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+        rec2.putAll(map1);     
+        rec2.getOrCreateSubMap("subMap1").putAll(map1);
+        
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+        assertFalse(rec1.containsKey(k3));
     }
 
     @Test
@@ -198,7 +218,24 @@ public class StringProtocolCodecTest extends CodecBaseTest
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
                 StringProtocolCodec.RPC_COMMAND_CHARS, change, new StringProtocolCodec().getCharset())).toCharArray());
 
-        assertEquals(change, result);
+        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        map1.put(k1, v3);
+        map1.put(k3, v3);
+        map1.put(k4, v4);
+        
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        rec1.putAll(map1);     
+        rec1.getOrCreateSubMap("subMap1").putAll(map1);
+        
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+        rec2.putAll(map1);     
+        rec2.getOrCreateSubMap("subMap1").putAll(map1);
+        
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+        assertFalse(rec1.containsKey(k3));
     }
 
     @Test
