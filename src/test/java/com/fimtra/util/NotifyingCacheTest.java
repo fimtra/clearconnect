@@ -222,14 +222,14 @@ public class NotifyingCacheTest
     {
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
-        assertTrue(candidate.containsKey("1"));
-        assertEquals("1", candidate.get("1"));
-        assertNull(candidate.get("11"));
-        assertFalse(candidate.containsKey("11"));
+        assertTrue(this.candidate.containsKey("1"));
+        assertEquals("1", this.candidate.get("1"));
+        assertNull(this.candidate.get("11"));
+        assertFalse(this.candidate.containsKey("11"));
         Set<String> expected = new HashSet<String>();
         expected.add("2");
         expected.add("1");
-        assertEquals(expected, candidate.keySet());
+        assertEquals(expected, this.candidate.keySet());
     }
 
     @Test
@@ -375,6 +375,9 @@ public class NotifyingCacheTest
         assertEquals("Got: " + listener1, 0, listener1.size());
         assertTrue("Got: " + listener2, listener2.contains("1"));
         assertFalse("Got: " + listener2, listener2.contains("2"));
+
+        assertEquals(0, this.candidate.listenersToNotifyWithInitialImages.size());
+        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
 
     @Test
@@ -504,6 +507,6 @@ public class NotifyingCacheTest
         assertTrue(candidate.notifyListenersDataRemoved("1"));
 
         assertEquals(expectedNotifiedAdded, notifiedAdded);
-        assertEquals(expectedNotifiedRemoved, notifiedRemoved);
+        assertEquals(expectedNotifiedRemoved, notifiedRemoved);        
     }
 }

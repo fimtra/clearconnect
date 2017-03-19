@@ -16,6 +16,8 @@
 package com.fimtra.util;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -71,6 +73,13 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final Lock writeLock;
     List<LISTENER_CLASS> listeners;
     final IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor;
+    /**
+     * This is populated when a listener is registered and prevents duplicate updates being sent to
+     * the listener during its phase of receiving initial images whilst any concurrent updates may
+     * also be occurring.
+     */
+    final Map<LISTENER_CLASS, Map<String, DATA>> listenersToNotifyWithInitialImages;
+    int listenersBeingNotifiedWithInitialImages;
 
     /**
      * Construct a <b>synchronously</b> updating instance
@@ -122,6 +131,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.destructor = destructor;
         this.cache = new LinkedHashMap<String, DATA>(2);
         this.listeners = new ArrayList<LISTENER_CLASS>(1);
+        this.listenersToNotifyWithInitialImages =
+            Collections.synchronizedMap(new HashMap<LISTENER_CLASS, Map<String, DATA>>());
         this.executor = executor;
         final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
         this.readLock = reentrantReadWriteLock.readLock();
@@ -219,14 +230,22 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         final Set<String> keysSnapshot;
 
                         // hold the lock and add the listener in the task to ensure the listener is
-                        // added and notified without clashing with a concurrent update - this is
-                        // mainly for the synchronous executor uses
+                        // added and notified without clashing with a concurrent update
                         NotifyingCache.this.writeLock.lock();
                         try
                         {
                             if (listener == null || NotifyingCache.this.listeners.contains(listener))
                             {
                                 return;
+                            }
+
+                            final Map<String, DATA> notifiedData =
+                                Collections.synchronizedMap(new HashMap<String, DATA>());
+                            synchronized (NotifyingCache.this.listenersToNotifyWithInitialImages)
+                            {
+                                NotifyingCache.this.listenersToNotifyWithInitialImages.put(listener, notifiedData);
+                                NotifyingCache.this.listenersBeingNotifiedWithInitialImages =
+                                    NotifyingCache.this.listenersToNotifyWithInitialImages.size();
                             }
 
                             final List<LISTENER_CLASS> copy =
@@ -242,25 +261,40 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                                 @Override
                                 public void run()
                                 {
-                                    DATA data;
-                                    for (String key : keysSnapshot)
+                                    try
                                     {
-                                        // given the snapshot of the keys, get the "live" data
-                                        data = get(key);
-                                        if (data != null)
+                                        DATA data;
+                                        for (String key : keysSnapshot)
                                         {
-                                            try
+                                            // given the snapshot of the keys, get the "live" data
+                                            data = get(key);
+
+                                            if (is.eq(data, notifiedData.put(key, data)))
                                             {
-                                                notifyListenerDataAdded(listener, key, data);
+                                                // already notified by a concurrent update
+                                                continue;
                                             }
-                                            catch (Exception e)
+
+                                            if (data != null)
                                             {
-                                                Log.log(NotifyingCache.this,
-                                                    "Could not notify " + ObjectUtils.safeToString(listener)
-                                                        + " with initial image " + key + "="
-                                                        + ObjectUtils.safeToString(data),
-                                                    e);
+                                                try
+                                                {
+                                                    notifyListenerDataAdded(listener, key, data);
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    handleException(key, data, listener, e, "INITIAL IMAGE");
+                                                }
                                             }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        synchronized (NotifyingCache.this.listenersToNotifyWithInitialImages)
+                                        {
+                                            NotifyingCache.this.listenersToNotifyWithInitialImages.remove(listener);
+                                            NotifyingCache.this.listenersBeingNotifiedWithInitialImages =
+                                                NotifyingCache.this.listenersToNotifyWithInitialImages.size();
                                         }
                                     }
                                 }
@@ -329,30 +363,55 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final boolean notifyListenersDataAdded(final String key, final DATA data)
     {
         final boolean added;
-        final List<LISTENER_CLASS> listenersToNotify;
         Runnable command = null;
         this.writeLock.lock();
         try
         {
             added = !is.eq(this.cache.put(key, data), data);
-            listenersToNotify = this.listeners;
             if (added)
             {
+                final List<LISTENER_CLASS> listenersToNotify = this.listeners;
                 command = new Runnable()
                 {
                     @Override
                     public void run()
                     {
-                        for (LISTENER_CLASS listener : listenersToNotify)
+                        // if there are listeners that are being notified with initial images
+                        // signal an update will happen for this key
+                        // THIS PREVENTS DUPLICATE NOTIFICATIONS
+                        if (NotifyingCache.this.listenersBeingNotifiedWithInitialImages > 0)
                         {
-                            try
+                            for (LISTENER_CLASS listener : listenersToNotify)
                             {
-                                notifyListenerDataAdded(listener, key, data);
+                                final Map<String, DATA> imagesNotified =
+                                    NotifyingCache.this.listenersToNotifyWithInitialImages.get(listener);
+                                if (imagesNotified != null && is.eq(data, imagesNotified.put(key, data)))
+                                {
+                                    continue;
+                                }
+
+                                try
+                                {
+                                    notifyListenerDataAdded(listener, key, data);
+                                }
+                                catch (Exception e)
+                                {
+                                    handleException(key, data, listener, e, "ADD");
+                                }
                             }
-                            catch (Exception e)
+                        }
+                        else
+                        {
+                            for (LISTENER_CLASS listener : listenersToNotify)
                             {
-                                Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
-                                    + " with ADD " + ObjectUtils.safeToString(data), e);
+                                try
+                                {
+                                    notifyListenerDataAdded(listener, key, data);
+                                }
+                                catch (Exception e)
+                                {
+                                    handleException(key, data, listener, e, "ADD");
+                                }
                             }
                         }
                     }
@@ -391,16 +450,15 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final boolean notifyListenersDataRemoved(final String key)
     {
         final boolean removed;
-        final List<LISTENER_CLASS> listenersToNotify;
         Runnable command = null;
         this.writeLock.lock();
         try
         {
             final DATA removedData = this.cache.remove(key);
             removed = removedData != null;
-            listenersToNotify = this.listeners;
             if (removed)
             {
+                final List<LISTENER_CLASS> listenersToNotify = this.listeners;
                 command = new Runnable()
                 {
                     @Override
@@ -414,8 +472,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                             }
                             catch (Exception e)
                             {
-                                Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener)
-                                    + " with REMOVE " + ObjectUtils.safeToString(removedData), e);
+                                handleException(key, removedData, listener, e, "REMOVE");
                             }
                         }
                     }
@@ -442,6 +499,12 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         return removed;
     }
 
+    void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e, String operation)
+    {
+        Log.log(NotifyingCache.this, "Could not notify " + ObjectUtils.safeToString(listener) + " with " + operation
+            + " " + key + "=" + ObjectUtils.safeToString(data), e);
+    }
+    
     public final void destroy()
     {
         this.destructor.destroy(this);
@@ -457,6 +520,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     /**
      * Called after the data has been added to the cache.
+     * <p>
+     * <b>This can be called by multiple threads concurrently and must be thread-safe.</b>
      * 
      * @param key
      *            the key for the data that was added
@@ -467,6 +532,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     /**
      * Called after the data has been removed from the cache.
+     * <p>
+     * <b>This can be called by multiple threads concurrently and must be thread-safe.</b>
      * 
      * @param key
      *            the key for the data that was removed
