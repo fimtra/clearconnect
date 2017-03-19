@@ -66,4 +66,12 @@ public interface ITransportChannel
      *         method.
      */
     boolean hasRxData();
+
+    /**
+     * Used for instrumentation of a channel to see if it cannot cope with the volume of updates
+     * required to be sent.
+     * 
+     * @return the transmission queue size
+     */
+    int getTxQueueSize();
 }

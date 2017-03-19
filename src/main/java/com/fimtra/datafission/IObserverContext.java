@@ -181,6 +181,7 @@ public interface IObserverContext
             String UPTIME = "Uptime(sec)";
             String PROTOCOL = "Protocol";
             String TRANSPORT = "Transport";
+            String TX_QUEUE_SIZE = "TxQueueSize";
         }
     }
 

@@ -141,7 +141,7 @@ public class TcpChannel implements ITransportChannel
     private final AtomicBoolean onChannelClosedCalled;
 
     StateEnum state = StateEnum.IDLE;
-
+    
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
      * format.
@@ -205,7 +205,7 @@ public class TcpChannel implements ITransportChannel
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.txFrames = CollectionUtils.newDeque();
+        this.txFrames = CollectionUtils.newDeque();        
         this.readFrames = CollectionUtils.newDeque();
         this.resolvedFrames = CollectionUtils.newDeque();
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
@@ -317,7 +317,6 @@ public class TcpChannel implements ITransportChannel
 
             synchronized (this)
             {
-                // todo need some queue monitoring at the TCP sending level
                 for (int i = 0; i < byteFragmentsToSend.length; i++)
                 {
                     this.txFrames.add(byteFragmentsToSend[i]);
@@ -596,6 +595,12 @@ public class TcpChannel implements ITransportChannel
         final boolean hasRxData = this.rxData > 0;
         this.rxData = 0;
         return hasRxData;
+    }
+
+    @Override
+    public int getTxQueueSize()
+    {
+        return this.txFrames.size();
     }
 }
 
