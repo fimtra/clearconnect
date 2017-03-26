@@ -97,7 +97,7 @@ public class ContextTest
         listener.latch = new CountDownLatch(2);
         this.candidate.addObserver(listener, name);
 
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
         this.candidate.getRecord(name).put(key, v1);
         this.candidate.publishAtomicChange(name);
         assertTrue(listener.latch.await(1, TimeUnit.SECONDS));
@@ -112,7 +112,7 @@ public class ContextTest
     @Test
     public void testAddAllEntriesRemovedToAtomicChange()
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         instance.put(K2, V2);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
@@ -128,7 +128,7 @@ public class ContextTest
     @Test
     public void testAddEntryRemovedToAtomicChange()
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
@@ -143,7 +143,7 @@ public class ContextTest
     @Test
     public void testAddEntryUpdatedToAtomicChange()
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
@@ -192,6 +192,7 @@ public class ContextTest
 
         this.candidate.setPermissionFilter(filter);
 
+        // create the record without verifying the first update because of the permission filter
         Map<String, IValue> instance = this.candidate.createRecord(name);
         instance.put(K1, V1);
         instance.put(K2, V2);
@@ -220,7 +221,7 @@ public class ContextTest
     @Test
     public void testAddObserverAfterCreating() throws InterruptedException
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
         assertNotNull(instance);
         instance.put(K1, V1);
         instance.put(K2, V2);
@@ -276,6 +277,7 @@ public class ContextTest
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
+        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
 
     @Test
@@ -290,17 +292,19 @@ public class ContextTest
         Map<String, IValue> expectedMap = new HashMap<String, IValue>();
         expectedMap.put(K1, V1);
         expectedMap.put(K2, V2);
-        Map<String, IValue> instance = this.candidate.createRecord(name, expectedMap);
+        Map<String, IValue> instance = createRecordWaitForUpdate(name, expectedMap);
         assertNotNull(instance);
         assertTrue("Did not get notified on creation", latch.await(1, TimeUnit.SECONDS));
 
-        assertEquals(1, observer.changes.size());
+        final int size = observer.changes.size();
+        assertEquals("Got: " + observer.changes, 1, size);
         assertEquals(expectedMap, observer.images.get(0));
         assertEquals(2, observer.changes.get(0).getPutEntries().size());
         assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
 
-        assertEquals(1, observer2.changes.size());
+        final int size2 = observer2.changes.size();
+        assertEquals("Got: " + observer.changes, 1, size2);
         assertEquals(expectedMap, observer2.images.get(0));
         assertEquals(2, observer2.changes.get(0).getPutEntries().size());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
@@ -317,7 +321,7 @@ public class ContextTest
         this.candidate.publishAtomicChange(name).await();
         assertTrue(latch.await(1, TimeUnit.SECONDS));
 
-        assertEquals(1, observer.changes.size());
+        assertEquals(1, size);
         assertEquals(expectedMap, observer.images.get(0));
         Map<String, IValue> expectedPuts = new HashMap<String, IValue>();
         expectedPuts.put(K2, V2p);
@@ -325,11 +329,12 @@ public class ContextTest
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
 
-        assertEquals(1, observer2.changes.size());
+        assertEquals(1, size2);
         assertEquals(expectedMap, observer2.images.get(0));
         assertEquals(expectedPuts, observer2.changes.get(0).getPutEntries());
         assertEquals(1, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
+        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
 
     @Test
@@ -350,7 +355,7 @@ public class ContextTest
     @Test
     public void testAddObserverForSameObserverAfterCreating() throws InterruptedException
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
         assertNotNull(instance);
         instance.put(K1, V1);
         instance.put(K2, V2);
@@ -375,7 +380,7 @@ public class ContextTest
     @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextConnections()
     {
-        this.candidate.createRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
+        createRecordWaitForUpdate(ISystemRecordNames.CONTEXT_CONNECTIONS);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -393,7 +398,7 @@ public class ContextTest
     @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextRpcs()
     {
-        this.candidate.createRecord(ISystemRecordNames.CONTEXT_RPCS);
+        createRecordWaitForUpdate(ISystemRecordNames.CONTEXT_RPCS);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -411,7 +416,7 @@ public class ContextTest
     @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextRecords()
     {
-        this.candidate.createRecord(ISystemRecordNames.CONTEXT_RECORDS);
+        createRecordWaitForUpdate(ISystemRecordNames.CONTEXT_RECORDS);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -429,7 +434,7 @@ public class ContextTest
     @Test
     public void testContextRecordsRemovesEntryWhenRemovingMap() throws InterruptedException
     {
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
         final TestCachingAtomicChangeObserver registryObserver = new TestCachingAtomicChangeObserver(true);
         this.candidate.addObserver(registryObserver, ISystemRecordNames.CONTEXT_RECORDS);
 
@@ -483,7 +488,7 @@ public class ContextTest
     @Test(expected = IllegalArgumentException.class)
     public void testCannotCreateMapWithSameNameAsContextStatus()
     {
-        this.candidate.createRecord(ISystemRecordNames.CONTEXT_STATUS);
+        createRecordWaitForUpdate(ISystemRecordNames.CONTEXT_STATUS);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -509,7 +514,7 @@ public class ContextTest
     @Test
     public void testContextSubscriptionRemovedWhenRemovingMap() throws InterruptedException
     {
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
         // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
@@ -583,7 +588,7 @@ public class ContextTest
     @Test
     public void testContextSubscriptionsListsObserversForMap() throws InterruptedException
     {
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
         // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
@@ -680,17 +685,17 @@ public class ContextTest
     @Test(expected = IllegalStateException.class)
     public void testCreateInstanceString()
     {
-        final Map<String, IValue> createInstance = this.candidate.createRecord(name);
+        final Map<String, IValue> createInstance = createRecordWaitForUpdate(name);
         assertNotNull(createInstance);
         // try creating a second duplicate
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
     }
 
     @Test
     public void testCreateInstanceStringMapOfStringIValue()
     {
         final HashMap<String, IValue> record = new HashMap<String, IValue>();
-        final Map<String, IValue> createInstance = this.candidate.createRecord(name, record);
+        final Map<String, IValue> createInstance = createRecordWaitForUpdate(name, record);
         assertNotNull(createInstance);
         assertNotSame(record, ((Record) createInstance).data);
     }
@@ -699,7 +704,7 @@ public class ContextTest
     public void testGetInstance()
     {
         assertNull(this.candidate.getRecord("sdf"));
-        final Map<String, IValue> createInstance = this.candidate.createRecord(name);
+        final Map<String, IValue> createInstance = createRecordWaitForUpdate(name);
         assertEquals(createInstance, this.candidate.getRecord(name));
     }
 
@@ -731,8 +736,8 @@ public class ContextTest
     public void testGetInstanceNames()
     {
         final String name2 = name + "1";
-        this.candidate.createRecord(name);
-        this.candidate.createRecord(name2);
+        createRecordWaitForUpdate(name);
+        createRecordWaitForUpdate(name2);
         Set<String> expected = new HashSet<String>();
         expected.add(name);
         expected.add(name2);
@@ -748,7 +753,7 @@ public class ContextTest
     public void testInitialObserverForBlankMap() throws InterruptedException
     {
         @SuppressWarnings("unused")
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
@@ -764,7 +769,7 @@ public class ContextTest
         final int instanceCount = 100;
         for (int i = 0; i < instanceCount; i++)
         {
-            final Map<String, IValue> instance = this.candidate.createRecord(name + i);
+            final Map<String, IValue> instance = createRecordWaitForUpdate(name + i);
             executor.scheduleAtFixedRate(new Runnable()
             {
                 long i;
@@ -807,7 +812,7 @@ public class ContextTest
     @Test
     public void testPublishAtomicChangesForNoChange() throws InterruptedException
     {
-        final Map<String, IValue> instance = this.candidate.createRecord(name);
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
@@ -832,18 +837,22 @@ public class ContextTest
         this.candidate.publishAtomicChange(name).await();
         assertNull(this.candidate.pendingAtomicChanges.get(name));
 
-        assertNotNull(this.candidate.createRecord(name));
+        assertNotNull(createRecordWaitForUpdate(name));
         assertNull(this.candidate.pendingAtomicChanges.get(name));
         this.candidate.publishAtomicChange(name).await();
         assertNull(this.candidate.pendingAtomicChanges.get(name));
     }
 
     @Test
-    public void testRemoveInstance()
+    public void testRemoveInstance() throws InterruptedException
     {
         assertNull(this.candidate.removeRecord("sdf"));
-        final Map<String, IValue> createInstance = this.candidate.createRecord(name);
+        final Map<String, IValue> createInstance = createRecordWaitForUpdate(name);
+        final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(new CountDownLatch(1));
+        this.candidate.addObserver(observer, name);
+        assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
         assertNotNull(this.candidate.imageCache.images.get(name));
+        this.candidate.removeObserver(observer, name);
 
         // add stuff to the instance
         this.candidate.addObserver(new TestCachingAtomicChangeObserver(), name);
@@ -886,13 +895,15 @@ public class ContextTest
         Map<String, IValue> record = new HashMap<String, IValue>();
         record.put(K1, V1);
         record.put(K2, V2);
-        assertNotNull(this.candidate.createRecord(name, record));
+        assertNotNull(createRecordWaitForUpdate(name, record));
         assertTrue(latch.await(1, TimeUnit.SECONDS));
 
         // only observer2 is notified
-        assertEquals(0, observer.changes.size());
+        final int size = observer.changes.size();
+        assertEquals("Got: " + observer.changes, 0, size);
 
-        assertEquals(1, observer2.changes.size());
+        final int size2 = observer2.changes.size();
+        assertEquals("Got: " + observer2.changes, 1, size2);
         assertEquals(record, observer2.images.get(0));
         assertEquals(2, observer2.changes.get(0).getPutEntries().size());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
@@ -906,7 +917,7 @@ public class ContextTest
     @Test
     public void testRemoveObserverAfterMapRemoved()
     {
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
         assertNotNull(this.candidate.removeRecord(name));
@@ -916,9 +927,9 @@ public class ContextTest
     @Test
     public void testGetLastPublishedImage() throws InterruptedException
     {
-        assertNull(this.candidate.getLastPublishedImage(name));
+        assertNull(this.candidate.getLastPublishedImage_callInRecordContext(name));
 
-        this.candidate.createRecord(name);
+        createRecordWaitForUpdate(name);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
 
@@ -932,7 +943,7 @@ public class ContextTest
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
 
         // check the last published vs received
-        final IRecord lastPublishedImage = this.candidate.getLastPublishedImage(name);
+        final IRecord lastPublishedImage = this.candidate.getLastPublishedImage_callInRecordContext(name);
         assertEquals(observer.getLatestImage(), lastPublishedImage);
         assertTrue(lastPublishedImage instanceof ImmutableRecord);
     }
@@ -955,31 +966,31 @@ public class ContextTest
     @Test(expected = IllegalArgumentException.class)
     public void testCreateIllegalNameRecord_ACK()
     {
-        this.candidate.createRecord(ProxyContext.ACK);
+        createRecordWaitForUpdate(ProxyContext.ACK);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testCreateIllegalNameRecord_NOK()
     {
-        this.candidate.createRecord(ProxyContext.NOK);
+        createRecordWaitForUpdate(ProxyContext.NOK);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testCreateIllegalNameRecord_RPC_RECORD_RESULT_PREFIX()
     {
-        this.candidate.createRecord(RpcInstance.RPC_RECORD_RESULT_PREFIX);
+        createRecordWaitForUpdate(RpcInstance.RPC_RECORD_RESULT_PREFIX);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testCreateIllegalNameRecord_2()
     {
-        this.candidate.createRecord("ContextRecords");
+        createRecordWaitForUpdate("ContextRecords");
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testCreateIllegalNameRecord_3()
     {
-        this.candidate.createRecord(AtomicChangeTeleporter.PART_INDEX_PREFIX + "somthing");
+        createRecordWaitForUpdate(AtomicChangeTeleporter.PART_INDEX_PREFIX + "somthing");
     }
 
     @Test
@@ -994,7 +1005,7 @@ public class ContextTest
     public void testAddRemoveUpdateValidator() throws InterruptedException
     {
         // DONT USE MOCKITO - ITS RUBBISH AT MULTI-THREAD
-        final IRecord record = this.candidate.createRecord(name);
+        final IRecord record = createRecordWaitForUpdate(name);
 
         final CountDownLatch validator1OnRegistration = new CountDownLatch(1);
         final CountDownLatch validator2OnRegistration = new CountDownLatch(1);
@@ -1103,5 +1114,31 @@ public class ContextTest
         assertEquals(2, validateCalls1.size());
         assertEquals(recordImage, validateCalls2.get(2));
 
+    }
+
+    private IRecord createRecordWaitForUpdate(String name)
+    {
+        return createRecordWaitForUpdate(name, null);
+    }
+
+    private IRecord createRecordWaitForUpdate(String name, Map<String, IValue> data)
+    {
+        // wait for the first record image
+        CountDownLatch latch = new CountDownLatch(1);
+        final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(latch);
+        this.candidate.addObserver(observer, name);
+
+        final IRecord record =
+            data == null ? this.candidate.createRecord(name) : this.candidate.createRecord(name, data);
+        try
+        {
+            assertTrue(latch.await(1, TimeUnit.SECONDS));
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        this.candidate.removeObserver(observer, name);
+        return record;
     }
 }

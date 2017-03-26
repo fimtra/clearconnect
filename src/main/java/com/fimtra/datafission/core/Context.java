@@ -311,6 +311,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /** The permission token used for subscribing each record */
     final Map<String, String> tokenPerRecord;
 
+    /**
+     * This is populated when a listener is registered and prevents duplicate updates being sent to
+     * the listener during its phase of receiving initial images whilst any concurrent updates may
+     * also be occurring.
+     */
+    final Map<IRecordListener, Set<String>> listenersToNotifyWithInitialImages;
+    int listenersBeingNotifiedWithInitialImages;
+
     /** Construct the context with the given name */
     public Context(String name)
     {
@@ -360,6 +368,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         this.rpcInstances = new ConcurrentHashMap<String, IRpcInstance>();
         this.validators = new CopyOnWriteArraySet<IValidator>();
+
+        this.listenersToNotifyWithInitialImages =
+            Collections.synchronizedMap(new HashMap<IRecordListener, Set<String>>());
 
         // create the special records by hand
         createSystemRecord(ISystemRecordNames.CONTEXT_RECORDS);
@@ -447,14 +458,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new IllegalArgumentException("The name [" + name + "] contains illegal characters");
         }
 
-        final Record record;
-        final IRecordListener[] subscribersForInstance;
-        synchronized (this.recordCreateLock)
-        {
-            record = createRecordInternal_callWithLock(name, initialData);
-            subscribersForInstance = this.recordObservers.getSubscribersFor(name);
-        }
-
         // publish the update to the ContextRecords before publishing to observers - one of the
         // observers may check the ContextRecords so the created record MUST be in there before
         final IRecord contextRecords = this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
@@ -463,6 +466,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new IllegalStateException(
                 "Cannot create new record [" + name + "] in shutdown context " + ObjectUtils.safeToString(this));
         }
+
+        final Record record;
+        synchronized (this.recordCreateLock)
+        {
+            record = createRecordInternal_callWithLock(name, initialData);
+        }
+
         synchronized (contextRecords.getWriteLock())
         {
             // important to access subscriptions whilst holding the write lock of CONTEXT_RECORDS -
@@ -474,45 +484,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
         }
 
-        // now notify observers of the record with its initial image
-        if (subscribersForInstance.length > 0)
-        {
-            if (log)
-            {
-                Log.log(this, "Subscriber count is ", Integer.toString(subscribersForInstance.length),
-                    " for created record [", name, "]");
-            }
+        // always force a publish for the initial create - guaranteed to be sequence 0
+        publishAtomicChange(name, true);
 
-            synchronized (record.getWriteLock())
-            {
-                // create and trigger the image publish whilst holding the record's lock - prevents
-                // (however unlikely) concurrent publishing occurring whilst creating
-                executeSequentialCoreTask(new ISequentialRunnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        long start;
-                        final IRecord imageToPublish = getLastPublishedImage(name);
-                        final IRecordChange atomicChange = new AtomicChange(imageToPublish);
-
-                        for (int i = 0; i < subscribersForInstance.length; i++)
-                        {
-                            start = System.nanoTime();
-                            subscribersForInstance[i].onChange(imageToPublish, atomicChange);
-                            ContextUtils.measureTask(name, "notify created record", subscribersForInstance[i],
-                                (System.nanoTime() - start));
-                        }
-                    }
-
-                    @Override
-                    public Object context()
-                    {
-                        return name;
-                    }
-                });
-            }
-        }
         return record;
     }
 
@@ -530,20 +504,46 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     private Record createRecordInternal_callWithLock(final String name, Map<String, IValue> initialData)
     {
-        final Record record;
         if (this.records.get(name) != null)
         {
             throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
         }
 
-        this.sequences.put(name, new AtomicLong());
-        this.imageCache.put(name, new Record(name, initialData, this.noopChangeManager));
-        record = new Record(name, initialData, this);
+        //
+        // DO NOT ALTER THE ORDER OF THESE STATEMENTS
+        //
+
+        final Record record = new Record(name, ContextUtils.EMPTY_MAP, this);
+        this.records.put(name, record);
+        // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus starting at 0
+        this.sequences.put(name, new AtomicLong(-1));
+        getPendingAtomicChangesForWrite(name);
+        // this will set off an atomic change for the construction
+        record.putAll(initialData);
+
+        // update the image cache in the context of the record - this prevents clashes with
+        // concurrent record listeners being added
+        executeSequentialCoreTask(new ISequentialRunnable()
+        {
+            @Override
+            public void run()
+            {
+                Context.this.imageCache.put(name,
+                    new Record(name, ContextUtils.EMPTY_MAP, Context.this.noopChangeManager));
+            }
+
+            @Override
+            public Object context()
+            {
+                return name;
+            }
+        });
+        
         if (log)
         {
             Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
         }
-        this.records.put(name, record);
+        
         return record;
     }
 
@@ -672,6 +672,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch publishAtomicChange(final String name)
     {
+        return publishAtomicChange(name, false);
+    }
+
+    private CountDownLatch publishAtomicChange(final String name, boolean forcePublish)
+    {
         final CountDownLatch latch = new CountDownLatch(1);
         final IRecord record = this.records.get(name);
         if (record == null)
@@ -684,7 +689,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         synchronized (record.getWriteLock())
         {
             final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
-            if (atomicChange == null || atomicChange.isEmpty())
+            // need to prevent empty changes BUT also allow the initial create if it had blank data
+            if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
             {
                 latch.countDown();
                 return latch;
@@ -718,22 +724,56 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         }
 
                         long start;
-                        IRecordListener iAtomicChangeObserver = null;
-                        final IRecordListener[] subscribersFor = Context.this.recordObservers.getSubscribersFor(name);
-                        for (int i = 0; i < subscribersFor.length; i++)
+                        IRecordListener listener = null;
+                        final IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
+
+                        // if there are any pending initial images waiting, we need to ensure we
+                        // don't notify this update to the registered listener
+                        if (Context.this.listenersBeingNotifiedWithInitialImages > 0)
                         {
-                            try
+                            Set<String> initialImagePending;
+                            for (int i = 0; i < subscribersForRecord.length; i++)
                             {
-                                iAtomicChangeObserver = subscribersFor[i];
-                                start = System.nanoTime();
-                                iAtomicChangeObserver.onChange(notifyImage, atomicChange);
-                                ContextUtils.measureTask(name, "local record update", iAtomicChangeObserver,
-                                    (System.nanoTime() - start));
+                                try
+                                {
+                                    listener = subscribersForRecord[i];
+
+                                    initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
+                                    if (initialImagePending != null && initialImagePending.contains(name))
+                                    {
+                                        // don't notify - let the initial image task do this
+                                        // as it will pass in a full image as the atomic change
+                                        // (thus simulating the initial image)
+                                        continue;
+                                    }
+
+                                    start = System.nanoTime();
+                                    listener.onChange(notifyImage, atomicChange);
+                                    ContextUtils.measureTask(name, "local record update", listener,
+                                        (System.nanoTime() - start));
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
+                                }
                             }
-                            catch (Exception e)
+                        }
+                        else
+                        {
+                            for (int i = 0; i < subscribersForRecord.length; i++)
                             {
-                                Log.log(Context.this,
-                                    "Could not notify " + iAtomicChangeObserver + " with " + atomicChange, e);
+                                try
+                                {
+                                    listener = subscribersForRecord[i];
+                                    start = System.nanoTime();
+                                    listener.onChange(notifyImage, atomicChange);
+                                    ContextUtils.measureTask(name, "local record update", listener,
+                                        (System.nanoTime() - start));
+                                }
+                                catch (Exception e)
+                                {
+                                    Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
+                                }
                             }
                         }
                     }
@@ -791,22 +831,44 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
 
                 // perform the add for the records with valid permission tokens
-                doAddSingleObserver(observer, permissionedRecords);
+                addSingleObserver(observer, permissionedRecords);
             }
         }, resultMap);
 
         futureResult.run();
         return futureResult;
     }
-
-    void doAddSingleObserver(final IRecordListener observer, Collection<String> recordNames)
+    
+    void addSingleObserver(final IRecordListener observer, Collection<String> recordNames)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
         synchronized (this.recordCreateLock)
         {
+            final Set<String> initialImagePending;
+            synchronized (this.listenersToNotifyWithInitialImages)
+            {
+                final Set<String> exists = this.listenersToNotifyWithInitialImages.get(observer);
+                if (exists != null)
+                {
+                    initialImagePending = exists;
+                }
+                else
+                {
+                    initialImagePending = Collections.synchronizedSet(new HashSet<String>());
+                    this.listenersToNotifyWithInitialImages.put(observer, initialImagePending);
+                }
+                this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
+            }
+            
             final List<String> subscriberAdded = new LinkedList<String>();
             for (final String name : recordNames)
             {
+                // check if the observer has already been registered
+                if (!initialImagePending.add(name))
+                {
+                    continue;
+                }
+         
                 if (this.recordObservers.addSubscriberFor(name, observer))
                 {
                     if (log)
@@ -814,30 +876,30 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
                     }
                     subscriberAdded.add(name);
-                    
-                    // Check if there is an image before creating a task to notify with the image.
-                    // Don't try an optimise by re-use the published image we get here - its not
-                    // safe to cache, see javadocs on the method - we only want to know if there is
-                    // an image
-                    if (getLastPublishedImage(name) != null)
+
+                    executeSequentialCoreTask(new ISequentialRunnable()
                     {
-                        executeSequentialCoreTask(new ISequentialRunnable()
+                        @Override
+                        public void run()
                         {
-                            @Override
-                            public void run()
-                            {
+                            try
+                            {                 
+                                // happens if a removeObserver is called before the add completes
+                                if (!initialImagePending.contains(name))
+                                {
+                                    return;
+                                }
+                                
                                 if (log)
                                 {
                                     Log.log(this, "Notifying initial image [", name, "], listener=",
                                         ObjectUtils.safeToString(observer));
                                 }
-                                final long start = System.nanoTime();
-                                final IRecord imageSnapshot = getLastPublishedImage(name);
-                                // this can be null if there is a concurrent delete
-                                // ... nothing we can do about this, the subscription is still valid
-                                // though
+                                final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
+
                                 if (imageSnapshot != null)
                                 {
+                                    final long start = System.nanoTime();
                                     observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
                                     ContextUtils.measureTask(name, "record image-on-subscribe", observer,
                                         (System.nanoTime() - start));
@@ -851,16 +913,22 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                     }
                                 }
                             }
-
-                            @Override
-                            public Object context()
+                            finally
                             {
-                                return name;
+                                initialImagePending.remove(name);
+                                updateListenerCountsForInitialImages(observer, initialImagePending);
                             }
-                        });
-                    }
+                        }
+
+                        @Override
+                        public Object context()
+                        {
+                            return name;
+                        }
+                    });
                 }
             }
+
             addDeltaToSubscriptionCount(1, subscriberAdded);
         }
     }
@@ -868,19 +936,28 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch removeObserver(IRecordListener observer, String... recordNames)
     {
-        doRemoveSingleObserver(observer, recordNames);
+        removeSingleObserver(observer, recordNames);
         return new CountDownLatch(0);
     }
 
 
-    private void doRemoveSingleObserver(IRecordListener observer, String... names)
+    private void removeSingleObserver(IRecordListener observer, String... names)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
         synchronized (this.recordCreateLock)
         {
-            final List<String> toRemove = new LinkedList<String>();
-            for (String name : names)
+            final Set<String> initialImagePending = this.listenersToNotifyWithInitialImages.get(observer);
+            if (initialImagePending != null)
             {
+                initialImagePending.removeAll(Arrays.asList(names));
+                updateListenerCountsForInitialImages(observer, initialImagePending);
+            }
+            
+            final List<String> toRemove = new LinkedList<String>();
+            String name;
+            for (int i = 0; i < names.length; i++)
+            {
+                name = names[i];
                 if (this.recordObservers.removeSubscriberFor(name, observer))
                 {
                     if (log)
@@ -1087,7 +1164,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      *         call to {@link #publishAtomicChange(IRecord)}, <code>null</code> if no image has been
      *         published
      */
-    IRecord getLastPublishedImage(String name)
+    IRecord getLastPublishedImage_callInRecordContext(String name)
     {
         return this.imageCache.getImmutableInstance(name);
     }
@@ -1123,7 +1200,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 @Override
                 public void run()
                 {
-                    final IRecord record = getLastPublishedImage(name);
+                    final IRecord record = getLastPublishedImage_callInRecordContext(name);
                     if (record != null)
                     {
                         validator.validate(record, new AtomicChange(record));
@@ -1221,6 +1298,18 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return false;
         }
         return true;
+    }
+
+    final void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
+    {
+        if (initialImagePending.size() == 0)
+        {
+            synchronized (this.listenersToNotifyWithInitialImages)
+            {
+                this.listenersToNotifyWithInitialImages.remove(listener);
+                this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
+            }
+        }
     }
 }
 

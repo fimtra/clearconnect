@@ -192,24 +192,8 @@ public class Publisher
                         {
                             final AtomicLong currentSequence =
                                 ProxyContextMultiplexer.this.systemRecordSequences.get(atomicChange.getName());
+                            atomicChange.setSequence(currentSequence.getAndIncrement());
 
-                            if (atomicChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR && currentSequence.get() != 0)
-                            {
-                                // we get-then-increment the sequences, BUT we need to send the
-                                // previous sequence if its an image (e.g. if we had a
-                                // re-sync for the record), hence we do sequence-1
-                                atomicChange.setSequence(currentSequence.get() - 1);
-                            }
-                            else
-                            {
-                                atomicChange.setSequence(currentSequence.getAndIncrement());
-                            }
-
-                            // the first message that we send is always an image
-                            if (atomicChange.getSequence() == 0)
-                            {
-                                atomicChange.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
-                            }
                             handleRecordChange(atomicChange);
                         }
                     }, CachePolicyEnum.NO_IMAGE_NEEDED));
@@ -394,13 +378,13 @@ public class Publisher
          * <b>ONLY CALL THIS IN AN {@link ISequentialRunnable} RUNNING IN THE SAME CONTEXT AS THE
          * RECORD NAME! OTHERWISE YOU ARE NOT GUARANTEED TO GET THE LAST PUBLISHED IMAGE.</b>
          * <P>
-         * @see Context#getLastPublishedImage(String)
+         * @see Context#getLastPublishedImage_callInRecordContext(String)
          * @param recordNameToRepublish
          * @param publisher
          */
         void republishImage(final String recordNameToRepublish, final ProxyContextPublisher publisher)
         {
-            final IRecord record = Publisher.this.context.getLastPublishedImage(recordNameToRepublish);
+            final IRecord record = Publisher.this.context.getLastPublishedImage_callInRecordContext(recordNameToRepublish);
             if (record != null)
             {
                 final AtomicChange change = new AtomicChange(record);

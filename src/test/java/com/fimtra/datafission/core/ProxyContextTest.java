@@ -256,7 +256,7 @@ public class ProxyContextTest
             observer.verify();
         }
 
-        ThreadUtils.newThread(new Runnable()
+        (new Runnable()
         {
             @Override
             public void run()
@@ -268,8 +268,8 @@ public class ProxyContextTest
                 ProxyContextTest.this.candidate.destroy();
                 ProxyContextTest.this.context.destroy();
             }
-        }, "tearDown").start();
-
+        }).run();
+        
         ChannelUtils.WATCHDOG.configure(5000);
     }
 
@@ -361,10 +361,53 @@ public class ProxyContextTest
         final String name = "sdf1";
         final String key = "Kmy1";
         final TextValue v1 = TextValue.valueOf("value1");
-
+        
         this.context.createRecord(name);
         this.context.getRecord(name).put(key, v1);
         this.context.publishAtomicChange(name);
+        
+        final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
+        final int timeout = TIMEOUT;
+        listener.latch = new CountDownLatch(1);
+        this.candidate.addObserver(listener, name);
+        
+        assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
+        assertEquals(v1, listener.getLatestImage().get(key));
+        
+        listener.latch = new CountDownLatch(1);
+        synchronized (this.candidate.resyncs)
+        {
+            this.candidate.resync(name);
+            assertTrue(this.candidate.resyncs.contains(name));
+        }
+        // we spin until we have detected the resync has completed - NOTE: a resync may not generate
+        // a record update as the image will be identical
+        TestUtils.waitForEvent(new EventChecker()
+        {
+            @Override
+            public Object got()
+            {
+                return ProxyContextTest.this.candidate.resyncs.contains(name);
+            }
+            
+            @Override
+            public Object expect()
+            {
+                return false;
+            }
+        });
+    }
+    
+    @Test
+    public void testResyncSystemRecord() throws Exception
+    {
+        createComponents();
+        for (int i = 0; i < 20; i++)
+        {
+            context.createRecord("rec-" + i);
+        }
+        
+        final String name = IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
         final int timeout = TIMEOUT;
@@ -372,8 +415,21 @@ public class ProxyContextTest
         this.candidate.addObserver(listener, name);
 
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
-        assertEquals(v1, listener.getLatestImage().get(key));
+        TestUtils.waitForEvent(new EventChecker()
+        {
+            @Override
+            public Object got()
+            {
+                return ProxyContextTest.this.candidate.getRecord(name).containsKey("rec-15");
+            }
 
+            @Override
+            public Object expect()
+            {
+                return true;
+            }
+        });
+        
         listener.latch = new CountDownLatch(1);
         synchronized (this.candidate.resyncs)
         {
@@ -1329,7 +1385,8 @@ public class ProxyContextTest
 
         assertTrue("Triggered " + (UPDATE_COUNT - observer.latch.getCount()) + " times",
             observer.latch.await(timeout, TimeUnit.SECONDS));
-        assertEquals(UPDATE_COUNT, observer.images.size());
+        final int size = observer.images.size();
+        assertEquals("Got: " + observer.images, UPDATE_COUNT, size);
         int max = UPDATE_COUNT - 1;
         Map<String, IValue> image = observer.images.get(max);
         assertEquals("Image: " + image, text + max, image.get(key).textValue());
