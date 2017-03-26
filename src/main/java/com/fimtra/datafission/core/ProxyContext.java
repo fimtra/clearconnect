@@ -141,6 +141,7 @@ public final class ProxyContext implements IObserverContext
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
     static final String NOK = ContextUtils.PROTOCOL_PREFIX + "NOK_";
+    private static final int ACK_LEN = ACK.length();
 
     static final String SUBSCRIBE = "subscribe";
     static final String UNSUBSCRIBE = "unsubscribe";
@@ -364,6 +365,8 @@ public final class ProxyContext implements IObserverContext
 
     /** Tracks records that have a re-sync operation pending */
     final Set<String> resyncs;
+    /** Flags if there is any record undergoing a resync */
+    boolean resyncInProgress;
 
     /** The name given to the "session" between this proxy and its remote context. */
     final String sessionContextName;
@@ -858,7 +861,7 @@ public final class ProxyContext implements IObserverContext
                 // check the channel is the currently active one - failed re-connects can
                 // have a channel with the same receiver but we must ignore events from it
                 // as it was a previous (failed) attempt
-                if (ProxyContext.this.channelToken == receiverToken)
+                if (ProxyContext.this.channelToken == this.receiverToken)
                 {
                     executeSequentialCoreTask(new ISequentialRunnable()
                     {
@@ -903,7 +906,7 @@ public final class ProxyContext implements IObserverContext
                 // there is no alternative - a local flag is not an option - setting it
                 // during onChannelConnected is not guaranteed to work as that can happen on
                 // a different thread
-                if (ProxyContext.this.channelToken == receiverToken)
+                if (ProxyContext.this.channelToken == this.receiverToken)
                 {
                     executeSequentialCoreTask(new ISequentialRunnable()
                     {
@@ -965,11 +968,14 @@ public final class ProxyContext implements IObserverContext
             {
                 final String recordName =
                     substituteLocalNameWithRemoteName(AtomicChangeTeleporter.getRecordName(_recName));
-                if (!ProxyContext.this.resyncs.contains(recordName))
+                if (resync(recordName))
                 {
-                    Log.log(this, "Error processing received change for " + recordName, e);
-
-                    resync(recordName);
+                    Log.log(this, "Resync of " + recordName + " started due to error processing received change", e);
+                }
+                else
+                {
+                    Log.log(this, "Resync of ", recordName, " in progress, error handling previous unsynced change: ",
+                        e.toString(), " (this should be resolved when the next image is received)");
                 }
             }
 
@@ -1083,7 +1089,12 @@ public final class ProxyContext implements IObserverContext
                 }
 
                 final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
-                final String action = changeName.substring(ACK.length());
+                final String action = changeName.substring(ACK_LEN);
+                // always ensure a NOK is logged
+                if (!log && !logRx && !subscribeResult.booleanValue())
+                {
+                    Log.log(this, "(<-) ", SUBSCRIBE, NOK, ObjectUtils.safeToString(recordNames));
+                }
                 List<CountDownLatch> latches;
                 String recordName;
                 final int recordNameCount = recordNames.size();
@@ -1173,7 +1184,6 @@ public final class ProxyContext implements IObserverContext
 
         executeSequentialCoreTask(new ISequentialRunnable()
         {
-
             @Override
             public void run()
             {
@@ -1184,9 +1194,25 @@ public final class ProxyContext implements IObserverContext
                     final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
                     if (isImage)
                     {
-                        ProxyContext.this.resyncs.remove(name);
+                        synchronized (ProxyContext.this.resyncs)
+                        {
+                            if (ProxyContext.this.resyncs.remove(name))
+                            {
+                                ProxyContext.this.resyncInProgress = ProxyContext.this.resyncs.size() > 0;
+                            }
+                        }
                     }
-                    // todo else check if its in resyncs - then ignore the update
+                    else
+                    {
+                        // NOTE: this block is hit for every delta received, the resyncInProgress
+                        // flag helps to optimise redundant hits to the resyncs.contains(name) call
+                        if (ProxyContext.this.resyncInProgress && ProxyContext.this.resyncs.contains(name))
+                        {
+                            Log.log(ProxyContext.this, "Ignoring delta change for record=", changeName,
+                                ", resync in progress");
+                            return;
+                        }
+                    }
 
                     final boolean recordIsSubscribed =
                         ProxyContext.this.context.recordObservers.getSubscribersFor(name).length > 0;
@@ -1263,10 +1289,18 @@ public final class ProxyContext implements IObserverContext
      * 
      * @param name
      *            the record to re-sync.
+     * @return <code>true</code> if the resync was sent, <code>false</code> if there is already
+     *         a resync in progress
      */
-    void resync(final String name)
+    boolean resync(final String name)
     {
-        if (this.resyncs.add(name))
+        final boolean resyncNeeded;
+        synchronized (this.resyncs)
+        {
+            resyncNeeded = this.resyncs.add(name);
+            this.resyncInProgress = this.resyncs.size() > 0;
+        }
+        if (resyncNeeded)
         {
             // mark the record as disconnected, then reconnecting
             synchronized (this.remoteConnectionStatusRecord.getWriteLock())
@@ -1280,6 +1314,8 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "(->) re-sync ", name);
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
                 new String[] { substituteRemoteNameWithLocalName(name) }));
+            
+            return true;
         }
         else
         {
@@ -1287,6 +1323,8 @@ public final class ProxyContext implements IObserverContext
             {
                 Log.log(this, "Ignoring duplicate re-sync for ", name);
             }
+            
+            return false;
         }
     }
 

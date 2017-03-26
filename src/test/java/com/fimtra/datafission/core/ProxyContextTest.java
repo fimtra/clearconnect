@@ -379,6 +379,7 @@ public class ProxyContextTest
         {
             this.candidate.resync(name);
             assertTrue(this.candidate.resyncs.contains(name));
+            assertTrue(this.candidate.resyncInProgress);
         }
         // we spin until we have detected the resync has completed - NOTE: a resync may not generate
         // a record update as the image will be identical
@@ -396,6 +397,7 @@ public class ProxyContextTest
                 return false;
             }
         });
+        assertFalse(this.candidate.resyncInProgress);
     }
     
     @Test
