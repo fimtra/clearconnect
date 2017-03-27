@@ -146,7 +146,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 rpcExecutor, utilityExecutor);
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
-
+        
         // update service stats periodically
         this.statsUpdateTask = this.context.getUtilityExecutor().scheduleWithFixedDelay(
             new Runnable()
@@ -587,9 +587,20 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     }
 
     @Override
-    public void setPermissionFilter(IPermissionFilter filter)
+    public void setPermissionFilter(final IPermissionFilter filter)
     {
-        this.context.setPermissionFilter(filter);
+        this.context.setPermissionFilter(new IPermissionFilter()
+        {
+            @Override
+            public boolean accept(String permissionToken, String recordName)
+            {
+                if(SERVICE_STATS_RECORD_NAME.equals(recordName))
+                {
+                    return true;
+                }
+                return filter.accept(permissionToken, recordName);
+            }
+        });
     }
 
     @Override
