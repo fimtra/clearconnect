@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
+
 /**
  * Tests for the {@link NotifyingCache}
  * 
@@ -199,22 +201,43 @@ public class NotifyingCacheTest
 
         assertTrue("Got: " + latch.getCount(), latch.await(5, TimeUnit.SECONDS));
 
-        Thread.sleep(100);
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
+        {
+            Map<Integer, Integer> fails = new HashMap<Integer, Integer>();
 
-        Map<Integer, Integer> fails = new HashMap<Integer, Integer>();
-        for (int i = 0; i < COUNT; i++)
-        {
-            final int size = listeners.get(i).size();
-            if (size != COUNT)
+            @Override
+            public Object got()
             {
-                fails.put(i, size);
+                this.fails.clear();
+                for (int i = 0; i < COUNT; i++)
+                {
+                    final int size = listeners.get(i).size();
+                    if (size != COUNT)
+                    {
+                        this.fails.put(i, size);
+                        if (size > 0)
+                        {
+                            final String x = "For " + i + ", first update was: " + listeners.get(i).get(0)
+                                + ", last update was: " + listeners.get(i).get(size - 1);
+                        }
+                    }
+                }
+                return this.fails.size();
             }
-        }
-        if (fails.size() > 0)
-        {
-            fail("Each listener should only get " + COUNT + " updates, got failures (listener number=update count) "
-                + fails);
-        }
+
+            @Override
+            public Object expect()
+            {
+                return 0;
+            }
+            
+            @Override
+            public String getFailureReason()
+            {
+                return "Each listener should only get " + COUNT
+                    + " updates, got failures (listener number=update count) " + this.fails;
+            }
+        });
     }
 
     @Test
@@ -385,7 +408,7 @@ public class NotifyingCacheTest
     {
         assertFalse(this.candidate.addListener(null));
     }
-    
+
     @Test
     public void testNoDeadlock() throws InterruptedException
     {
@@ -396,7 +419,7 @@ public class NotifyingCacheTest
             {
                 listener.update(null, data);
             }
-            
+
             @Override
             protected void notifyListenerDataAdded(Observer listener, String key, String data)
             {
@@ -404,27 +427,28 @@ public class NotifyingCacheTest
             }
         };
         candidate.notifyListenersDataAdded("key", "data1");
-        
+
         doDeadlockTest(candidate);
     }
 
     @Test
     public void testNoDeadlockAsync() throws InterruptedException
     {
-        final NotifyingCache<Observer, String> candidate = new NotifyingCache<Observer, String>(ThreadUtils.newSingleThreadExecutorService("testNoDeadlockAsync"))
-        {
-            @Override
-            protected void notifyListenerDataRemoved(Observer listener, String key, String data)
+        final NotifyingCache<Observer, String> candidate =
+            new NotifyingCache<Observer, String>(ThreadUtils.newSingleThreadExecutorService("testNoDeadlockAsync"))
             {
-                listener.update(null, data);
-            }
+                @Override
+                protected void notifyListenerDataRemoved(Observer listener, String key, String data)
+                {
+                    listener.update(null, data);
+                }
 
-            @Override
-            protected void notifyListenerDataAdded(Observer listener, String key, String data)
-            {
-                listener.update(null, data);
-            }
-        };
+                @Override
+                protected void notifyListenerDataAdded(Observer listener, String key, String data)
+                {
+                    listener.update(null, data);
+                }
+            };
         candidate.notifyListenersDataAdded("key", "data1");
 
         doDeadlockTest(candidate);
@@ -453,7 +477,7 @@ public class NotifyingCacheTest
         });
 
         assertTrue(latch1.await(1, TimeUnit.SECONDS));
-        
+
         new Thread(new Runnable()
         {
             @Override
@@ -469,7 +493,7 @@ public class NotifyingCacheTest
                 });
             }
         }).start();
-        
+
         assertTrue(latch2.await(1, TimeUnit.SECONDS));
     }
 
@@ -507,6 +531,6 @@ public class NotifyingCacheTest
         assertTrue(candidate.notifyListenersDataRemoved("1"));
 
         assertEquals(expectedNotifiedAdded, notifiedAdded);
-        assertEquals(expectedNotifiedRemoved, notifiedRemoved);        
+        assertEquals(expectedNotifiedRemoved, notifiedRemoved);
     }
 }
