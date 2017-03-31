@@ -96,7 +96,7 @@ public class FileUtilsTest {
 	
 	@Test
 	public void testCopyMoveDeleteDirectory() throws IOException {
-		final File srcDir = new File(System.getProperty("user.dir"));
+		final File srcDir = new File("./logs");
 		final File targetDir = new File(System.getProperty("java.io.tmpdir"), srcDir.getName());
 
 		// copy

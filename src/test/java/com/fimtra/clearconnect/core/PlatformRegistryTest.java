@@ -19,9 +19,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
@@ -31,6 +33,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
+import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
@@ -52,6 +55,8 @@ public class PlatformRegistryTest
     @Before
     public void setup()
     {
+        regPort++;
+        port++;
         this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
         this.candidate.publisher.publishContextConnectionsRecordAtPeriod(100);
     }
@@ -60,6 +65,68 @@ public class PlatformRegistryTest
     public void teardown()
     {
         this.candidate.destroy();
+    }
+
+    @Test
+    public void testMultipleConnectionsRestart() throws IOException, InterruptedException
+    {
+        final int MAX = 100;
+        final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<CountDownLatch>();
+        connectedLatch.set(new CountDownLatch(MAX));
+        final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<CountDownLatch>();
+        disconnectedLatch.set(new CountDownLatch(MAX));
+        PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
+        for (int i = 0; i < MAX; i++)
+        {
+            final String suffix = i + "-" + System.nanoTime();
+            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i].setRegistryReconnectPeriodMillis(500);
+            agents[i].addRegistryAvailableListener(new IRegistryAvailableListener()
+            {
+                @Override
+                public void onRegistryDisconnected()
+                {
+                    disconnectedLatch.get().countDown();
+                }
+
+                @Override
+                public void onRegistryConnected()
+                {
+                    connectedLatch.get().countDown();
+                }
+            });
+        }
+        assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
+        candidate.destroy();
+        assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
+
+        try
+        {
+            while (true)
+            {
+                Socket s = null;
+                try
+                {
+                    s = new Socket(TcpChannelUtils.LOCALHOST_IP, regPort);
+                }
+                finally
+                {                    
+                    if (s != null)
+                    {
+                        s.close();
+                    }
+                    Thread.sleep(500);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+        }
+        
+        connectedLatch.set(new CountDownLatch(MAX));
+        candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort); 
+        final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
+        assertTrue("Only got: "+ (MAX - connectedLatch.get().getCount()),await);
     }
 
     @Test
@@ -74,13 +141,13 @@ public class PlatformRegistryTest
             final String suffix = i + "-" + System.nanoTime();
             agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
 
-            agents[i].createPlatformServiceInstance("Test-FTservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP,
-                port++, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            agents[i].createPlatformServiceInstance("Test-FTservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
             publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice-" + i, suffix));
 
             // create a load balanced service
-            agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP,
-                port++, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
             publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
         }
 
@@ -89,7 +156,7 @@ public class PlatformRegistryTest
         this.candidate.context.addObserver(new IRecordListener()
         {
             boolean connected;
-            
+
             @Override
             public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
@@ -98,7 +165,7 @@ public class PlatformRegistryTest
                     allConnections.countDown();
                     connected = true;
                 }
-                
+
                 // this is for when we destroy the agents
                 if (connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
                 {
@@ -122,7 +189,7 @@ public class PlatformRegistryTest
     void checkEmpty() throws InterruptedException
     {
         Thread.sleep(2000);
-        
+
         checkZeroSize(this.candidate.platformConnections);
         checkZeroSize(this.candidate.serviceInstancesPerAgent);
         // the platform registry adds itself as a service instance
@@ -149,7 +216,7 @@ public class PlatformRegistryTest
 
     void publishRecordAndRpc(final String suffix, final IPlatformServiceInstance service)
     {
-        ((PlatformServiceInstance)service).publisher.publishContextConnectionsRecordAtPeriod(100);
+        ((PlatformServiceInstance) service).publisher.publishContextConnectionsRecordAtPeriod(100);
         final IRecord record = service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
         record.put("field", System.currentTimeMillis());
         service.publishRecord(record);

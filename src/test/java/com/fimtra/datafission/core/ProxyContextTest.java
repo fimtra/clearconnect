@@ -22,10 +22,18 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,8 +50,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 import org.junit.After;
 import org.junit.Before;
@@ -51,7 +57,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.mockito.Mockito;
-import org.mockito.internal.verification.AtLeast;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -79,7 +84,6 @@ import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
-import com.fimtra.util.ThreadUtils;
 
 /**
  * Tests the {@link ProxyContext} and {@link Publisher}
@@ -130,7 +134,7 @@ public class ProxyContextTest
 
     String getContextName()
     {
-        return getClass().getSimpleName() + "-" + name.getMethodName();
+        return getClass().getSimpleName() + "-" + this.name.getMethodName();
     }
 
     private void createComponents() throws IOException
@@ -406,7 +410,7 @@ public class ProxyContextTest
         createComponents();
         for (int i = 0; i < 20; i++)
         {
-            context.createRecord("rec-" + i);
+            this.context.createRecord("rec-" + i);
         }
         
         final String name = IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
@@ -2256,6 +2260,82 @@ public class ProxyContextTest
         assertTrue(this.candidate.isActive());
         this.candidate.destroy();
         assertFalse(this.candidate.isActive());
+    }
+    
+    @Test
+    public void testRecordSubscribe_bounceContext() throws Exception
+    {
+        createComponents();
+        final String simpleRecord = "sdflasers_32";
+        IRecord record = this.context.createRecord(simpleRecord);
+        record.put(simpleRecord, TextValue.valueOf(simpleRecord));
+        record.put("time", System.currentTimeMillis());
+        
+        this.context.publishAtomicChange(record);
+        
+        final AtomicReference<CountDownLatch> latch = new AtomicReference(new CountDownLatch(1));
+        final IRecordListener observer = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                if (imageCopy.size() > 0)
+                {
+                    latch.get().countDown();
+                }
+            }
+        };
+        this.candidate.addObserver(observer, simpleRecord);
+     
+        final int timeout = TIMEOUT;
+        assertTrue(latch.get().await(timeout, TimeUnit.SECONDS));
+        latch.set(new CountDownLatch(1));
+        
+        this.publisher.destroy();
+        this.context.destroy();
+        this.executor.shutdownNow();
+        
+
+        try
+        {
+            while (true)
+            {
+                Socket s = null;
+                try
+                {
+                    s = new Socket(LOCALHOST, this.PORT);
+                }
+                finally
+                {                    
+                    if (s != null)
+                    {
+                        s.close();
+                    }
+                    Thread.sleep(500);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+        }
+        
+        // re-add the listener - ensures idempotency is tested
+        this.candidate.addObserver(observer, simpleRecord);
+        
+        // re-create the context
+        this.contextName = getContextName();
+        this.context = new Context(this.contextName);
+        doSetup();
+        this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
+        
+        // re-create the record
+        record = this.context.createRecord(simpleRecord);
+        record.put(simpleRecord, TextValue.valueOf(simpleRecord));
+        record.put("time", System.currentTimeMillis());
+        
+        this.context.publishAtomicChange(record);
+        
+        assertTrue(latch.get().await(timeout, TimeUnit.SECONDS));
     }
 
     @Test

@@ -68,7 +68,7 @@ import com.fimtra.thimble.ThimbleExecutor;
  * process coalescing of pending updates.
  * <li>Time-based: coalescing of updates will happen at a guaranteed rate for all updates to each
  * record.
- * <ul>
+ * </ul>
  * <p>
  * A note about context-based coalescing: be careful when attaching a context-based coalescing
  * listener, that shares its {@link ThimbleExecutor} with other coalescing listeners, to multiple

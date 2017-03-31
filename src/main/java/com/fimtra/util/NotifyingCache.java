@@ -46,7 +46,7 @@ import com.fimtra.util.LazyObject.IDestructor;
  * <p>
  * <b>Threading:</b> all listeners are notified with initial images using an internal
  * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the
- * cache are notified using the respective thread model used for ache construction.
+ * cache are notified using the respective thread model used for cache construction.
  * <p>
  * A notifying cache should be equal by object reference only.
  * 

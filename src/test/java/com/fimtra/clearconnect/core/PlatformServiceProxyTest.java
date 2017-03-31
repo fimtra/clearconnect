@@ -40,7 +40,6 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 
 import com.fimtra.channel.ChannelUtils;
-import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
@@ -48,6 +47,7 @@ import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
+import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
@@ -59,7 +59,6 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
-import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
@@ -72,12 +71,13 @@ import com.fimtra.util.ThreadUtils;
  */
 public class PlatformServiceProxyTest
 {
+    private String TEST_PLATFORM_SERVICE;
+
     @Rule
     public TestName name = new TestName();
 
     private static final String RPC2 = "rpc2";
     private static final String RPC1 = "rpc1";
-    static int PORT = 31000;
     static int registryPort = 31500;
     static String registryHost = TcpChannelUtils.LOCALHOST_IP;
     static String agentHost = TcpChannelUtils.LOCALHOST_IP;
@@ -100,18 +100,18 @@ public class PlatformServiceProxyTest
     public void setUp() throws Exception
     {
         System.err.println(this.name.getMethodName());
+        this.TEST_PLATFORM_SERVICE = this.name.getMethodName();
         registryPort++;
         ChannelUtils.WATCHDOG.configure(200, 10);
-        this.registry = new PlatformRegistry(this.name.getMethodName(), registryHost, registryPort);
+        this.registry = new PlatformRegistry(this.TEST_PLATFORM_SERVICE, registryHost, registryPort);
         this.agent = new PlatformRegistryAgent("Agent", registryHost, registryPort);
-        PORT += 1;
+        this.agent.createPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "PRIMARY", hostName, 0,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+        this.agent.waitForPlatformService(this.TEST_PLATFORM_SERVICE);
+
         this.service =
-            new PlatformServiceInstance(null, "TestPlatformService", "PRIMARY", WireProtocolEnum.STRING,
-                RedundancyModeEnum.FAULT_TOLERANT, hostName, PORT, null, null, null,
-                TransportTechnologyEnum.getDefaultFromSystemProperty());
-        this.candidate =
-            new PlatformServiceProxy(this.agent, "TestPlatformService", new StringProtocolCodec(), hostName, PORT,
-                TransportTechnologyEnum.getDefaultFromSystemProperty());
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "PRIMARY");
+        this.candidate = (PlatformServiceProxy) this.agent.getPlatformServiceProxy(this.TEST_PLATFORM_SERVICE);
         this.candidate.setReconnectPeriodMillis(200);
         this.agent.setRegistryReconnectPeriodMillis(200);
 
@@ -146,7 +146,8 @@ public class PlatformServiceProxyTest
     {
         IServiceConnectionStatusListener listener = mock(IServiceConnectionStatusListener.class);
         this.candidate.addServiceConnectionStatusListener(listener);
-        verify(listener, timeout(1000).atLeastOnce()).onConnected(eq(this.service.getPlatformServiceFamily()), anyInt());
+        verify(listener, timeout(1000).atLeastOnce()).onConnected(eq(this.service.getPlatformServiceFamily()),
+            anyInt());
         this.service.destroy();
         verify(listener, timeout(1000).atLeastOnce()).onReconnecting(eq(this.service.getPlatformServiceFamily()),
             anyInt());
@@ -159,19 +160,18 @@ public class PlatformServiceProxyTest
     {
         int i = 0;
         Map<String, SubscriptionInfo> allSubscriptions;
-        while ((allSubscriptions = this.service.getAllSubscriptions()).size() != 4 && i++ < 20)
+        while ((allSubscriptions = this.service.getAllSubscriptions()).size() != 5 && i++ < 20)
         {
             Thread.sleep(100);
         }
-        assertEquals("Got: " + allSubscriptions, 4, allSubscriptions.size());
-
+        assertEquals("Got: " + allSubscriptions, 5, allSubscriptions.size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(5, this.service.getAllSubscriptions().size());
+        assertEquals(6, this.service.getAllSubscriptions().size());
         assertEquals(1, this.service.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.service.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -179,7 +179,7 @@ public class PlatformServiceProxyTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(4, this.service.getAllSubscriptions().size());
+        assertEquals(5, this.service.getAllSubscriptions().size());
         assertNull(this.service.getAllSubscriptions().get(record1));
     }
 
@@ -383,8 +383,8 @@ public class PlatformServiceProxyTest
             });
             assertTrue("GOT: " + records, latch.get().await(5, TimeUnit.SECONDS));
             waitForContextSubscriptionsToUpdate();
-            assertEquals("GOT: " + records + ", candidate.getAllRecordNames()=" + this.candidate.getAllRecordNames(),
-                6, this.candidate.getAllRecordNames().size());
+            assertEquals("GOT: " + records + ", candidate.getAllRecordNames()=" + this.candidate.getAllRecordNames(), 6,
+                this.candidate.getAllRecordNames().size());
 
             latch.set(new CountDownLatch(1));
             assertTrue(this.service.createRecord(record1));
@@ -426,7 +426,7 @@ public class PlatformServiceProxyTest
         IRpcAvailableListener rpcListener = mock(IRpcAvailableListener.class);
         this.candidate.addRpcAvailableListener(rpcListener);
         verify(rpcListener, timeout(1000).times(1)).onRpcAvailable(any(IRpcInstance.class));
-        
+
         assertEquals(1, this.candidate.getAllRpcs().size());
         IRpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         assertTrue(this.service.publishRPC(rpc1));
@@ -560,6 +560,70 @@ public class PlatformServiceProxyTest
         record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.service.publishRecord(record).await(1, TimeUnit.SECONDS));
 
+        assertTrue(latch.get().await(1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testUpdateRecord_bounceService() throws InterruptedException
+    {
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        IRecordListener listener = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                if (imageCopy.size() > 0)
+                {
+                    latch.get().countDown();
+                }
+            }
+        };
+        this.candidate.addRecordListener(listener, record1);
+
+        IRecord record = this.service.getOrCreateRecord(record1);
+        record.put("time", System.currentTimeMillis());
+        this.service.publishRecord(record);
+
+        assertTrue(latch.get().await(1, TimeUnit.SECONDS));
+
+        // re-add the listener - this should be idempotent
+        this.candidate.addRecordListener(listener, record1);
+
+        final CountDownLatch latch2 = new CountDownLatch(1);
+        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        {
+            @Override
+            public void onServiceUnavailable(String serviceFamily)
+            {
+                if (serviceFamily.equals(PlatformServiceProxyTest.this.TEST_PLATFORM_SERVICE))
+                {
+                    latch2.countDown();
+                }
+            }
+
+            @Override
+            public void onServiceAvailable(String serviceFamily)
+            {
+
+            }
+        });
+
+        // destroy and re-create
+        this.agent.destroyPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "PRIMARY");
+
+        assertTrue(latch2.await(5, TimeUnit.SECONDS));
+
+        this.agent.createPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "SECONDARY", hostName, 0,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+        this.agent.waitForPlatformService(this.TEST_PLATFORM_SERVICE);
+        this.service =
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "SECONDARY");
+
+        record = this.service.getOrCreateRecord(record1);
+        record.put("time", System.currentTimeMillis());
+        this.service.publishRecord(record);
+
+        latch.set(new CountDownLatch(1));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
     }
 

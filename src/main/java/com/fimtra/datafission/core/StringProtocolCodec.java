@@ -52,9 +52,10 @@ import com.fimtra.util.ObjectUtils;
  *  scope          = "i" | "d" ; identifies either an image or delta
  *  seq_num        = 1*DIGIT ; the sequency number
  *  puts           = "|p" 1*key-value-pair
- *  removes        = "|r" 1*key-value-pair
+ *  removes        = "|r" 1*remove-key
  *  sub-map        = "|:|" name [puts] [removes]
  *  key-value-pair = "|" key "=" value
+ *  remove-key     = "|" key "=" null
  *  key            = 1*ALPHA
  *  value          = 1*ALPHA
  *  

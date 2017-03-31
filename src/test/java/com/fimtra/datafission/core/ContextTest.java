@@ -226,9 +226,70 @@ public class ContextTest
         instance.put(K1, V1);
         instance.put(K2, V2);
         this.candidate.publishAtomicChange(name).await();
-
+        
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         final TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
+        
+        // add the first observer, wait for update
+        observer.latch = new CountDownLatch(1);
+        this.candidate.addObserver(observer, name);
+        assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
+        
+        // check image notified to observer added after creation
+        Map<String, IValue> expectedImage = new HashMap<String, IValue>();
+        expectedImage.put(K1, V1);
+        expectedImage.put(K2, V2);
+        assertEquals("changes: " + observer.changes, 1, observer.changes.size());
+        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals(2, observer.changes.get(0).getPutEntries().size());
+        assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
+        assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
+        
+        observer.reset();
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+        observer.latch = countDownLatch;
+        observer2.latch = countDownLatch;
+        
+        // change the instance and publish the change
+        instance.put(K1, V1n);
+        instance.put(K5, V5);
+        expectedImage.put(K1, V1n);
+        expectedImage.put(K5, V5);
+        this.candidate.publishAtomicChange(name).await();
+        
+        // add observer2 AFTER publishing the last change
+        this.candidate.addObserver(observer2, name);
+        
+        assertTrue(countDownLatch.await(1, TimeUnit.SECONDS));
+        
+        // check both observers have the same image
+        Map<String, IValue> putEntries = new HashMap<String, IValue>();
+        putEntries.put(K1, V1n);
+        putEntries.put(K5, V5);
+        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals("changes: " + observer.changes, 1, observer.changes.size());
+        assertEquals(putEntries, observer.changes.get(0).getPutEntries());
+        assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
+        assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
+        
+        assertEquals(expectedImage, observer2.images.get(0));
+        assertEquals("changes: " + observer2.changes, 1, observer2.changes.size());
+        assertEquals(new HashMap<String, IValue>(instance), observer2.changes.get(0).getPutEntries());
+        assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
+        assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
+        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
+    }
+    
+    @Test
+    public void testAddObserverIdempotent() throws InterruptedException
+    {
+        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        assertNotNull(instance);
+        instance.put(K1, V1);
+        instance.put(K2, V2);
+        this.candidate.publishAtomicChange(name).await();
+
+        final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
 
         // add the first observer, wait for update
         observer.latch = new CountDownLatch(1);
@@ -246,19 +307,18 @@ public class ContextTest
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
 
         observer.reset();
-        CountDownLatch countDownLatch = new CountDownLatch(2);
+        CountDownLatch countDownLatch = new CountDownLatch(1);
         observer.latch = countDownLatch;
-        observer2.latch = countDownLatch;
 
+        // re-add the same listener - checks IDEMPOTENCY
+        this.candidate.addObserver(observer, name);
+        
         // change the instance and publish the change
         instance.put(K1, V1n);
         instance.put(K5, V5);
         expectedImage.put(K1, V1n);
         expectedImage.put(K5, V5);
         this.candidate.publishAtomicChange(name).await();
-
-        // add observer2 AFTER publishing the last change
-        this.candidate.addObserver(observer2, name);
 
         assertTrue(countDownLatch.await(1, TimeUnit.SECONDS));
 
@@ -271,12 +331,7 @@ public class ContextTest
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
-
-        assertEquals(expectedImage, observer2.images.get(0));
-        assertEquals("changes: " + observer2.changes, 1, observer.changes.size());
-        assertEquals(putEntries, observer.changes.get(0).getPutEntries());
-        assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
-        assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
+        
         assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
 
