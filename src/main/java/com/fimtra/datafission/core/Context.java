@@ -860,73 +860,91 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
             }
             
+            // first pass, whilst holding the initialImagePending lock, work out if the listener
+            // needs to be added
             final List<String> subscriberAdded = new LinkedList<String>();
-            for (final String name : recordNames)
+            synchronized(initialImagePending)
             {
-                // check if the observer has already been registered
-                if (!initialImagePending.add(name))
+                for (String name : recordNames)
                 {
-                    continue;
-                }
-         
-                if (this.recordObservers.addSubscriberFor(name, observer))
-                {
-                    if (log)
+                    // check if the observer has already been registered
+                    if (!initialImagePending.add(name))
                     {
-                        Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
+                        continue;
                     }
-                    subscriberAdded.add(name);
 
-                    executeSequentialCoreTask(new ISequentialRunnable()
+                    if (this.recordObservers.addSubscriberFor(name, observer))
                     {
-                        @Override
-                        public void run()
+                        subscriberAdded.add(name);
+                    }
+                    else
+                    {
+                        initialImagePending.remove(name);
+                    }
+                }
+                updateListenerCountsForInitialImages(observer, initialImagePending);
+            }
+            
+            // second pass, trigger the initial image notification for the names that were added for
+            // subscribing
+            for (final String name : subscriberAdded)
+            {
+                if (log)
+                {
+                    Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
+                }
+
+                executeSequentialCoreTask(new ISequentialRunnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        try
                         {
-                            try
-                            {                 
-                                // happens if a removeObserver is called before the add completes
-                                if (!initialImagePending.contains(name))
-                                {
-                                    return;
-                                }
-                                
+                            // happens if a removeObserver is called before the add completes
+                            if (!initialImagePending.remove(name))
+                            {
+                                return;
+                            }
+
+                            if (log)
+                            {
+                                Log.log(this, "Notifying initial image [", name, "], listener=",
+                                    ObjectUtils.safeToString(observer));
+                            }
+                            final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
+
+                            if (imageSnapshot != null)
+                            {
+                                final long start = System.nanoTime();
+                                observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
+                                ContextUtils.measureTask(name, "record image-on-subscribe", observer,
+                                    (System.nanoTime() - start));
+                            }
+                            else
+                            {
                                 if (log)
                                 {
-                                    Log.log(this, "Notifying initial image [", name, "], listener=",
+                                    Log.log(this, "No initial image available [", name, "], listener=",
                                         ObjectUtils.safeToString(observer));
                                 }
-                                final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
-
-                                if (imageSnapshot != null)
-                                {
-                                    final long start = System.nanoTime();
-                                    observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
-                                    ContextUtils.measureTask(name, "record image-on-subscribe", observer,
-                                        (System.nanoTime() - start));
-                                }
-                                else
-                                {
-                                    if (log)
-                                    {
-                                        Log.log(this, "No initial image available [", name, "], listener=",
-                                            ObjectUtils.safeToString(observer));
-                                    }
-                                }
                             }
-                            finally
+                        }
+                        finally
+                        {
+                            synchronized (initialImagePending)
                             {
-                                initialImagePending.remove(name);
                                 updateListenerCountsForInitialImages(observer, initialImagePending);
                             }
                         }
+                    }
 
-                        @Override
-                        public Object context()
-                        {
-                            return name;
-                        }
-                    });
-                }
+                    @Override
+                    public Object context()
+                    {
+                        return name;
+                    }
+                });
             }
 
             addDeltaToSubscriptionCount(1, subscriberAdded);
@@ -949,8 +967,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final Set<String> initialImagePending = this.listenersToNotifyWithInitialImages.get(observer);
             if (initialImagePending != null)
             {
-                initialImagePending.removeAll(Arrays.asList(names));
-                updateListenerCountsForInitialImages(observer, initialImagePending);
+                synchronized (initialImagePending)
+                {
+                    initialImagePending.removeAll(Arrays.asList(names));
+                    updateListenerCountsForInitialImages(observer, initialImagePending);
+                }
             }
             
             final List<String> toRemove = new LinkedList<String>();
