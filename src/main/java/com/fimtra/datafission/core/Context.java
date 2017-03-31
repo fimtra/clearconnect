@@ -73,8 +73,9 @@ import com.fimtra.util.UtilProperties;
  * To publish changes to remote observers, a {@link Publisher} must be created and attached to the
  * context. The publisher can then publish changes to one or more {@link ProxyContext} instances.
  * <p>
- * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()} associated with the name of
- * the record. This allows operations on different records to run in parallel.
+ * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()}
+ * associated with the name of the record. This allows operations on different records to run in
+ * parallel.
  * 
  * @see IRecord
  * @author Ramon Servadei
@@ -515,7 +516,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         final Record record = new Record(name, ContextUtils.EMPTY_MAP, this);
         this.records.put(name, record);
-        // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus starting at 0
+        // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus
+        // starting at 0
         this.sequences.put(name, new AtomicLong(-1));
         getPendingAtomicChangesForWrite(name);
         // this will set off an atomic change for the construction
@@ -538,12 +540,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 return name;
             }
         });
-        
+
         if (log)
         {
             Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
         }
-        
+
         return record;
     }
 
@@ -592,7 +594,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         final Set<String> recordsToProcess;
                         synchronized (Context.this.recordsToRemoveFromSystemRecords)
                         {
-                            recordsToProcess = CollectionUtils.newHashSet(Context.this.recordsToRemoveFromSystemRecords);
+                            recordsToProcess =
+                                CollectionUtils.newHashSet(Context.this.recordsToRemoveFromSystemRecords);
                             Context.this.recordsToRemoveFromSystemRecords.clear();
                         }
 
@@ -725,55 +728,53 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
                         long start;
                         IRecordListener listener = null;
-                        final IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
+                        IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
 
                         // if there are any pending initial images waiting, we need to ensure we
                         // don't notify this update to the registered listener
                         if (Context.this.listenersBeingNotifiedWithInitialImages > 0)
                         {
+                            // work out who to notify, i.e. listeners NOT expecting an image
                             Set<String> initialImagePending;
+                            final List<IRecordListener> listenersNotExpectingImage = new LinkedList<IRecordListener>();
                             for (int i = 0; i < subscribersForRecord.length; i++)
                             {
-                                try
+                                listener = subscribersForRecord[i];
+
+                                // NOTE: cannot optimise by locking
+                                // listenersToNotifyWithInitialImages outside the loop - this can
+                                // lead to a deadlock as the lock order with initialImagePending
+                                // will then become broken
+                                initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
+                                if (initialImagePending != null && initialImagePending.contains(name))
                                 {
-                                    listener = subscribersForRecord[i];
-
-                                    initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
-                                    if (initialImagePending != null && initialImagePending.contains(name))
-                                    {
-                                        // don't notify - let the initial image task do this
-                                        // as it will pass in a full image as the atomic change
-                                        // (thus simulating the initial image)
-                                        continue;
-                                    }
-
-                                    start = System.nanoTime();
-                                    listener.onChange(notifyImage, atomicChange);
-                                    ContextUtils.measureTask(name, "local record update", listener,
-                                        (System.nanoTime() - start));
+                                    // don't notify - let the initial image task do this
+                                    // as it will pass in a full image as the atomic change
+                                    // (thus simulating the initial image)
+                                    continue;
                                 }
-                                catch (Exception e)
+                                else
                                 {
-                                    Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
+                                    listenersNotExpectingImage.add(listener);
                                 }
                             }
+                            subscribersForRecord = listenersNotExpectingImage.toArray(
+                                new IRecordListener[listenersNotExpectingImage.size()]);
                         }
-                        else
+
+                        for (int i = 0; i < subscribersForRecord.length; i++)
                         {
-                            for (int i = 0; i < subscribersForRecord.length; i++)
+                            try
                             {
-                                try
-                                {
-                                    listener = subscribersForRecord[i];
-                                    start = System.nanoTime();
-                                    listener.onChange(notifyImage, atomicChange);
-                                    ContextUtils.measureTask(name, "local record update", listener,
-                                        (System.nanoTime() - start));
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
-                                }
+                                listener = subscribersForRecord[i];
+                                start = System.nanoTime();
+                                listener.onChange(notifyImage, atomicChange);
+                                ContextUtils.measureTask(name, "local record update", listener,
+                                    (System.nanoTime() - start));
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
                             }
                         }
                     }
@@ -838,7 +839,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         futureResult.run();
         return futureResult;
     }
-    
+
     void addSingleObserver(final IRecordListener observer, Collection<String> recordNames)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
@@ -859,11 +860,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
                 this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
             }
-            
+
             // first pass, whilst holding the initialImagePending lock, work out if the listener
             // needs to be added
             final List<String> subscriberAdded = new LinkedList<String>();
-            synchronized(initialImagePending)
+            synchronized (initialImagePending)
             {
                 for (String name : recordNames)
                 {
@@ -884,7 +885,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
                 updateListenerCountsForInitialImages(observer, initialImagePending);
             }
-            
+
             // second pass, trigger the initial image notification for the names that were added for
             // subscribing
             for (final String name : subscriberAdded)
@@ -958,7 +959,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return new CountDownLatch(0);
     }
 
-
     private void removeSingleObserver(IRecordListener observer, String... names)
     {
         // NOTE: use a single lock to ensure thread-safe access to recordObservers
@@ -973,7 +973,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     updateListenerCountsForInitialImages(observer, initialImagePending);
                 }
             }
-            
+
             final List<String> toRemove = new LinkedList<String>();
             String name;
             for (int i = 0; i < names.length; i++)
@@ -983,7 +983,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     if (log)
                     {
-                        Log.log(this, "Removed listener from [", name, "] listener=", ObjectUtils.safeToString(observer));
+                        Log.log(this, "Removed listener from [", name, "] listener=",
+                            ObjectUtils.safeToString(observer));
                     }
                     toRemove.add(name);
                 }
