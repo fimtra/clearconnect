@@ -206,6 +206,7 @@ public final class PlatformRegistry
         String SERVICE_INSTANCES = "ServiceInstances";
         String CONNECTIONS = "Connections";
         String UPTIME = "Uptime";
+        String AGENTS = "Agents";
     }
 
     public static final String SERVICE_NAME = "PlatformRegistry";
@@ -1160,9 +1161,12 @@ final class EventHandler
                 IRuntimeStatusRecordFields.RUNTIME_HOST).textValue());
         }
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.NODES, LongValue.valueOf(hosts.size()));
-
+        
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICES,
             LongValue.valueOf(this.registry.services.size()));
+
+        this.registry.platformSummary.put(IPlatformSummaryRecordFields.AGENTS,
+            LongValue.valueOf(this.registry.runtimeStatus.getSubMapKeys().size()));
 
         int serviceInstanceCount = 0;
         for (String serviceName : this.registry.serviceInstancesPerServiceFamily.getSubMapKeys())
