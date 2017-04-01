@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -83,9 +85,9 @@ public class ContextUtils
      */
     public static final class AllRecordsRegistrationManager implements IRecordListener
     {
-        private final IRecordListener allRecordsListener;
-        private final IObserverContext context;
-        private final Set<String> subscribed = new HashSet<String>();
+        final IRecordListener allRecordsListener;
+        final IObserverContext context;
+        final Set<String> subscribed = new HashSet<String>();
 
         AllRecordsRegistrationManager(IRecordListener allRecordsListener, IObserverContext context)
         {
@@ -97,9 +99,14 @@ public class ContextUtils
         public void destroy()
         {
             this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
+            List<String> temp = new LinkedList<String>();
             for (String recordName : this.subscribed)
             {
-                this.context.removeObserver(this.allRecordsListener, recordName);
+                temp.add(recordName);
+            }
+            if (temp.size() > 0)
+            {
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }
             this.subscribed.clear();
         }
@@ -107,23 +114,34 @@ public class ContextUtils
         @Override
         public void onChange(IRecord imageCopy, IRecordChange atomicChange)
         {
+            List<String> temp = new LinkedList<String>();
             for (String recordName : atomicChange.getPutEntries().keySet())
             {
                 if (!ContextUtils.isSystemRecordName(recordName) && this.subscribed.add(recordName))
                 {
-                    this.context.addObserver(this.allRecordsListener, recordName);
+                    temp.add(recordName);
                 }
             }
+            if (temp.size() > 0)
+            {
+                this.context.addObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+            }
+
+            temp = new LinkedList<String>();
             for (String recordName : atomicChange.getRemovedEntries().keySet())
             {
                 if (this.subscribed.remove(recordName))
                 {
-                    this.context.removeObserver(this.allRecordsListener, recordName);
+                    temp.add(recordName);
                 }
+            }
+            if (temp.size() > 0)
+            {
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }
         }
     }
-    
+
     static final String FISSION = "fission";
     static final String FISSION_RPC = FISSION + "-rpc";
     static final String FISSION_CORE = FISSION + "-core";
@@ -148,7 +166,7 @@ public class ContextUtils
         set.add(ISystemRecordNames.CONTEXT_CONNECTIONS);
         SYSTEM_RECORDS = Collections.unmodifiableSet(set);
     }
-    
+
     /**
      * This is the default shared {@link ThimbleExecutor} used for <b>system record</b> event
      * handling.
@@ -440,7 +458,7 @@ public class ContextUtils
      */
     public static boolean isSystemRecordName(String name)
     {
-		if (name != null && name.startsWith(ISystemRecordNames.CONTEXT, 0))
+        if (name != null && name.startsWith(ISystemRecordNames.CONTEXT, 0))
         {
             return SYSTEM_RECORDS.contains(name);
         }
@@ -517,7 +535,7 @@ public class ContextUtils
             }
         }
         // need to do the final one
-        if(index > 0 && indexFound)
+        if (index > 0 && indexFound)
         {
             key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
             value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
@@ -739,7 +757,7 @@ public class ContextUtils
             context.publishAtomicChange(record);
         }
     }
-    
+
     /**
      * @return <code>true</code> if the thread is a core thread
      */
