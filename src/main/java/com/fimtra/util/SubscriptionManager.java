@@ -19,7 +19,9 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -41,9 +43,9 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         new ConcurrentHashMap<SUBSCRIPTION_KEY, SUBSCRIBER[]>(2);
         
     /** tracks subscribe order */
-    final List<SUBSCRIPTION_KEY> subscribeOrder =
-        Collections.synchronizedList(new ArrayList<SUBSCRIPTION_KEY>());
-
+    final Set<SUBSCRIPTION_KEY> subscribeOrder =
+        Collections.synchronizedSet(new LinkedHashSet<SUBSCRIPTION_KEY>());
+    
     /**
      * Construct the subscription manager passing in the class for the subscriber. This is required
      * to ensure correct array component type is used internall.
@@ -103,6 +105,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         {
             current = (SUBSCRIBER[]) Array.newInstance(this.subscriberClass, 1);
             current[0] = subscriber;
+            
             this.subscribeOrder.add(key);
         }
         else
