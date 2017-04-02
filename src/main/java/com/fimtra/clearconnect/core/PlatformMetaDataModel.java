@@ -23,7 +23,6 @@ import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RUNTIME_STATUS;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICES;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
 import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.AVG_MSG_SIZE;
@@ -398,17 +397,6 @@ public final class PlatformMetaDataModel
             }
         }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED);
 
-    final CoalescingRecordListener _serviceInstancesPerServiceFamilyRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServiceInstancesUpdate(imageCopy);
-            }
-        }, SERVICE_INSTANCES_PER_SERVICE_FAMILY);
-
     final CoalescingRecordListener _recordsPerServiceFamilyListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
         {
@@ -555,12 +543,6 @@ public final class PlatformMetaDataModel
         return this.agent.registryProxy.addObserver(this._recordsPerServiceFamilyListener, RECORDS_PER_SERVICE_FAMILY);
     }
 
-    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCES_PER_SERVICE_FAMILY()
-    {
-        return this.agent.registryProxy.addObserver(this._serviceInstancesPerServiceFamilyRecordListener,
-            SERVICE_INSTANCES_PER_SERVICE_FAMILY);
-    }
-
     Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCE_STATS()
     {
         return this.agent.registryProxy.addObserver(this._serviceInstanceStatsRecordListener, SERVICE_INSTANCE_STATS);
@@ -673,7 +655,6 @@ public final class PlatformMetaDataModel
     {
         registerListener_SERVICE_INSTANCE_STATS();
         registerListener_SERVICE_INSTANCES_PER_AGENT();
-        registerListener_SERVICE_INSTANCES_PER_SERVICE_FAMILY();
         return this.serviceInstancesContext;
     }
 
@@ -901,64 +882,41 @@ public final class PlatformMetaDataModel
         IRecord statsForServiceInstance;
         for (String serviceInstanceId : atomicChange.getSubMapKeys())
         {
-            stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getPutEntries();
             statsForServiceInstance = this.serviceInstancesContext.getOrCreateRecord(serviceInstanceId);
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.UPTIME, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.UpTimeSecs.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.SUBSCRIPTION_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.SubscriptionCount.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MESSAGE_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.MessagesSent.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.KbSent.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MSGS_PER_SEC, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.MsgsPerSec.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_PER_SEC, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.KbPerSec.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.AVG_MSG_SIZE, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.AvgMsgSizeBytes.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.VERSION, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.Version.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RECORD_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.RecordCount.toString());
-            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RPC_COUNT, statsForServiceInstance,
-                ServiceInstanceMetaDataRecordDefinition.RpcCount.toString());
             
-            this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
-        }
-    }
-
-    void handlePlatformServiceInstancesUpdate(IRecord imageCopy)
-    {
-        final Set<String> serviceInstanceIDs = new HashSet<String>();
-        final Set<String> serviceFamilys = imageCopy.getSubMapKeys();
-        Map<String, IValue> instances;
-        String serviceInstanceID;
-        TextValue serviceFamilyTextValue;
-        for (String serviceFamily : serviceFamilys)
-        {
-            serviceFamilyTextValue = TextValue.valueOf(serviceFamily);
-            instances = imageCopy.getOrCreateSubMap(serviceFamily);
-
-            // add new instances
-            for (Iterator<Map.Entry<String, IValue>> it = instances.entrySet().iterator(); it.hasNext();)
+            stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getPutEntries();
+            if(stats.size() > 0)
             {
-                serviceInstanceID = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, it.next().getKey());
-                this.serviceInstancesContext.getOrCreateRecord(serviceInstanceID).put(
-                    ServiceInstanceMetaDataRecordDefinition.Service.toString(), serviceFamilyTextValue);
-                this.serviceInstancesContext.publishAtomicChange(serviceInstanceID);
-                serviceInstanceIDs.add(serviceInstanceID);
+                statsForServiceInstance.put(ServiceInstanceMetaDataRecordDefinition.Service.toString(),
+                    PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId)[0]);
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.UPTIME, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.UpTimeSecs.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.SUBSCRIPTION_COUNT, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.SubscriptionCount.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MESSAGE_COUNT, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.MessagesSent.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_COUNT, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.KbSent.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.MSGS_PER_SEC, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.MsgsPerSec.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.KB_PER_SEC, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.KbPerSec.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.AVG_MSG_SIZE, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.AvgMsgSizeBytes.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.VERSION, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.Version.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RECORD_COUNT, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.RecordCount.toString());
+                ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RPC_COUNT, statsForServiceInstance,
+                    ServiceInstanceMetaDataRecordDefinition.RpcCount.toString());
+                this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
             }
-        }
-
-        // remove instances
-        Set<String> previousServiceInstances = new HashSet<String>(this.serviceInstancesContext.getRecordNames());
-        previousServiceInstances.removeAll(serviceInstanceIDs);
-        for (String removedServiceInstanceID : previousServiceInstances)
-        {
-            if (!ContextUtils.isSystemRecordName(removedServiceInstanceID))
+            
+            stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getRemovedEntries();
+            if (stats.size() > 0)
             {
-                removeServiceInstance(removedServiceInstanceID);
+                // NOTE: fields are never removed, so any remove means the entire submap has been removed
+                removeServiceInstance(serviceInstanceId);
             }
         }
     }

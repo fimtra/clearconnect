@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
+import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.IFtStatusListener;
@@ -169,8 +170,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     }
 
                     final double inverse_1K = 1 / 1024d;
-                    final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
-                    final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
+                    // can be null on the first call
+                    final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
+                        : PlatformServiceInstance.this.publisher.getMessagesPublished();
+                    final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
+                        : PlatformServiceInstance.this.publisher.getBytesPublished();
                     final double perSec = 1d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
 
                     PlatformServiceInstance.this.stats.put(
@@ -200,8 +204,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
                     PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
                 }
-            }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
-            DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
+            }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
 
         this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
         this.recordAvailableNotifyingCache =

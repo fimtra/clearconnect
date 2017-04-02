@@ -85,7 +85,14 @@ public abstract class PlatformCoreProperties
          * E.g. <code>-Dplatform.agentServiceRegistrationTimeoutMillis=30000</code><br>
          * 
          */
-        String PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS = "agentServiceRegistrationTimeoutMillis";
+        String PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS = BASE + "agentServiceRegistrationTimeoutMillis";
+
+        /**
+         * The system property name to define the period in SECONDS that a service instance uses for
+         * publishing its "Service Stats" record.<br>
+         * E.g. <code>-Dplatform.serviceStatsRecordPublishPeriodSecs=10</code><br>
+         */
+        String SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS = BASE + "serviceStatsRecordPublishPeriodSecs";
     }
 
     /**
@@ -170,6 +177,17 @@ public abstract class PlatformCoreProperties
          */
         long PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS =
             Long.parseLong(System.getProperty(Names.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS, "30000"));
+        
+        
+        /**
+         * The period in SECONDS that a service instance uses for publishing its "Service Stats" record.
+         * <p>
+         * Default is: 10
+         * 
+         * @see Names#SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS
+         */
+        long SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS = Long.parseLong(System.getProperty(
+            Names.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, "10"));
     }
 
     private PlatformCoreProperties()
