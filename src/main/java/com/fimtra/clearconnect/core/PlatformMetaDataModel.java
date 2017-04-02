@@ -58,10 +58,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
+import com.fimtra.clearconnect.core.PlatformRegistry.IServiceRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
-import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
@@ -288,43 +288,6 @@ public final class PlatformMetaDataModel
         }
     }
 
-    static void updateRecordWithCountsAndPublish(final String recordName, final Map<String, IValue> instancesToCount,
-        final Context context, final String countField, ConcurrentMap<String, Runnable> pendingTasks)
-    {
-        final int size = instancesToCount.size();
-        final IRecord serviceRecord = context.getRecord(recordName);
-        final Runnable task = new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                final IRecord record = context.getRecord(recordName);
-                record.put(countField, LongValue.valueOf(size));
-                context.publishAtomicChange(record);
-            }
-        };
-
-        if (serviceRecord != null)
-        {
-            task.run();
-        }
-        else
-        {
-            /*
-             * This prevents the following race condition:
-             * 
-             * - if a service is destroyed, it is removed from the registry SERVICES record and
-             * published instantly (t1) but the records/RPCs from the service are removed and
-             * published by the registry after a delay (t2)...so if you connect to the registry in
-             * between t1 and t2 you will accidentally create the record representing the service if
-             * using getOrCreate and it will not be removed (because no more signals happen to say
-             * the service is gone)...so we use this observer on when the record is created to
-             * actually fire the change
-             */
-            pendingTasks.put(recordName, task);
-        }
-    }
-
     static void removeSystemRecords(Map<String, IValue> records)
     {
         for (Iterator<Map.Entry<String, IValue>> it = records.entrySet().iterator(); it.hasNext();)
@@ -527,9 +490,6 @@ public final class PlatformMetaDataModel
 
     boolean reset;
 
-    // track tasks that should only run when the service exists
-    final ConcurrentMap<String, Runnable> pendingTasks;
-
     public PlatformMetaDataModel(String registryNode, int registryPort) throws IOException
     {
         this.agent = new PlatformRegistryAgent(PlatformMetaDataModel.class.getSimpleName(), registryNode, registryPort);
@@ -546,8 +506,6 @@ public final class PlatformMetaDataModel
         this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
         this.serviceInstanceRecordsContext = new ConcurrentHashMap<String, Context>();
 
-        this.pendingTasks = new ConcurrentHashMap<String, Runnable>();
-
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -561,24 +519,6 @@ public final class PlatformMetaDataModel
             {
             }
         });
-
-        this.servicesContext.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord image, IRecordChange atomicChange)
-            {
-                handlePendingTasks(image, PlatformMetaDataModel.this.pendingTasks);
-            }
-        }, ISystemRecordNames.CONTEXT_RECORDS);
-
-        this.serviceInstancesContext.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord image, IRecordChange atomicChange)
-            {
-                handlePendingTasks(image, PlatformMetaDataModel.this.pendingTasks);
-            }
-        }, ISystemRecordNames.CONTEXT_RECORDS);
         
         // the bare minimum
         registerListener_PLATFORM_CONNECTIONS();
@@ -718,8 +658,6 @@ public final class PlatformMetaDataModel
     public IObserverContext getPlatformServicesContext()
     {
         registerListener_SERVICES();
-        registerListener_RECORDS_PER_SERVICE_FAMILY();
-        registerListener_RPCS_PER_SERVICE_FAMILY();
         return this.servicesContext;
     }
 
@@ -733,8 +671,6 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstancesContext()
     {
-        registerListener_RECORDS_PER_SERVICE_INSTANCE();
-        registerListener_RPCS_PER_SERVICE_INSTANCE();
         registerListener_SERVICE_INSTANCE_STATS();
         registerListener_SERVICE_INSTANCES_PER_AGENT();
         registerListener_SERVICE_INSTANCES_PER_SERVICE_FAMILY();
@@ -915,13 +851,22 @@ public final class PlatformMetaDataModel
         Map.Entry<String, IValue> entry;
         String serviceFamilyName = null;
         IValue redundancyMode = null;
+        IRecord serviceRecord;
         for (Iterator<Map.Entry<String, IValue>> it = imageCopy.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             serviceFamilyName = entry.getKey();
             redundancyMode = entry.getValue();
-            this.servicesContext.getOrCreateRecord(serviceFamilyName).put(
-                ServiceMetaDataRecordDefinition.Mode.toString(), redundancyMode.textValue());
+            serviceRecord = this.servicesContext.getOrCreateRecord(serviceFamilyName);
+            serviceRecord.put(ServiceMetaDataRecordDefinition.Mode.toString(), redundancyMode.textValue());
+            final Map<String, IValue> serviceRecordsRpcs = imageCopy.getOrCreateSubMap(serviceFamilyName);
+            serviceRecord.put(ServiceMetaDataRecordDefinition.RecordCount.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.RECORD_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.RpcCount.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.RPC_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.InstanceCount.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.SERVICE_INSTANCE_COUNT));
+            
             this.servicesContext.publishAtomicChange(serviceFamilyName);
         }
 
@@ -974,6 +919,11 @@ public final class PlatformMetaDataModel
                 ServiceInstanceMetaDataRecordDefinition.AvgMsgSizeBytes.toString());
             ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.VERSION, statsForServiceInstance,
                 ServiceInstanceMetaDataRecordDefinition.Version.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RECORD_COUNT, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.RecordCount.toString());
+            ContextUtils.fieldCopy(stats, IServiceStatsRecordFields.RPC_COUNT, statsForServiceInstance,
+                ServiceInstanceMetaDataRecordDefinition.RpcCount.toString());
+            
             this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
         }
     }
@@ -989,10 +939,6 @@ public final class PlatformMetaDataModel
         {
             serviceFamilyTextValue = TextValue.valueOf(serviceFamily);
             instances = imageCopy.getOrCreateSubMap(serviceFamily);
-
-            // update the instance count per service
-            updateRecordWithCountsAndPublish(serviceFamily, instances, this.servicesContext,
-                ServiceMetaDataRecordDefinition.InstanceCount.toString(), this.pendingTasks);
 
             // add new instances
             for (Iterator<Map.Entry<String, IValue>> it = instances.entrySet().iterator(); it.hasNext();)
@@ -1024,8 +970,6 @@ public final class PlatformMetaDataModel
         {
             records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceFamily));
             removeSystemRecords(records);
-            updateRecordWithCountsAndPublish(serviceFamily, records, this.servicesContext,
-                ServiceMetaDataRecordDefinition.RecordCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceFamily, this.serviceRecordsContext, records,
                 change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
@@ -1040,8 +984,6 @@ public final class PlatformMetaDataModel
         {
             records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceInstanceID));
             removeSystemRecords(records);
-            updateRecordWithCountsAndPublish(serviceInstanceID, records, this.serviceInstancesContext,
-                ServiceInstanceMetaDataRecordDefinition.RecordCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceInstanceID, this.serviceInstanceRecordsContext, records,
                 change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),
@@ -1055,8 +997,6 @@ public final class PlatformMetaDataModel
         for (String serviceFamily : imageCopy.getSubMapKeys())
         {
             rpcs = imageCopy.getOrCreateSubMap(serviceFamily);
-            updateRecordWithCountsAndPublish(serviceFamily, rpcs, this.servicesContext,
-                ServiceMetaDataRecordDefinition.RpcCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceFamily, this.serviceRpcsContext, rpcs,
                 change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
@@ -1070,8 +1010,6 @@ public final class PlatformMetaDataModel
         for (String serviceInstanceID : imageCopy.getSubMapKeys())
         {
             rpcs = imageCopy.getOrCreateSubMap(serviceInstanceID);
-            updateRecordWithCountsAndPublish(serviceInstanceID, rpcs, this.serviceInstancesContext,
-                ServiceInstanceMetaDataRecordDefinition.RpcCount.toString(), this.pendingTasks);
 
             handleRecordsForContext(serviceInstanceID, this.serviceInstanceRpcsContext, rpcs,
                 change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),

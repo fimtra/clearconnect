@@ -96,6 +96,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         String KB_PER_SEC = "Kb per sec";
         String UPTIME = "Uptime(sec)";
         String VERSION = "Version";
+        String RECORD_COUNT = "RecordCount";
+        String RPC_COUNT = "RpcCount";
     }
 
     static final String RPC_FT_SERVICE_STATUS = "ftServiceInstanceStatus";
@@ -188,6 +190,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         LongValue.valueOf(messagesPublished));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
                         LongValue.valueOf((long) (bytesPublished * inverse_1K)));
+                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RECORD_COUNT,
+                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
+                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
+                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
 
                     this.lastMessagesPublished = messagesPublished;
                     this.lastBytesPublished = bytesPublished;
