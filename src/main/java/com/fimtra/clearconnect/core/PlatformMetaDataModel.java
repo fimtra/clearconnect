@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -96,7 +97,7 @@ import com.fimtra.util.is;
  * <li>{@link #getPlatformNodesContext()}
  * <li>{@link #getPlatformServicesContext()}
  * <li>{@link #getPlatformServiceInstancesContext()}
- * <li>{@link #getPlatformRegsitryAgentsContext()}
+ * <li>{@link #getPlatformRegistryAgentsContext()}
  * <li>{@link #getPlatformServiceProxiesContext()}
  * <li>{@link #getPlatformServiceRecordsContext(String)}
  * <li>{@link #getPlatformServiceRpcsContext(String)}
@@ -138,7 +139,7 @@ public final class PlatformMetaDataModel
     /**
      * The fields for each record in the agents context
      * 
-     * @see PlatformMetaDataModel#getPlatformRegsitryAgentsContext()
+     * @see PlatformMetaDataModel#getPlatformRegistryAgentsContext()
      */
     public static enum AgentMetaDataRecordDefinition
     {
@@ -153,8 +154,8 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceProxyMetaDataRecordDefinition
     {
-            EndPoint, SubscriptionCount, MessagesReceived, LstAvgMsgSize, AvgMsgSizeBytes, DataCountKb, ConnectionUptime, Service,
-            ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
+            EndPoint, SubscriptionCount, MessagesReceived, LstAvgMsgSize, AvgMsgSizeBytes, DataCountKb,
+            ConnectionUptime, Service, ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
     }
 
     /**
@@ -398,6 +399,118 @@ public final class PlatformMetaDataModel
         }
         return iValue;
     }
+    
+    final ThimbleExecutor coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
+    
+    final CoalescingRecordListener _servicesRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handlePlatformServicesUpdate(imageCopy, atomicChange);
+            }
+        }, SERVICES);
+
+    final CoalescingRecordListener _serviceInstancesPerAgentRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
+            }
+        }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED);
+
+    final CoalescingRecordListener _serviceInstanceStatsRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleServiceInstanceStatsUpdate(atomicChange);
+            }
+        }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED);
+
+    final CoalescingRecordListener _serviceInstancesPerServiceFamilyRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handlePlatformServiceInstancesUpdate(imageCopy);
+            }
+        }, SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+
+    final CoalescingRecordListener _recordsPerServiceFamilyListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRecordsPerServiceUpdate(imageCopy, atomicChange);
+            }
+        }, RECORDS_PER_SERVICE_FAMILY);
+
+    final CoalescingRecordListener _runtimeStatusRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRuntimeStatusUpdate(imageCopy);
+            }
+        }, RUNTIME_STATUS);
+
+    final CoalescingRecordListener _platformConnectionsRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleConnectionsUpdate(imageCopy);
+            }
+        }, PLATFORM_CONNECTIONS);
+
+    final CoalescingRecordListener _recordsPerServiceInstanceRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
+            }
+        }, RECORDS_PER_SERVICE_INSTANCE);
+
+    final CoalescingRecordListener _rpsPerServiceFamilyRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRpcsPerServiceUpdate(imageCopy, atomicChange);
+            }
+        }, RPCS_PER_SERVICE_FAMILY);
+
+    final CoalescingRecordListener _rpcsPerServiceInstanceRecordListener =
+        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                checkReset();
+                handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
+            }
+        }, RPCS_PER_SERVICE_INSTANCE);
 
     final PlatformRegistryAgent agent;
 
@@ -412,8 +525,6 @@ public final class PlatformMetaDataModel
     final ConcurrentMap<String, Context> serviceInstanceRpcsContext;
     final ConcurrentMap<String, Context> serviceInstanceRecordsContext;
 
-    final ThimbleExecutor coalescingExecutor;
-
     boolean reset;
 
     // track tasks that should only run when the service exists
@@ -422,8 +533,6 @@ public final class PlatformMetaDataModel
     public PlatformMetaDataModel(String registryNode, int registryPort) throws IOException
     {
         this.agent = new PlatformRegistryAgent(PlatformMetaDataModel.class.getSimpleName(), registryNode, registryPort);
-
-        this.coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
 
         this.nodesContext = new Context("nodes");
         this.agentsContext = new Context("agents");
@@ -470,106 +579,61 @@ public final class PlatformMetaDataModel
                 handlePendingTasks(image, PlatformMetaDataModel.this.pendingTasks);
             }
         }, ISystemRecordNames.CONTEXT_RECORDS);
+        
+        // the bare minimum
+        registerListener_PLATFORM_CONNECTIONS();
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServicesUpdate(imageCopy, atomicChange);
-            }
-        }, SERVICES), SERVICES);
+    Future<Map<String, Boolean>> registerListener_RUNTIME_STATUS()
+    {
+        return this.agent.registryProxy.addObserver(this._runtimeStatusRecordListener, RUNTIME_STATUS);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
-            }
-        }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCES_PER_AGENT);
+    Future<Map<String, Boolean>> registerListener_PLATFORM_CONNECTIONS()
+    {
+        return this.agent.registryProxy.addObserver(this._platformConnectionsRecordListener, PLATFORM_CONNECTIONS);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleServiceInstanceStatsUpdate(atomicChange);
-            }
-        }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED), SERVICE_INSTANCE_STATS);
+    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_INSTANCE()
+    {
+        return this.agent.registryProxy.addObserver(this._rpcsPerServiceInstanceRecordListener, RPCS_PER_SERVICE_INSTANCE);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServiceInstancesUpdate(imageCopy);
-            }
-        }, SERVICE_INSTANCES_PER_SERVICE_FAMILY), SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_FAMILY()
+    {
+        return this.agent.registryProxy.addObserver(this._rpsPerServiceFamilyRecordListener, RPCS_PER_SERVICE_FAMILY);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRecordsPerServiceUpdate(imageCopy, atomicChange);
-            }
-        }, RECORDS_PER_SERVICE_FAMILY), RECORDS_PER_SERVICE_FAMILY);
+    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_INSTANCE()
+    {
+        return this.agent.registryProxy.addObserver(this._recordsPerServiceInstanceRecordListener,
+            RECORDS_PER_SERVICE_INSTANCE);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
-            }
-        }, RECORDS_PER_SERVICE_INSTANCE), RECORDS_PER_SERVICE_INSTANCE);
+    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_FAMILY()
+    {
+        return this.agent.registryProxy.addObserver(this._recordsPerServiceFamilyListener, RECORDS_PER_SERVICE_FAMILY);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRpcsPerServiceUpdate(imageCopy, atomicChange);
-            }
-        }, RPCS_PER_SERVICE_FAMILY), RPCS_PER_SERVICE_FAMILY);
+    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCES_PER_SERVICE_FAMILY()
+    {
+        return this.agent.registryProxy.addObserver(this._serviceInstancesPerServiceFamilyRecordListener,
+            SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
-            }
-        }, RPCS_PER_SERVICE_INSTANCE), RPCS_PER_SERVICE_INSTANCE);
+    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCE_STATS()
+    {
+        return this.agent.registryProxy.addObserver(this._serviceInstanceStatsRecordListener, SERVICE_INSTANCE_STATS);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleConnectionsUpdate(imageCopy);
-            }
-        }, PLATFORM_CONNECTIONS), PLATFORM_CONNECTIONS);
+    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCES_PER_AGENT()
+    {
+        return this.agent.registryProxy.addObserver(this._serviceInstancesPerAgentRecordListener, SERVICE_INSTANCES_PER_AGENT);
+    }
 
-        this.agent.registryProxy.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRuntimeStatusUpdate(imageCopy);
-            }
-        }, RUNTIME_STATUS), RUNTIME_STATUS);
+    void registerListener_SERVICES()
+    {
+        this.agent.registryProxy.addObserver(this._servicesRecordListener, SERVICES);
     }
 
     void checkReset()
@@ -638,8 +702,9 @@ public final class PlatformMetaDataModel
      * @see AgentMetaDataRecordDefinition
      * @return a context for the agents on the platform
      */
-    public IObserverContext getPlatformRegsitryAgentsContext()
+    public IObserverContext getPlatformRegistryAgentsContext()
     {
+        registerListener_RUNTIME_STATUS();
         return this.agentsContext;
     }
 
@@ -652,6 +717,9 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServicesContext()
     {
+        registerListener_SERVICES();
+        registerListener_RECORDS_PER_SERVICE_FAMILY();
+        registerListener_RPCS_PER_SERVICE_FAMILY();
         return this.servicesContext;
     }
 
@@ -665,6 +733,11 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstancesContext()
     {
+        registerListener_RECORDS_PER_SERVICE_INSTANCE();
+        registerListener_RPCS_PER_SERVICE_INSTANCE();
+        registerListener_SERVICE_INSTANCE_STATS();
+        registerListener_SERVICE_INSTANCES_PER_AGENT();
+        registerListener_SERVICE_INSTANCES_PER_SERVICE_FAMILY();
         return this.serviceInstancesContext;
     }
 
@@ -692,6 +765,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceRecordsContext(String serviceFamily)
     {
+        registerListener_RECORDS_PER_SERVICE_FAMILY();
         return safeGetContext(this.serviceRecordsContext, serviceFamily);
     }
 
@@ -707,6 +781,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstanceRecordsContext(String platformServiceInstanceID)
     {
+        registerListener_RECORDS_PER_SERVICE_INSTANCE();
         return safeGetContext(this.serviceInstanceRecordsContext, platformServiceInstanceID);
     }
 
@@ -721,6 +796,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceRpcsContext(String serviceFamily)
     {
+        registerListener_RPCS_PER_SERVICE_FAMILY();
         return safeGetContext(this.serviceRpcsContext, serviceFamily);
     }
 
@@ -736,6 +812,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstanceRpcsContext(String platformServiceInstanceID)
     {
+        registerListener_RPCS_PER_SERVICE_INSTANCE();
         return safeGetContext(this.serviceInstanceRpcsContext, platformServiceInstanceID);
     }
 
@@ -1162,7 +1239,8 @@ public final class PlatformMetaDataModel
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MessagesReceived.toString(),
                         messageCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.AvgMsgSizeBytes.toString(), avgMsgSize);
-                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.LstAvgMsgSize.toString(), lstIntervalMsgSize);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.LstAvgMsgSize.toString(),
+                        lstIntervalMsgSize);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);

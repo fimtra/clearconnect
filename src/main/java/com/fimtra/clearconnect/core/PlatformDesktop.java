@@ -57,12 +57,14 @@ import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.TableModelEvent;
@@ -79,6 +81,7 @@ import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
@@ -91,6 +94,7 @@ import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.BlobValue;
+import com.fimtra.datafission.field.TextValue;
 import com.fimtra.datafission.ui.ColumnOrientedRecordTable;
 import com.fimtra.datafission.ui.ColumnOrientedRecordTableModel;
 import com.fimtra.datafission.ui.RowOrientedRecordTable;
@@ -183,8 +187,7 @@ class PlatformDesktop
 
             String title = tokens[indexTitle];
             title = "null".equals(title.toLowerCase()) ? null : title;
-            RecordSubscriptionPlatformDesktopView view =
-                new RecordSubscriptionPlatformDesktopView(desktop, title,
+            RecordSubscriptionPlatformDesktopView view = new RecordSubscriptionPlatformDesktopView(desktop, title,
                 PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), tokens[indexViewKey]);
             try
             {
@@ -418,15 +421,11 @@ class PlatformDesktop
             switch(parentMetaDataViewType)
             {
                 case RPCS_PER_INSTANCE:
-                    instance =
-                        RpcInstance.constructInstanceFromDefinition(
-                            rpcName,
-                            rpcRecordDefinition.get(ServiceInstanceRpcMetaDataRecordDefinition.Definition.toString()).textValue());
+                    instance = RpcInstance.constructInstanceFromDefinition(rpcName, rpcRecordDefinition.get(
+                        ServiceInstanceRpcMetaDataRecordDefinition.Definition.toString()).textValue());
                     break;
                 case RPCS_PER_SERVICE:
-                    instance =
-                        RpcInstance.constructInstanceFromDefinition(
-                            rpcName,
+                    instance = RpcInstance.constructInstanceFromDefinition(rpcName,
                         rpcRecordDefinition.get(ServiceRpcMetaDataRecordDefinition.Definition.toString()).textValue());
                     break;
                 default :
@@ -590,8 +589,7 @@ class PlatformDesktop
             title = "null".equals(title.toLowerCase()) ? null : title;
             String viewKey = tokens[indexViewKey];
             viewKey = "null".equals(viewKey.toLowerCase()) ? null : viewKey;
-            MetaDataPlatformDesktopView view =
-                new MetaDataPlatformDesktopView(desktop, title,
+            MetaDataPlatformDesktopView view = new MetaDataPlatformDesktopView(desktop, title,
                 PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), viewKey);
             try
             {
@@ -653,8 +651,8 @@ class PlatformDesktop
 
             this.model = new RowOrientedRecordTableModel();
             this.table = new RowOrientedRecordTable(this.model);
-            this.context =
-                metaDataViewType.getContextForMetaDataViewType(platformDesktop.getMetaDataModel(), this.metaDataViewKey);
+            this.context = metaDataViewType.getContextForMetaDataViewType(platformDesktop.getMetaDataModel(),
+                this.metaDataViewKey);
             this.metaDataViewType.register(this.context, this.model, this.metaDataViewKey);
             this.model.addRecordRemovedListener(this.context);
 
@@ -705,30 +703,115 @@ class PlatformDesktop
     }
 
     /**
-     * Displays runtime summary information
+     * Displays summary information for the desktop environment
      * 
      * @author Ramon Servadei
      */
-    static final class RuntimeSummaryPanel extends JPanel
+    static final class DesktopSummaryPanel extends JPanel
     {
         private static final double inverse_1MB = 1d / (1024 * 1024);
         private static final long serialVersionUID = 1L;
 
         final Thread t;
-        final JLabel version;
-        final JLabel memory;
 
-        RuntimeSummaryPanel(String platformVersion)
+        final SummaryField dataCount;
+        final SummaryField msgCount;
+        final JProgressBar memory;
+        final JProgressBar msgsPerSec;
+
+        DesktopSummaryPanel(IObserverContext registryProxy)
         {
-            this.version = new JLabel(" Registry Version: " + platformVersion + " ");
-            this.version.setBorder(BorderFactory.createEtchedBorder());
-            this.memory = new JLabel();
-            this.memory.setBorder(BorderFactory.createEtchedBorder());
+            this.dataCount = new SummaryField("Kb Rx", false);
+            this.msgCount = new SummaryField("Messges Rx", false);
+
+            this.memory = new JProgressBar();
+            this.memory.setStringPainted(true);
+            this.memory.setMaximum(100);
+
+            this.msgsPerSec = new JProgressBar();
+            this.msgsPerSec.setMaximum(0);
+            this.msgsPerSec.setStringPainted(true);
+
+            final String name = registryProxy.getName();
+            registryProxy.addObserver(new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord image, IRecordChange atomicChange)
+                {
+                    for (String connection : atomicChange.getSubMapKeys())
+                    {
+                        final IValue proxyId =
+                            image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.PROXY_ID);
+                        if (proxyId != null && proxyId.textValue().contains(name))
+                        {
+                            final Map<String, IValue> putEntries =
+                                atomicChange.getSubMapAtomicChange(connection).getPutEntries();
+                            if (putEntries.size() > 0)
+                            {
+                                final IValue kbVal =
+                                    image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.KB_PER_SEC);
+                                if (kbVal != null)
+                                {
+                                    SwingUtilities.invokeLater(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            final int v = (int) kbVal.longValue() * 10;
+                                            if (DesktopSummaryPanel.this.msgsPerSec.getMaximum() < v)
+                                            {
+                                                DesktopSummaryPanel.this.msgsPerSec.setMaximum(v);
+                                            }
+                                            DesktopSummaryPanel.this.msgsPerSec.setValue(v);
+                                            DesktopSummaryPanel.this.msgsPerSec.setString(kbVal.textValue());
+                                        }
+                                    });
+                                }
+                                final IValue msgCountVal = image.getOrCreateSubMap(connection).get(
+                                    IContextConnectionsRecordFields.MESSAGE_COUNT);
+                                if (msgCountVal != null)
+                                {
+                                    SwingUtilities.invokeLater(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            DesktopSummaryPanel.this.msgCount.setValue(msgCountVal);
+                                        }
+                                    });
+                                }
+                                final IValue kbCountVal = image.getOrCreateSubMap(connection).get(
+                                    IContextConnectionsRecordFields.KB_COUNT);
+                                if (kbCountVal != null)
+                                {
+                                    SwingUtilities.invokeLater(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            DesktopSummaryPanel.this.dataCount.setValue(kbCountVal);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
+
             final FlowLayout layout = new FlowLayout(FlowLayout.RIGHT);
             layout.setHgap(0);
             setLayout(layout);
-            add(this.version);
+
+            this.dataCount.addTo(this);
+            this.dataCount.setValue(TextValue.valueOf(""));
+            this.msgCount.addTo(this);
+            this.msgCount.setValue(TextValue.valueOf(""));
+            
+            add(new JLabel("Kb/s"));
+            add(this.msgsPerSec);
             add(Box.createHorizontalStrut(6));
+            add(new JLabel("Mem"));
             add(this.memory);
             this.t = ThreadUtils.newThread(new Runnable()
             {
@@ -737,14 +820,18 @@ class PlatformDesktop
                 {
                     while (true)
                     {
-                        final String text =
-                            " Desktop Memory: " + (long) (Runtime.getRuntime().totalMemory() * inverse_1MB) + "M ";
+                        final long used =
+                            (long) ((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())
+                                * inverse_1MB);
+                        final long max = (long) (Runtime.getRuntime().totalMemory() * inverse_1MB);
+                        final String text = used + "/" + max + "M";
                         SwingUtilities.invokeLater(new Runnable()
                         {
                             @Override
                             public void run()
                             {
-                                RuntimeSummaryPanel.this.memory.setText(text);
+                                DesktopSummaryPanel.this.memory.setValue((int) (((double) used / max) * 100));
+                                DesktopSummaryPanel.this.memory.setString(text);
                             }
                         });
                         try
@@ -756,8 +843,117 @@ class PlatformDesktop
                         }
                     }
                 }
-            }, "desktop-runtime-summary");
+            }, "desktop-summary-panel");
             this.t.start();
+        }
+    }
+
+    static final CompoundBorder LINE_BORDER = BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(Color.black), BorderFactory.createEmptyBorder(0, 6, 1, 6));
+    static final CompoundBorder ETCHED_BORDER = BorderFactory.createCompoundBorder(BorderFactory.createEtchedBorder(),
+        BorderFactory.createEmptyBorder(0, 6, 1, 6));
+
+    static final class SummaryField
+    {
+        final JLabel component;
+        final String fieldName;
+        String value;
+
+        SummaryField(String fieldName)
+        {
+            this(fieldName, true);
+        }
+
+        SummaryField(String fieldName, boolean lineBorder)
+        {
+            this.component = new JLabel();
+            this.component.setBorder(lineBorder ? LINE_BORDER : ETCHED_BORDER);
+
+            this.fieldName = fieldName;
+        }
+
+        void addTo(JPanel panel)
+        {
+            panel.add(this.component);
+            panel.add(Box.createHorizontalStrut(6));
+        }
+
+        void setValue(IValue value)
+        {
+            if (value != null)
+            {
+                this.component.setText(this.fieldName + ": " + value.textValue());
+            }
+        }
+    }
+
+    /**
+     * Displays summary information for the ClearConnect platform
+     * 
+     * @author Ramon Servadei
+     */
+    static final class PlatformSummaryPanel extends JPanel
+    {
+        private static final long serialVersionUID = 1L;
+
+        final SummaryField version;
+        final SummaryField uptime;
+        final SummaryField nodeCount;
+        final SummaryField agentCount;
+        final SummaryField serviceCount;
+        final SummaryField serviceInstanceCount;
+        final SummaryField connectionCount;
+
+        PlatformSummaryPanel(IObserverContext registryProxy)
+        {
+            this.version = new SummaryField("Registry Version");
+            this.uptime = new SummaryField("Uptime");
+            this.nodeCount = new SummaryField("Nodes");
+            this.agentCount = new SummaryField("Agents");
+            this.serviceCount = new SummaryField("Services");
+            this.serviceInstanceCount = new SummaryField("Service Instances");
+            this.connectionCount = new SummaryField("Platform Connections");
+
+            registryProxy.addObserver(new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord image, IRecordChange atomicChange)
+                {
+                    final Map<String, IValue> copy = new HashMap<String, IValue>(image.asFlattenedMap());
+                    SwingUtilities.invokeLater(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            PlatformSummaryPanel.this.nodeCount.setValue(copy.get(IPlatformSummaryRecordFields.NODES));
+                            PlatformSummaryPanel.this.agentCount.setValue(
+                                copy.get(IPlatformSummaryRecordFields.AGENTS));
+                            PlatformSummaryPanel.this.serviceCount.setValue(
+                                copy.get(IPlatformSummaryRecordFields.SERVICES));
+                            PlatformSummaryPanel.this.serviceInstanceCount.setValue(
+                                copy.get(IPlatformSummaryRecordFields.SERVICE_INSTANCES));
+                            PlatformSummaryPanel.this.connectionCount.setValue(
+                                copy.get(IPlatformSummaryRecordFields.CONNECTIONS));
+                            PlatformSummaryPanel.this.version.setValue(copy.get(IPlatformSummaryRecordFields.VERSION));
+                            PlatformSummaryPanel.this.uptime.setValue(copy.get(IPlatformSummaryRecordFields.UPTIME));
+                        }
+                    });
+                }
+
+            }, IRegistryRecordNames.PLATFORM_SUMMARY);
+
+            final FlowLayout layout = new FlowLayout(FlowLayout.CENTER);
+            layout.setHgap(0);
+            setLayout(layout);
+            this.version.addTo(this);
+            this.uptime.addTo(this);
+            this.nodeCount.addTo(this);
+            this.agentCount.addTo(this);
+            this.serviceCount.addTo(this);
+            this.serviceInstanceCount.addTo(this);
+            this.connectionCount.addTo(this);
+
+            setBackground(Color.WHITE);
         }
     }
 
@@ -1156,7 +1352,8 @@ class PlatformDesktop
                             if (PlatformMetaDataViewEnum.this.viewClass == RpcPlatformDesktopView.class)
                             {
                                 final IRecord selectedRecord = parentTable.getSelectedRecord();
-                                new RpcPlatformDesktopView(desktop, title, selectedRecord, parentTable.metaDataViewType);
+                                new RpcPlatformDesktopView(desktop, title, selectedRecord,
+                                    parentTable.metaDataViewType);
                             }
                         }
                     }
@@ -1210,7 +1407,7 @@ class PlatformDesktop
                 case CONNECTIONS:
                     return model.getPlatformConnectionsContext();
                 case AGENTS:
-                    return model.getPlatformRegsitryAgentsContext();
+                    return model.getPlatformRegistryAgentsContext();
                 case CLIENTS_PER_INSTANCE:
                 case CLIENTS_PER_SERVICE:
                     return model.getPlatformServiceProxiesContext();
@@ -1296,19 +1493,10 @@ class PlatformDesktop
 
                 PlatformDesktop.this.desktopWindow = new JFrame();
                 PlatformDesktop.this.desktopWindow.setIconImage(createIcon());
-
-                String platformVersion = "?.?.?";
-                final IRecord platformSummary = platformMetaDataModel.agent.registryProxy.getRemoteRecordImage(
-                    IRegistryRecordNames.PLATFORM_SUMMARY, 5000);
-                if (platformSummary != null)
-                {
-                    final IValue iValue = platformSummary.get(IPlatformSummaryRecordFields.VERSION);
-                    if (iValue != null)
-                    {
-                        platformVersion = iValue.textValue();
-                    }
-                }
-                PlatformDesktop.this.desktopWindow.add(new RuntimeSummaryPanel(platformVersion), BorderLayout.SOUTH);
+                PlatformDesktop.this.desktopWindow.add(
+                    new PlatformSummaryPanel(platformMetaDataModel.agent.registryProxy), BorderLayout.NORTH);
+                PlatformDesktop.this.desktopWindow.add(
+                    new DesktopSummaryPanel(platformMetaDataModel.agent.registryProxy), BorderLayout.SOUTH);
 
                 platformMetaDataModel.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
                 {
@@ -1413,7 +1601,8 @@ class PlatformDesktop
                     {
                         if (view instanceof RecordSubscriptionPlatformDesktopView)
                         {
-                            pw.println(RecordSubscriptionPlatformDesktopView.toStateString((RecordSubscriptionPlatformDesktopView) view));
+                            pw.println(RecordSubscriptionPlatformDesktopView.toStateString(
+                                (RecordSubscriptionPlatformDesktopView) view));
                         }
                     }
                 }
@@ -1488,8 +1677,7 @@ class PlatformDesktop
 
     static Image createIcon()
     {
-        BlobValue hexIcon =
-            new BlobValue(
+        BlobValue hexIcon = new BlobValue(
             "89504E470D0A1A0A0000000D4948445200000020000000200806000000737A7AF400000006624B474400FF00FF00FFA0BDA793000000097048597300000B1300000B1301009A9C180000000774494D4507D"
                 + "F061D140E0C8E9514B10000001974455874436F6D6D656E74004372656174656420776974682047494D5057810E17000004464944415458C3ED576D4C5B65147EEEBDED6D3BCA5A4A296360658389B5930F2D68DC1"
                 + "7CA20B0397F8C4432974516232386A4C60F66A624334A66430C81B14D162251C130A2811FD3CCC9624686B0216ECE31661719DD1C2B6C6BF9680BEDED7DAF3F26464A5B6881F867E7DF3DEF79CF79EE39CF39EFFB0"
