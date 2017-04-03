@@ -39,6 +39,7 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.PUBLISHER_PORT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.SUBSCRIPTION_COUNT;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TRANSPORT;
+import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TX_QUEUE_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
 import java.io.IOException;
@@ -154,7 +155,7 @@ public final class PlatformMetaDataModel
     public static enum ServiceProxyMetaDataRecordDefinition
     {
             EndPoint, SubscriptionCount, MessagesReceived, LstAvgMsgSize, AvgMsgSizeBytes, DataCountKb,
-            ConnectionUptime, Service, ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName
+            ConnectionUptime, Service, ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName, TxQueue
     }
 
     /**
@@ -164,7 +165,7 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceMetaDataRecordDefinition
     {
-            Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount
+            Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount, SubscriptionCount, MsgsPerSec, MessagesSent, KbPerSec, KbSent, TxQueue
     }
 
     /**
@@ -847,6 +848,18 @@ public final class PlatformMetaDataModel
                 serviceRecordsRpcs.get(IServiceRecordFields.RPC_COUNT));
             serviceRecord.put(ServiceMetaDataRecordDefinition.InstanceCount.toString(),
                 serviceRecordsRpcs.get(IServiceRecordFields.SERVICE_INSTANCE_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.MsgsPerSec.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.MSGS_PER_SEC));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.KbPerSec.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.KB_PER_SEC));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.MessagesSent.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.MESSAGE_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.KbSent.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.KB_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.SubscriptionCount.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
+            serviceRecord.put(ServiceMetaDataRecordDefinition.TxQueue.toString(),
+                serviceRecordsRpcs.get(IServiceRecordFields.TX_QUEUE_SIZE));
             
             this.servicesContext.publishAtomicChange(serviceFamilyName);
         }
@@ -1039,6 +1052,7 @@ public final class PlatformMetaDataModel
         LongValue msgPerSec;
         LongValue lstIntervalMsgSize;
         DoubleValue kbPerSec;
+        LongValue txQueue;
         LongValue subscriptionCount;
         LongValue kbCount;
         LongValue connectionUptime;
@@ -1082,6 +1096,7 @@ public final class PlatformMetaDataModel
                 msgPerSec = connectionRecord.get(MSGS_PER_SEC);
                 lstIntervalMsgSize = connectionRecord.get(LAST_INTERVAL_MSG_SIZE);
                 kbPerSec = connectionRecord.get(KB_PER_SEC);
+                txQueue = connectionRecord.get(TX_QUEUE_SIZE);
                 subscriptionCount = connectionRecord.get(SUBSCRIPTION_COUNT);
                 kbCount = connectionRecord.get(KB_COUNT);
                 connectionUptime = connectionRecord.get(UPTIME);
@@ -1139,6 +1154,7 @@ public final class PlatformMetaDataModel
                         lstIntervalMsgSize);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.MsgsPerSec.toString(), msgPerSec);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.KbPerSec.toString(), kbPerSec);
+                    serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.TxQueue.toString(), txQueue);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.DataCountKb.toString(), kbCount);
                     serviceProxyRecord.put(ServiceProxyMetaDataRecordDefinition.SubscriptionCount.toString(),
                         subscriptionCount);

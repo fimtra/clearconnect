@@ -906,13 +906,13 @@ class PlatformDesktop
 
         PlatformSummaryPanel(IObserverContext registryProxy)
         {
-            this.version = new SummaryField("Registry Version");
+            this.version = new SummaryField("Registry");
             this.uptime = new SummaryField("Uptime");
             this.nodeCount = new SummaryField("Nodes");
             this.agentCount = new SummaryField("Agents");
             this.serviceCount = new SummaryField("Services");
-            this.serviceInstanceCount = new SummaryField("Service Instances");
-            this.connectionCount = new SummaryField("Platform Connections");
+            this.serviceInstanceCount = new SummaryField("Instances");
+            this.connectionCount = new SummaryField("Connections");
 
             registryProxy.addObserver(new IRecordListener()
             {

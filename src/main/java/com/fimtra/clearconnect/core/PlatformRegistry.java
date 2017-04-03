@@ -78,6 +78,7 @@ import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
+import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ICoalescingRunnable;
@@ -215,6 +216,12 @@ public final class PlatformRegistry
         String RECORD_COUNT = "RecordCount";
         String RPC_COUNT = "RpcCount";
         String SERVICE_INSTANCE_COUNT = "ServiceInstancesCount";
+        String MSGS_PER_SEC = "Msgs per sec";
+        String KB_PER_SEC = "Kb per sec";
+        String MESSAGE_COUNT = "Msgs published";
+        String KB_COUNT = "Kb published";
+        String SUBSCRIPTION_COUNT = "Subscriptions";
+        String TX_QUEUE_SIZE = "TxQueueSize";
     }
     
     public static final String SERVICE_NAME = "PlatformRegistry";
@@ -236,6 +243,8 @@ public final class PlatformRegistry
          * 
          * Agents subscribe for this to have a live view of the services that exist, each service
          * identified by its service family name
+         * 
+         * @see IServiceRecordFields
          */
         String SERVICES = "Services";
 
@@ -511,7 +520,12 @@ public final class PlatformRegistry
         createDeregisterRpc();
         createRuntimeStaticRpc();
         createRuntimeDynamicRpc();
-
+        
+        final Map<String, IValue> registryServiceSubMap = this.services.getOrCreateSubMap(SERVICE_NAME);
+        registryServiceSubMap.put(IServiceRecordFields.RPC_COUNT,
+            LongValue.valueOf(this.context.getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
+        registryServiceSubMap.put(IServiceRecordFields.SERVICE_INSTANCE_COUNT, LongValue.valueOf(1));
+        
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
@@ -827,6 +841,7 @@ final class EventHandler
     final ConcurrentMap<String, FutureTask<String>> confirmedMasterInstancePerFtService;
     final ConcurrentMap<RegistrationToken, ProxyContext> monitoredServiceInstances;
     final ConcurrentMap<RegistrationToken, PlatformServiceConnectionMonitor> connectionMonitors;
+    final ConcurrentMap<String, Set<String>> connectionsPerServiceFamily;
 
     EventHandler(final PlatformRegistry registry)
     {
@@ -839,6 +854,7 @@ final class EventHandler
         this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
         this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
         this.registrationTokenPerInstance = new ConcurrentHashMap<String, RegistrationToken>();
+        this.connectionsPerServiceFamily = new ConcurrentHashMap<String, Set<String>>();
 
         this.pendingPublish = new HashSet<String>();
         this.eventCount = new AtomicInteger(0);
@@ -1445,6 +1461,7 @@ final class EventHandler
                 this.registry.services.removeSubMap(serviceFamily);
                 this.pendingMasterInstancePerFtService.remove(serviceFamily);
                 this.confirmedMasterInstancePerFtService.remove(serviceFamily);
+                this.connectionsPerServiceFamily.remove(serviceFamily);
                 publishServices = true;
             }
         }
@@ -1826,7 +1843,7 @@ final class EventHandler
             Log.log(this, "WARNING: RPC call from unregistered agent ", agentName);
         }
     }
-
+  
     private void handleConnectionsUpdate_callInFamilyScope(final IRecordChange atomicChange, String serviceFamily,
         String serviceMember)
     {
@@ -1844,6 +1861,15 @@ final class EventHandler
             }
         }
 
+        // get the connections for the family
+        Set<String> connectionIds = this.connectionsPerServiceFamily.get(serviceFamily);
+        if(connectionIds == null)
+        {
+            connectionIds = new HashSet<String>();
+            this.connectionsPerServiceFamily.put(serviceFamily, connectionIds);
+        }
+        connectionIds.addAll(atomicChange.getSubMapKeys());
+        
         IValue proxyId;
         String agent = null;
         IRecordChange subMapAtomicChange;
@@ -1862,16 +1888,56 @@ final class EventHandler
                     Log.log(this, "Agent disconnected: ", proxyId.textValue());
                 }
             }
+            
             connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
             subMapAtomicChange.applyTo(connection);
             if (connection.isEmpty())
             {
                 // purge the connection
                 this.registry.platformConnections.removeSubMap(connectionId);
+                connectionIds.remove(connectionId);
             }
         }
+        
+        // aggregate stats at the service-level service, e.g. subscription, txQueue, msgs published
+        long subscriptionCount = 0;
+        long txQueue = 0;
+        long msgsPublished = 0;
+        long msgsPerSec = 0;
+        double kbPerSec = 0;
+        long kbPublished = 0;
+        for (String connectionId : connectionIds)
+        {
+            connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
+            subscriptionCount += getLong(connection.get(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT));
+            msgsPublished += getLong(connection.get(IContextConnectionsRecordFields.MESSAGE_COUNT));
+            msgsPerSec += getLong(connection.get(IContextConnectionsRecordFields.MSGS_PER_SEC));
+            kbPerSec += getDouble(connection.get(IContextConnectionsRecordFields.KB_PER_SEC));
+            kbPublished += getLong(connection.get(IContextConnectionsRecordFields.KB_COUNT));
+            txQueue += getLong(connection.get(IContextConnectionsRecordFields.TX_QUEUE_SIZE));
+        }
+        
+        final Map<String, IValue> familyStats = this.registry.services.getOrCreateSubMap(serviceFamily);
+        familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbPublished));
+        familyStats.put(IServiceRecordFields.KB_PER_SEC, DoubleValue.valueOf(((long) ((kbPerSec * 10d)) / 10d)));
+        familyStats.put(IServiceRecordFields.MESSAGE_COUNT, LongValue.valueOf(msgsPublished));
+        familyStats.put(IServiceRecordFields.MSGS_PER_SEC, LongValue.valueOf(msgsPerSec));
+        familyStats.put(IServiceRecordFields.SUBSCRIPTION_COUNT, LongValue.valueOf(subscriptionCount));
+        familyStats.put(IServiceRecordFields.TX_QUEUE_SIZE, LongValue.valueOf(txQueue));
+        
+        publishTimed(this.registry.services);
         publishTimed(this.registry.runtimeStatus);
         publishTimed(this.registry.platformConnections);
+    }
+
+    private static double getDouble(IValue iValue)
+    {
+        return iValue == null ? 0 : iValue.doubleValue();
+    }
+
+    private static long getLong(IValue iValue)
+    {
+        return iValue == null ? 0 : iValue.longValue();
     }
 
     /**
@@ -2108,15 +2174,11 @@ final class EventHandler
                 if (size == 0)
                 {
                     objectsPerPlatformServiceRecord.removeSubMap(serviceFamily);
-                    EventHandler.this.registry.services.getOrCreateSubMap(serviceFamily).remove(
-                        servicesObjectCountField);
                 }
-                else
-                {
-                    EventHandler.this.registry.services.getOrCreateSubMap(serviceFamily).put(servicesObjectCountField,
-                        LongValue.valueOf(serviceObjects.size()));
-                    publishTimed(EventHandler.this.registry.services);
-                }
+                
+                EventHandler.this.registry.services.getOrCreateSubMap(serviceFamily).put(servicesObjectCountField,
+                    LongValue.valueOf(serviceObjects.size()));
+                publishTimed(EventHandler.this.registry.services);
             }
         }
         catch (Exception e)
@@ -2395,6 +2457,15 @@ final class EventHandler
             PlatformUtils.composePlatformServiceInstanceID(PlatformRegistry.SERVICE_NAME, this.registry.platformName);
         atomicChange.applyTo(this.registry.recordsPerServiceInstance.getOrCreateSubMap(registryInstanceName));
         publishTimed(this.registry.recordsPerServiceInstance);
+
+        final Map<String, IValue> registryServiceSubMap =
+            this.registry.services.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
+        final LongValue recordCounts =
+            LongValue.valueOf(this.registry.context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size());
+        if (!recordCounts.equals(registryServiceSubMap.put(IServiceRecordFields.RECORD_COUNT, recordCounts)))
+        {
+            publishTimed(this.registry.services);
+        }
     }
 
     private void logExceptionAndDeregister_familyScope(final RegistrationToken registrationToken,

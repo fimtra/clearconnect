@@ -24,10 +24,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -66,9 +68,11 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue.TypeEnum;
+import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
+import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
@@ -1479,7 +1483,7 @@ public class PlatformTest
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                serviceRecordImage.set(imageCopy);
+                serviceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
                 serviceLatch.get().countDown();
             }
         };
@@ -1493,7 +1497,7 @@ public class PlatformTest
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                serviceInstanceRecordImage.set(imageCopy);
+                serviceInstanceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
                 serviceInstanceLatch.get().countDown();
             }
         };
@@ -1553,8 +1557,26 @@ public class PlatformTest
         this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
         assertTrue(serviceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
-        assertNotNull("Got: " + serviceRecordImage.get(), serviceRecordImage.get());
-        assertEquals("Got: " + serviceRecordImage.get(), 1, serviceRecordImage.get().size());
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object got()
+            {
+                return serviceRecordImage.get().size();
+            }
+            
+            @Override
+            public Object expect()
+            {
+                return 1;
+            }
+            
+            @Override
+            public String getFailureReason()
+            {
+                return "Got: " + serviceRecordImage.get();
+            }
+        });
 
         assertTrue(serviceInstanceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
         assertEquals("Got: " + serviceRecordImage.get(), 1, serviceRecordImage.get().size());
