@@ -196,24 +196,23 @@ public abstract class DataFissionProperties
          * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
          * {@link Context} instances in the runtime.
          * <p>
-         * Default is minimum of 4 OR 1x available CPU cores (+1) in the host runtime
+         * Default is maximum of 4 OR 1/2 available CPU cores in the host runtime
          * 
          * @see Names#CORE_THREAD_COUNT
          */
         int CORE_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.CORE_THREAD_COUNT, ""
-            + (Runtime.getRuntime().availableProcessors() < 4 ? 4 : (Runtime.getRuntime().availableProcessors() + 1))));
+            + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() / 2))));
 
         /**
          * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all
          * DataFission {@link Context} instances in the runtime.
          * <p>
-         * Default is minimum of 4 OR 1x available CPU cores in the host runtime.
+         * Default is maximum of 4 OR 1/2 available CPU cores in the host runtime.
          * 
          * @see Names#RPC_THREAD_COUNT
          */
-        int RPC_THREAD_COUNT = Integer.parseInt(
-            System.getProperty(Names.RPC_THREAD_COUNT, "" + (Runtime.getRuntime().availableProcessors() < 4 ? 4
-                : (Runtime.getRuntime().availableProcessors()))));
+        int RPC_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RPC_THREAD_COUNT, ""
+            + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() / 2))));
 
         /**
          * The timeout to wait for an RPC to start.
@@ -290,7 +289,7 @@ public abstract class DataFissionProperties
          * 
          * @see Names#RECONNECT_THREAD_COUNT
          */
-        int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "2"));
+        int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "1"));
 
         /**
          * The maximum size for the keys pool for records.
