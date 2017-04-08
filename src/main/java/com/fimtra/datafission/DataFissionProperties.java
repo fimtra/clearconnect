@@ -196,23 +196,35 @@ public abstract class DataFissionProperties
          * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
          * {@link Context} instances in the runtime.
          * <p>
-         * Default is maximum of 4 OR 1/2 available CPU cores in the host runtime
+         * These are the defaults for the following processor counts:
+         * <ul>
+         * <li>small (less than 8 processors) = 4
+         * <li>medium (8 to 32 processors) = processors / 2
+         * <li>large (over 32 processors) = 16
+         * </ul>
          * 
          * @see Names#CORE_THREAD_COUNT
          */
-        int CORE_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.CORE_THREAD_COUNT, ""
-            + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() / 2))));
+        int CORE_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.CORE_THREAD_COUNT,
+            "" + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() < 32
+                ? Runtime.getRuntime().availableProcessors() / 2 : 16))));
 
         /**
          * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all
          * DataFission {@link Context} instances in the runtime.
          * <p>
-         * Default is maximum of 4 OR 1/2 available CPU cores in the host runtime.
+         * These are the defaults for the following processor counts:
+         * <ul>
+         * <li>small (less than 8 processors) = 4
+         * <li>medium (8 to 32 processors) = processors / 2
+         * <li>large (over 32 processors) = 16
+         * </ul>
          * 
          * @see Names#RPC_THREAD_COUNT
          */
-        int RPC_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RPC_THREAD_COUNT, ""
-            + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() / 2))));
+        int RPC_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RPC_THREAD_COUNT,
+            "" + (Runtime.getRuntime().availableProcessors() < 8 ? 4 : (Runtime.getRuntime().availableProcessors() < 32
+                ? Runtime.getRuntime().availableProcessors() / 2 : 16))));
 
         /**
          * The timeout to wait for an RPC to start.
