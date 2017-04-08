@@ -16,10 +16,10 @@
 package com.fimtra.clearconnect.core;
 
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PLATFORM_CONNECTIONS;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_INSTANCE;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY;
-import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_INSTANCE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PREFIX_RECORDS_PER_INSTANCE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PREFIX_RECORDS_PER_SERVICE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PREFIX_RPCS_PER_INSTANCE;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.PREFIX_RPCS_PER_SERVICE;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.RUNTIME_STATUS;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICES;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT;
@@ -165,7 +165,8 @@ public final class PlatformMetaDataModel
      */
     public static enum ServiceMetaDataRecordDefinition
     {
-            Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount, SubscriptionCount, MsgsPerSec, MessagesSent, KbPerSec, KbSent, TxQueue
+            Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount, SubscriptionCount, MsgsPerSec, MessagesSent,
+            KbPerSec, KbSent, TxQueue
     }
 
     /**
@@ -238,28 +239,32 @@ public final class PlatformMetaDataModel
         }
     }
 
+    /**
+     * Transfer the changes from the updatedRecordsForContext into the context held in the
+     * contextPerName map.
+     */
     static void handleRecordsForContext(String contextName, ConcurrentMap<String, Context> contextsPerName,
-        final Map<String, IValue> recordsForContext, final Map<String, IValue> updatedRecordsForContext, String field)
+        final Set<String> currentRecordsForContext, final Map<String, IValue> updatedRecordsForContext, String field)
     {
         Map.Entry<String, IValue> entry;
-        String key;
+        String recordName;
         IValue value;
         IRecord record;
         Context context = safeGetContext(contextsPerName, contextName);
         for (Iterator<Map.Entry<String, IValue>> it = updatedRecordsForContext.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
-            key = entry.getKey();
-            if (ContextUtils.isSystemRecordName(key))
+            recordName = entry.getKey();
+            if (ContextUtils.isSystemRecordName(recordName))
             {
                 continue;
             }
             value = entry.getValue();
-            record = context.getOrCreateRecord(key);
+            record = context.getOrCreateRecord(recordName);
             record.put(field, value.textValue());
             context.publishAtomicChange(record);
         }
-        removeRecordsNotUpdated(recordsForContext.keySet(), context);
+        removeRecordsNotUpdated(currentRecordsForContext, context);
     }
 
     static void updateCountsForKey(final String key, final Map<String, AtomicInteger> countsPerKey)
@@ -288,11 +293,11 @@ public final class PlatformMetaDataModel
         }
     }
 
-    static void removeSystemRecords(Map<String, IValue> records)
+    static void removeSystemRecords(Set<String> records)
     {
-        for (Iterator<Map.Entry<String, IValue>> it = records.entrySet().iterator(); it.hasNext();)
+        for (Iterator<String> it = records.iterator(); it.hasNext();)
         {
-            if (ContextUtils.isSystemRecordName(it.next().getKey()))
+            if (ContextUtils.isSystemRecordName(it.next()))
             {
                 it.remove();
             }
@@ -362,9 +367,29 @@ public final class PlatformMetaDataModel
         }
         return iValue;
     }
+
+    static String removePrefixRecordsPerService(String name)
+    {
+        return name.substring(PREFIX_RECORDS_PER_SERVICE.length());
+    }
+
+    static String removePrefixRecordsPerInstance(String name)
+    {
+        return name.substring(PREFIX_RECORDS_PER_INSTANCE.length());
+    }
+
+    static String removePrefixRpcsPerService(String name)
+    {
+        return name.substring(PREFIX_RPCS_PER_SERVICE.length());
+    }
+
+    static String removePrefixRpcsPerInstance(String name)
+    {
+        return name.substring(PREFIX_RPCS_PER_INSTANCE.length());
+    }
     
     final ThimbleExecutor coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
-    
+
     final CoalescingRecordListener _servicesRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
         {
@@ -407,7 +432,7 @@ public final class PlatformMetaDataModel
                 checkReset();
                 handleRecordsPerServiceUpdate(imageCopy, atomicChange);
             }
-        }, RECORDS_PER_SERVICE_FAMILY);
+        }, PREFIX_RECORDS_PER_SERVICE);
 
     final CoalescingRecordListener _runtimeStatusRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
@@ -440,7 +465,7 @@ public final class PlatformMetaDataModel
                 checkReset();
                 handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
             }
-        }, RECORDS_PER_SERVICE_INSTANCE);
+        }, PREFIX_RECORDS_PER_INSTANCE);
 
     final CoalescingRecordListener _rpsPerServiceFamilyRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
@@ -451,7 +476,7 @@ public final class PlatformMetaDataModel
                 checkReset();
                 handleRpcsPerServiceUpdate(imageCopy, atomicChange);
             }
-        }, RPCS_PER_SERVICE_FAMILY);
+        }, PREFIX_RPCS_PER_SERVICE);
 
     final CoalescingRecordListener _rpcsPerServiceInstanceRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
@@ -462,7 +487,7 @@ public final class PlatformMetaDataModel
                 checkReset();
                 handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
             }
-        }, RPCS_PER_SERVICE_INSTANCE);
+        }, PREFIX_RPCS_PER_INSTANCE);
 
     final PlatformRegistryAgent agent;
 
@@ -508,7 +533,7 @@ public final class PlatformMetaDataModel
             {
             }
         });
-        
+
         // the bare minimum
         registerListener_PLATFORM_CONNECTIONS();
     }
@@ -523,25 +548,28 @@ public final class PlatformMetaDataModel
         return this.agent.registryProxy.addObserver(this._platformConnectionsRecordListener, PLATFORM_CONNECTIONS);
     }
 
-    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_INSTANCE()
+    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_INSTANCE(String serviceInstanceId)
     {
-        return this.agent.registryProxy.addObserver(this._rpcsPerServiceInstanceRecordListener, RPCS_PER_SERVICE_INSTANCE);
+        return this.agent.registryProxy.addObserver(this._rpcsPerServiceInstanceRecordListener,
+            PREFIX_RPCS_PER_INSTANCE + serviceInstanceId);
     }
 
-    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_FAMILY()
+    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_FAMILY(String serviceFamily)
     {
-        return this.agent.registryProxy.addObserver(this._rpsPerServiceFamilyRecordListener, RPCS_PER_SERVICE_FAMILY);
+        return this.agent.registryProxy.addObserver(this._rpsPerServiceFamilyRecordListener,
+            PREFIX_RPCS_PER_SERVICE + serviceFamily);
     }
 
-    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_INSTANCE()
+    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_INSTANCE(String serviceInstanceId)
     {
         return this.agent.registryProxy.addObserver(this._recordsPerServiceInstanceRecordListener,
-            RECORDS_PER_SERVICE_INSTANCE);
+            PREFIX_RECORDS_PER_INSTANCE + serviceInstanceId);
     }
 
-    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_FAMILY()
+    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_FAMILY(String serviceFamily)
     {
-        return this.agent.registryProxy.addObserver(this._recordsPerServiceFamilyListener, RECORDS_PER_SERVICE_FAMILY);
+        return this.agent.registryProxy.addObserver(this._recordsPerServiceFamilyListener,
+            PREFIX_RECORDS_PER_SERVICE + serviceFamily);
     }
 
     Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCE_STATS()
@@ -551,7 +579,8 @@ public final class PlatformMetaDataModel
 
     Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCES_PER_AGENT()
     {
-        return this.agent.registryProxy.addObserver(this._serviceInstancesPerAgentRecordListener, SERVICE_INSTANCES_PER_AGENT);
+        return this.agent.registryProxy.addObserver(this._serviceInstancesPerAgentRecordListener,
+            SERVICE_INSTANCES_PER_AGENT);
     }
 
     void registerListener_SERVICES()
@@ -683,7 +712,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceRecordsContext(String serviceFamily)
     {
-        registerListener_RECORDS_PER_SERVICE_FAMILY();
+        registerListener_RECORDS_PER_SERVICE_FAMILY(serviceFamily);
         return safeGetContext(this.serviceRecordsContext, serviceFamily);
     }
 
@@ -699,7 +728,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstanceRecordsContext(String platformServiceInstanceID)
     {
-        registerListener_RECORDS_PER_SERVICE_INSTANCE();
+        registerListener_RECORDS_PER_SERVICE_INSTANCE(platformServiceInstanceID);
         return safeGetContext(this.serviceInstanceRecordsContext, platformServiceInstanceID);
     }
 
@@ -714,7 +743,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceRpcsContext(String serviceFamily)
     {
-        registerListener_RPCS_PER_SERVICE_FAMILY();
+        registerListener_RPCS_PER_SERVICE_FAMILY(serviceFamily);
         return safeGetContext(this.serviceRpcsContext, serviceFamily);
     }
 
@@ -730,7 +759,7 @@ public final class PlatformMetaDataModel
      */
     public IObserverContext getPlatformServiceInstanceRpcsContext(String platformServiceInstanceID)
     {
-        registerListener_RPCS_PER_SERVICE_INSTANCE();
+        registerListener_RPCS_PER_SERVICE_INSTANCE(platformServiceInstanceID);
         return safeGetContext(this.serviceInstanceRpcsContext, platformServiceInstanceID);
     }
 
@@ -860,7 +889,7 @@ public final class PlatformMetaDataModel
                 serviceRecordsRpcs.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
             serviceRecord.put(ServiceMetaDataRecordDefinition.TxQueue.toString(),
                 serviceRecordsRpcs.get(IServiceRecordFields.TX_QUEUE_SIZE));
-            
+
             this.servicesContext.publishAtomicChange(serviceFamilyName);
         }
 
@@ -896,9 +925,9 @@ public final class PlatformMetaDataModel
         for (String serviceInstanceId : atomicChange.getSubMapKeys())
         {
             statsForServiceInstance = this.serviceInstancesContext.getOrCreateRecord(serviceInstanceId);
-            
+
             stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getPutEntries();
-            if(stats.size() > 0)
+            if (stats.size() > 0)
             {
                 statsForServiceInstance.put(ServiceInstanceMetaDataRecordDefinition.Service.toString(),
                     PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId)[0]);
@@ -924,11 +953,12 @@ public final class PlatformMetaDataModel
                     ServiceInstanceMetaDataRecordDefinition.RpcCount.toString());
                 this.serviceInstancesContext.publishAtomicChange(statsForServiceInstance);
             }
-            
+
             stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getRemovedEntries();
             if (stats.size() > 0)
             {
-                // NOTE: fields are never removed, so any remove means the entire submap has been removed
+                // NOTE: fields are never removed, so any remove means the entire submap has been
+                // removed
                 removeServiceInstance(serviceInstanceId);
             }
         }
@@ -936,56 +966,39 @@ public final class PlatformMetaDataModel
 
     void handleRecordsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        Map<String, IValue> records;
-        for (String serviceFamily : imageCopy.getSubMapKeys())
-        {
-            records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceFamily));
-            removeSystemRecords(records);
+        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        removeSystemRecords(currentRecordNames);
 
-            handleRecordsForContext(serviceFamily, this.serviceRecordsContext, records,
-                change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
-                ServiceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
-        }
+        handleRecordsForContext(removePrefixRecordsPerService(imageCopy.getName()), this.serviceRecordsContext,
+            currentRecordNames, change.getPutEntries(),
+            ServiceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
     }
 
     void handleRecordsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        Map<String, IValue> records;
-        for (String serviceInstanceID : imageCopy.getSubMapKeys())
-        {
-            records = new HashMap<String, IValue>(imageCopy.getOrCreateSubMap(serviceInstanceID));
-            removeSystemRecords(records);
+        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        removeSystemRecords(currentRecordNames);
 
-            handleRecordsForContext(serviceInstanceID, this.serviceInstanceRecordsContext, records,
-                change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),
-                ServiceInstanceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
-        }
+        handleRecordsForContext(removePrefixRecordsPerInstance(imageCopy.getName()), this.serviceInstanceRecordsContext,
+            currentRecordNames, change.getPutEntries(),
+            ServiceInstanceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
     }
 
     void handleRpcsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        Map<String, IValue> rpcs;
-        for (String serviceFamily : imageCopy.getSubMapKeys())
-        {
-            rpcs = imageCopy.getOrCreateSubMap(serviceFamily);
+        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
 
-            handleRecordsForContext(serviceFamily, this.serviceRpcsContext, rpcs,
-                change.getSubMapAtomicChange(serviceFamily).getPutEntries(),
-                ServiceRpcMetaDataRecordDefinition.Definition.toString());
-        }
+        handleRecordsForContext(removePrefixRpcsPerService(imageCopy.getName()), this.serviceRpcsContext,
+            currentRecordNames, change.getPutEntries(), ServiceRpcMetaDataRecordDefinition.Definition.toString());
     }
 
     void handleRpcsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        Map<String, IValue> rpcs;
-        for (String serviceInstanceID : imageCopy.getSubMapKeys())
-        {
-            rpcs = imageCopy.getOrCreateSubMap(serviceInstanceID);
+        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
 
-            handleRecordsForContext(serviceInstanceID, this.serviceInstanceRpcsContext, rpcs,
-                change.getSubMapAtomicChange(serviceInstanceID).getPutEntries(),
-                ServiceInstanceRpcMetaDataRecordDefinition.Definition.toString());
-        }
+        handleRecordsForContext(removePrefixRpcsPerInstance(imageCopy.getName()), this.serviceInstanceRpcsContext,
+            currentRecordNames, change.getPutEntries(),
+            ServiceInstanceRpcMetaDataRecordDefinition.Definition.toString());
     }
 
     void handleRuntimeStatusUpdate(IRecord imageCopy)

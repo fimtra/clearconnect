@@ -90,7 +90,7 @@ public class PlatformTest
 {
     @Rule
     public TestName name = new TestName();
-    
+
     private String logStart()
     {
         System.err.println(this.name.getMethodName());
@@ -102,7 +102,7 @@ public class PlatformTest
         final List<String> available = new ArrayList<String>();
         final List<String> unavailable = new ArrayList<String>();
         boolean debug = false;
-        
+
         @Override
         public String toString()
         {
@@ -289,7 +289,7 @@ public class PlatformTest
     public void setup()
     {
         Log.log(this, "============== START " + this.name.getMethodName() + " =============================");
-        
+
         ChannelUtils.WATCHDOG.configure(RECONNECT_PERIOD, 10);
 
         registryPort += 1;
@@ -311,9 +311,8 @@ public class PlatformTest
 
     void createAgent008() throws IOException
     {
-        this.agent008 =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008", this.registryHost,
-                registryPort);
+        this.agent008 = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008", this.registryHost,
+            registryPort);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
     }
 
@@ -338,7 +337,7 @@ public class PlatformTest
                 }
             }
         }, "tearDown").start();
-        
+
         Log.log(this, "============== END TEAR DOWN " + name.getMethodName() + " =============================");
 
         ChannelUtils.WATCHDOG.configure(5000);
@@ -352,20 +351,22 @@ public class PlatformTest
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-        
+
         final TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
         this.agent.addServiceAvailableListener(serviceListener);
         TestServiceInstanceAvailableListener serviceInstanceListener = new TestServiceInstanceAvailableListener();
         this.agent.addServiceInstanceAvailableListener(serviceInstanceListener);
-     
+
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT,
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // stop the registry
         this.registry.destroy();
-        
+
         serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
+        serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT,
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // bit of a sleep for I/O to settle so we can re-create on the same port
         int i = 0;
@@ -380,17 +381,17 @@ public class PlatformTest
         catch (Exception er)
         {
         }
-     
+
         // restart the registry, then check we get our services back
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
-        
+
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
-        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));        
+        serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT,
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
     }
-    
-    
+
     @Test(timeout = 30000l)
     public void testWaitForServices() throws IOException, InterruptedException
     {
@@ -421,7 +422,8 @@ public class PlatformTest
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        assertEquals(getPlatformName(), this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+        assertEquals(getPlatformName(),
+            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
     }
 
     @Test
@@ -447,8 +449,8 @@ public class PlatformTest
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         // todo fails here 2x
-        assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
-            servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+        assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort += 1,
+            WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
     }
 
     @Test
@@ -469,8 +471,8 @@ public class PlatformTest
             @Override
             public Object got()
             {
-                final IRecord record =
-                    PlatformTest.this.registry.context.getRecord(PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+                final IRecord record = PlatformTest.this.registry.context.getRecord(
+                    PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
                 if (record == null)
                 {
                     return null;
@@ -533,8 +535,8 @@ public class PlatformTest
     }
 
     @Test
-    public void testFaultToleranceServiceInstanceChangesOverThenDestroyLastService() throws InterruptedException,
-        IOException
+    public void testFaultToleranceServiceInstanceChangesOverThenDestroyLastService()
+        throws InterruptedException, IOException
     {
         final String SERVICE1 = logStart();
         Log.log(this, ">>>>>> START testServiceInstanceChangesOverThenDestroyLastService");
@@ -545,21 +547,21 @@ public class PlatformTest
             IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
             IFtStatusListener ftStatusListener2 = mock(IFtStatusListener.class);
 
-            
-            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort +=
-                1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-            
+            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
-            
+
             // check primary is active
             verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
 
             // standby may or may not be called - it depends on timings
             verify(ftStatusListener1, atLeast(0)).onStandby(eq(SERVICE1), eq(this.primary));
 
-            // create secondary after primary is confirmed (so we know that secondary is standby for the test)
-            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
-                    1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));            
+            // create secondary after primary is confirmed (so we know that secondary is standby for
+            // the test)
+            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             // wait for both instances to be registered - otherwise we can get interleaving
             // available-unavailable-available signals in the test which causes false failures
@@ -567,16 +569,17 @@ public class PlatformTest
             this.agent.addServiceInstanceAvailableListener(serviceInstanceListener);
             final String serviceInstance1 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
             final String serviceInstance2 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
-            serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1, serviceInstance2);            
+            serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1,
+                serviceInstance2);
 
             TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
             this.agent.addServiceAvailableListener(serviceListener);
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
-            
+
             this.agent.getPlatformServiceInstance(SERVICE1, this.secondary).addFtStatusListener(ftStatusListener2);
             verify(ftStatusListener2, timeout(activateTimeout).times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
-            
+
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY");
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
 
@@ -590,15 +593,15 @@ public class PlatformTest
 
             Log.log(this, ">>>>> recreating SERVICE1 PRIMARY");
             // recreate the first service instance again
-            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort +=
-                1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             IFtStatusListener ftStatusListener3 = mock(IFtStatusListener.class);
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener3);
 
             serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
-                
+
             verify(ftStatusListener3, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
             // note: standby may or may not be called - depends on timings
             verify(ftStatusListener3, atMost(2)).onStandby(eq(SERVICE1), eq(this.primary));
@@ -609,7 +612,7 @@ public class PlatformTest
 
             verify(ftStatusListener1, atLeast(0)).onStandby(eq(SERVICE1), eq(this.primary));
             verify(ftStatusListener2, times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
-            
+
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
 
@@ -678,9 +681,8 @@ public class PlatformTest
         final String SERVICE2 = this.name.getMethodName() + "2";
         final String SERVICE3 = this.name.getMethodName() + "3";
         createAgent();
-        boolean platformService =
-            this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+        boolean platformService = this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
+            servicePort, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
         assertTrue(platformService);
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -728,21 +730,25 @@ public class PlatformTest
         this.agent.addServiceAvailableListener(serviceAvailableListener);
         verify(serviceAvailableListener, timeout(timeout)).onServiceAvailable(eq("PlatformRegistry"));
         verify(serviceAvailableListener, timeout(timeout)).onServiceAvailable(eq(SERVICE1));
-        
+
         assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
-        verify(listener, timeout(timeout)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        verify(listener, timeout(timeout)).onConnected(
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
         reset(listener);
-        
+
         assertNotNull(this.agent008.getPlatformServiceProxy(SERVICE1));
-        verify(listener, timeout(timeout)).onConnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        verify(listener, timeout(timeout)).onConnected(
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
         reset(listener);
 
         this.agent008.destroyPlatformServiceProxy(SERVICE1);
-        verify(listener, timeout(timeout)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+        verify(listener, timeout(timeout)).onDisconnected(
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
         reset(listener);
 
         this.agent.destroyPlatformServiceProxy(SERVICE1);
-        verify(listener, timeout(timeout)).onDisconnected(eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+        verify(listener, timeout(timeout)).onDisconnected(
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
         reset(listener);
     }
 
@@ -982,8 +988,8 @@ public class PlatformTest
                 WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
-            assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost,
-                servicePort2, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
             assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
             listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1079,20 +1085,18 @@ public class PlatformTest
     @Ignore
     // this is ignored as it only tests an agent re-connecting
     // see testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed
-    public void testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed() throws IOException,
-        InterruptedException
+    public void testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed()
+        throws IOException, InterruptedException
     {
-        final String SERVICE1 =
-            logStart();
+        final String SERVICE1 = logStart();
         Log.log(this, ">>>>> START testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
 
         int oldPort = registryPort;
         int newPort = registryPort += 1;
 
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
-        this.agent =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(), new EndPointAddress(this.registryHost,
-                oldPort), alternate);
+        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+            new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
@@ -1151,8 +1155,8 @@ public class PlatformTest
     }
 
     @Test
-    public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents() throws IOException,
-        InterruptedException
+    public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents()
+        throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
         final String SERVICE2 = this.name.getMethodName() + "2";
@@ -1163,14 +1167,12 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(), new EndPointAddress(this.registryHost,
-                oldPort), alternate);
+        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+            new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
-        this.agent008 =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008", new EndPointAddress(
-                this.registryHost, oldPort), alternate);
+        this.agent008 = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008",
+            new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
@@ -1229,8 +1231,8 @@ public class PlatformTest
                 WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
-            assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost,
-                servicePort2, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
             assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
             listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1329,8 +1331,7 @@ public class PlatformTest
     @Test
     // note: we ignore this as there is already a test doing this with two agents ->
     // testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents
-    public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed() throws IOException,
-        InterruptedException
+    public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed() throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
 
@@ -1340,9 +1341,8 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(), new EndPointAddress(this.registryHost,
-                oldPort), alternate);
+        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+            new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
@@ -1450,15 +1450,15 @@ public class PlatformTest
         this.registry.destroy();
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost);
 
-        this.agent =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
-                this.registry.publisher.getEndPointAddress().getNode());
+        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+            this.registry.publisher.getEndPointAddress().getNode());
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        assertEquals(getPlatformName(), this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+        assertEquals(getPlatformName(),
+            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
     }
 
     private String getPlatformName()
@@ -1564,13 +1564,13 @@ public class PlatformTest
             {
                 return serviceRecordImage.get().size();
             }
-            
+
             @Override
             public Object expect()
             {
                 return 1;
             }
-            
+
             @Override
             public String getFailureReason()
             {
@@ -1633,20 +1633,21 @@ public class PlatformTest
         createAgent008();
 
         verifyPlatformName(this.agent);
+
         // create a FT service
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         waitForPrimaryToBeActive(SERVICE1);
-        
-        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
-            1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+
+        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
+            servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         // create a LB service
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
-        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.secondary, this.agentHost, servicePort +=
-            1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.secondary, this.agentHost,
+            servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
 
         this.agent.waitForPlatformService(SERVICE1);
         this.agent008.waitForPlatformService(SERVICE1);
@@ -1658,40 +1659,15 @@ public class PlatformTest
         IPlatformServiceInstance lb1 = this.agent.getPlatformServiceInstance(SERVICE2, this.primary);
         IPlatformServiceInstance lb2 = this.agent008.getPlatformServiceInstance(SERVICE2, this.secondary);
 
-        final AtomicReference<IRecord> serviceInstanceRpcs = new AtomicReference<IRecord>();
-        final AtomicReference<IRecord> serviceRpcs = new AtomicReference<IRecord>();
-
         // note: the built-in ftServiceInstanceStatus RPC is published for all FT services
-        // automatically, hence we have 2 + 1 expected as the test publishes a custom RPC per
-        // service
-        final int serviceCount = 3;
-        // similar story here - the 2 FT services have 2 RPCs, the 2 LB services have 1
-        final int instanceCount = 6;
+        // automatically
+        final int SERVICE1_RPC_COUNT = 2;
+        final int SERVICE1_PRIMARY_RPC_COUNT = 2;
+        final int SERVICE1_SECONDARY_RPC_COUNT = 2;
 
-        IRecordListener platformListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                serviceInstanceRpcs.set(imageCopy);
-            }
-        };
-        this.agent.registryProxy.addObserver(platformListener,
-            PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_INSTANCE);
-
-        IRecordListener platformServiceListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                Log.log(this, ">>>> ON CHANGE SERVICE RPCS " + atomicChange);
-                serviceRpcs.set(imageCopy);
-            }
-        };
-        this.agent.registryProxy.addObserver(platformServiceListener,
-            PlatformRegistry.IRegistryRecordNames.RPCS_PER_SERVICE_FAMILY);
-
-        Log.log(this, ">>>> start publish");
+        final int SERVICE2_RPC_COUNT = 1;
+        final int SERVICE2_PRIMARY_RPC_COUNT = 1;
+        final int SERVICE2_SECONDARY_RPC_COUNT = 1;
 
         ft1.publishRPC(new RpcInstance(TypeEnum.TEXT, "FT_RPC1"));
         ft2.publishRPC(new RpcInstance(TypeEnum.TEXT, "FT_RPC1"));
@@ -1699,68 +1675,174 @@ public class PlatformTest
         lb1.publishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC1"));
         lb2.publishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC1"));
 
-        Log.log(this, ">>>> end publish");
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1), SERVICE1_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2), SERVICE2_RPC_COUNT);
 
-        // expect FT_RPC1 x2, LB_RPC1 x2, ftServiceInstanceStatus x2
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount);
-        checkRecordSubmapSize(serviceRpcs, serviceCount);
+        // check counts for instance-level
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)), SERVICE1_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)),
+            SERVICE1_SECONDARY_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)), SERVICE2_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)),
+            SERVICE2_SECONDARY_RPC_COUNT);
 
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)).containsKey("FT_RPC1"));
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)).containsKey("FT_RPC1"));
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)).containsKey("LB_RPC1"));
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_RPC1"));
+        // check instance-level views
+        checkServiceInstanceContainsRpc(SERVICE1, this.primary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE1, this.secondary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.primary, "LB_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.secondary, "LB_RPC1");
 
         // check service-level views
-        assertTrue("Got: " + serviceRpcs, serviceRpcs.get().getOrCreateSubMap(SERVICE1).containsKey("FT_RPC1"));
-        assertTrue("Got: " + serviceRpcs, serviceRpcs.get().getOrCreateSubMap(SERVICE2).containsKey("LB_RPC1"));
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1).containsKey("FT_RPC1"));
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2).containsKey("LB_RPC1"));
 
         // publish a second RPC
         lb2.publishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC2"));
 
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount + 1);
-        checkRecordSubmapSize(serviceRpcs, serviceCount + 1);
+        // check instance-level views
+        checkServiceInstanceContainsRpc(SERVICE1, this.primary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE1, this.secondary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.primary, "LB_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.secondary, "LB_RPC1");
+        // the new published one
+        checkServiceInstanceContainsRpc(SERVICE2, this.secondary, "LB_RPC2");
 
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_RPC2"));
-        assertTrue("Got: " + serviceRpcs, serviceRpcs.get().getOrCreateSubMap(SERVICE2).containsKey("LB_RPC2"));
+        // check counts for service-level
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1), SERVICE1_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2), SERVICE2_RPC_COUNT + 1);
+
+        // check counts for instance-level
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)), SERVICE1_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)),
+            SERVICE1_SECONDARY_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)), SERVICE2_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)),
+            SERVICE2_SECONDARY_RPC_COUNT + 1);
 
         // remove lb1.LB_RPC1 - only service instance change will occur
         lb1.unpublishRPC(new RpcInstance(TypeEnum.TEXT, "LB_RPC1"));
 
-        checkRecordSubmapSize(serviceInstanceRpcs, instanceCount);
-        checkRecordSubmapSize(serviceRpcs, serviceCount + 1);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1), SERVICE1_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2), SERVICE2_RPC_COUNT + 1);
 
-        assertFalse(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)).containsKey("LB_RPC1"));
-        assertTrue(
-            "Got: " + serviceInstanceRpcs,
-            serviceInstanceRpcs.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_RPC1"));
-        assertTrue("Got: " + serviceRpcs, serviceRpcs.get().getOrCreateSubMap(SERVICE2).containsKey("LB_RPC1"));
+        // check counts for instance-level
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)), SERVICE1_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)),
+            SERVICE1_SECONDARY_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)), 0);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)),
+            SERVICE2_SECONDARY_RPC_COUNT + 1);
+
+        // check instance-level views
+        checkServiceInstanceContainsRpc(SERVICE1, this.primary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE1, this.secondary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.secondary, "LB_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE2, this.secondary, "LB_RPC2");
+
+        // check service-level views
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1).containsKey("FT_RPC1"));
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2).containsKey("LB_RPC1"));
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2).containsKey("LB_RPC2"));
 
         // we will be removing these rpcs (lb2)
         // service2.LB_RPC2=SLB_RPC2
         // service2.LB_RPC1=SLB_RPC1
         this.agent008.destroyPlatformServiceInstance(SERVICE2, this.secondary);
 
-        checkRecordSubmapSize(serviceInstanceRpcs, 4);
-        checkRecordSubmapSize(serviceRpcs, 2);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1), SERVICE1_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2), 0);
+
+        // check counts for instance-level
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)), SERVICE1_PRIMARY_RPC_COUNT);
+        checkRecordSize(
+            this.registry.eventHandler.getRpcsPerServiceInstance(
+                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)),
+            SERVICE1_SECONDARY_RPC_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)), 0);
+        checkRecordSize(this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)), 0);
+
+        // check instance-level views
+        checkServiceInstanceContainsRpc(SERVICE1, this.primary, "FT_RPC1");
+        checkServiceInstanceContainsRpc(SERVICE1, this.secondary, "FT_RPC1");
+
+        // check service-level views
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE1).containsKey("FT_RPC1"));
+        assertTrue(this.registry.eventHandler.getRpcsPerServiceFamily(SERVICE2).isEmpty());
+    }
+
+    private void checkServiceInstanceContainsRpc(final String service, final String member, final String rpcName)
+        throws EventFailedException, InterruptedException
+    {
+        final IRecord rpcsPerServiceInstance = this.registry.eventHandler.getRpcsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(service, member));
+        waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object expect()
+            {
+                return Boolean.TRUE;
+            }
+
+            @Override
+            public Object got()
+            {
+                return rpcsPerServiceInstance.containsKey(rpcName);
+            }
+
+            @Override
+            public String getFailureReason()
+            {
+                return "Was: " + rpcsPerServiceInstance;
+            }
+        });
+    }
+
+    private void checkServiceInstanceContainsRecord(final String service, final String member, final String record)
+        throws EventFailedException, InterruptedException
+    {
+        final IRecord recordsPerServiceInstance = this.registry.eventHandler.getRecordsPerServiceInstance(
+            PlatformUtils.composePlatformServiceInstanceID(service, member));
+        waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object expect()
+            {
+                return Boolean.TRUE;
+            }
+
+            @Override
+            public Object got()
+            {
+                return recordsPerServiceInstance.containsKey(record);
+            }
+
+            @Override
+            public String getFailureReason()
+            {
+                return "Was: " + recordsPerServiceInstance;
+            }
+        });
     }
 
     @Test
@@ -1778,45 +1860,20 @@ public class PlatformTest
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         waitForPrimaryToBeActive(SERVICE1);
-        
-        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort +=
-            1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+
+        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
+            servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         // create a LB service
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
-        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.secondary, this.agentHost, servicePort +=
-            1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.secondary, this.agentHost,
+            servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
 
         IPlatformServiceInstance ft1 = this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
         IPlatformServiceInstance ft2 = this.agent008.getPlatformServiceInstance(SERVICE1, this.secondary);
         IPlatformServiceInstance lb1 = this.agent.getPlatformServiceInstance(SERVICE2, this.primary);
         IPlatformServiceInstance lb2 = this.agent008.getPlatformServiceInstance(SERVICE2, this.secondary);
-
-        final AtomicReference<IRecord> recordsAcrossInstances = new AtomicReference<IRecord>();
-        final AtomicReference<IRecord> recordsAcrossFamilies = new AtomicReference<IRecord>();
-
-        IRecordListener platformListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                recordsAcrossInstances.set(imageCopy);
-            }
-        };
-        this.agent.registryProxy.addObserver(platformListener,
-            PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_INSTANCE);
-
-        IRecordListener platformServiceListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                recordsAcrossFamilies.set(imageCopy);
-            }
-        };
-        this.agent.registryProxy.addObserver(platformServiceListener,
-            PlatformRegistry.IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY);
 
         ft1.createRecord("FT_REC1");
         ft2.createRecord("FT_REC1");
@@ -1827,70 +1884,80 @@ public class PlatformTest
         /*
          * Each service has the 5 system records + "Service stats" + xx_REC1 = 7
          */
-        final int recordsForOneInstance = 7;
-        // registry has 5 system records, 11 registry records, 4 serviceInfo records for the
-        // services
-        int registryServiceRecords = 5 + 11 + 4;
-        int expectedRecordsAcrossInstancesCount = 4 * recordsForOneInstance + registryServiceRecords;
-        int expectedRecordsAcrossFamiliesCount = 2 * recordsForOneInstance + registryServiceRecords;
 
-        checkRecordSubmapSize(recordsAcrossInstances, expectedRecordsAcrossInstancesCount);
-        checkRecordSubmapSize(recordsAcrossFamilies, expectedRecordsAcrossFamiliesCount);
+        int SERVICE1_RECORD_COUNT = 7;
+        int SERVICE2_RECORD_COUNT = 7;
+        int SERVICE1_PRIMARY_RECORD_COUNT = 7;
+        int SERVICE1_SECONDARY_RECORD_COUNT = 7;
+        int SERVICE2_PRIMARY_RECORD_COUNT = 7;
+        int SERVICE2_SECONDARY_RECORD_COUNT = 7;
+        
+        final String service1_primary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
+        final String service1_secondary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
+        final String service2_primary = PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary);
+        final String service2_secondary = PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary);
 
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary)).containsKey("FT_REC1"));
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary)).containsKey("FT_REC1"));
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)).containsKey("LB_REC1"));
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_REC1"));
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1), SERVICE1_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE2), SERVICE2_RECORD_COUNT);
 
-        // check service-level views
-        assertTrue("Got: " + recordsAcrossFamilies,
-            recordsAcrossFamilies.get().getOrCreateSubMap(SERVICE1).containsKey("FT_REC1"));
-        assertTrue("Got: " + recordsAcrossFamilies,
-            recordsAcrossFamilies.get().getOrCreateSubMap(SERVICE2).containsKey("LB_REC1"));
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_primary),
+            SERVICE1_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_secondary),
+            SERVICE1_SECONDARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_primary),
+            SERVICE2_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary),
+            SERVICE2_SECONDARY_RECORD_COUNT);
+
+        checkServiceInstanceContainsRecord(SERVICE1, this.primary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.primary, "LB_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC1");
+    
 
         // publish a second record
         lb2.createRecord("LB_REC2");
-        checkRecordSubmapSize(recordsAcrossInstances, expectedRecordsAcrossInstancesCount + 1);
-        checkRecordSubmapSize(recordsAcrossFamilies, expectedRecordsAcrossFamiliesCount + 1);
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_REC2"));
-        assertTrue("Got: " + recordsAcrossFamilies,
-            recordsAcrossFamilies.get().getOrCreateSubMap(SERVICE2).containsKey("LB_REC2"));
+
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1), SERVICE1_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE2), SERVICE2_RECORD_COUNT + 1);
+
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_primary),
+            SERVICE1_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_secondary),
+            SERVICE1_SECONDARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_primary),
+            SERVICE2_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary),
+            SERVICE2_SECONDARY_RECORD_COUNT + 1);
+
+        checkServiceInstanceContainsRecord(SERVICE1, this.primary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.primary, "LB_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC2");
 
         // remove 1 load-balanced record - the other one should still be visible
         // after this, LB_REC1 only exists for lb2
         lb1.deleteRecord(lb1.getRecord("LB_REC1"));
-        checkRecordSubmapSize(recordsAcrossInstances, expectedRecordsAcrossInstancesCount);
-        checkRecordSubmapSize(recordsAcrossFamilies, expectedRecordsAcrossFamiliesCount + 1);
 
-        assertTrue("Got: " + recordsAcrossFamilies,
-            recordsAcrossFamilies.get().getOrCreateSubMap(SERVICE2).containsKey("LB_REC1"));
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1), SERVICE1_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE2), SERVICE2_RECORD_COUNT + 1);
 
-        assertFalse(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary)).containsKey("LB_REC1"));
-        assertTrue(
-            "Got: " + recordsAcrossInstances,
-            recordsAcrossInstances.get().getOrCreateSubMap(
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.secondary)).containsKey("LB_REC1"));
-        assertTrue("Got: " + recordsAcrossFamilies,
-            recordsAcrossFamilies.get().getOrCreateSubMap(SERVICE2).containsKey("LB_REC1"));
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_primary),
+            SERVICE1_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_secondary),
+            SERVICE1_SECONDARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_primary),
+            SERVICE2_PRIMARY_RECORD_COUNT - 1);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary),
+            SERVICE2_SECONDARY_RECORD_COUNT + 1);
 
+        checkServiceInstanceContainsRecord(SERVICE1, this.primary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC1");
+        checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC2");
+         
+  
         // we will be removing these records (lb2)
         // service2.LB_REC2=SLB_REC2
         // service2.LB_REC1=SLB_REC1
@@ -1898,11 +1965,21 @@ public class PlatformTest
         // after this, LB_REC1 is gone from the LB service (so this service now only has 1 instance
         // live with 6 records)
         this.agent008.destroyPlatformServiceInstance(SERVICE2, this.secondary);
+        
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1), SERVICE1_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE2), SERVICE2_RECORD_COUNT - 1);
 
-        // a ServiceInfo record is removed when service2 is destroyed, hence 19 not 20 for the
-        // registry service records
-        checkRecordSubmapSize(recordsAcrossInstances, (recordsForOneInstance * 2) + 6 + registryServiceRecords - 1);
-        checkRecordSubmapSize(recordsAcrossFamilies, recordsForOneInstance + 6 + registryServiceRecords - 1);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_primary),
+            SERVICE1_PRIMARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service1_secondary),
+            SERVICE1_SECONDARY_RECORD_COUNT);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_primary),
+            SERVICE2_PRIMARY_RECORD_COUNT - 1);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary),
+            0);
+
+        checkServiceInstanceContainsRecord(SERVICE1, this.primary, "FT_REC1");
+        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");    
     }
 
     void waitForPrimaryToBeActive(final String SERVICE1)
@@ -1911,7 +1988,7 @@ public class PlatformTest
         IFtStatusListener ftStatusListener1 = mock(IFtStatusListener.class);
         this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
         verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
-        // when adding a listener, we are not guaranteed to be standby 
+        // when adding a listener, we are not guaranteed to be standby
         verify(ftStatusListener1, atMost(2)).onStandby(eq(SERVICE1), eq(this.primary));
     }
 
@@ -1921,9 +1998,6 @@ public class PlatformTest
         final String SERVICE1 = logStart();
 
         createAgent();
-
-        final IRecord recordsPerPlatformService =
-            this.registry.context.getRecord(IRegistryRecordNames.RECORDS_PER_SERVICE_FAMILY);
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort++,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
@@ -1937,43 +2011,41 @@ public class PlatformTest
             (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.secondary);
         s2.publisher.publishContextConnectionsRecordAtPeriod(10);
 
-        final IRecord recordsPerPlatformServiceInstance =
-            this.registry.context.getRecord(IRegistryRecordNames.RECORDS_PER_SERVICE_INSTANCE);
-
         final String s1primary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
         final String s1secondary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
 
         final String recordName = "lasers";
         s1.createRecord(recordName);
         // wait for the record to appear in our instance map
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1primary, recordName, 0l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1primary), recordName, 0l);
 
         s2.createRecord(recordName);
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1secondary, recordName, 0l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1secondary), recordName, 0l);
 
         IRecordListener listener = mock(IRecordListener.class);
         IRecordListener listener2 = mock(IRecordListener.class);
 
         s1.addRecordListener(listener, recordName);
-        checkSubMapFieldLongValue(recordsPerPlatformService, SERVICE1, recordName, 1l);
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1primary, recordName, 1l);
+        IRecord recordsPerPlatformService = this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1);
+        checkFieldLongValue(recordsPerPlatformService, recordName, 1l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1primary), recordName, 1l);
 
         s2.addRecordListener(listener2, recordName);
-        checkSubMapFieldLongValue(recordsPerPlatformService, SERVICE1, recordName, 2l);
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1secondary, recordName, 1l);
+        checkFieldLongValue(recordsPerPlatformService, recordName, 2l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1secondary), recordName, 1l);
 
         s1.destroy();
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1primary, recordName, -1l);
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1secondary, recordName, 1l);
-        checkSubMapFieldLongValue(recordsPerPlatformService, SERVICE1, recordName, 1l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1primary), recordName, -1l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1secondary), recordName, 1l);
+        checkFieldLongValue(recordsPerPlatformService, recordName, 1l);
 
         s2.deleteRecord(s2.getRecord(recordName));
-        checkSubMapFieldLongValue(recordsPerPlatformServiceInstance, s1secondary, recordName, -1l);
-        checkSubMapFieldLongValue(recordsPerPlatformService, SERVICE1, recordName, -1l);
+        checkFieldLongValue(this.registry.eventHandler.getRecordsPerServiceInstance(s1secondary), recordName, -1l);
+        checkFieldLongValue(recordsPerPlatformService, recordName, -1l);
     }
 
-    private final static void checkSubMapFieldLongValue(final IRecord record, final String subMapName,
-        final String fieldName, final long expect) throws InterruptedException, EventFailedException
+    private final static void checkFieldLongValue(final IRecord record, final String fieldName, final long expect)
+        throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventChecker()
         {
@@ -1988,7 +2060,7 @@ public class PlatformTest
             {
                 try
                 {
-                    return record.getOrCreateSubMap(subMapName).get(fieldName).longValue();
+                    return record.get(fieldName).longValue();
                 }
                 catch (NullPointerException e)
                 {
@@ -2010,7 +2082,7 @@ public class PlatformTest
         }
     }
 
-    private static void checkRecordSubmapSize(final AtomicReference<IRecord> record, final int expect)
+    private static void checkRecordSize(final IRecord record, final int expect)
         throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventCheckerWithFailureReason()
@@ -2026,7 +2098,7 @@ public class PlatformTest
             {
                 try
                 {
-                    return record.get().asFlattenedMap().size();
+                    return record.size();
                 }
                 catch (NullPointerException e)
                 {
@@ -2074,8 +2146,7 @@ public class PlatformTest
         });
     }
 
-    private void verifyPlatformName(final PlatformRegistryAgent agent) throws EventFailedException,
-        InterruptedException
+    private void verifyPlatformName(final PlatformRegistryAgent agent) throws EventFailedException, InterruptedException
     {
         waitForEvent(new EventChecker()
         {

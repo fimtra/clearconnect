@@ -97,7 +97,7 @@ public class PlatformRegistryTest
             });
         }
         assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
-        candidate.destroy();
+        this.candidate.destroy();
         assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
 
         try
@@ -110,7 +110,7 @@ public class PlatformRegistryTest
                     s = new Socket(TcpChannelUtils.LOCALHOST_IP, regPort);
                 }
                 finally
-                {                    
+                {
                     if (s != null)
                     {
                         s.close();
@@ -122,11 +122,11 @@ public class PlatformRegistryTest
         catch (Exception e)
         {
         }
-        
+
         connectedLatch.set(new CountDownLatch(MAX));
-        candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort); 
+        this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
         final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
-        assertTrue("Only got: "+ (MAX - connectedLatch.get().getCount()),await);
+        assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
     }
 
     @Test
@@ -163,11 +163,11 @@ public class PlatformRegistryTest
                 if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
                 {
                     allConnections.countDown();
-                    connected = true;
+                    this.connected = true;
                 }
 
                 // this is for when we destroy the agents
-                if (connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
+                if (this.connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
                 {
                     noConnections.countDown();
                 }
@@ -202,13 +202,6 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.eventHandler.confirmedMasterInstancePerFtService);
         checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
         checkZeroSize(this.candidate.eventHandler.connectionMonitors);
-
-        // the platform registry adds its records as a service instance
-        checkSize(0, 1, this.candidate.recordsPerServiceInstance);
-        checkZeroSize(this.candidate.rpcsPerServiceInstance);
-        // the platform registry adds its records as a service
-        checkSize(0, 1, this.candidate.recordsPerServiceFamily);
-        checkZeroSize(this.candidate.rpcsPerServiceFamily);
 
         // need to wait for connections to be destroyed?
         checkZeroSize(this.candidate.runtimeStatus);
