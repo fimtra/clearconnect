@@ -722,7 +722,7 @@ class PlatformDesktop
         DesktopSummaryPanel(IObserverContext registryProxy)
         {
             this.dataCount = new SummaryField("Kb Rx", false);
-            this.msgCount = new SummaryField("Messges Rx", false);
+            this.msgCount = new SummaryField("Msgs Rx", false);
 
             this.memory = new JProgressBar();
             this.memory.setStringPainted(true);
@@ -748,22 +748,24 @@ class PlatformDesktop
                                 atomicChange.getSubMapAtomicChange(connection).getPutEntries();
                             if (putEntries.size() > 0)
                             {
-                                final IValue kbVal =
+                                final IValue msgsPerSec =
+                                        image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.MSGS_PER_SEC);
+                                final IValue kbsPerSec =
                                     image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.KB_PER_SEC);
-                                if (kbVal != null)
+                                if (msgsPerSec != null)
                                 {
                                     SwingUtilities.invokeLater(new Runnable()
                                     {
                                         @Override
                                         public void run()
                                         {
-                                            final int v = (int) kbVal.longValue() * 10;
+                                            final int v = (int) msgsPerSec.longValue() * 10;
                                             if (DesktopSummaryPanel.this.msgsPerSec.getMaximum() < v)
                                             {
                                                 DesktopSummaryPanel.this.msgsPerSec.setMaximum(v);
                                             }
                                             DesktopSummaryPanel.this.msgsPerSec.setValue(v);
-                                            DesktopSummaryPanel.this.msgsPerSec.setString(kbVal.textValue());
+                                            DesktopSummaryPanel.this.msgsPerSec.setString(msgsPerSec.textValue() + " (" + kbsPerSec.textValue() + " kb/s)");
                                         }
                                     });
                                 }
@@ -808,7 +810,7 @@ class PlatformDesktop
             this.msgCount.addTo(this);
             this.msgCount.setValue(TextValue.valueOf(""));
             
-            add(new JLabel("Kb/s"));
+            add(new JLabel("Msgs/s"));
             add(this.msgsPerSec);
             add(Box.createHorizontalStrut(6));
             add(new JLabel("Mem"));
@@ -824,7 +826,7 @@ class PlatformDesktop
                             (long) ((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())
                                 * inverse_1MB);
                         final long max = (long) (Runtime.getRuntime().totalMemory() * inverse_1MB);
-                        final String text = used + "/" + max + "M";
+                        final String text = used + " / " + max + "M";
                         SwingUtilities.invokeLater(new Runnable()
                         {
                             @Override
