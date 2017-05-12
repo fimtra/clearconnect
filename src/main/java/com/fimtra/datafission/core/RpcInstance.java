@@ -82,10 +82,11 @@ public final class RpcInstance implements IRpcInstance
          * <b>Note:</b> the arguments will exactly match that of the {@link RpcInstance} that it is
          * registered with. The {@link RpcInstance#execute(IValue...)} method will throw an
          * {@link ExecutionException} if the argument types or numbers do not match the RPC
-         * definition of the instance.
+         * definition of the instance. Some or all of the arguments can be <code>null</code>.
          * 
          * @param args
-         *            the argument to execute the RPC with
+         *            the arguments to execute the RPC with - <b>Note:</b> some or all of the
+         *            arguments can be <code>null</code>
          * @return the result, can be <code>null</code>
          * @return the response from the RPC
          * @throws TimeOutException
@@ -711,7 +712,7 @@ public final class RpcInstance implements IRpcInstance
         }
         for (int i = 0; i < args.length; i++)
         {
-            if (args[i].getType() != getArgTypes()[i])
+            if (args[i] != null && args[i].getType() != getArgTypes()[i])
             {
                 throw new ExecutionException("Incorrect argument type at index " + i + ", expecting a "
                     + getArgTypes()[i].name());

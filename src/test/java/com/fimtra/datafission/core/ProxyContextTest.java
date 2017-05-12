@@ -1703,7 +1703,7 @@ public class ProxyContextTest
         this.candidate.getRpc("getTime").executeNoResponse();
         assertTrue(latch.await(10, TimeUnit.SECONDS));
     }
-
+    
     @Test
     public void testRpcWithSimpleArgs() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
@@ -1723,12 +1723,39 @@ public class ProxyContextTest
             }
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
+        
+        waitForRpcToBePublished(rpc);
+        
+        IValue result = this.candidate.getRpc("concat").execute(TextValue.valueOf("someValue1"),
+            new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
+        assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
+    }
+
+    @Test
+    public void testRpcWithNullInArgs() throws TimeOutException, ExecutionException, InterruptedException, IOException
+    {
+        createComponents();
+        this.executor.shutdownNow();
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {                    
+                    sb.append(iValue == null ? null : iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
+            }
+        }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
+        this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
 
         IValue result = this.candidate.getRpc("concat").execute(TextValue.valueOf("someValue1"),
-            new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
-        assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
+            new DoubleValue(Double.NaN), LongValue.valueOf(2345), null);
+        assertEquals("someValue1,NaN,2345,null,", result.textValue());
     }
 
     @Test
@@ -2273,7 +2300,7 @@ public class ProxyContextTest
         
         this.context.publishAtomicChange(record);
         
-        final AtomicReference<CountDownLatch> latch = new AtomicReference(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final IRecordListener observer = new IRecordListener()
         {
             @Override
