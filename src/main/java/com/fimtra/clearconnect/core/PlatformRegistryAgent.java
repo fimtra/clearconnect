@@ -1163,28 +1163,28 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 final long memAvailable = (long) (runtime.freeMemory() * MB);
                                 final long threadCount = this.threadMxBean.getThreadCount();
 
-                                long gcMillisPerMin = 0;
+                                long gcMillisInPeriod = 0;
                                 long time = 0;
                                 for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
                                 {
                                     time = gcMxBean.getCollectionTime();
                                     if (time > -1)
                                     {
-                                        gcMillisPerMin += time;
+                                        gcMillisInPeriod += time;
                                     }
                                 }
                                 // store and work out delta of gc times
                                 time = this.gcTimeLastPeriod;
-                                this.gcTimeLastPeriod = gcMillisPerMin;
-                                gcMillisPerMin -= time;
-                                final double perMin = 60d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
-                                gcMillisPerMin *= perMin;
+                                this.gcTimeLastPeriod = gcMillisInPeriod;
+                                gcMillisInPeriod -= time;
+                                final double inverseLoggingPeriodSecs =
+                                    1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                                 // this is now the "% GC duty cycle per minute"
-                                gcMillisPerMin = (long) ((double) gcMillisPerMin / 600);
+                                gcMillisInPeriod = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
 
                                 final long qTotalExecuted = stats[2];
-                                final long eventsPerMin =
-                                    (long) ((qTotalExecuted - this.executedFromLastPeriod) * perMin);
+                                final long eventsPerSec =
+                                    (long) ((qTotalExecuted - this.executedFromLastPeriod) * inverseLoggingPeriodSecs);
                                 final long uptime =
                                     (System.currentTimeMillis() - PlatformRegistryAgent.this.startTime) / 1000;
                                 this.executedFromLastPeriod = qTotalExecuted;
@@ -1193,8 +1193,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                     rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
                                         LongValue.valueOf(qOverflow), LongValue.valueOf(qTotalSubmitted),
                                         LongValue.valueOf(memUsed), LongValue.valueOf(memAvailable),
-                                        LongValue.valueOf(threadCount), LongValue.valueOf(gcMillisPerMin),
-                                        LongValue.valueOf(eventsPerMin), LongValue.valueOf(uptime));
+                                        LongValue.valueOf(threadCount), LongValue.valueOf(gcMillisInPeriod),
+                                        LongValue.valueOf(eventsPerSec), LongValue.valueOf(uptime));
                                 }
                                 catch (Exception e)
                                 {

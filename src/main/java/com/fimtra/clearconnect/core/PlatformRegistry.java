@@ -196,7 +196,7 @@ public final class PlatformRegistry
         String SYSTEM_LOAD = "SystemLoad";
         String RUNTIME = "Runtime";
         String USER = "User";
-        String EPM = "EPM";
+        String EPS = "EPM";
         String UPTIME_SECS = "Uptime";
     }
 
@@ -673,7 +673,7 @@ public final class PlatformRegistry
             IRuntimeStatusRecordFields.Q_OVERFLOW, IRuntimeStatusRecordFields.Q_TOTAL_SUBMITTED,
             IRuntimeStatusRecordFields.MEM_USED_MB, IRuntimeStatusRecordFields.MEM_AVAILABLE_MB,
             IRuntimeStatusRecordFields.THREAD_COUNT, IRuntimeStatusRecordFields.SYSTEM_LOAD,
-            IRuntimeStatusRecordFields.EPM, IRuntimeStatusRecordFields.UPTIME_SECS };
+            IRuntimeStatusRecordFields.EPS, IRuntimeStatusRecordFields.UPTIME_SECS };
 
         final RpcInstance runtimeStatus =
             new RpcInstance(TypeEnum.TEXT, RUNTIME_DYNAMIC, fields, TypeEnum.TEXT, TypeEnum.LONG, TypeEnum.LONG,
@@ -1792,7 +1792,7 @@ final class EventHandler
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.MEM_AVAILABLE_MB, args[4]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.THREAD_COUNT, args[5]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.SYSTEM_LOAD, args[6]);
-            runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.EPM, args[7]);
+            runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.EPS, args[7]);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.UPTIME_SECS, args[8]);
             publishTimed(this.registry.runtimeStatus);
         }

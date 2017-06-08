@@ -144,7 +144,7 @@ public final class PlatformMetaDataModel
     public static enum AgentMetaDataRecordDefinition
     {
             Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
-            Runtime, User, EPM
+            Runtime, User, EPS
     }
 
     /**
@@ -1030,8 +1030,8 @@ public final class PlatformMetaDataModel
                     subMap.get(IRuntimeStatusRecordFields.RUNTIME));
                 agentRecord.put(AgentMetaDataRecordDefinition.User.toString(),
                     subMap.get(IRuntimeStatusRecordFields.USER));
-                agentRecord.put(AgentMetaDataRecordDefinition.EPM.toString(),
-                    subMap.get(IRuntimeStatusRecordFields.EPM));
+                agentRecord.put(AgentMetaDataRecordDefinition.EPS.toString(),
+                    subMap.get(IRuntimeStatusRecordFields.EPS));
                 agentRecord.put(AgentMetaDataRecordDefinition.UpTimeSecs.toString(),
                     subMap.get(IRuntimeStatusRecordFields.UPTIME_SECS));
                 this.agentsContext.publishAtomicChange(agentRecord);
