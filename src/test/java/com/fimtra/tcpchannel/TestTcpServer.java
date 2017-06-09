@@ -78,7 +78,7 @@ public class TestTcpServer
         @Override
         public void onDataReceived(byte[] data, ITransportChannel source)
         {
-            source.sendAsync(data);
+            source.send(data);
         }
 
         @Override
@@ -227,8 +227,8 @@ public class TestTcpServer
         result = channelClosedLatch.await(STD_TIMEOUT, TimeUnit.SECONDS);
         assertTrue("Channel closed callbacks invoked " + (2 - channelClosedLatch.getCount()) + " times", result);
 
-        assertFalse(client.sendAsync("sdf3".getBytes()));
-        assertFalse(client2.sendAsync("sdf3".getBytes()));
+        assertFalse(client.send("sdf3".getBytes()));
+        assertFalse(client2.send("sdf3".getBytes()));
     }
 
     @Test(expected = ConnectException.class)
@@ -367,10 +367,10 @@ public class TestTcpServer
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
-        assertTrue(client.sendAsync(message1.getBytes()));
-        assertTrue(client.sendAsync(message2.getBytes()));
-        assertTrue(client2.sendAsync(message1.getBytes()));
-        assertTrue(client2.sendAsync(message2.getBytes()));
+        assertTrue(client.send(message1.getBytes()));
+        assertTrue(client.send(message2.getBytes()));
+        assertTrue(client2.send(message1.getBytes()));
+        assertTrue(client2.send(message2.getBytes()));
         final boolean result = latch.await(STD_TIMEOUT, TimeUnit.SECONDS);
         assertTrue("onDataReceived only called " + (4 - latch.getCount()) + " times", result);
         assertEquals(expected1, received1);
@@ -417,10 +417,10 @@ public class TestTcpServer
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
-        assertTrue(client.sendAsync(message1.getBytes()));
-        assertTrue(client.sendAsync(message2.getBytes()));
-        assertTrue(client2.sendAsync(message1.getBytes()));
-        assertTrue(client2.sendAsync(message2.getBytes()));
+        assertTrue(client.send(message1.getBytes()));
+        assertTrue(client.send(message2.getBytes()));
+        assertTrue(client2.send(message1.getBytes()));
+        assertTrue(client2.send(message2.getBytes()));
         final boolean result = latch.await(STD_TIMEOUT, TimeUnit.SECONDS);
         assertTrue("onDataReceived only called " + (4 - latch.getCount()) + " times", result);
         assertEquals(expected1, received1);
@@ -453,7 +453,7 @@ public class TestTcpServer
         int i = 0;
         while (i < messageCount)
         {
-            client.sendAsync(("" + ++i).getBytes());
+            client.send(("" + ++i).getBytes());
         }
         assertTrue("Only received " + (messageCount - latch.getCount()) + " correct messages",
             latch.await(STD_TIMEOUT, TimeUnit.SECONDS));
@@ -564,7 +564,7 @@ public class TestTcpServer
         {
             for (int i = 0; i < clientCount; i++)
             {
-                clients.get(i).sendAsync(("" + j).getBytes());
+                clients.get(i).send(("" + j).getBytes());
             }
         }
         final boolean result = latch.await(STD_TIMEOUT, TimeUnit.SECONDS);
@@ -734,7 +734,7 @@ public class TestTcpServer
 
         }, this.frameEncodingFormat);
         assertTrue("channel was not connected", channelConnectedLatch.await(STD_TIMEOUT, TimeUnit.SECONDS));
-        client.sendAsync(generateMassiveMessage(65539));
+        client.send(generateMassiveMessage(65539));
         final int timeout = 1;
         switch(this.frameEncodingFormat)
         {

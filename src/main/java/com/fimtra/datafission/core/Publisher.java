@@ -542,7 +542,7 @@ public class Publisher
         {
             if (pointToPoint)
             {
-                sendAsync(txMessage);
+                send(txMessage);
             }
             this.bytesPublished += txMessage.length;
             this.messagesPublished++;
@@ -633,6 +633,12 @@ public class Publisher
         @Override
         public boolean sendAsync(byte[] toSend)
         {
+            return send(toSend);
+        }
+
+        @Override
+        public boolean send(byte[] toSend)
+        {
             if (logTx)
             {
                 // log first 200 bytes that are sent
@@ -640,7 +646,7 @@ public class Publisher
                     new String(toSend, 0, (toSend.length < 200 ? toSend.length : 200)),
                     (toSend.length < 200 ? "" : "...(truncated)"));
             }
-            return this.channel.sendAsync(this.codec.finalEncode(toSend));
+            return this.channel.send(this.codec.finalEncode(toSend));
         }
 
         @Override
@@ -821,7 +827,7 @@ public class Publisher
                                 Log.log(Publisher.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
                                 if (response.syncDataResponse != null)
                                 {
-                                    proxyContextPublisher.channel.sendAsync(response.syncDataResponse);
+                                    proxyContextPublisher.channel.send(response.syncDataResponse);
                                     Log.log(Publisher.class, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
                                 }
                                 if (!response.syncFailed)
@@ -1148,7 +1154,7 @@ public class Publisher
         {
             Log.log(Publisher.this, "(->) ", ObjectUtils.safeToString(atomicChange));
         }
-        client.sendAsync(proxyContextPublisher.codec.finalEncode(
+        client.send(proxyContextPublisher.codec.finalEncode(
             proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange)));
     }
 

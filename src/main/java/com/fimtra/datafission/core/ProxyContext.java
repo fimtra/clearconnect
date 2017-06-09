@@ -883,7 +883,7 @@ public final class ProxyContext implements IObserverContext
                             // proxy initiates the codec-sync operation
                             // THIS MUST BE THE FIRST MESSAGE SENT
 
-                            localChannelRef.sendAsync(
+                            localChannelRef.send(
                                 ProxyContext.this.codec.getSessionProtocol().getSessionSyncStartMessage(
                                     ProxyContext.this.sessionContextName));
                             Log.log(ProxyContext.this, "(->) START SESSION SYNC ",
@@ -922,7 +922,7 @@ public final class ProxyContext implements IObserverContext
                                     Log.log(ProxyContext.this, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
                                     if (response.syncDataResponse != null)
                                     {
-                                        localChannelRef.sendAsync(response.syncDataResponse);
+                                        localChannelRef.send(response.syncDataResponse);
                                         Log.log(ProxyContext.this, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
                                     }
                                     if (response.syncComplete)
@@ -1690,6 +1690,6 @@ public final class ProxyContext implements IObserverContext
 
     void finalEncodeAndSendToPublisher(byte[] data)
     {
-        this.channel.sendAsync(this.codec.finalEncode(data));
+        this.channel.send(this.codec.finalEncode(data));
     }
 }

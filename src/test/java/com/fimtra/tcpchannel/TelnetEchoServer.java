@@ -35,7 +35,7 @@ public class TelnetEchoServer
             @Override
             public void onDataReceived(byte[] data, ITransportChannel source)
             {
-                source.sendAsync(("\r\n(" + new String(data) + ")").getBytes());
+                source.send(("\r\n(" + new String(data) + ")").getBytes());
             }
 
             @Override

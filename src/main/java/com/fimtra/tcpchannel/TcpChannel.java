@@ -185,7 +185,7 @@ public class TcpChannel implements ITransportChannel
      * connection to the indicated host and port. After the constructor completes, the channel is
      * ready for use however the underlying {@link SocketChannel} may not yet be connected. This
      * does not stop the channel from being used; any data queued up to send via the
-     * {@link #sendAsync(byte[])} method will be sent when the connection completes.
+     * {@link #send(byte[])} method will be sent when the connection completes.
      * 
      * @param serverHost
      *            the target host for the TCP connection
@@ -306,8 +306,15 @@ public class TcpChannel implements ITransportChannel
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
 
     }
+    
+    @Override
+    public boolean send(byte[] toSend)
+    {
+        return sendAsync(toSend);
+    }
 
     @Override
+    @Deprecated
     public boolean sendAsync(byte[] toSend)
     {
         try

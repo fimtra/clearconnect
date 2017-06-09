@@ -311,7 +311,7 @@ public class TcpServer implements IEndPointService
         {
             try
             {
-                clients[i].sendAsync(txMessage);
+                clients[i].send(txMessage);
             }
             catch (Exception e)
             {

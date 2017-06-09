@@ -141,7 +141,7 @@ public final class ChannelWatchdog implements Runnable
             @Override
             public void run()
             {
-                channel.sendAsync(ChannelUtils.HEARTBEAT_SIGNAL);
+                channel.send(ChannelUtils.HEARTBEAT_SIGNAL);
             }
         });
     }
@@ -154,7 +154,7 @@ public final class ChannelWatchdog implements Runnable
             try
             {
                 // send HB
-                if (!channel.sendAsync(ChannelUtils.HEARTBEAT_SIGNAL))
+                if (!channel.send(ChannelUtils.HEARTBEAT_SIGNAL))
                 {
                     channel.destroy("Could not send heartbeat");
                     stopMonitoring(channel);

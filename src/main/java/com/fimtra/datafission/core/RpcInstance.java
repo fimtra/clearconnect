@@ -198,7 +198,7 @@ public final class RpcInstance implements IRpcInstance
                     final Map<String, IValue> resultEntries = new HashMap<String, IValue>(2);
 
                     // tell the remote caller we have started
-                    this.caller.sendAsync(
+                    this.caller.send(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
                     Log.log(CallReceiver.class, "(->) STARTED ", resultRecordName);
@@ -223,7 +223,7 @@ public final class RpcInstance implements IRpcInstance
                         Log.log(CallReceiver.class, "Exception handling RPC: " + callDetails, e);
                     }
 
-                    this.caller.sendAsync(
+                    this.caller.send(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
                     if (logVerbose)
@@ -315,7 +315,7 @@ public final class RpcInstance implements IRpcInstance
                     {
                         Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName);
                     }
-                    this.callReceiver.sendAsync(
+                    this.callReceiver.send(
                         this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName)));
                     return null;
                 }
@@ -343,7 +343,7 @@ public final class RpcInstance implements IRpcInstance
                                 " is being called using a core/system/RPC thread - this can lead to a stall.");
                         }
                         
-                        this.callReceiver.sendAsync(
+                        this.callReceiver.send(
                             this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, args, resultMapName)));
 
                         try

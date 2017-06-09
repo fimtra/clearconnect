@@ -121,7 +121,7 @@ public class TestTcpChannel
         {
             final String e = data.get(i);
             final byte[] bytes = e.getBytes();
-            c1.sendAsync(bytes);
+            c1.send(bytes);
             size += bytes.length;
         }
 

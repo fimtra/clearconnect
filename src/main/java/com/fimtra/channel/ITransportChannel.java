@@ -31,8 +31,21 @@ public interface ITransportChannel
      *            the byte[] to send
      * @return <code>true</code> if the data was added to the transmission queue and will be sent,
      *         <code>false</code> if the data cannot be sent because the channel is closed
+     * @deprecated will be removed in subsequent release
      */
+    @Deprecated
     boolean sendAsync(byte[] toSend);
+
+    /**
+     * Sends the byte[] to the receiver end of this channel. This blocks until the data is sent. May
+     * throw a {@link RuntimeException} if some IO problem occurs.
+     * 
+     * @param toSend
+     *            the byte[] to send
+     * @return <code>true</code> if the data sent, <code>false</code> if the data cannot be sent
+     *         because the channel is closed
+     */
+    boolean send(byte[] toSend);
 
     /**
      * Closes this {@link ITransportChannel} and releases all underlying resources supporting the
