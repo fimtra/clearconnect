@@ -121,9 +121,6 @@ public abstract class TcpChannelUtils
     /** Handles all socket read operations for all {@link TcpChannel} instances */
     final static SelectorProcessor READER = new SelectorProcessor("tcp-channel-reader", SelectionKey.OP_READ);
 
-    /** Handles all socket write operations for all {@link TcpChannel} instances */
-    final static SelectorProcessor WRITER = new SelectorProcessor("tcp-channel-writer", SelectionKey.OP_WRITE);
-
     /** Handles all socket accept operations for all {@link TcpServer} instances */
     final static SelectorProcessor ACCEPT_PROCESSOR = new SelectorProcessor("tcp-channel-accept",
         SelectionKey.OP_ACCEPT);
