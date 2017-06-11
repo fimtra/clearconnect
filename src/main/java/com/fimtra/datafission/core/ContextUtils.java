@@ -23,6 +23,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.nio.CharBuffer;
 import java.util.Collections;
 import java.util.HashMap;
@@ -763,7 +766,7 @@ public class ContextUtils
      */
     public static boolean isSystemThread()
     {
-        return Thread.currentThread().getName().startsWith(FISSION_SYSTEM, 0);
+        return SYSTEM_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
     }
 
     /**
@@ -771,7 +774,7 @@ public class ContextUtils
      */
     public static boolean isCoreThread()
     {
-        return Thread.currentThread().getName().startsWith(FISSION_CORE, 0);
+        return CORE_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
     }
 
     /**
@@ -779,7 +782,19 @@ public class ContextUtils
      */
     public static boolean isRpcThread()
     {
-        return Thread.currentThread().getName().startsWith(FISSION_RPC, 0);
+        return RPC_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
+    }
+
+    /**
+     * @return <code>true</code> if the thread is an internal thread, this covers core, rpc and
+     *         system threads
+     * @see #isCoreThread()
+     * @see #isRpcThread()
+     * @see #isSystemThread()
+     */
+    public static boolean isFrameworkThread()
+    {
+        return FRAMEWORK_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
     }
 
     /**
@@ -903,5 +918,37 @@ public class ContextUtils
                 || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
         }
         return false;
+    }
+
+    final static Set<Long> FRAMEWORK_THREAD_IDS = new HashSet<Long>();
+    final static Set<Long> CORE_THREAD_IDS = new HashSet<Long>();
+    final static Set<Long> SYSTEM_THREAD_IDS = new HashSet<Long>();
+    final static Set<Long> RPC_THREAD_IDS = new HashSet<Long>();
+    static
+    {
+        final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        final long[] allThreadIds = threadMXBean.getAllThreadIds();
+        for (int i = 0; i < allThreadIds.length; i++)
+        {
+            long threadId = allThreadIds[i];
+            final ThreadInfo threadInfo = threadMXBean.getThreadInfo(threadId);
+            final String name = threadInfo.getThreadName();
+            final Long threadIdAsLong = Long.valueOf(threadId);
+            if (name.startsWith(FISSION_CORE, 0))
+            {
+                CORE_THREAD_IDS.add(threadIdAsLong);
+                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+            }
+            else if (name.startsWith(FISSION_RPC, 0))
+            {
+                RPC_THREAD_IDS.add(threadIdAsLong);
+                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+            }
+            else if (name.startsWith(FISSION_SYSTEM, 0))
+            {
+                SYSTEM_THREAD_IDS.add(threadIdAsLong);
+                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+            }
+        }
     }
 }
