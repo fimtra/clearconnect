@@ -250,9 +250,6 @@ public final class RpcInstance implements IRpcInstance
          */
         static class Caller implements IRpcExecutionHandler
         {
-            private static final char FISSION_THREADS_FIRST_CHAR = ContextUtils.FISSION.charAt(0);
-            private static final char FISSION_THREADS_SECOND_CHAR = ContextUtils.FISSION.charAt(1);
-
             private final String rpcName;
             private final ICodec codec;
             private final ITransportChannel callReceiver;
@@ -333,11 +330,7 @@ public final class RpcInstance implements IRpcInstance
                             Log.log(Caller.class, "(->) ", resultMapName);
                         }
                         
-                        final String currentThreadName = Thread.currentThread().getName();
-                        if (currentThreadName.charAt(0) == FISSION_THREADS_FIRST_CHAR
-                            && currentThreadName.charAt(1) == FISSION_THREADS_SECOND_CHAR
-                            && (ContextUtils.isCoreThread() || ContextUtils.isRpcThread()
-                                || ContextUtils.isSystemThread()))
+                        if (ContextUtils.isFrameworkThread())
                         {
                             Log.log(this, "*** WARNING *** RPC ", this.rpcName,
                                 " is being called using a core/system/RPC thread - this can lead to a stall.");
