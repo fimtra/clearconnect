@@ -35,8 +35,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IPublisherContext;
@@ -94,6 +97,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * record creates
      */
     public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
+
+    static final AtomicInteger pushCount = new AtomicInteger();
 
     static
     {
@@ -680,12 +685,29 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     private CountDownLatch publishAtomicChange(final String name, boolean forcePublish)
     {
+        if (name == null)
+        {
+            throw new NullPointerException("Null record name not allowed");
+        }
+
+        // throttling only activated for application threads
+        if (!forcePublish && !ContextUtils.isFrameworkThread() && !ContextUtils.isSystemRecordName(name))
+        {
+            while (pushCount.get() > DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD)
+            {
+                LockSupport.parkNanos(pushCount.get());
+            }
+        }
+
+        pushCount.getAndIncrement();
+        
         final CountDownLatch latch = new CountDownLatch(1);
         final IRecord record = this.records.get(name);
         if (record == null)
         {
             Log.log(this, "Ignoring publish of non-existent record [", name, "]");
             latch.countDown();
+            pushCount.decrementAndGet();
             return latch;
         }
 
@@ -696,6 +718,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
             {
                 latch.countDown();
+                pushCount.decrementAndGet();
                 return latch;
             }
 
@@ -780,6 +803,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     }
                     finally
                     {
+                        Context.pushCount.decrementAndGet();
                         latch.countDown();
                     }
                 }

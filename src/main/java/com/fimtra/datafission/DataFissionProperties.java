@@ -183,6 +183,14 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.subscribeBatchSize=50</code>
          */
         String SUBSCRIBE_BATCH_SIZE = BASE + "subscribeBatchSize";
+
+        /**
+         * The maximum pending event queue size before a thread will wait in
+         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below
+         * this value. Only affects application threads. <br>
+         * E.g. <code>-DdataFission.pendingEventThrottleThreshold=200</code>
+         */
+        String PENDING_EVENT_THROTTLE_THRESHOLD = "pendingEventThrottleThreshold";
     }
 
     /**
@@ -379,7 +387,7 @@ public abstract class DataFissionProperties
          * @see Names#SUBSCRIBE_DELAY_MICROS
          */
         int SUBSCRIBE_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_DELAY_MICROS, "0"));
-
+        
         /**
          * The batch size for handling mass subscribes.
          * <p>
@@ -388,6 +396,17 @@ public abstract class DataFissionProperties
          * @see Names#SUBSCRIBE_BATCH_SIZE
          */
         int SUBSCRIBE_BATCH_SIZE = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_BATCH_SIZE, "50"));
+
+        /**
+         * The maximum pending event queue size before a thread will wait in
+         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below
+         * this value. Only affects application threads.
+         * <p>
+         * Default is 200.
+         * 
+         * @see Names#PENDING_EVENT_THROTTLE_THRESHOLD
+         */
+        int PENDING_EVENT_THROTTLE_THRESHOLD = Integer.parseInt(System.getProperty(Names.PENDING_EVENT_THROTTLE_THRESHOLD, "200"));
     }
 
     private DataFissionProperties()
