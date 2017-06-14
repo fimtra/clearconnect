@@ -21,6 +21,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
@@ -28,28 +29,26 @@ import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.thimble.ThimbleExecutor;
 
 /**
- * A platform registry agent is the API entry into the platform. At the centre of the platform is
- * the 'platform registry service' (the 'registry'). The registry maintains a register of all
- * platform service instances available on the platform. Platform service instances are created and
- * registered via the platform registry agent (the 'agent'). The agent itself registers with the
- * registry and so also becomes part of the platform. Once a platform service instance is
- * registered, its platform service is known to all platform agents.
+ * A platform registry agent (the 'agent') is the API entry into the ClearConnect platform. At the
+ * centre of the platform is the {@link PlatformRegistry} (the 'registry'). The registry maintains a
+ * register of all {@link IPlatformServiceInstance} ('service instances') available on the platform.
+ * Service instances are created and registered via the agent. The agent itself registers with the
+ * registry and so also becomes part of the platform.
  * <p>
- * An agent creates platform service instances that support a platform service. The agent also
- * constructs platform service proxies that allow interaction with a platform service via one of the
- * platform service's instances.
+ * An agent creates service instances that support a 'service'. Once a service instance is
+ * registered, its service is known to all platform agents. The service can be accessed by
+ * {@link IPlatformServiceProxy} ('proxies') that the agent constructs. The proxies allow
+ * interaction with a service via one of the service instances.
  * <p>
- * Applications can listen for newly created platform services via the
+ * Applications can listen for newly created services via the
  * {@link #addServiceAvailableListener(IServiceAvailableListener)} method and obtain remote access
- * to these via the {@link IPlatformServiceProxy} interface. Applications can create platform
- * services via the
- * {@link #createPlatformServiceInstance(String, WireProtocolEnum, String, int, String)} method and
- * use the {@link IPlatformServiceInstance} by obtaining it via the
+ * to these via the {@link IPlatformServiceProxy} interface. Applications can create services via
+ * the {@link #createPlatformServiceInstance(String, WireProtocolEnum, String, int, String)} method
+ * and use the {@link IPlatformServiceInstance} by obtaining it via the
  * {@link #getPlatformServiceInstance(String, String)} method.
  * <p>
- * Platform service names are unique across the platform. For a discussion on the fault-tolerance
- * and load-balancing platform service modes, refer to the {@link IPlatformServiceInstance}
- * documentation.
+ * Service names are unique across the platform. For a discussion on the fault-tolerance and
+ * load-balancing service modes, refer to the {@link IPlatformServiceInstance} documentation.
  * 
  * @see IPlatformServiceInstance
  * @see IPlatformServiceProxy
