@@ -48,12 +48,14 @@ import com.fimtra.util.ObjectUtils;
  */
 public final class ChannelWatchdog implements Runnable
 {
+    
     int heartbeatPeriodMillis;
     int missedHeartbeatCount;
     volatile Set<ITransportChannel> channels;
     /** Tracks channels that receive a HB */
     final Set<ITransportChannel> channelsReceivingHeartbeat;
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
+    final Object lock;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory()
     {
@@ -73,6 +75,7 @@ public final class ChannelWatchdog implements Runnable
     public ChannelWatchdog()
     {
         super();
+        this.lock = new Object();
         this.channels = new HashSet<ITransportChannel>();
         this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
         this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
@@ -112,16 +115,24 @@ public final class ChannelWatchdog implements Runnable
      */
     public void configure(int periodMillis, int missedHeartbeats)
     {
-        if (this.current != null)
+        synchronized (this.lock)
         {
-            this.current.cancel(false);
+            if (this.heartbeatPeriodMillis == periodMillis && this.missedHeartbeatCount == missedHeartbeats)
+            {
+                return;
+            }
+            
+            if (this.current != null)
+            {
+                this.current.cancel(false);
+            }        
+            this.heartbeatPeriodMillis = periodMillis;
+            this.missedHeartbeatCount = missedHeartbeats;
+            this.current = this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis,
+                this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
+            Log.log(this, "Heartbeat period is ", Integer.toString(this.heartbeatPeriodMillis),
+                "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
         }
-        this.heartbeatPeriodMillis = periodMillis;
-        this.missedHeartbeatCount = missedHeartbeats;
-        this.current = this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis,
-            this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
-        Log.log(this, "Heartbeat period is ", Integer.toString(this.heartbeatPeriodMillis),
-            "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
     }
 
     /**
@@ -130,7 +141,7 @@ public final class ChannelWatchdog implements Runnable
      */
     public void addChannel(final ITransportChannel channel)
     {
-        synchronized (this)
+        synchronized (this.lock)
         {
             final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
             copy.add(channel);
@@ -149,8 +160,19 @@ public final class ChannelWatchdog implements Runnable
     @Override
     public void run()
     {
+        final ScheduledFuture<?> ref;
+        synchronized (this.lock)
+        {
+            ref = this.current;
+        }
         for (ITransportChannel channel : this.channels)
         {
+            if (ref.isCancelled())
+            {
+                this.channelsMissingHeartbeat.clear();
+                return;
+            }
+
             try
             {
                 // send HB
@@ -216,7 +238,7 @@ public final class ChannelWatchdog implements Runnable
     private void stopMonitoring(ITransportChannel channel)
     {
         final boolean remove;
-        synchronized (this)
+        synchronized (this.lock)
         {
             final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
             remove = copy.remove(channel);
