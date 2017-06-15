@@ -40,6 +40,9 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.TestUtils;
+import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
+import com.fimtra.util.TestUtils.EventFailedException;
 
 /**
  * Tests for the {@link PlatformRegistry}
@@ -216,11 +219,51 @@ public class PlatformRegistryTest
         service.publishRPC(new RpcInstance(TypeEnum.DOUBLE, "rpc-" + System.currentTimeMillis() + "-" + suffix));
     }
 
-    private static void checkSize(int expectedRecordFieldCount, int expectedSubMapSize, IRecord record)
+    private static void checkSize(final int expectedRecordFieldCount, final int expectedSubMapSize,
+        final IRecord record) throws EventFailedException, InterruptedException
     {
-        assertEquals("Got:" + record.keySet(), expectedRecordFieldCount, record.size());
-        assertEquals("(Submaps) Got keys:" + record.getSubMapKeys() + ", record=" + record, expectedSubMapSize,
-            record.getSubMapKeys().size());
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object got()
+            {
+                return record.size();
+            }
+
+            @Override
+            public Object expect()
+            {
+                return expectedRecordFieldCount;
+            }
+
+            @Override
+            public String getFailureReason()
+            {
+                return "Got:" + record.keySet();
+            }
+        }, 10000);
+
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object got()
+            {
+                return record.getSubMapKeys().size();
+            }
+
+            @Override
+            public Object expect()
+            {
+                return expectedSubMapSize;
+            }
+
+            @Override
+            public String getFailureReason()
+            {
+                return "(Submaps) Got keys:" + record.getSubMapKeys() + ", record=" + record;
+            }
+        }, 10000);
+
     }
 
     private static void checkZeroSize(Map<?, ?> map)
@@ -228,7 +271,7 @@ public class PlatformRegistryTest
         assertEquals(0, map.size());
     }
 
-    private static void checkZeroSize(IRecord record)
+    private static void checkZeroSize(IRecord record) throws EventFailedException, InterruptedException
     {
         checkSize(0, 0, record);
     }
