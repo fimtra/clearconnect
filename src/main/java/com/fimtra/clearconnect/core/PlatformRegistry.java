@@ -800,12 +800,14 @@ final class EventHandler
     final ConcurrentMap<RegistrationToken, ProxyContext> monitoredServiceInstances;
     final ConcurrentMap<RegistrationToken, PlatformServiceConnectionMonitor> connectionMonitors;
     final ConcurrentMap<String, Set<String>> connectionsPerServiceFamily;
-
+    final AtomicInteger servicesRecordSize;
+    
     EventHandler(final PlatformRegistry registry)
     {
         this.registry = registry;
         this.startTimeMillis = System.currentTimeMillis();
 
+        this.servicesRecordSize = new AtomicInteger(0);
         this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
         this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
         this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
@@ -2138,7 +2140,7 @@ final class EventHandler
                 e);
         }
     }
-
+    
     /**
      * Publishes the record at a point in time in the future (in seconds). If there is a pending
      * publish for the record then the current call will do nothing and use the pending publish.
@@ -2146,8 +2148,21 @@ final class EventHandler
     private void publishTimed(final IRecord record)
     {
         // only time publish records that are not "service" oriented - this prevents service
-        // detection issues occurring due to "anti-aliasing"
-        if (record.getName().startsWith(IRegistryRecordNames.SERVICES, 0)
+        // detection issues occurring due to "aliasing" (i.e. on-off-on being seen as just on)
+        boolean publishServiceRecordImmediately = record.getName().startsWith(IRegistryRecordNames.SERVICES, 0);
+        if (publishServiceRecordImmediately)
+        {
+            final int size = record.size();
+            if (this.servicesRecordSize.getAndSet(size) == size)
+            {
+                // if the SERVICES record size is unchanged, skip an immediate publish and schedule
+                // a pending publish (otherwise we start pumping out updates due to record changes
+                // in the service which cause the registry to become quite chatty on the network to
+                // its agents - agents subscribe for the SERVICES record by default) 
+                publishServiceRecordImmediately = false;
+            }
+        }
+        if (publishServiceRecordImmediately
             || record.getName().startsWith(IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, 0))
         {
             this.registry.context.publishAtomicChange(record);
