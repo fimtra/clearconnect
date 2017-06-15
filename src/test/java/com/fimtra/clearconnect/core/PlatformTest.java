@@ -1488,7 +1488,14 @@ public class PlatformTest
             }
         };
         this.agent.registryProxy.addObserver(serviceListener, PlatformRegistry.IRegistryRecordNames.SERVICES);
+        
+        final long timeoutSecs = 5;
+        assertTrue(serviceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
+        assertNotNull("Got: " + serviceRecordImage.get(), serviceRecordImage.get());
+        assertEquals("Got: " + serviceRecordImage.get(), 1, serviceRecordImage.get().size());
 
+        serviceLatch.set(new CountDownLatch(1));
+        
         final AtomicReference<CountDownLatch> serviceInstanceLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(2));
         final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<IRecord>();
@@ -1508,7 +1515,6 @@ public class PlatformTest
         this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
 
-        final long timeoutSecs = 5;
         assertTrue(serviceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
         assertNotNull("Got: " + serviceRecordImage.get(), serviceRecordImage.get());
         assertEquals("Got: " + serviceRecordImage.get(), 2, serviceRecordImage.get().size());
