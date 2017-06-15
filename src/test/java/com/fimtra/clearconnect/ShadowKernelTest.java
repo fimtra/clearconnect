@@ -69,8 +69,9 @@ public class ShadowKernelTest
     {
         IRegistryAvailableListener listener = mock(IRegistryAvailableListener.class);
         this.agent.addRegistryAvailableListener(listener);
-        final int millis = 10000;
-        verify(listener, timeout(millis)).onRegistryConnected();
+        final int millis = 30000;
+
+        verify(listener, timeout(millis).times(1)).onRegistryConnected();
 
         this.primary.destroy();
 
