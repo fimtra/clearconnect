@@ -37,7 +37,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext;
@@ -98,7 +97,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      */
     public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
 
-    static final AtomicInteger pushCount = new AtomicInteger();
+    static final AtomicInteger eventCount = new AtomicInteger();
 
     static
     {
@@ -325,6 +324,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Map<IRecordListener, Set<String>> listenersToNotifyWithInitialImages;
     int listenersBeingNotifiedWithInitialImages;
 
+    final ContextThrottle throttle;
+    
     /** Construct the context with the given name */
     public Context(String name)
     {
@@ -352,6 +353,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         super();
 
         this.name = name;
+        this.throttle = new ContextThrottle(DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD, eventCount);
         this.noopChangeManager = new NoopAtomicChangeManager(this.name);
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
@@ -690,132 +692,131 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new NullPointerException("Null record name not allowed");
         }
 
-        // throttling only activated for application threads
-        if (!forcePublish && !ContextUtils.isFrameworkThread() && !ContextUtils.isSystemRecordName(name))
-        {
-            while (pushCount.get() > DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD)
-            {
-                LockSupport.parkNanos(pushCount.get());
-            }
-        }
-
-        pushCount.getAndIncrement();
+        this.throttle.eventStart(name, forcePublish);
         
-        final CountDownLatch latch = new CountDownLatch(1);
-        final IRecord record = this.records.get(name);
-        if (record == null)
+        try
         {
-            Log.log(this, "Ignoring publish of non-existent record [", name, "]");
-            latch.countDown();
-            pushCount.decrementAndGet();
-            return latch;
-        }
-
-        synchronized (record.getWriteLock())
-        {
-            final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
-            // need to prevent empty changes BUT also allow the initial create if it had blank data
-            if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
+            final CountDownLatch latch = new CountDownLatch(1);
+            final IRecord record = this.records.get(name);
+            if (record == null)
             {
+                Log.log(this, "Ignoring publish of non-existent record [", name, "]");
                 latch.countDown();
-                pushCount.decrementAndGet();
+                this.throttle.eventFinish();
                 return latch;
             }
-
-            // update the sequence (version) of the record when publishing
-            ((Record) record).setSequence(atomicChange.getSequence());
-
-            final ISequentialRunnable notifyTask = new ISequentialRunnable()
+    
+            synchronized (record.getWriteLock())
             {
-                @Override
-                public void run()
+                final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
+                // need to prevent empty changes BUT also allow the initial create if it had blank data
+                if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
                 {
-                    try
+                    latch.countDown();
+                    this.throttle.eventFinish();
+                    return latch;
+                }
+    
+                // update the sequence (version) of the record when publishing
+                ((Record) record).setSequence(atomicChange.getSequence());
+    
+                final ISequentialRunnable notifyTask = new ISequentialRunnable()
+                {
+                    @Override
+                    public void run()
                     {
-                        // update the image with the atomic changes in the runnable
-                        final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
-
-                        // this can happen if there is a concurrent delete
-                        if (notifyImage == null)
+                        try
                         {
-                            return;
-                        }
-
-                        if (Context.this.validators.size() > 0)
-                        {
-                            for (IValidator validator : Context.this.validators)
+                            // update the image with the atomic changes in the runnable
+                            final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
+    
+                            // this can happen if there is a concurrent delete
+                            if (notifyImage == null)
                             {
-                                validator.validate(notifyImage, atomicChange);
+                                return;
                             }
-                        }
-
-                        long start;
-                        IRecordListener listener = null;
-                        IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
-
-                        // if there are any pending initial images waiting, we need to ensure we
-                        // don't notify this update to the registered listener
-                        if (Context.this.listenersBeingNotifiedWithInitialImages > 0)
-                        {
-                            // work out who to notify, i.e. listeners NOT expecting an image
-                            Set<String> initialImagePending;
-                            final List<IRecordListener> listenersNotExpectingImage = new LinkedList<IRecordListener>();
+    
+                            if (Context.this.validators.size() > 0)
+                            {
+                                for (IValidator validator : Context.this.validators)
+                                {
+                                    validator.validate(notifyImage, atomicChange);
+                                }
+                            }
+    
+                            long start;
+                            IRecordListener listener = null;
+                            IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
+    
+                            // if there are any pending initial images waiting, we need to ensure we
+                            // don't notify this update to the registered listener
+                            if (Context.this.listenersBeingNotifiedWithInitialImages > 0)
+                            {
+                                // work out who to notify, i.e. listeners NOT expecting an image
+                                Set<String> initialImagePending;
+                                final List<IRecordListener> listenersNotExpectingImage = new LinkedList<IRecordListener>();
+                                for (int i = 0; i < subscribersForRecord.length; i++)
+                                {
+                                    listener = subscribersForRecord[i];
+    
+                                    // NOTE: cannot optimise by locking
+                                    // listenersToNotifyWithInitialImages outside the loop - this can
+                                    // lead to a deadlock as the lock order with initialImagePending
+                                    // will then become broken
+                                    initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
+                                    if (initialImagePending != null && initialImagePending.contains(name))
+                                    {
+                                        // don't notify - let the initial image task do this
+                                        // as it will pass in a full image as the atomic change
+                                        // (thus simulating the initial image)
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        listenersNotExpectingImage.add(listener);
+                                    }
+                                }
+                                subscribersForRecord = listenersNotExpectingImage.toArray(
+                                    new IRecordListener[listenersNotExpectingImage.size()]);
+                            }
+    
                             for (int i = 0; i < subscribersForRecord.length; i++)
                             {
-                                listener = subscribersForRecord[i];
-
-                                // NOTE: cannot optimise by locking
-                                // listenersToNotifyWithInitialImages outside the loop - this can
-                                // lead to a deadlock as the lock order with initialImagePending
-                                // will then become broken
-                                initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
-                                if (initialImagePending != null && initialImagePending.contains(name))
+                                try
                                 {
-                                    // don't notify - let the initial image task do this
-                                    // as it will pass in a full image as the atomic change
-                                    // (thus simulating the initial image)
-                                    continue;
+                                    listener = subscribersForRecord[i];
+                                    start = System.nanoTime();
+                                    listener.onChange(notifyImage, atomicChange);
+                                    ContextUtils.measureTask(name, "local record update", listener,
+                                        (System.nanoTime() - start));
                                 }
-                                else
+                                catch (Exception e)
                                 {
-                                    listenersNotExpectingImage.add(listener);
+                                    Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
                                 }
                             }
-                            subscribersForRecord = listenersNotExpectingImage.toArray(
-                                new IRecordListener[listenersNotExpectingImage.size()]);
                         }
-
-                        for (int i = 0; i < subscribersForRecord.length; i++)
+                        finally
                         {
-                            try
-                            {
-                                listener = subscribersForRecord[i];
-                                start = System.nanoTime();
-                                listener.onChange(notifyImage, atomicChange);
-                                ContextUtils.measureTask(name, "local record update", listener,
-                                    (System.nanoTime() - start));
-                            }
-                            catch (Exception e)
-                            {
-                                Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
-                            }
+                            Context.this.throttle.eventFinish();
+                            latch.countDown();
                         }
                     }
-                    finally
+    
+                    @Override
+                    public Object context()
                     {
-                        Context.pushCount.decrementAndGet();
-                        latch.countDown();
+                        return name;
                     }
-                }
-
-                @Override
-                public Object context()
-                {
-                    return name;
-                }
-            };
-            executeSequentialCoreTask(notifyTask);
-            return latch;
+                };
+                executeSequentialCoreTask(notifyTask);
+                return latch;
+            }
+        }
+        catch (RuntimeException e)
+        {
+            this.throttle.eventFinish();
+            throw e;
         }
     }
 
