@@ -134,6 +134,12 @@ public class TcpServer implements IEndPointService
                 {
                     try
                     {
+                        if (!TcpServer.this.serverSocketChannel.isOpen())
+                        {
+                            Log.log(this, ObjectUtils.safeToString(TcpServer.this), " server socket closed");
+                            return;
+                        }
+                        
                         SocketChannel socketChannel = TcpServer.this.serverSocketChannel.accept();
                         if (socketChannel == null)
                         {
