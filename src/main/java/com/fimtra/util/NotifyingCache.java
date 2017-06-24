@@ -511,7 +511,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.writeLock.lock();
         try
         {
-            this.listeners = null;
+            this.listeners = Collections.emptyList();
             this.cache.clear();
         }
         finally
