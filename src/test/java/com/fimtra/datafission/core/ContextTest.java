@@ -50,6 +50,7 @@ import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
@@ -1054,6 +1055,16 @@ public class ContextTest
         this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1"));
         this.candidate.removeRpc("rpc1");
         this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1", TypeEnum.TEXT));
+    }
+    
+    @Test(expected = UnsupportedOperationException.class)
+    public void testGetAllRpcUnmodifiable()
+    {
+        this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1"));
+        final Map<String, IRpcInstance> allRpcs = this.candidate.getAllRpcs();
+        assertEquals(this.candidate.rpcInstances, allRpcs);
+        // will fail
+        allRpcs.clear();
     }
 
     @Test

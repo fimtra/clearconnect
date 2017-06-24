@@ -1358,6 +1358,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
         }
     }
+
+    public Map<String, IRpcInstance> getAllRpcs()
+    {
+        return Collections.unmodifiableMap(this.rpcInstances);
+    }
 }
 
 /**

@@ -15,8 +15,11 @@
  */
 package com.fimtra.clearconnect.core;
 
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,8 +47,8 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.util.LazyObject;
-import com.fimtra.util.LazyObject.IDestructor;
 import com.fimtra.util.LazyObject.IConstructor;
+import com.fimtra.util.LazyObject.IDestructor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
@@ -69,6 +72,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     private final String platformName;
     final String serviceFamily;
 
+    Map<String, IRpcInstance> allRpcs;
+    
     @SuppressWarnings({ "rawtypes" })
     PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
         final int port, TransportTechnologyEnum transportTechnology)
@@ -262,9 +267,40 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public Map<String, IRpcInstance> getAllRpcs()
     {
-        return this.rpcAvailableNotifyingCache.get().getCacheSnapshot();
+        synchronized (this.rpcAvailableNotifyingCache)
+        {
+            if (this.allRpcs == null)
+            {
+                final NotifyingCache<IRpcAvailableListener, IRpcInstance> notifyingCache =
+                    this.rpcAvailableNotifyingCache.get();
+                final ConcurrentHashMap<String, IRpcInstance> innerMap = new ConcurrentHashMap<String, IRpcInstance>();
+                notifyingCache.addListener(new IRpcAvailableListener()
+                {
+                    @Override
+                    public void onRpcUnavailable(IRpcInstance rpc)
+                    {
+                        innerMap.remove(rpc.getName());
+                    }
+
+                    @Override
+                    public void onRpcAvailable(IRpcInstance rpc)
+                    {
+                        innerMap.put(rpc.getName(), rpc);
+                    }
+                });
+                innerMap.putAll(notifyingCache.getCacheSnapshot());
+                this.allRpcs = Collections.unmodifiableMap(innerMap);
+            }
+        }
+        return this.allRpcs;
     }
 
+    @Override
+    public IRpcInstance getRpc(String rpcName)
+    {
+        return this.rpcAvailableNotifyingCache.get().get(rpcName);
+    }
+    
     @Override
     public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException
@@ -300,8 +336,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
         this.proxyContext.destroy();
-
         this.recordAvailableNotifyingCache.destroy();
+        // todo notify listeners disconnected 
         this.recordConnectionStatusNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.serviceConnectionStatusNotifyingCache.destroy();

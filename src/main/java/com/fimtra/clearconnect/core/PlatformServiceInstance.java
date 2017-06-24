@@ -16,7 +16,6 @@
 package com.fimtra.clearconnect.core;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -322,15 +321,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public Map<String, IRpcInstance> getAllRpcs()
     {
-        final IRecord rpcRecord = this.context.getRecord(ISystemRecordNames.CONTEXT_RPCS);
-        final Map<String, IRpcInstance> rpcs = new HashMap<String, IRpcInstance>();
-        for (String rpcName : rpcRecord.keySet())
-        {
-            rpcs.put(rpcName, this.context.getRpc(rpcName));
-        }
-        return rpcs;
+        return this.context.getAllRpcs();
     }
 
+    @Override
+    public IRpcInstance getRpc(String rpcName)
+    {
+        return this.context.getRpc(rpcName);
+    }
+    
     @Override
     public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException
@@ -431,6 +430,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.recordAvailableNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.subscriptionNotifyingCache.destroy();
+        
+        // todo notify listeners before destroy?
         this.proxyConnectionListenerCache.destroy();
 
         this.active = false;

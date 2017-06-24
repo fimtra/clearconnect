@@ -281,4 +281,13 @@ public interface IPlatformServiceComponent
      */
     @Deprecated
     ScheduledExecutorService getUtilityExecutor();
+
+    /**
+     * Get an RPC by its name.
+     * 
+     * @param rpcName
+     *            the name of the RPC to get
+     * @return the RPC, or <code>null</code>
+     */
+    IRpcInstance getRpc(String rpcName);
 }
