@@ -508,8 +508,16 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final void destroy()
     {
         this.destructor.destroy(this);
-        this.listeners.clear();
-        this.cache.clear();
+        this.writeLock.lock();
+        try
+        {
+            this.listeners = null;
+            this.cache.clear();
+        }
+        finally
+        {
+            this.writeLock.unlock();
+        }
     }
 
     @Override
