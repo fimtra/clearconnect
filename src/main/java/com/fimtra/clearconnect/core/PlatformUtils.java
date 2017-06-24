@@ -945,8 +945,7 @@ public class PlatformUtils
         final String rpcName, final IValue... rpcArgs) throws TimeOutException
     {
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
-        // TODO getAllRpcs is expensive - calls snapshot each time
-        rpcRef.set(component.getAllRpcs().get(rpcName));
+        rpcRef.set(component.getRpc(rpcName));
         if (rpcRef.get() == null)
         {
             final CountDownLatch latch = new CountDownLatch(1);

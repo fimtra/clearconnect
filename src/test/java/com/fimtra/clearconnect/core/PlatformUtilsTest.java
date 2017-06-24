@@ -15,10 +15,14 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
-
-import java.util.HashMap;
-import java.util.Map;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -32,14 +36,6 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.field.TextValue;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for {@link PlatformUtils}
@@ -62,13 +58,11 @@ public class PlatformUtilsTest
     public void testExecuteRpcAvailable() throws TimeOutException, ExecutionException
     {
         IPlatformServiceComponent component = mock(IPlatformServiceComponent.class);
-        Map<String, IRpcInstance> rpcs = new HashMap<String, IRpcInstance>();
         final TextValue result = TextValue.valueOf("result!");
         IRpcInstance rpc = mock(IRpcInstance.class);
         when(rpc.execute()).thenReturn(result);
 
-        rpcs.put("rpc1", rpc);
-        when(component.getAllRpcs()).thenReturn(rpcs);
+        when(component.getRpc(eq("rpc1"))).thenReturn(rpc);
 
         assertEquals(result, PlatformUtils.executeRpc(component, 10, "rpc1"));
     }
