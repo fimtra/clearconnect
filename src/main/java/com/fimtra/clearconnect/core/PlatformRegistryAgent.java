@@ -110,7 +110,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     boolean registryConnected;
     final ProxyContext registryProxy;
     final Lock createLock;
-    /** Ensures idemptotent call to {@link #destroy()} */
+    /** Ensures idempotent call to {@link #destroy()} */
     final AtomicBoolean destroyCalled;
     /**
      * The services registered through this agent. Key=function of {serviceFamily,serviceMember}
@@ -436,7 +436,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 PlatformRegistryAgent.this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext();)
                             {
                                 platformServiceInstance = it.next().getValue();
-                                Log.log(PlatformRegistryAgent.this, "Registering ",
+                                Log.log(PlatformRegistryAgent.this, "Preparing to register ",
                                     ObjectUtils.safeToString(platformServiceInstance));
                                 registerServiceWithRetry(platformServiceInstance, new Runnable()
                                 {
@@ -682,41 +682,41 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         };
         addServiceInstanceAvailableListener(listener);
         
-        Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
-
         try
         {
-                registerRpc.execute(
-                TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
-                TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
-                TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
-                LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
-                TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
-                TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
-                TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
-        }
-        catch (ExecutionException e)
-        {
-            if (e.getCause() instanceof AlreadyRegisteredException)
+            Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
+            try
             {
-                final AlreadyRegisteredException details = (AlreadyRegisteredException) e.getCause();
-                if (this.agentName.equals(details.agentName)
-                    && details.port == serviceInstance.endPointAddress.getPort()
-                    && details.nodeName == serviceInstance.endPointAddress.getNode()
-                    && details.redundancyMode == serviceInstance.getRedundancyMode().toString())
-                // NOTE: we're not checking the transport tech or wire protocol
-                {
-                    Log.log(this, "Registry has already registered ", ObjectUtils.safeToString(serviceInstance));
-                    return;
-                }
+                registerRpc.execute(TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
+                    TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
+                    TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
+                    LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
+                    TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
+                    TextValue.valueOf(serviceInstance.getRedundancyMode().toString()),
+                    TextValue.valueOf(this.agentName),
+                    TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
             }
-            throw e;
-        }
-        // now setup an "expectation" that the service will become registered - if the service
-        // is not registered in 30 secs, say, then something has gone wrong and a re-register is
-        // needed
-        try
-        {
+            catch (ExecutionException e)
+            {
+                if (e.getCause() instanceof AlreadyRegisteredException)
+                {
+                    final AlreadyRegisteredException details = (AlreadyRegisteredException) e.getCause();
+                    if (is.eq(this.agentName, details.agentName)
+                        && is.eq(details.port, serviceInstance.endPointAddress.getPort())
+                        && is.eq(details.nodeName, serviceInstance.endPointAddress.getNode())
+                        && is.eq(details.redundancyMode, serviceInstance.getRedundancyMode().toString()))
+                    // NOTE: we're not checking the transport tech or wire protocol
+                    {
+                        Log.log(this, "Registry has already registered ", ObjectUtils.safeToString(serviceInstance));
+                        return;
+                    }
+                }
+                throw e;
+            }
+            
+            // now setup an "expectation" that the service will become registered - if the service
+            // is not registered in 30 secs, say, then something has gone wrong and a re-register is
+            // needed
             try
             {
                 if (!latch.await(Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
@@ -1034,7 +1034,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     TextValue.valueOf(serviceFamily));
             if (instanceForService == null)
             {
-                Log.log("Registry has no service registered for '", serviceFamily, "'");
+                Log.log(this, "Registry has no service registered for '", serviceFamily, "'");
                 return null;
             }
             return this.registryProxy.getRemoteRecordImage(instanceForService.textValue(),
