@@ -105,7 +105,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     boolean active;
     final long startTimeMillis;
     final Context context;
-    boolean isFtMasterInstance;
+    Boolean isFtMasterInstance;
     final String platformName;
     final String serviceFamily;
     final String serviceMember;
@@ -229,15 +229,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         public void run()
                         {
                             PlatformServiceInstance.this.isFtMasterInstance =
-                                Boolean.valueOf(args[0].textValue()).booleanValue();
+                                Boolean.valueOf(args[0].textValue());
                             Log.banner(PlatformServiceInstance.this, PlatformServiceInstance.this.toString() + " "
-                                + (PlatformServiceInstance.this.isFtMasterInstance ? "ACTIVE" : "STANDBY"));
+                                + (PlatformServiceInstance.this.isFtMasterInstance.booleanValue() ? "ACTIVE" : "STANDBY"));
 
                             for (IFtStatusListener iFtStatusListener : PlatformServiceInstance.this.ftStatusListeners)
                             {
                                 try
                                 {
-                                    if (PlatformServiceInstance.this.isFtMasterInstance)
+                                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
                                     {
                                         iFtStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
                                             PlatformServiceInstance.this.serviceMember);
@@ -430,8 +430,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.recordAvailableNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.subscriptionNotifyingCache.destroy();
-        
-        // todo notify listeners before destroy?
         this.proxyConnectionListenerCache.destroy();
 
         this.active = false;
@@ -538,15 +536,18 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             public void run()
             {
                 PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
-                if (PlatformServiceInstance.this.isFtMasterInstance)
+                if (PlatformServiceInstance.this.isFtMasterInstance != null)
                 {
-                    ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
-                        PlatformServiceInstance.this.serviceMember);
-                }
-                else
-                {
-                    ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
-                        PlatformServiceInstance.this.serviceMember);
+                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
+                    {
+                        ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
+                            PlatformServiceInstance.this.serviceMember);
+                    }
+                    else
+                    {
+                        ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
+                            PlatformServiceInstance.this.serviceMember);
+                    }
                 }
             }
         });
