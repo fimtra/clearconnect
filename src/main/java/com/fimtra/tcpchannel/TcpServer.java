@@ -292,6 +292,9 @@ public class TcpServer implements IEndPointService
     public void destroy()
     {
         Log.log(TcpChannelUtils.class, "Closing ", ObjectUtils.safeToString(this.serverSocketChannel));
+        
+        TcpChannelUtils.ACCEPT_PROCESSOR.cancel(this.serverSocketChannel);
+        
         try
         {
             this.serverSocketChannel.socket().close();
@@ -302,7 +305,6 @@ public class TcpServer implements IEndPointService
             Log.log(TcpChannelUtils.class, "Could not close " + ObjectUtils.safeToString(this.serverSocketChannel), e);
         }
 
-        TcpChannelUtils.ACCEPT_PROCESSOR.cancel(this.serverSocketChannel);
 
         final Set<ITransportChannel> connections;
         synchronized (this.clients)
