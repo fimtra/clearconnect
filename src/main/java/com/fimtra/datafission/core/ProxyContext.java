@@ -445,9 +445,6 @@ public final class ProxyContext implements IObserverContext
                 // NOTE: we use the ADDED events to trigger notification of listeners
                 ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext,
                     new Pair<String, Boolean>(sessionId, Boolean.FALSE));
-
-                // remove the data
-                ProxyContext.this.sessionCache.notifyListenersDataRemoved(sessionContext);
             }
         };
         this.sessionCache = new NotifyingCache<ISessionListener, Pair<String, Boolean>>()
