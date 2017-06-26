@@ -1869,6 +1869,11 @@ final class EventHandler
         for (String connectionId : connectionIds)
         {
             connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
+            if(connection.isEmpty())
+            {
+                this.registry.platformConnections.removeSubMap(connectionId);
+                continue;
+            }
             subscriptionCount += getLong(connection.get(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT));
             msgsPublished += getLong(connection.get(IContextConnectionsRecordFields.MESSAGE_COUNT));
             msgsPerSec += getLong(connection.get(IContextConnectionsRecordFields.MSGS_PER_SEC));
