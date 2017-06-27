@@ -17,6 +17,7 @@ package com.fimtra.datafission;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
@@ -191,6 +192,15 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.pendingEventThrottleThreshold=200</code>
          */
         String PENDING_EVENT_THROTTLE_THRESHOLD = "pendingEventThrottleThreshold";
+
+        
+        /**
+         * The name of the system property to define the period, in milliseconds, for a
+         * {@link Publisher} to publish updates to the
+         * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
+         * E.g. <code>-DdataFission.connectionsRecordPublishPeriodMillis=10000</code>
+         */
+        String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = "connectionsRecordPublishPeriodMillis";
     }
 
     /**
@@ -407,6 +417,17 @@ public abstract class DataFissionProperties
          * @see Names#PENDING_EVENT_THROTTLE_THRESHOLD
          */
         int PENDING_EVENT_THROTTLE_THRESHOLD = Integer.parseInt(System.getProperty(Names.PENDING_EVENT_THROTTLE_THRESHOLD, "200"));
+
+        /**
+         * The period, in milliseconds, for a {@link Publisher} to publish updates to the
+         * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
+         * <p>
+         * Default is 10000.
+         * 
+         * @see Names#CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS
+         */
+        long CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS =
+            Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "100000"));
     }
 
     private DataFissionProperties()

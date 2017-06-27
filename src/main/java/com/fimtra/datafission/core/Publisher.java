@@ -687,7 +687,7 @@ public class Publisher
     final IRecord connectionsRecord;
     final ProxyContextMultiplexer multiplexer;
     final TransportTechnologyEnum transportTechnology;
-    volatile long contextConnectionsRecordPublishPeriodMillis = DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS * 1000;
+    volatile long contextConnectionsRecordPublishPeriodMillis = DataFissionProperties.Values.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS;
     ScheduledFuture contextConnectionsRecordPublishTask;
     volatile long messagesPublished;
     volatile long bytesPublished;
