@@ -427,7 +427,7 @@ public abstract class DataFissionProperties
          * @see Names#CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS
          */
         long CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS =
-            Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "100000"));
+            Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "10000"));
     }
 
     private DataFissionProperties()
