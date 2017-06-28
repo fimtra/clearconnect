@@ -605,6 +605,7 @@ public class Publisher
 
         void destroy()
         {
+
             long time = System.currentTimeMillis();
             this.active = false;
             this.codec.getSessionProtocol().destroy();
@@ -615,6 +616,13 @@ public class Publisher
                 copy = CollectionUtils.newHashSet(this.subscriptions);
             }
             unsubscribe(copy);
+            
+            if (Publisher.this.connectionsRecord.removeSubMap(
+                getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel)) != null)
+            {
+                Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+            }
+            
             Log.log(this, "Destroyed ", this.identity, ", removed ", Integer.toString(copy.size()), " subscriptions (",
                 Long.toString(System.currentTimeMillis() - time), "ms)");
         }
