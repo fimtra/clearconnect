@@ -474,6 +474,8 @@ public class Publisher
             submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
                 TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
 
+            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+            
             scheduleStatsUpdateTask();
 
             Log.log(this, "Constructed for ", ObjectUtils.safeToString(channel));
