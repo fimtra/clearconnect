@@ -344,8 +344,9 @@ public class TcpChannel implements ITransportChannel
     void readFrames()
     {
         long start = System.nanoTime();
+        long socketRead = 0;
         long connected = 0;
-        long readFrames = 0;
+        long decodeFrames = 0;
         long resolveFrames = 0;
         long processFrames = 0;
         int size = 0;
@@ -362,6 +363,7 @@ public class TcpChannel implements ITransportChannel
                 default :
                     this.rxData++;
             }
+            socketRead = System.nanoTime();
 
             // mark connected when we receive the first message (all channels send a heartbeat or
             // data as the first action they perform)
@@ -378,11 +380,11 @@ public class TcpChannel implements ITransportChannel
                     Log.log(this, ObjectUtils.safeToString(this) + " receiver "
                         + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected", e);
                 }
+                connected = System.nanoTime();
             }
-            connected = System.nanoTime();
 
             this.readerWriter.readFrames(this.readFrames);
-            readFrames = System.nanoTime();
+            decodeFrames = System.nanoTime();
 
             byte[] data = null;
             size = this.readFrames.size();
@@ -434,12 +436,25 @@ public class TcpChannel implements ITransportChannel
             final long elapsedTimeNanos = System.nanoTime() - start;
             if (elapsedTimeNanos > Values.SLOW_RX_FRAME_THRESHOLD_NANOS)
             {
-                Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
-                    Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [connected=",
-                    Long.toString(((long) ((connected - start) * _INVERSE_1000000))), "ms, read(", Integer.toString(size), ")=",
-                    Long.toString(((long) ((readFrames - connected) * _INVERSE_1000000))), "ms, resolve=",
-                    Long.toString(((long) ((resolveFrames - readFrames) * _INVERSE_1000000))), "ms, process=",
-                    Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
+                if (connected == 0)
+                {
+                    Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
+                        Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [socketRead=",
+                        Long.toString(((long) ((socketRead - start) * _INVERSE_1000000))), "ms, decodeFrames(", Integer.toString(size), ")=",
+                        Long.toString(((long) ((decodeFrames - socketRead) * _INVERSE_1000000))), "ms, resolveFrames=",
+                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), "ms, processFrames=",
+                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
+                }
+                else
+                {
+                    Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
+                        Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [socketRead=",
+                        Long.toString(((long) ((socketRead - start) * _INVERSE_1000000))), "ms, onChannelConnected=",
+                        Long.toString(((long) ((connected - socketRead) * _INVERSE_1000000))), "ms, decodeFrames(", Integer.toString(size), ")=",
+                        Long.toString(((long) ((decodeFrames - connected) * _INVERSE_1000000))), "ms, resolveFrames=",
+                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), "ms, processFrames=",
+                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
+                }
             }
         }
     }
