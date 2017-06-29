@@ -64,8 +64,8 @@ public class ByteArrayFragmentTest
         for (int i = 0; i < fragments.length; i++)
         {
             ByteArrayFragment byteArrayFragment = fragments[i];
-            assertTrue("Got: " + byteArrayFragment.data.length + " but max is " + max,
-                byteArrayFragment.data.length <= max);
+            assertTrue("Got: " + byteArrayFragment.length + " but max is " + max,
+                byteArrayFragment.length <= max);
         }
     }
 
@@ -79,7 +79,7 @@ public class ByteArrayFragmentTest
         {
             assertEquals(fragmentsForTxData[0].id, fragmentsForTxData[i].id);
             assertEquals(i, fragmentsForTxData[i].sequenceId);
-            assertEquals("hello", new String(fragmentsForTxData[i].data));
+            assertEquals("hello", new String(fragmentsForTxData[i].getData()));
             if (i < (fragmentsForTxData.length - 1))
             {
                 assertFalse(fragmentsForTxData[i].isLastElement());
@@ -114,7 +114,7 @@ public class ByteArrayFragmentTest
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
             assertEquals(fragment.lastElement, resolved.lastElement);
-            assertArrayEquals(fragment.data, resolved.data);
+            assertArrayEquals(fragment.getData(), resolved.getData());
         }
     }
 
@@ -324,7 +324,7 @@ public class ByteArrayFragmentTest
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
             assertEquals(fragment.lastElement, resolved.lastElement);
-            assertArrayEquals(fragment.data, resolved.data);
+            assertArrayEquals(fragment.getData(), resolved.getData());
         }
     }
 

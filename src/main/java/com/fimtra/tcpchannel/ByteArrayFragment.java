@@ -145,14 +145,14 @@ final class ByteArrayFragment
         ByteArrayFragment[] fragments = new ByteArrayFragment[fragmentCount];
         int pointer = 0;
         int remainder = data.length;
-        byte[] fragmentData;
+        int length;
         for (int i = 0; i < fragmentCount; i++)
         {
-            fragmentData = new byte[remainder > maxFragmentInternalByteSize ? maxFragmentInternalByteSize : remainder];
-            System.arraycopy(data, pointer, fragmentData, 0, fragmentData.length);
-            fragments[i] = new ByteArrayFragment(id, i, (byte) (i == (fragmentCount - 1) ? 1 : 0), fragmentData);
-            pointer += fragmentData.length;
-            remainder -= fragmentData.length;
+            length = remainder > maxFragmentInternalByteSize ? maxFragmentInternalByteSize : remainder;
+            fragments[i] =
+                new ByteArrayFragment(id, i, (byte) (i == (fragmentCount - 1) ? 1 : 0), data, pointer, length);
+            pointer += length;
+            remainder -= length;
         }
         return fragments;
     }
@@ -171,9 +171,7 @@ final class ByteArrayFragment
         final int id = buffer.getInt();
         final int sequenceId = buffer.getInt();
         final byte lastElement = buffer.get();
-        final byte[] data = new byte[buffer.array().length - 9];
-        System.arraycopy(rxData, 9, data, 0, data.length);
-        return new ByteArrayFragment(id, sequenceId, lastElement, data);
+        return new ByteArrayFragment(id, sequenceId, lastElement, rxData, 9, buffer.array().length - 9);
     }
 
     /**
@@ -195,9 +193,7 @@ final class ByteArrayFragment
         final int id = parts[0];
         final int sequenceId = parts[1];
         final byte lastElement = (byte) parts[2];
-        final byte[] data = new byte[rxData.length - (lengthPlus4)];
-        System.arraycopy(rxData, lengthPlus4, data, 0, data.length);
-        return new ByteArrayFragment(id, sequenceId, lastElement, data);
+        return new ByteArrayFragment(id, sequenceId, lastElement, rxData, lengthPlus4, rxData.length - (lengthPlus4));
     }
 
     /**
@@ -224,16 +220,20 @@ final class ByteArrayFragment
 
     final int id;
     final byte lastElement;
+    int offset;
+    int length;
     int sequenceId;
     byte[] data;
 
-    private ByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data)
+    private ByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
         super();
         this.id = id;
         this.sequenceId = sequenceId;
         this.lastElement = lastElement;
         this.data = data;
+        this.offset = offset;
+        this.length = len;
     }
 
     /**
@@ -257,8 +257,8 @@ final class ByteArrayFragment
      */
     byte[] toTxBytesRawByteHeader()
     {
-        byte[] txBytes = new byte[9 + this.data.length];
-        System.arraycopy(this.data, 0, txBytes, 9, this.data.length);
+        byte[] txBytes = new byte[9 + this.length];
+        System.arraycopy(this.data, this.offset, txBytes, 9, this.length);
         // write the header
         txBytes[0] = (byte) (this.id >> 24);
         txBytes[1] = (byte) (this.id >> 16);
@@ -300,10 +300,10 @@ final class ByteArrayFragment
         final byte[] header = sb.toString().getBytes(UTF8);
         final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(header.length).getBytes(UTF8);
         final int headerSize = len.length + header.length;
-        final byte[] txBytes = new byte[headerSize + this.data.length];
+        final byte[] txBytes = new byte[headerSize + this.length];
         System.arraycopy(len, 0, txBytes, 0, len.length);
         System.arraycopy(header, 0, txBytes, len.length, header.length);
-        System.arraycopy(this.data, 0, txBytes, headerSize, this.data.length);
+        System.arraycopy(this.data, this.offset, txBytes, headerSize, this.length);
         return txBytes;
     }
 
@@ -328,10 +328,12 @@ final class ByteArrayFragment
         {
             throw new IncorrectSequenceException("Expected " + (this.sequenceId) + " but got " + other.sequenceId);
         }
-        byte[] d = new byte[this.data.length + other.data.length];
-        System.arraycopy(this.data, 0, d, 0, this.data.length);
-        System.arraycopy(other.data, 0, d, this.data.length, other.data.length);
+        byte[] d = new byte[this.length + other.length];
+        System.arraycopy(this.data, this.offset, d, 0, this.length);
+        System.arraycopy(other.data, other.offset, d, this.length, other.length);
         this.data = d;
+        this.offset = 0;
+        this.length = this.data.length;
         return this;
     }
 
@@ -340,6 +342,12 @@ final class ByteArrayFragment
      */
     byte[] getData()
     {
+        if (this.offset != 0 || this.length != this.data.length)
+        {
+            final byte[] d = new byte[this.length];
+            System.arraycopy(this.data, this.offset, d, 0, this.length);
+            return d;
+        }
         return this.data;
     }
 
@@ -371,6 +379,6 @@ final class ByteArrayFragment
     public String toString()
     {
         return "ByteArrayFragment [id=" + this.id + ", sequenceId=" + this.sequenceId + ", lastElement="
-            + this.lastElement + ", data=" + this.data.length + "]";
+            + this.lastElement + ", data=" + this.length + "]";
     }
 }

@@ -69,7 +69,7 @@ abstract class ByteArrayFragmentResolver
         {
             final ByteArrayFragment[] fragments =
                 ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            byte[][] fragmentsToSend = new byte[fragments.length][];
+            final byte[][] fragmentsToSend = new byte[fragments.length][];
             for (int i = 0; i < fragments.length; i++)
             {
                 fragmentsToSend[i] = fragments[i].toTxBytesRawByteHeader();
@@ -92,7 +92,7 @@ abstract class ByteArrayFragmentResolver
         {
             final ByteArrayFragment[] fragments =
                 ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            byte[][] fragmentsToSend = new byte[fragments.length][];
+            final byte[][] fragmentsToSend = new byte[fragments.length][];
             for (int i = 0; i < fragments.length; i++)
             {
                 fragmentsToSend[i] = fragments[i].toTxBytesUTF8Header();
