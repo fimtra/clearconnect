@@ -25,7 +25,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
@@ -114,7 +113,7 @@ public class TcpChannel implements ITransportChannel
     final ByteBuffer rxFrames;
     final Deque<byte[]> readFrames;
     final Deque<byte[]> resolvedFrames;
-    final AtomicInteger txFrames;
+    int txFrames;
     final SocketChannel socketChannel;
     final IFrameReaderWriter readerWriter;
     final ByteArrayFragmentResolver byteArrayFragmentResolver;
@@ -198,7 +197,6 @@ public class TcpChannel implements ITransportChannel
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.txFrames = new AtomicInteger();
         this.readFrames = CollectionUtils.newDeque();
         this.resolvedFrames = CollectionUtils.newDeque();
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
@@ -218,7 +216,6 @@ public class TcpChannel implements ITransportChannel
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
         this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.txFrames = new AtomicInteger();
         this.readFrames = CollectionUtils.newDeque();
         this.resolvedFrames = CollectionUtils.newDeque();
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
@@ -294,9 +291,9 @@ public class TcpChannel implements ITransportChannel
             final byte[][] byteFragmentsToSend =
                 this.byteArrayFragmentResolver.getByteFragmentsToSend(toSend, TcpChannelProperties.Values.TX_SEND_SIZE);
 
-            this.txFrames.addAndGet(byteFragmentsToSend.length);            
             try
             {
+                this.txFrames += byteFragmentsToSend.length;
                 synchronized (this)
                 {
                     for (int i = 0; i < byteFragmentsToSend.length; i++)
@@ -307,7 +304,7 @@ public class TcpChannel implements ITransportChannel
             }
             finally
             {
-                this.txFrames.addAndGet(-byteFragmentsToSend.length);
+                this.txFrames -= byteFragmentsToSend.length;
             }
 
             return true;
@@ -535,7 +532,7 @@ public class TcpChannel implements ITransportChannel
     @Override
     public int getTxQueueSize()
     {
-        return this.txFrames.get();
+        return this.txFrames;
     }
 }
 
