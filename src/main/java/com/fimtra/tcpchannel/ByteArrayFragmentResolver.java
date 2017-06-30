@@ -15,6 +15,7 @@
  */
 package com.fimtra.tcpchannel;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,8 +46,8 @@ abstract class ByteArrayFragmentResolver
             case TERMINATOR_BASED:
                 return new UTF8HeaderByteArrayFragmentResolver();
             default :
-                throw new IllegalArgumentException("No byte array fragment resolver available for frame encoding "
-                    + frameEncodingFormat);
+                throw new IllegalArgumentException(
+                    "No byte array fragment resolver available for frame encoding " + frameEncodingFormat);
         }
     }
 
@@ -65,14 +66,18 @@ abstract class ByteArrayFragmentResolver
         }
 
         @Override
-        byte[][] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
+        ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
         {
             final ByteArrayFragment[] fragments =
                 ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            final byte[][] fragmentsToSend = new byte[fragments.length][];
+            final ByteBuffer[] fragmentsToSend = new ByteBuffer[fragments.length * 2];
+            ByteBuffer[] parts;
+            int k = 0;
             for (int i = 0; i < fragments.length; i++)
             {
-                fragmentsToSend[i] = fragments[i].toTxBytesRawByteHeader();
+                parts = fragments[i].toTxBytesRawByteHeader();
+                fragmentsToSend[k++] = parts[0];
+                fragmentsToSend[k++] = parts[1];
             }
             return fragmentsToSend;
         }
@@ -88,14 +93,18 @@ abstract class ByteArrayFragmentResolver
         }
 
         @Override
-        byte[][] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
+        ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
         {
             final ByteArrayFragment[] fragments =
                 ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            final byte[][] fragmentsToSend = new byte[fragments.length][];
+            final ByteBuffer[] fragmentsToSend = new ByteBuffer[fragments.length * 2];
+            ByteBuffer[] parts;
+            int k = 0;
             for (int i = 0; i < fragments.length; i++)
             {
-                fragmentsToSend[i] = fragments[i].toTxBytesUTF8Header();
+                parts = fragments[i].toTxBytesUTF8Header();
+                fragmentsToSend[k++] = parts[0];
+                fragmentsToSend[k++] = parts[1];
             }
             return fragmentsToSend;
         }
@@ -113,16 +122,16 @@ abstract class ByteArrayFragmentResolver
     abstract byte[] resolve(byte[] byteFragmentTxData);
 
     /**
-     * Convenience method to split a byte[] into the transmission bytes representing the byte array
-     * fragments for the whole message.
+     * Convenience method to split a byte[] into the transmission {@link ByteBuffer} objects
+     * representing the byte array fragments for the whole message.
      * 
      * @param toSend
      *            the data to send
      * @param maxFragmentInternalByteSize
      *            the maximum size of each {@link ByteArrayFragment} instance's internal byte[]
-     * @return the array of byte[] objects to send
+     * @return the array of {@link ByteBuffer} objects to send
      */
-    abstract byte[][] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize);
+    abstract ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize);
 
     byte[] resolveInternal(final ByteArrayFragment fragment)
     {

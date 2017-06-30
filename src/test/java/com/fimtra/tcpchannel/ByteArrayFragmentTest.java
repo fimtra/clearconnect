@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +33,7 @@ import com.fimtra.tcpchannel.ByteArrayFragment.ByteArrayFragmentUtils;
 import com.fimtra.tcpchannel.ByteArrayFragment.IncorrectSequenceException;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.RawByteHeaderByteArrayFragmentResolver;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.UTF8HeaderByteArrayFragmentResolver;
+import com.fimtra.util.ByteBufferUtils;
 
 /**
  * Tests for the {@link ByteArrayFragment}
@@ -110,12 +112,18 @@ public class ByteArrayFragmentTest
         ByteArrayFragment resolved;
         for (ByteArrayFragment fragment : fragmentsForTxData)
         {
-            resolved = ByteArrayFragment.fromRxBytesRawByteHeader(fragment.toTxBytesRawByteHeader());
+            final byte[] asBytes = asBytes(fragment.toTxBytesRawByteHeader());
+            resolved = ByteArrayFragment.fromRxBytesRawByteHeader(asBytes);
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
             assertEquals(fragment.lastElement, resolved.lastElement);
             assertArrayEquals(fragment.getData(), resolved.getData());
         }
+    }
+
+    private static byte[] asBytes(ByteBuffer[] buffers)
+    {
+        return ByteBufferUtils.asBytes(ByteBufferUtils.join(buffers));
     }
 
     /**
@@ -197,7 +205,7 @@ public class ByteArrayFragmentTest
         byte[] resolved = null;
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
-            resolved = resolver.resolve(fragmentsForTxData[i].toTxBytesRawByteHeader());
+            resolved = resolver.resolve(asBytes(fragmentsForTxData[i].toTxBytesRawByteHeader()));
         }
         assertEquals(0, resolver.fragments.size());
         assertArrayEquals(data, resolved);
@@ -224,7 +232,7 @@ public class ByteArrayFragmentTest
         byte[] resolved = null;
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
-            resolved = resolver.resolve(fragmentsForTxData[i].toTxBytesUTF8Header());
+            resolved = resolver.resolve(asBytes(fragmentsForTxData[i].toTxBytesUTF8Header()));
         }
         assertEquals(0, resolver.fragments.size());
         assertArrayEquals(data, resolved);
@@ -236,10 +244,10 @@ public class ByteArrayFragmentTest
         byte[] data = "hello".getBytes();
         ByteArrayFragment[] fragmentsForTxData = ByteArrayFragment.getFragmentsForTxData(data, 1);
         ByteArrayFragmentResolver resolver = new UTF8HeaderByteArrayFragmentResolver();
-        assertNull(resolver.resolve(fragmentsForTxData[0].toTxBytesUTF8Header()));
+        assertNull(resolver.resolve(asBytes(fragmentsForTxData[0].toTxBytesUTF8Header())));
         assertEquals(1, resolver.fragments.size());
         // force incorrect sequence here
-        assertNull(resolver.resolve(fragmentsForTxData[2].toTxBytesUTF8Header()));
+        assertNull(resolver.resolve(asBytes(fragmentsForTxData[2].toTxBytesUTF8Header())));
         assertEquals(0, resolver.fragments.size());
     }
 
@@ -249,10 +257,10 @@ public class ByteArrayFragmentTest
         byte[] data = "hello".getBytes();
         ByteArrayFragment[] fragmentsForTxData = ByteArrayFragment.getFragmentsForTxData(data, 1);
         ByteArrayFragmentResolver resolver = new RawByteHeaderByteArrayFragmentResolver();
-        assertNull(resolver.resolve(fragmentsForTxData[0].toTxBytesRawByteHeader()));
+        assertNull(resolver.resolve(asBytes(fragmentsForTxData[0].toTxBytesRawByteHeader())));
         assertEquals(1, resolver.fragments.size());
         // force incorrect sequence here
-        assertNull(resolver.resolve(fragmentsForTxData[2].toTxBytesRawByteHeader()));
+        assertNull(resolver.resolve(asBytes(fragmentsForTxData[2].toTxBytesRawByteHeader())));
         assertEquals(0, resolver.fragments.size());
     }
 
@@ -285,7 +293,7 @@ public class ByteArrayFragmentTest
         byte[] resolved;
         for (ByteArrayFragment byteArrayFragment : fragments)
         {
-            resolved = resolver.resolve(byteArrayFragment.toTxBytesRawByteHeader());
+            resolved = resolver.resolve(asBytes(byteArrayFragment.toTxBytesRawByteHeader()));
             if (resolved != null)
             {
                 try
@@ -320,7 +328,8 @@ public class ByteArrayFragmentTest
         ByteArrayFragment resolved;
         for (ByteArrayFragment fragment : fragmentsForTxData)
         {
-            resolved = ByteArrayFragment.fromRxBytesUTF8Header(fragment.toTxBytesUTF8Header());
+            final byte[] asBytes = asBytes(fragment.toTxBytesUTF8Header());
+            resolved = ByteArrayFragment.fromRxBytesUTF8Header(asBytes);
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
             assertEquals(fragment.lastElement, resolved.lastElement);

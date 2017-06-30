@@ -288,7 +288,7 @@ public class TcpChannel implements ITransportChannel
     {
         try
         {
-            final byte[][] byteFragmentsToSend =
+            final ByteBuffer[] byteFragmentsToSend =
                 this.byteArrayFragmentResolver.getByteFragmentsToSend(toSend, TcpChannelProperties.Values.TX_SEND_SIZE);
 
             try
@@ -296,9 +296,10 @@ public class TcpChannel implements ITransportChannel
                 this.txFrames += byteFragmentsToSend.length;
                 synchronized (this)
                 {
-                    for (int i = 0; i < byteFragmentsToSend.length; i++)
+                    for (int i = 0; i < byteFragmentsToSend.length;)
                     {
-                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i]);
+                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i++],
+                            byteFragmentsToSend[i++]);
                     }
                 }
             }
@@ -561,12 +562,13 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 {
     int txLength;
     int bytesWritten;
-    final ByteBuffer[] buffers = new ByteBuffer[2];
+    final ByteBuffer[] buffers;
     final TcpChannel tcpChannel;
 
     AbstractFrameReaderWriter(TcpChannel tcpChannel)
     {
         super();
+        this.buffers = new ByteBuffer[3];
         this.tcpChannel = tcpChannel;
     }
 
@@ -585,7 +587,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         }
     }
 
-    abstract void writeNextFrame(byte[] data) throws Exception;
+    abstract void writeNextFrame(ByteBuffer header, ByteBuffer data) throws Exception;
 }
 
 /**
@@ -601,7 +603,7 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
     TerminatorBasedReaderWriter(TcpChannel tcpChannel)
     {
         super(tcpChannel);
-        this.buffers[1] = this.terminatorByteBuffer;
+        this.buffers[2] = this.terminatorByteBuffer;
     }
 
     @Override
@@ -611,11 +613,13 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
     }
 
     @Override
-    void writeNextFrame(byte[] data) throws IOException
+    void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
-        this.bytesWritten = 0;
-        this.txLength = data.length + TcpChannel.TERMINATOR.length;
-        this.buffers[0] = ByteBuffer.wrap(data);
+        this.bytesWritten = 0;        
+        final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
+        this.txLength = frameLen + TcpChannel.TERMINATOR.length;
+        this.buffers[0] = header;
+        this.buffers[1] = data;
         writeBuffersToSocket();
         this.terminatorByteBuffer.flip();
     }
@@ -644,12 +648,14 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
     }
 
     @Override
-    void writeNextFrame(byte[] data) throws IOException
+    void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
         this.bytesWritten = 0;
-        this.txLength = data.length + 4;
-        this.txLengthBuffer.putInt(0, data.length);
-        this.buffers[1] = ByteBuffer.wrap(data);
+        final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
+        this.txLength = frameLen + 4;
+        this.txLengthBuffer.putInt(0, frameLen);
+        this.buffers[1] = header;
+        this.buffers[2] = data;
         writeBuffersToSocket();
         this.txLengthBuffer.flip();
     }

@@ -17,8 +17,6 @@ package com.fimtra.tcpchannel;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.is;
@@ -196,27 +194,6 @@ final class ByteArrayFragment
         return new ByteArrayFragment(id, sequenceId, lastElement, rxData, lengthPlus4, rxData.length - (lengthPlus4));
     }
 
-    /**
-     * Convenience method to split a byte[] into the transmission bytes representing the byte array
-     * fragments for the whole message. The header encoding is UTF8.
-     * 
-     * @param toSend
-     *            the data to send
-     * @param maxFragmentInternalByteSize
-     *            the maximum size of each {@link ByteArrayFragment} instance's internal byte[]
-     * @return the list of byte[] objects to send
-     */
-    static List<byte[]> getByteFragmentsToSendUTF8Header(byte[] toSend, int maxFragmentInternalByteSize)
-    {
-        ByteArrayFragment[] fragments = ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-        List<byte[]> fragmentsToSend = new ArrayList<byte[]>(fragments.length);
-        for (int i = 0; i < fragments.length; i++)
-        {
-            ByteArrayFragment byteArrayFragment = fragments[i];
-            fragmentsToSend.add(byteArrayFragment.toTxBytesUTF8Header());
-        }
-        return fragmentsToSend;
-    }
 
     final int id;
     final byte lastElement;
@@ -224,7 +201,7 @@ final class ByteArrayFragment
     int length;
     int sequenceId;
     byte[] data;
-
+    
     private ByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
         super();
@@ -253,23 +230,22 @@ final class ByteArrayFragment
      * </pre>
      * 
      * @see #fromRxBytesRawByteHeader(byte[])
-     * @return the byte[] to send that represents this fragment
+     * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
-    byte[] toTxBytesRawByteHeader()
+    ByteBuffer[] toTxBytesRawByteHeader()
     {
-        byte[] txBytes = new byte[9 + this.length];
-        System.arraycopy(this.data, this.offset, txBytes, 9, this.length);
+        byte[] header = new byte[9];
         // write the header
-        txBytes[0] = (byte) (this.id >> 24);
-        txBytes[1] = (byte) (this.id >> 16);
-        txBytes[2] = (byte) (this.id >> 8);
-        txBytes[3] = (byte) (this.id);
-        txBytes[4] = (byte) (this.sequenceId >> 24);
-        txBytes[5] = (byte) (this.sequenceId >> 16);
-        txBytes[6] = (byte) (this.sequenceId >> 8);
-        txBytes[7] = (byte) (this.sequenceId);
-        txBytes[8] = (this.lastElement);
-        return txBytes;
+        header[0] = (byte) (this.id >> 24);
+        header[1] = (byte) (this.id >> 16);
+        header[2] = (byte) (this.id >> 8);
+        header[3] = (byte) (this.id);
+        header[4] = (byte) (this.sequenceId >> 24);
+        header[5] = (byte) (this.sequenceId >> 16);
+        header[6] = (byte) (this.sequenceId >> 8);
+        header[7] = (byte) (this.sequenceId);
+        header[8] = (this.lastElement);
+        return new ByteBuffer[] { ByteBuffer.wrap(header), ByteBuffer.wrap(this.data, this.offset, this.length) };
     }
 
     /**
@@ -290,21 +266,19 @@ final class ByteArrayFragment
      * </pre>
      * 
      * @see #fromRxBytesUTF8Header(byte[])
-     * @return the byte[] to send that represents this fragment
+     * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
-    byte[] toTxBytesUTF8Header()
+    ByteBuffer[] toTxBytesUTF8Header()
     {
         final StringBuilder sb = new StringBuilder(32);
         sb.append('|').append(this.id).append('|').append(this.sequenceId).append('|').append(this.lastElement).append(
             '|');
-        final byte[] header = sb.toString().getBytes(UTF8);
-        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(header.length).getBytes(UTF8);
-        final int headerSize = len.length + header.length;
-        final byte[] txBytes = new byte[headerSize + this.length];
-        System.arraycopy(len, 0, txBytes, 0, len.length);
-        System.arraycopy(header, 0, txBytes, len.length, header.length);
-        System.arraycopy(this.data, this.offset, txBytes, headerSize, this.length);
-        return txBytes;
+        final byte[] idSeqLstElement = sb.toString().getBytes(UTF8);
+        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(idSeqLstElement.length).getBytes(UTF8);
+        final byte[] header = new byte[len.length + idSeqLstElement.length];
+        System.arraycopy(len, 0, header, 0, len.length);
+        System.arraycopy(idSeqLstElement, 0, header, len.length, idSeqLstElement.length);
+        return new ByteBuffer[] { ByteBuffer.wrap(header), ByteBuffer.wrap(this.data, this.offset, this.length) };
     }
 
     /**
