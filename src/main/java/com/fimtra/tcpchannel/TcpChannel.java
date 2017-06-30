@@ -291,10 +291,10 @@ public class TcpChannel implements ITransportChannel
             final ByteBuffer[] byteFragmentsToSend =
                 this.byteArrayFragmentResolver.getByteFragmentsToSend(toSend, TcpChannelProperties.Values.TX_SEND_SIZE);
 
-            try
+            synchronized (this)
             {
                 this.txFrames += byteFragmentsToSend.length;
-                synchronized (this)
+                try
                 {
                     for (int i = 0; i < byteFragmentsToSend.length;)
                     {
@@ -302,10 +302,10 @@ public class TcpChannel implements ITransportChannel
                             byteFragmentsToSend[i++]);
                     }
                 }
-            }
-            finally
-            {
-                this.txFrames -= byteFragmentsToSend.length;
+                finally
+                {
+                    this.txFrames -= byteFragmentsToSend.length;
+                }
             }
 
             return true;
