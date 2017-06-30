@@ -41,20 +41,22 @@ public abstract class ByteBufferUtils
     }
 
     /**
-     * @return a new byte[] that holds the data in the buffer from 0-limit in the buffer
+r     * @return a new byte[] that holds the data in the buffer from position-limit in the buffer
      */
     public static final byte[] asBytes(ByteBuffer buffer)
     {
-        final byte[] data = new byte[buffer.limit()];
+        final byte[] data = new byte[buffer.limit() - buffer.position()];
         if (data.length > 0)
         {
-            System.arraycopy(buffer.array(), 0, data, 0, buffer.limit());
+            System.arraycopy(buffer.array(), buffer.position(), data, 0, data.length);
         }
         return data;
     }
 
     /**
-     * Copy the data into the buffer, resizing it if needed
+     * Copy the data into the buffer, resizing it if needed, position will be set to the end of the
+     * copied data in the buffer, the limit is either the end of the buffers internal array (if its
+     * resized) or unchanged if the copied data fitted into the buffer.
      * 
      * @return the {@link ByteBuffer} with the data added to it (resized if needed)
      */
@@ -184,6 +186,30 @@ public abstract class ByteBufferUtils
         return localBuf;
     }
 
+    /**
+     * Join all the buffers into a single new buffer.
+     * 
+     * @param buffers
+     *            the buffers to join
+     * @return the buffer with all the buffers concatenated into it, positin 0 and limit set to the
+     *         size of the concatenated buffer data
+     */
+    public static final ByteBuffer join(ByteBuffer... buffers)
+    {
+        ByteBuffer result = ByteBuffer.wrap(new byte[BLOCK_SIZE]);
+        for (ByteBuffer byteBuffer : buffers)
+        {
+            final byte[] asBytes = asBytes(byteBuffer);
+            result = copyBytesIntoBuffer(asBytes, result);
+        }
+        
+        // set the limit and position to reflect the joined buffer data
+        result.limit(result.position());
+        result.position(0);
+        
+        return result;
+    }
+    
     /**
      * @return a new buffer with the contents of the original buffer and extended by the size
      */

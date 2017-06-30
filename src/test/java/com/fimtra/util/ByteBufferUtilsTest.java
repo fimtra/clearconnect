@@ -62,12 +62,37 @@ public class ByteBufferUtilsTest
         final byte[] result = ByteBufferUtils.asBytes(ByteBuffer.wrap(new byte[0]));
         assertEquals(0, result.length);
     }
-
+    
     @Test
     public void testAsBytes()
     {
         final byte[] result = ByteBufferUtils.asBytes(ByteBuffer.wrap(BYTES));
         assertEquals(HELLO, new String(result));
+    }
+    
+    @Test
+    public void testAsBytes_wrappedSubArray()
+    {
+        final ByteBuffer buffer = getBufferForSubArray();
+        final byte[] result = ByteBufferUtils.asBytes(buffer);
+        assertEquals(HELLO, new String(result));
+    }
+
+    @Test
+    public void testJoin_wrappedSubArray()
+    {
+        final ByteBuffer[] buffersToJoin =
+            new ByteBuffer[] { getBufferForSubArray(), ByteBuffer.wrap(BYTES), getBufferForSubArray() };
+
+        final ByteBuffer joined = ByteBufferUtils.join(buffersToJoin);
+        assertEquals(HELLO + HELLO + HELLO, new String(ByteBufferUtils.asBytes(joined)));
+    }
+
+    static ByteBuffer getBufferForSubArray()
+    {
+        final byte[] extended = new byte[BYTES.length * 2];
+        System.arraycopy(BYTES, 0, extended, 2, BYTES.length);
+        return ByteBuffer.wrap(extended, 2, BYTES.length);
     }
 
     @Test
