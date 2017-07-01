@@ -255,15 +255,15 @@ public class TestTcpServer
         {
             assertFalse(client.isConnected());
         }
-        
+
         assertTrue(this.server.blacklistHosts.containsKey(hostname));
-        
+
         Log.log(this, "**** STARTING TEST CONNECTIONS");
-     
+
         // fake that the blacklist time has expired
         this.server.blacklistHosts.put(hostname, this.server.blacklistHosts.get(hostname).longValue()
             - (TcpChannelProperties.Values.SLS_BLACKLIST_TIME_MILLIS));
-    
+
         // attempt connection
 
         final CountDownLatch latch = new CountDownLatch(4);
@@ -811,25 +811,34 @@ public class TestTcpServer
 
         }, this.frameEncodingFormat);
         assertTrue("channel was not connected", channelConnectedLatch.await(STD_TIMEOUT, TimeUnit.SECONDS));
-        client.send(generateMassiveMessage(65539));
-        final int timeout = 1;
+        final int messageSize = 65539;
+        client.send(generateMassiveMessage(messageSize));
+        final int timeout = 2;
         switch(this.frameEncodingFormat)
         {
             case LENGTH_BASED:
                 assertTrue(dataLatch.await(timeout, TimeUnit.SECONDS));
-                assertEquals("data rx", 65539, dataRef.get().length);
+                assertEquals("data rx", messageSize, dataRef.get().length);
                 break;
             case TERMINATOR_BASED:
                 assertTrue(dataLatch.await(timeout, TimeUnit.SECONDS));
-                assertEquals("data rx", 65539, dataRef.get().length);
+                assertEquals("data rx", messageSize, dataRef.get().length);
                 break;
         }
     }
 
-    private static byte[] generateMassiveMessage(int i)
+    private static byte[] generateMassiveMessage(int size)
     {
-        final byte[] data = new byte[i];
-        Arrays.fill(data, (byte) '0');
+        final byte[] data = new byte[size];
+        int a = 65;
+        for (int i = 0; i < size; i++)
+        {
+            data[i] = (byte) a++;
+            if (a > 90)
+            {
+                a = 65;
+            }
+        }
         return data;
     }
 }
