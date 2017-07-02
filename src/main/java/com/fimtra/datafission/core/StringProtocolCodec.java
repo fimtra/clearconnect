@@ -779,7 +779,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public char[] decode(byte[] data)
     {
-        return getCharset().decode(ByteBuffer.wrap(this.sessionSyncProtocol.decode(data))).array();
+        return UTF8.decode(ByteBuffer.wrap(this.sessionSyncProtocol.decode(data))).array();
     }
 
     @Override
