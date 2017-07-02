@@ -16,9 +16,9 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -35,7 +35,6 @@ import com.fimtra.datafission.field.AbstractValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
-import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -230,6 +229,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         try
         {
             char[] tempArr = new char[50];
+            // todo replace with CharBuffer[] - reduces array copying when creating the tokens
             final char[][] tokens = findTokens(decodedMessage);
             final String name = stringFromCharBuffer(tokens[1]);
             final AtomicChange atomicChange = new AtomicChange(name);
@@ -683,7 +683,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         int tokenIndex = 0;
         char[][] tokens = new char[10][];
-        CharBuffer cbuf = CharBuffer.allocate(CharBufferUtils.BLOCK_SIZE);
+        char[] cbuf = new char[32];
+        int cbufPtr = 0;
         char previous = 0;
         int slashCount = 0;
         for (int i = 0; i < chars.length; i++)
@@ -699,16 +700,19 @@ public class StringProtocolCodec implements ICodec<char[]>
                         if (tokenIndex == tokens.length)
                         {
                             // resize
-                            char[][] temp = new char[tokens.length + 10][];
-                            System.arraycopy(tokens, 0, temp, 0, tokens.length);
-                            tokens = temp;
+                            tokens = Arrays.copyOf(tokens, tokens.length + 10);
                         }
-                        tokens[tokenIndex++] = CharBufferUtils.getCharsFromBufferAndReset(cbuf);
+                        tokens[tokenIndex++] = Arrays.copyOf(cbuf, cbufPtr);
+                        cbufPtr = 0;
                     }
                     else
                     {
                         // this is an escaped "|" so is part of the data (not a delimiter)
-                        cbuf = CharBufferUtils.put(chars[i], cbuf);
+                        if (cbufPtr == cbuf.length)
+                        {
+                            cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
+                        }
+                        cbuf[cbufPtr++] = chars[i];
                     }
                     slashCount = 0;
                     break;
@@ -716,19 +720,26 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // we need to count how many "\" we have
                     // an even number means they are escaped so a "|" is a token
                     slashCount++;
-                    cbuf = CharBufferUtils.put(chars[i], cbuf);
+                    if (cbufPtr == cbuf.length)
+                    {
+                        cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
+                    }
+                    cbuf[cbufPtr++] = chars[i];
                     break;
                 default :
                     slashCount = 0;
-                    cbuf = CharBufferUtils.put(chars[i], cbuf);
+                    if (cbufPtr == cbuf.length)
+                    {
+                        cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
+                    }
+                    cbuf[cbufPtr++] = chars[i];
             }
             previous = chars[i];
         }
 
-        final char[][] retArr = new char[tokenIndex + 1][];
-        System.arraycopy(tokens, 0, retArr, 0, tokenIndex);
-        retArr[tokenIndex++] = CharBufferUtils.getCharsFromBufferAndReset(cbuf);
-        return retArr;
+        tokens = Arrays.copyOf(tokens, tokenIndex + 1);
+        tokens[tokenIndex++] = Arrays.copyOf(cbuf, cbufPtr);
+        return tokens;
     }
 
     @Override
