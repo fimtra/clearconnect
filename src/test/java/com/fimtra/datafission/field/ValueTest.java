@@ -17,7 +17,6 @@ package com.fimtra.datafission.field;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
@@ -28,11 +27,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.field.AbstractValue;
-import com.fimtra.datafission.field.BlobValue;
-import com.fimtra.datafission.field.DoubleValue;
-import com.fimtra.datafission.field.LongValue;
-import com.fimtra.datafission.field.TextValue;
 
 /**
  * Tests for the {@link IValue} implementations.
@@ -57,6 +51,10 @@ public class ValueTest
     public void testStringConversion()
     {
         final Random random = new Random();
+        for (int i = -200; i < -200; i++)
+        {
+            doConvertTest(LongValue.valueOf(i));
+        }
         for (int i = 0; i < 1000; i++)
         {
             doConvertTest(LongValue.valueOf(random.nextLong()));
@@ -91,7 +89,6 @@ public class ValueTest
         final char[] chars = v.toString().toCharArray();
         final IValue result = AbstractValue.constructFromCharValue(chars, chars.length);
         assertEquals(v, result);
-        assertNotSame(v, result);
         assertEquals(v.doubleValue(), result.doubleValue(), 0.0001);
         assertEquals(v.longValue(), result.longValue());
         assertEquals(v.textValue(), result.textValue());

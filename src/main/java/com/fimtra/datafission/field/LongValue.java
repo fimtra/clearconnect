@@ -143,23 +143,14 @@ public final class LongValue extends AbstractValue
 
     public static IValue valueOf(char[] chars, int start, int len)
     {
-        return LongValue.valueOf(parseLong(chars, start, len, 10));
+        return LongValue.valueOf(parseLong(chars, start, len));
     }
 
-    private static long parseLong(char[] chars, int start, int length, int radix) throws NumberFormatException
+    private static long parseLong(char[] chars, int start, int length) throws NumberFormatException
     {
         if (chars == null)
         {
             throw new NumberFormatException("null");
-        }
-
-        if (radix < Character.MIN_RADIX)
-        {
-            throw new NumberFormatException("radix " + radix + " less than Character.MIN_RADIX");
-        }
-        if (radix > Character.MAX_RADIX)
-        {
-            throw new NumberFormatException("radix " + radix + " greater than Character.MAX_RADIX");
         }
 
         long result = 0;
@@ -193,20 +184,50 @@ public final class LongValue extends AbstractValue
                 }
                 i++;
             }
-            multmin = limit / radix;
+            multmin = (long) (limit * 0.1d);
             while (i < len)
             {
                 // Accumulating negatively avoids surprises near MAX_VALUE
-                digit = Character.digit(chars[i++], radix);
-                if (digit < 0)
+                switch(chars[i++])
                 {
-                    throw new NumberFormatException(new String(chars, start, len));
+                    case '0':
+                        digit = 0;
+                        break;
+                    case '1':
+                        digit = 1;
+                        break;
+                    case '2':
+                        digit = 2;
+                        break;
+                    case '3':
+                        digit = 3;
+                        break;
+                    case '4':
+                        digit = 4;
+                        break;
+                    case '5':
+                        digit = 5;
+                        break;
+                    case '6':
+                        digit = 6;
+                        break;
+                    case '7':
+                        digit = 7;
+                        break;
+                    case '8':
+                        digit = 8;
+                        break;
+                    case '9':
+                        digit = 9;
+                        break;
+                    default :
+                        throw new NumberFormatException(new String(chars, start, len));
                 }
                 if (result < multmin)
                 {
                     throw new NumberFormatException(new String(chars, start, len));
                 }
-                result *= radix;
+                result *= 10;
                 if (result < limit + digit)
                 {
                     throw new NumberFormatException(new String(chars, start, len));
