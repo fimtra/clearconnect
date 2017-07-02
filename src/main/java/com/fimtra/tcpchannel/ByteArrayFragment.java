@@ -156,42 +156,49 @@ final class ByteArrayFragment
     }
 
     /**
-     * Resolve a {@link ByteArrayFragment} from the received byte[] with the header encoded in raw
+     * Resolve a {@link ByteArrayFragment} from the received {@link ByteBuffer} with the header encoded in raw
      * byte form. The byte[] will be one of those returned from {@link #toTxBytesRawByteHeader()}
      * 
      * @param rxData
-     *            the byte[] for a ByteArrayFragment
+     *            the {@link ByteBuffer} for a ByteArrayFragment
      * @return a ByteArrayFragment
      */
-    static ByteArrayFragment fromRxBytesRawByteHeader(byte[] rxData)
+    static ByteArrayFragment fromRxBytesRawByteHeader(ByteBuffer rxData)
     {
-        final ByteBuffer buffer = ByteBuffer.wrap(rxData);
-        final int id = buffer.getInt();
-        final int sequenceId = buffer.getInt();
-        final byte lastElement = buffer.get();
-        return new ByteArrayFragment(id, sequenceId, lastElement, rxData, 9, buffer.array().length - 9);
+        final int id = rxData.getInt();
+        final int sequenceId = rxData.getInt();
+        final byte lastElement = rxData.get();
+        return new ByteArrayFragment(id, sequenceId, lastElement, rxData.array(), rxData.position(),
+            rxData.limit() - rxData.position());
     }
 
     /**
-     * Resolve a {@link ByteArrayFragment} from the received byte[] with the header encoded in UTF8
+     * Resolve a {@link ByteArrayFragment} from the received {@link ByteBuffer} with the header encoded in UTF8
      * characters. The byte[] will be one of those returned from {@link #toTxBytesUTF8Header()}
      * 
      * @param rxData
-     *            the byte[] for a ByteArrayFragment
+     *            the {@link ByteBuffer} for a ByteArrayFragment
      * @return a ByteArrayFragment
      */
-    static ByteArrayFragment fromRxBytesUTF8Header(byte[] rxData)
+    static ByteArrayFragment fromRxBytesUTF8Header(ByteBuffer rxData)
     {
+        final byte[] lenArr = new byte[4];
+        rxData.get(lenArr);
         // UTF8 has 1 byte per char
-        int length = Integer.parseInt(new String(rxData, 0, 4, UTF8));
-        final int lengthPlus4 = length + 4;
+        final int headerLen = Integer.parseInt(new String(lenArr, UTF8));
+        
         // we don't want the first "|"
-        String header = new String(rxData, 5, length, UTF8);
-        int[] parts = ByteArrayFragmentUtils.split3NumbersByPipe(header);
+        rxData.get();
+        final byte[] headerArr = new byte[headerLen - 1];
+        rxData.get(headerArr);
+        final String header = new String(headerArr, UTF8);
+
+        final int[] parts = ByteArrayFragmentUtils.split3NumbersByPipe(header);
         final int id = parts[0];
         final int sequenceId = parts[1];
         final byte lastElement = (byte) parts[2];
-        return new ByteArrayFragment(id, sequenceId, lastElement, rxData, lengthPlus4, rxData.length - (lengthPlus4));
+        return new ByteArrayFragment(id, sequenceId, lastElement, rxData.array(), rxData.position(),
+            rxData.limit() - rxData.position());
     }
 
 
@@ -320,7 +327,9 @@ final class ByteArrayFragment
         {
             final byte[] d = new byte[this.length];
             System.arraycopy(this.data, this.offset, d, 0, this.length);
-            return d;
+            this.data = d;
+            this.offset = 0;
+            this.length = this.data.length;
         }
         return this.data;
     }

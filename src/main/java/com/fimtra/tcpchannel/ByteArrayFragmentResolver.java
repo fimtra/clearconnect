@@ -60,7 +60,7 @@ abstract class ByteArrayFragmentResolver
     static final class RawByteHeaderByteArrayFragmentResolver extends ByteArrayFragmentResolver
     {
         @Override
-        byte[] resolve(byte[] byteFragmentTxData)
+        byte[] resolve(ByteBuffer byteFragmentTxData)
         {
             return resolveInternal(ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
         }
@@ -87,7 +87,7 @@ abstract class ByteArrayFragmentResolver
     static final class UTF8HeaderByteArrayFragmentResolver extends ByteArrayFragmentResolver
     {
         @Override
-        byte[] resolve(byte[] byteFragmentTxData)
+        byte[] resolve(ByteBuffer byteFragmentTxData)
         {
             return resolveInternal(ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
         }
@@ -111,15 +111,15 @@ abstract class ByteArrayFragmentResolver
     }
 
     /**
-     * Resolve the byte[] of the byteFragmentTxData into a data byte[]. If the original data[] was
-     * split into multiple fragments then only when all the fragments have been received (IN ORDER)
-     * will this method return the resolved data byte[].
+     * Resolve the {@link ByteBuffer} of the byteFragmentTxData into a data byte[]. If the original
+     * {@link ByteBuffer} was split into multiple fragments then only when all the fragments have
+     * been received (IN ORDER) will this method return the resolved data byte[].
      * 
      * @param byteFragmentTxData
-     *            a {@link ByteArrayFragment} in byte[] form
+     *            a {@link ByteArrayFragment} in {@link ByteBuffer} form
      * @return the fully resolved data byte[] or <code>null</code> if fragments are still missing
      */
-    abstract byte[] resolve(byte[] byteFragmentTxData);
+    abstract byte[] resolve(ByteBuffer byteFragmentTxData);
 
     /**
      * Convenience method to split a byte[] into the transmission {@link ByteBuffer} objects
@@ -156,6 +156,9 @@ abstract class ByteArrayFragmentResolver
                 final ByteArrayFragment current = this.fragments.get(fragment);
                 if (current == null)
                 {
+                    // call this to make a copy of the data - important as the internal byte buffer
+                    // can point to the TCP rx buffer, which will compact on future calls
+                    fragment.getData();
                     this.fragments.put(fragment, fragment);
                 }
                 else

@@ -17,21 +17,16 @@ package com.fimtra.tcpchannel;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Deque;
-import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
-import com.fimtra.util.LowGcLinkedList;
+import com.fimtra.util.ByteBufferUtils;
 
 /**
  * Tests for the {@link TcpChannelUtils}
@@ -40,6 +35,8 @@ import com.fimtra.util.LowGcLinkedList;
  */
 public class TestTcpChannelUtils
 {
+    final int[] readFramesSize = new int[1];
+
     @Before
     public void setUp() throws Exception
     {
@@ -66,44 +63,32 @@ public class TestTcpChannelUtils
         buffer.put(terminator);
         buffer.put(unfinished.getBytes());
 
-        LowGcLinkedList<byte[]> result = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decodeUsingTerminator(result, buffer, terminator);
-        assertEquals(unfinished.length(), buffer.position());
-        assertEquals(2, result.size());
-        assertEquals(hello, new String(result.get(0)));
-        assertEquals(world, new String(result.get(1)));
+        ByteBuffer[] result = new ByteBuffer[2];
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        assertEquals(2, this.readFramesSize[0]);
+        assertEquals(hello, new String(ByteBufferUtils.asBytes(result[0])));
+        assertEquals(world, new String(ByteBufferUtils.asBytes(result[1])));
+        buffer.compact();
 
-        result = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decodeUsingTerminator(result, buffer, terminator);
-        assertEquals(unfinished.length(), buffer.position());
-        assertEquals(0, result.size());
+        result = new ByteBuffer[2];
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        assertEquals(0, this.readFramesSize[0]);
+        buffer.compact();
 
         buffer.put(finished.getBytes());
         buffer.put(terminator);
         buffer.put(terminator);
-        result = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decodeUsingTerminator(result, buffer, terminator);
-        assertEquals(0, buffer.position());
-        assertEquals("result is " + showResult(result), 2, result.size());
-        assertEquals(unfinished + finished, new String(result.get(0)));
-        assertEquals("", new String(result.get(1)));
+        result = new ByteBuffer[2];
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        assertEquals(2, this.readFramesSize[0]);
+        assertEquals(unfinished + finished, new String(ByteBufferUtils.asBytes(result[0])));
+        assertEquals("", new String(ByteBufferUtils.asBytes(result[1])));
+        buffer.compact();
 
-        result = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decodeUsingTerminator(result, buffer, terminator);
+        result = new ByteBuffer[2];
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
         assertEquals(0, buffer.position());
-        assertEquals(0, result.size());
-    }
-
-    private static String showResult(List<byte[]> result)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[");
-        for (byte[] bs : result)
-        {
-            sb.append(new String(bs)).append(", ");
-        }
-        sb.append("]");
-        return sb.toString();
+        assertEquals(0, this.readFramesSize[0]);
     }
 
     @Test
@@ -129,13 +114,15 @@ public class TestTcpChannelUtils
 
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
-        final LowGcLinkedList<byte[]> decode = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decode(decode, buffer);
-        assertEquals(1, decode.size());
+        ByteBuffer[] decode = new ByteBuffer[2];
+        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer);
+        assertEquals(1, this.readFramesSize[0]);
         byte[] expected = new byte[2];
         expected[0] = (byte) 5;
         expected[1] = (byte) 6;
-        assertTrue(Arrays.equals(expected, decode.get(0)));
+        assertTrue(Arrays.equals(expected, ByteBufferUtils.asBytes(decode[0])));
+        buffer.compact();
+
         i = 0;
         byte[] expectedRemainder = new byte[6];
         expectedRemainder[i++] = (byte) 0;
@@ -164,8 +151,8 @@ public class TestTcpChannelUtils
 
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
-        final Deque<byte[]> decode = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decode(decode, buffer);
+        ByteBuffer[] decode = new ByteBuffer[2];
+        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer);
     }
 
     @Test(expected = BufferOverflowException.class)
@@ -184,7 +171,7 @@ public class TestTcpChannelUtils
 
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
-        final Deque<byte[]> decode = new LowGcLinkedList<byte[]>();
-        TcpChannelUtils.decodeUsingTerminator(decode, buffer, terminator);
+        ByteBuffer[] decode = new ByteBuffer[2];
+        decode = TcpChannelUtils.decodeUsingTerminator(decode, this.readFramesSize, buffer, terminator);
     }
 }

@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Queue;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
@@ -149,8 +148,9 @@ public abstract class TcpChannelUtils
     }
 
     /**
-     * Given a ByteBuffer of data, this method decodes it into a List of byte[] objects. Data
-     * between {@link TcpChannel} objects is encoded in the following format (ABNF notation):
+     * Given a ByteBuffer of data, this method decodes it into an array of {@link ByteBuffer}
+     * objects. Data between {@link TcpChannel} objects is encoded in the following format (ABNF
+     * notation):
      * 
      * <pre>
      *  stream = 1*frame
@@ -161,21 +161,27 @@ public abstract class TcpChannelUtils
      * </pre>
      * 
      * @param frames
-     *            the queue to place the decoded frames resolved from the buffer. Any incomplete
-     *            frames are left in the buffer.
+     *            the reference for the array to place the decoded frames resolved from the buffer.
+     *            Any incomplete frames are left in the buffer.
+     * @param framesSize
+     *            used as a reference to pass back the size of the array
      * @param buffer
      *            a bytebuffer holding any number of frames or <b>partial frames</b>
+     * @return the array with the decoded frames, different to the frames argument if the array was
+     *         resized
      * @throws BufferOverflowException
      *             if the buffer size cannot hold a complete frame
      */
-    static void decode(Queue<byte[]> frames, ByteBuffer buffer) throws BufferOverflowException
+    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer) throws BufferOverflowException
     {
+        ByteBuffer[] decoded = frames;
+        framesSize[0] = 0;
         buffer.flip();
         // the TCP message could be a concatenation of multiple ones
         // the format is: <4 bytes len><data><4 bytes len><data>
         int len;
-        byte[] message;
         int position;
+        int framePtr = 0;
         while (buffer.position() < buffer.limit())
         {
             try
@@ -197,10 +203,8 @@ public abstract class TcpChannelUtils
                         // the buffer is full and the length indicates that there is more data than
                         // the buffer can hold. We cannot extract the data from the buffer so we
                         // need indicate the buffer is full.
-                        final String overflowMessage =
-                            "Need to read " + len + " but buffer has no more space from current position: "
-                                + buffer.toString() + ", read=" + asString(frames) + ", buffer="
-                                + new String(buffer.array());
+                        final String overflowMessage = "Need to read " + len
+                            + " but buffer has no more space from current position: " + buffer.toString();
                         buffer.clear();
                         throw new BufferOverflowException(overflowMessage);
                     }
@@ -212,40 +216,22 @@ public abstract class TcpChannelUtils
             }
             else
             {
-                message = new byte[len];
-                System.arraycopy(buffer.array(), position, message, 0, len);
+                if (framePtr == decoded.length)
+                {
+                    decoded = Arrays.copyOf(decoded, decoded.length + 2);
+                }
+                decoded[framePtr++] = ByteBuffer.wrap(buffer.array(), position, len);
                 buffer.position(position + len);
-                frames.add(message);
             }
         }
-        buffer.compact();
-    }
-
-    private static String asString(Queue<byte[]> values)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[");
-        boolean first = true;
-        for (byte[] bs : values)
-        {
-            if (first)
-            {
-                first = false;
-            }
-            else
-            {
-                sb.append(", ");
-            }
-            sb.append(bs.length).append(" bytes");
-        }
-        sb.append("]");
-        return sb.toString();
+        framesSize[0] = framePtr;
+        return decoded;
     }
 
     /**
      * Given a ByteBuffer of data containing frames delimited by a termination byte, this method
-     * decodes it into a List of byte[] objects, one for each frame. This method assumes data is
-     * encoded in the following format (ABNF notation):
+     * decodes it into an array of {@link ByteBuffer} objects, one for each frame. This method
+     * assumes data is encoded in the following format (ABNF notation):
      * 
      * <pre>
      * stream = 1*frame
@@ -257,18 +243,24 @@ public abstract class TcpChannelUtils
      * </pre>
      * 
      * @param frames
-     *            the queue to place the decoded frames resolved from the buffer. Any incomplete
-     *            frames are left in the buffer.
+     *            the reference for the array to place the decoded frames resolved from the buffer.
+     *            Any incomplete frames are left in the buffer.
+     * @param framesSize
+     *            used as a reference to pass back the size of the array
      * @param buffer
      *            a bytebuffer holding any number of frames or <b>partial frames</b>
      * @param terminator
      *            the byte sequence for the end of a frame
+     * @return the array with the decoded frames, different to the frames argument if the array was
+     *         resized
      * @throws BufferOverflowException
      *             if the buffer size cannot hold a complete frame
      */
-    static void decodeUsingTerminator(Queue<byte[]> frames, ByteBuffer buffer, byte[] terminator)
+    static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] terminator)
         throws BufferOverflowException
     {
+        ByteBuffer[] decoded = frames;
+        framesSize[0] = 0;
         buffer.flip();
         final byte[] bufferArray = buffer.array();
         int[] terminatorIndex = new int[2];
@@ -293,15 +285,17 @@ public abstract class TcpChannelUtils
         {
             int len;
             int lastTerminatorIndex = 0;
-            byte[] frame;
             for (i = 0; i < terminatorIndexPtr; i++)
             {
                 len = terminatorIndex[i] - lastTerminatorIndex;
-                frame = new byte[len];
-                System.arraycopy(bufferArray, lastTerminatorIndex, frame, 0, len);
-                frames.add(frame);
+                if (i == decoded.length)
+                {
+                    decoded = Arrays.copyOf(decoded, decoded.length + 2);
+                }
+                decoded[i] = ByteBuffer.wrap(bufferArray, lastTerminatorIndex, len);
                 lastTerminatorIndex = terminatorIndex[i] + terminator.length;
             }
+            framesSize[0] = i;
             buffer.position(lastTerminatorIndex);
         }
         else
@@ -315,7 +309,7 @@ public abstract class TcpChannelUtils
                 throw new BufferOverflowException(overflowMessage);
             }
         }
-        buffer.compact();
+        return decoded;
     }
 
     /**

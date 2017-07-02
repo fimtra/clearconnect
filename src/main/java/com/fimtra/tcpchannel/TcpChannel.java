@@ -21,9 +21,8 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Deque;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fimtra.channel.ChannelUtils;
@@ -31,7 +30,6 @@ import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelProperties.Values;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
-import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -110,9 +108,10 @@ public class TcpChannel implements ITransportChannel
 
     int rxData;
     final IReceiver receiver;
-    final ByteBuffer rxFrames;
-    final Deque<byte[]> readFrames;
-    final Deque<byte[]> resolvedFrames;
+    final ByteBuffer rxBytes;
+    ByteBuffer[] readFrames;
+    final int[] readFramesSize = new int[1];
+    byte[][] resolvedFrames;
     int txFrames;
     final SocketChannel socketChannel;
     final IFrameReaderWriter readerWriter;
@@ -196,9 +195,9 @@ public class TcpChannel implements ITransportChannel
         FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException
     {
         this.onChannelClosedCalled = new AtomicBoolean();
-        this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.readFrames = CollectionUtils.newDeque();
-        this.resolvedFrames = CollectionUtils.newDeque();
+        this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
+        this.readFrames = new ByteBuffer[10];
+        this.resolvedFrames = new byte[10][];
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
@@ -215,9 +214,9 @@ public class TcpChannel implements ITransportChannel
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
-        this.rxFrames = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.readFrames = CollectionUtils.newDeque();
-        this.resolvedFrames = CollectionUtils.newDeque();
+        this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
+        this.readFrames = new ByteBuffer[10];
+        this.resolvedFrames = new byte[10][];
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
@@ -250,6 +249,7 @@ public class TcpChannel implements ITransportChannel
                 @Override
                 public void run()
                 {
+                    // todo multithread?
                     try
                     {
                         readFrames();
@@ -350,7 +350,9 @@ public class TcpChannel implements ITransportChannel
         int size = 0;
         try
         {
-            final int readCount = this.socketChannel.read(this.rxFrames);
+            this.rxBytes.compact();
+            final int readCount = this.socketChannel.read(this.rxBytes);
+
             switch(readCount)
             {
                 case -1:
@@ -376,31 +378,37 @@ public class TcpChannel implements ITransportChannel
                 catch (Exception e)
                 {
                     Log.log(this, ObjectUtils.safeToString(this) + " receiver "
-                        + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected", e);
+                        + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected",
+                        e);
                 }
                 connected = System.nanoTime();
             }
 
-            this.readerWriter.readFrames(this.readFrames);
+            this.readFrames = this.readerWriter.readFrames(this.rxBytes, this.readFrames, this.readFramesSize);
             decodeFrames = System.nanoTime();
 
-            byte[] data = null;
-            size = this.readFrames.size();
-            int i = 0;
+            ByteBuffer frame;
+            byte[] data;
+            size = this.readFramesSize[0];
+            int i = 0;            
+            int resolvedFramesSize = 0;
             for (i = 0; i < size; i++)
             {
-                data = this.readFrames.pop();
-                if ((data = this.byteArrayFragmentResolver.resolve(data)) != null)
+                frame = this.readFrames[i];
+                if ((data = this.byteArrayFragmentResolver.resolve(frame)) != null)
                 {
-                    this.resolvedFrames.add(data);
+                    if (resolvedFramesSize == this.resolvedFrames.length)
+                    {
+                        this.resolvedFrames = Arrays.copyOf(this.resolvedFrames, this.resolvedFrames.length + 2);
+                    }
+                    this.resolvedFrames[resolvedFramesSize++] = data;
                 }
             }
             resolveFrames = System.nanoTime();
-            
-            size = this.resolvedFrames.size();
-            for (i = 0; i < size; i++)
+
+            for (i = 0; i < resolvedFramesSize; i++)
             {
-                data = this.resolvedFrames.pop();
+                data = this.resolvedFrames[i];
                 switch(data.length)
                 {
                     case 1:
@@ -493,7 +501,7 @@ public class TcpChannel implements ITransportChannel
             synchronized (this)
             {
                 this.state = StateEnum.DESTROYED;
-                this.rxFrames.clear();
+                this.rxBytes.clear();
             }
 
             if (this.socketChannel != null)
@@ -545,10 +553,16 @@ public class TcpChannel implements ITransportChannel
 interface IFrameReaderWriter
 {
     /**
+     * @param rxBytes
+     *            the raw bytes read from a TCP socket
      * @param frames
-     *            the frames from the {@link TcpChannel#rxFrames}
+     *            the reference to the buffer to use for holding the decoded frames read from the
+     *            raw bytes
+     * @param framesSize
+     *            int[] to allow the result array size to be reported
+     * @return the frame buffer with all the decoded frames
      */
-    void readFrames(Queue<byte[]> frames);
+    ByteBuffer[] readFrames(ByteBuffer rxBytes, ByteBuffer[] frames, int[] framesSize);
 }
 
 /**
@@ -607,9 +621,9 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
     }
 
     @Override
-    public void readFrames(Queue<byte[]> frames)
+    public ByteBuffer[] readFrames(ByteBuffer rxBytes, ByteBuffer[] frames, int[] framesSize)
     {
-        TcpChannelUtils.decodeUsingTerminator(frames, this.tcpChannel.rxFrames, TcpChannel.TERMINATOR);
+        return TcpChannelUtils.decodeUsingTerminator(frames, framesSize, rxBytes, TcpChannel.TERMINATOR);
     }
 
     @Override
@@ -642,9 +656,9 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
     }
 
     @Override
-    public void readFrames(Queue<byte[]> frames)
+    public ByteBuffer[] readFrames(ByteBuffer rxBytes, ByteBuffer[] frames, int[] framesSize)
     {
-        TcpChannelUtils.decode(frames, this.tcpChannel.rxFrames);
+        return TcpChannelUtils.decode(frames, framesSize, rxBytes);
     }
 
     @Override
