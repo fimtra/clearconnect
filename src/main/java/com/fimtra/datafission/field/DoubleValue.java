@@ -65,7 +65,7 @@ public final class DoubleValue extends AbstractValue
 
     DoubleValue(char[] chars, int start, int len)
     {
-        this.value = Double.valueOf(new String(chars, start, len)).doubleValue();
+        this.value = Double.parseDouble(new String(chars, start, len));
     }
 
     @Override
