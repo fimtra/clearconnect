@@ -60,7 +60,6 @@ import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
-import com.fimtra.datafission.core.StringSymbolProtocolCodec.MissingKeySymbolMappingException;
 import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
@@ -943,10 +942,6 @@ public final class ProxyContext implements IObserverContext
                                 ProxyContext.this.onDataReceived(data);
                             }
                             catch (IncorrectSequenceException e)
-                            {
-                                handleException(e.recordName, e);
-                            }
-                            catch (MissingKeySymbolMappingException e)
                             {
                                 handleException(e.recordName, e);
                             }
