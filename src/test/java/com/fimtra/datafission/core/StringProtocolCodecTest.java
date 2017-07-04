@@ -57,8 +57,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringProtocolCodec.escape(value, sb, this.chars);
+        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
     }
 
@@ -67,8 +67,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "||||||||";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringProtocolCodec.escape(value, sb, this.chars);
+        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
     }
 
@@ -77,8 +77,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "special char ending \\";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray());
+        StringProtocolCodec.escape(value, sb, this.chars);
+        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
     }
 
@@ -87,11 +87,11 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \r\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
+        StringProtocolCodec.escape(value, sb, this.chars);
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
         assertFalse(escaped.contains("\n"));
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
+        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
     }
 
@@ -100,9 +100,9 @@ public class StringProtocolCodecTest extends CodecBaseTest
     {
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
         StringBuilder sb = new StringBuilder();
-        StringProtocolCodec.escape(value, sb, chars);
+        StringProtocolCodec.escape(value, sb, this.chars);
         String escaped = sb.toString();
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray());
+        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
     }
 
