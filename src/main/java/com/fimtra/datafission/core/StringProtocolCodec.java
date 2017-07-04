@@ -229,33 +229,40 @@ public class StringProtocolCodec implements ICodec<char[]>
         try
         {
             char[] tempArr = new char[50];
-            // todo replace with CharBuffer[] - reduces array copying when creating the tokens
-            final char[][] tokens = findTokens(decodedMessage);
-            final String name = stringFromCharBuffer(tokens[1]);
+            // use bijectional arrays to track the offset+len of each token
+            // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d array
+            final int[][] bijTokenOffset = new int[1][10];
+            final int[][] bijTokenLimit = new int[1][10];
+            final int[] bijTokenLen = new int[1];
+
+            findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
+            final String name = stringFromCharBuffer(decodedMessage, bijTokenOffset[0][1], bijTokenLimit[0][1]);
             final AtomicChange atomicChange = new AtomicChange(name);
             // prepare the put and remove maps
             atomicChange.internalGetPutEntries();
             atomicChange.internalGetRemovedEntries();
 
             // set the scope and sequence
-            final char[] sequenceToken = tokens[2];
-            atomicChange.setScope(sequenceToken[0]);
-            atomicChange.setSequence(LongValue.valueOf(sequenceToken, 1, sequenceToken.length - 1).longValue());
+            atomicChange.setScope(decodedMessage[bijTokenOffset[0][2]]);
+            atomicChange.setSequence(LongValue.valueOf(decodedMessage, bijTokenOffset[0][2] + 1,
+                bijTokenLimit[0][2] - bijTokenOffset[0][2] - 1).longValue());
 
             boolean put = true;
             boolean processSubmaps = false;
             String subMapName = null;
-            if (tokens.length > 2)
+            int position;
+            int len;
+            if (bijTokenLen[0] > 2)
             {
-                char[] chars;
                 char previous;
-                char[] currentTokenChars;
                 int j;
-                for (int i = 3; i < tokens.length; i++)
+                for (int i = 3; i < bijTokenLen[0]; i++)
                 {
-                    if (tokens[i].length == 1)
+                    position = bijTokenOffset[0][i];
+                    len = bijTokenLimit[0][i] - position;
+                    if (len == 1)
                     {
-                        switch(tokens[i][0])
+                        switch(decodedMessage[bijTokenOffset[0][i]])
                         {
                             case PUT_CODE:
                                 put = true;
@@ -265,7 +272,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                                 break;
                             case SUBMAP_CODE:
                                 processSubmaps = true;
-                                subMapName = stringFromCharBuffer(tokens[++i]);
+                                ++i;
+                                subMapName =
+                                    stringFromCharBuffer(decodedMessage, bijTokenOffset[0][i], bijTokenLimit[0][i]);
                                 break;
                             default :
                                 break;
@@ -273,36 +282,34 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                     else
                     {
-                        chars = tokens[i];
                         previous = 0;
-                        for (j = 0; j < chars.length; j++)
+                        // length must be relative to the position
+                        len += position;
+                        for (j = position; j < len; j++)
                         {
-                            switch(chars[j])
+                            if (tempArr.length < len)
+                            {
+                                tempArr = new char[len];
+                            }
+                            switch(decodedMessage[j])
                             {
                                 case CHAR_KEY_VALUE_SEPARATOR:
                                     // find where the first non-escaped "=" is
                                     if (previous != CHAR_ESCAPE)
                                     {
-                                        currentTokenChars = tokens[i];
-                                        if (tempArr.length < currentTokenChars.length)
-                                        {
-                                            tempArr = new char[currentTokenChars.length];
-                                        }
                                         if (processSubmaps)
                                         {
                                             if (put)
                                             {
                                                 atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr),
-                                                    null);
+                                                    decodeKey(decodedMessage, position, j, true, tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, tempArr), null);
                                             }
                                             else
                                             {
                                                 atomicChange.mergeSubMapEntryRemovedChange(subMapName,
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), decodeValue(
-                                                        currentTokenChars, j + 1, currentTokenChars.length, tempArr));
+                                                    decodeKey(decodedMessage, position, j, true, tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, tempArr));
                                             }
                                         }
                                         else
@@ -310,21 +317,20 @@ public class StringProtocolCodec implements ICodec<char[]>
                                             if (put)
                                             {
                                                 atomicChange.addEntry_onlyCallFromCodec(
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr),
-                                                    decodeValue(currentTokenChars, j + 1, currentTokenChars.length,
-                                                        tempArr));
+                                                    decodeKey(decodedMessage, position, j, true, tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, tempArr));
                                             }
                                             else
                                             {
                                                 atomicChange.removeEntry_onlyCallFromCodec(
-                                                    decodeKey(currentTokenChars, 0, j, true, tempArr), null);
+                                                    decodeKey(decodedMessage, position, j, true, tempArr), null);
                                             }
                                         }
-                                        j = chars.length;
+                                        j = decodedMessage.length;
                                     }
                                     break;
                                 default :
-                                    previous = chars[j];
+                                    previous = decodedMessage[j];
                             }
                         }
                     }
@@ -501,11 +507,11 @@ public class StringProtocolCodec implements ICodec<char[]>
                 // resize
                 charsRef.ref = (new char[length]);
             }
-            
+
             final char[] chars = charsRef.ref;
             final char[] escapedChars = new char[2];
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
-            
+
             escapedChars[0] = CHAR_ESCAPE;
             char charAt;
             int last = 0;
@@ -545,7 +551,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             Log.log(StringProtocolCodec.class, "Could not append for " + ObjectUtils.safeToString(valueToSend), e);
         }
     }
-    
+
     /**
      * Parse the chars and performs unescaping copying into the destination char[]
      * <p>
@@ -593,7 +599,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
         return unescapedPtr;
     }
-
+    
     /**
      * Performs unescaping and decoding of a key
      */
@@ -607,6 +613,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
 
         return hasPreamble
+            // todo think about keying the string pool on CharBuffer or char reference
             ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr - DOUBLE_KEY_PREAMBLE_LENGTH)
             : new String(unescaped, 0, unescapedPtr);
     }
@@ -631,25 +638,27 @@ public class StringProtocolCodec implements ICodec<char[]>
         return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
     }
 
-    static String stringFromCharBuffer(char[] chars)
+    static String stringFromCharBuffer(char[] chars, int offset, int limit)
     {
-        final char[] unescaped = new char[chars.length];
-        final int unescapedPtr = doUnescape(chars, 0, chars.length, unescaped);
+        final char[] unescaped = new char[limit - offset];
+        final int unescapedPtr = doUnescape(chars, offset, limit, unescaped);
         // note: this does an array copy when constructing the string
         return new String(unescaped, 0, unescapedPtr);
     }
 
     static List<String> getNamesFromCommandMessage(char[] decodedMessage)
     {
-        final char[][] tokens = findTokens(decodedMessage);
-        final List<String> names = new ArrayList<String>(tokens.length);
+        final int[][] bijTokenOffset = new int[1][10];
+        final int[][] bijTokenLimit = new int[1][10];
+        final int[] bijTokenLen = new int[1];
+
+        findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
+
+        final List<String> names = new ArrayList<String>(bijTokenLen[0]);
         // the first item will be the command - we ignore this
-        for (int i = 1; i < tokens.length; i++)
+        for (int i = 1; i < bijTokenLen[0]; i++)
         {
-            if (tokens[i] != null && tokens[i].length > 0)
-            {
-                names.add(stringFromCharBuffer(tokens[i]));
-            }
+            names.add(stringFromCharBuffer(decodedMessage, bijTokenOffset[0][i], bijTokenLimit[0][i]));
         }
         return names;
     }
@@ -677,13 +686,14 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     /**
-     * @return the tokens as an array <code>char[]</code>, first index is the token index
+     * Find the indexes of the tokens within the main chars array. Uses bijectional arrays to hold
+     * the offset and limit parts in the main chars array for each token found. Note: 2-dimensional
+     * arrays used as pointer to the 1-d array to allow pass-back if they are resized.
      */
-    static char[][] findTokens(final char[] chars)
+    static void findTokens(final char[] chars, int[] bijTokenLen, int[][] bijTokenOffset, int[][] bijTokenLimit)
     {
-        int tokenIndex = 0;
-        char[][] tokens = new char[10][];
-        char[] cbuf = new char[32];
+        bijTokenLen[0] = 0;
+
         int cbufPtr = 0;
         char previous = 0;
         int slashCount = 0;
@@ -693,26 +703,25 @@ public class StringProtocolCodec implements ICodec<char[]>
             {
                 case CHAR_TOKEN_DELIM:
                     if (previous != CHAR_ESCAPE ||
-                        // the previous was '\' and there was an even number of contiguous slashes
+                    // the previous was '\' and there was an even number of contiguous slashes
                         (slashCount % 2 == 0))
                     {
                         // an unescaped "|" is a true delimiter so start a new token
-                        if (tokenIndex == tokens.length)
+                        if (bijTokenLen[0] == bijTokenOffset[0].length)
                         {
                             // resize
-                            tokens = Arrays.copyOf(tokens, tokens.length + 10);
+                            bijTokenOffset[0] = Arrays.copyOf(bijTokenOffset[0], bijTokenOffset[0].length + 10);
+                            bijTokenLimit[0] = Arrays.copyOf(bijTokenLimit[0], bijTokenLimit[0].length + 10);
                         }
-                        tokens[tokenIndex++] = Arrays.copyOf(cbuf, cbufPtr);
-                        cbufPtr = 0;
+                        // NOTE: +1 to skip the "|"
+                        bijTokenOffset[0][bijTokenLen[0]] = cbufPtr + 1;
+                        bijTokenLimit[0][bijTokenLen[0]] = i;
+                        bijTokenLen[0]++;
+                        cbufPtr = i;
                     }
                     else
                     {
                         // this is an escaped "|" so is part of the data (not a delimiter)
-                        if (cbufPtr == cbuf.length)
-                        {
-                            cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
-                        }
-                        cbuf[cbufPtr++] = chars[i];
                     }
                     slashCount = 0;
                     break;
@@ -720,26 +729,22 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // we need to count how many "\" we have
                     // an even number means they are escaped so a "|" is a token
                     slashCount++;
-                    if (cbufPtr == cbuf.length)
-                    {
-                        cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
-                    }
-                    cbuf[cbufPtr++] = chars[i];
                     break;
                 default :
                     slashCount = 0;
-                    if (cbufPtr == cbuf.length)
-                    {
-                        cbuf = Arrays.copyOf(cbuf, cbuf.length + 32);
-                    }
-                    cbuf[cbufPtr++] = chars[i];
             }
             previous = chars[i];
         }
 
-        tokens = Arrays.copyOf(tokens, tokenIndex + 1);
-        tokens[tokenIndex++] = Arrays.copyOf(cbuf, cbufPtr);
-        return tokens;
+        if (bijTokenLen[0] == bijTokenOffset[0].length)
+        {
+            // resize
+            bijTokenOffset[0] = Arrays.copyOf(bijTokenOffset[0], bijTokenOffset[0].length + 10);
+            bijTokenLimit[0] = Arrays.copyOf(bijTokenLimit[0], bijTokenLimit[0].length + 10);
+        }
+        bijTokenOffset[0][bijTokenLen[0]] = cbufPtr + 1;
+        bijTokenLimit[0][bijTokenLen[0]] = chars.length;
+        bijTokenLen[0]++;
     }
 
     @Override
