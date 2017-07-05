@@ -15,11 +15,6 @@
  */
 package com.fimtra.util;
 
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-
 /**
  * A pool for holding canonical versions of objects.
  * <p>
@@ -27,32 +22,8 @@ import java.util.concurrent.TimeUnit;
  * 
  * @author Ramon Servadei
  */
-public final class ObjectPool<T>
+public final class ObjectPool<T> extends KeyedObjectPool<T, T>
 {
-    final static List<ObjectPool<?>> pools = new LowGcLinkedList<ObjectPool<?>>();
-    static
-    {
-        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                synchronized (pools)
-                {
-                    for (ObjectPool<?> pool : pools)
-                    {
-                        Log.log(ObjectPool.class, pool.toString());
-                    }
-                }
-            }
-        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
-    }
-
-    private final String name;
-    private final ConcurrentMap<T, T> pool;
-    private final LowGcLinkedList<T> order;
-    private final int maxSize;
-
     /**
      * Construct with unlimited size
      */
@@ -67,22 +38,7 @@ public final class ObjectPool<T>
      */
     public ObjectPool(String name, int maxSize)
     {
-        this.name = name;
-        this.maxSize = maxSize;
-        this.pool = new ConcurrentHashMap<T, T>();
-        this.order = (maxSize > 0 ? new LowGcLinkedList<T>() : null);
-        synchronized (pools)
-        {
-            pools.add(this);
-        }
-    }
-
-    public void destroy()
-    {
-        synchronized (pools)
-        {
-            pools.remove(this);
-        }
+        super(name, maxSize);
     }
 
     /**
@@ -95,35 +51,7 @@ public final class ObjectPool<T>
      */
     public T intern(T t)
     {
-        if (t == null)
-        {
-            return t;
-        }
-        final T putIfAbsent = this.pool.putIfAbsent(t, t);
-        if (putIfAbsent == null)
-        {
-            if (this.order != null)
-            {
-                synchronized (this.order)
-                {
-                    this.order.add(t);
-                    if (this.order.size > this.maxSize)
-                    {
-                        this.pool.remove(this.order.removeFirst());
-                    }
-                }
-            }
-            return t;
-        }
-        else
-        {
-            return putIfAbsent;
-        }
+        return super.intern(t, t);
     }
 
-    @Override
-    public String toString()
-    {
-        return "ObjectPool[" + this.name + ", " + this.pool.size() + "/" + this.maxSize + "]";
-    }
 }
