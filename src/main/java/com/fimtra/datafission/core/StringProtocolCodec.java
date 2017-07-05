@@ -35,6 +35,7 @@ import com.fimtra.datafission.field.AbstractValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
+import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -600,6 +601,16 @@ public class StringProtocolCodec implements ICodec<char[]>
         return unescapedPtr;
     }
     
+    static final CharSubArrayKeyedPool<String> decodedKeysPool =
+        new CharSubArrayKeyedPool<String>("codec-decoded-keys", 0, Record.keysPool)
+        {
+            @Override
+            public String newInstance(char[] chars, int offset, int count)
+            {
+                return new String(chars, offset, count);
+            }
+        };
+
     /**
      * Performs unescaping and decoding of a key
      */
@@ -613,9 +624,8 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
 
         return hasPreamble
-            // todo think about keying the string pool on CharBuffer or char reference
-            ? new String(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr - DOUBLE_KEY_PREAMBLE_LENGTH)
-            : new String(unescaped, 0, unescapedPtr);
+            ? decodedKeysPool.get(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr - DOUBLE_KEY_PREAMBLE_LENGTH)
+            : decodedKeysPool.get(unescaped, 0, unescapedPtr);
     }
 
     static String encodeValue(IValue value)

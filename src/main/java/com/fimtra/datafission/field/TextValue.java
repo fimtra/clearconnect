@@ -17,6 +17,7 @@ package com.fimtra.datafission.field;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IValue;
+import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
@@ -31,6 +32,16 @@ public final class TextValue extends AbstractValue
 {
     static final ObjectPool<TextValue> pool = new ObjectPool<TextValue>("TextValues",
         DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE);
+
+    static final CharSubArrayKeyedPool<TextValue> charSubArraysPool = new CharSubArrayKeyedPool<TextValue>(
+        "TextValues-charSubArrays", DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE, pool)
+    {
+        @Override
+        public TextValue newInstance(char[] chars, int offset, int count)
+        {
+            return new TextValue(new String(chars, offset, count));
+        }
+    };
 
     static final String NULL = "null";
 
@@ -62,6 +73,10 @@ public final class TextValue extends AbstractValue
         if (chars == null)
         {
             throw new IllegalArgumentException("cannot construct from null");
+        }
+        if (len <= DataFissionProperties.Values.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL)
+        {
+            return charSubArraysPool.get(chars, start, len);
         }
         return valueOf(new String(chars, start, len));
     }
