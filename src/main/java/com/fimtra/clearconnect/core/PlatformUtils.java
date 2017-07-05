@@ -20,6 +20,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -217,7 +219,8 @@ public class PlatformUtils
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                Set<String> newServices = atomicChange.getPutEntries().keySet();
+                final Set<String> newServices = atomicChange.getPutEntries().keySet();
+                final List<String> toLog = new LinkedList<String>();
                 for (String serviceFamily : newServices)
                 {
                     if (ContextUtils.isSystemRecordName(serviceFamily))
@@ -226,10 +229,15 @@ public class PlatformUtils
                     }
                     if (serviceAvailableListeners.notifyListenersDataAdded(serviceFamily, serviceFamily))
                     {
-                        Log.log(logContext, "Service available (discovered): '", serviceFamily, "'");
+                        toLog.add(serviceFamily);
                     }
                 }
-                Set<String> removedServices = atomicChange.getRemovedEntries().keySet();
+                if (toLog.size() > 0)
+                {
+                    Log.log(logContext, "Services available (discovered): ", toLog.toString());
+                }
+                toLog.clear();
+                final Set<String> removedServices = atomicChange.getRemovedEntries().keySet();
                 for (String serviceFamily : removedServices)
                 {
                     if (ContextUtils.isSystemRecordName(serviceFamily))
@@ -238,8 +246,12 @@ public class PlatformUtils
                     }
                     if (serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
                     {
-                        Log.log(logContext, "Service unavailable (lost): '", serviceFamily, "'");
+                        toLog.add(serviceFamily);
                     }
+                }
+                if (toLog.size() > 0)
+                {
+                    Log.log(logContext, "Services unavailable (lost): ", toLog.toString());
                 }
                 updateWaitLatch.countDown();
             }
@@ -294,6 +306,7 @@ public class PlatformUtils
                  */
                 IRecordChange changesForService;
                 String serviceInstanceId;
+                final List<String> toLog = new LinkedList<String>();
                 for (String serviceFamily : atomicChange.getSubMapKeys())
                 {
                     changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
@@ -305,9 +318,14 @@ public class PlatformUtils
                         if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
                             serviceInstanceId))
                         {
-                            Log.log(logContext, "Service instance available (discovered): '", serviceInstanceId, "'");
+                            toLog.add(serviceInstanceId);
                         }
                     }
+                    if (toLog.size() > 0)
+                    {
+                        Log.log(logContext, "Service instances available (discovered): ", toLog.toString());
+                    }
+                    toLog.clear();
                     Set<String> removedServices = changesForService.getRemovedEntries().keySet();
                     for (String serviceMember : removedServices)
                     {
@@ -315,8 +333,12 @@ public class PlatformUtils
                             PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
                         if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId))
                         {
-                            Log.log(logContext, "Service instance unavailable (lost): '", serviceInstanceId, "'");
+                            toLog.add(serviceInstanceId);
                         }
+                    }
+                    if (toLog.size() > 0)
+                    {
+                        Log.log(logContext, "Service instances unavailable (lost): ", toLog.toString());
                     }
                 }
                 updateWaitLatch.countDown();
