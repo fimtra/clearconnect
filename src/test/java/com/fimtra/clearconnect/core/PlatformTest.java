@@ -717,13 +717,11 @@ public class PlatformTest
             (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
         IProxyConnectionListener listener = mock(IProxyConnectionListener.class);
         service.addProxyConnectionListener(listener);
-        service.publisher.publishContextConnectionsRecordAtPeriod(100);
 
         // this is the registry connection
         // testAddProxyConnectionAvailableListener[PRIMARY]->PlatformRegistry[PlatformTestJUnit]@169.254.12.201
         final int timeout = 2000;
         verify(listener, timeout(timeout)).onConnected(anyString());
-        reset(listener);
 
         // wait for the service to be published
         final IServiceAvailableListener serviceAvailableListener = mock(IServiceAvailableListener.class);
@@ -734,22 +732,22 @@ public class PlatformTest
         assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onConnected(
             eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
-        reset(listener);
 
         assertNotNull(this.agent008.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onConnected(
             eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
-        reset(listener);
 
-        this.agent008.destroyPlatformServiceProxy(SERVICE1);
+        assertTrue(this.agent008.destroyPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onDisconnected(
             eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
-        reset(listener);
 
-        this.agent.destroyPlatformServiceProxy(SERVICE1);
+        // test disconnect then instant re-connect
+        assertTrue(this.agent.destroyPlatformServiceProxy(SERVICE1));
+        assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onDisconnected(
             eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
-        reset(listener);
+        verify(listener, timeout(timeout).times(2)).onConnected(
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
     }
 
     @Test

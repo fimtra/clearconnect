@@ -495,8 +495,15 @@ public class Publisher
                 @Override
                 public void run()
                 {
+                    final String transmissionStatisticsFieldName =
+                        getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel);
+                    if (!Publisher.this.connectionsRecord.keySet().contains(transmissionStatisticsFieldName))
+                    {
+                        ProxyContextPublisher.this.statsUpdateTask.cancel(false);
+                        return;
+                    }
                     final Map<String, IValue> submapConnections = Publisher.this.connectionsRecord.getOrCreateSubMap(
-                        getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel));
+                        transmissionStatisticsFieldName);
 
                     final double perSec =
                         1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
@@ -638,6 +645,7 @@ public class Publisher
             this.identity = identity;
             Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.channel)).put(
                 IContextConnectionsRecordFields.PROXY_ID, TextValue.valueOf(this.identity));
+            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
         }
 
         @Override
