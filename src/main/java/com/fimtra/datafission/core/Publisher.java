@@ -497,7 +497,7 @@ public class Publisher
                 {
                     final String transmissionStatisticsFieldName =
                         getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel);
-                    if (!Publisher.this.connectionsRecord.keySet().contains(transmissionStatisticsFieldName))
+                    if (!Publisher.this.connectionsRecord.getSubMapKeys().contains(transmissionStatisticsFieldName))
                     {
                         ProxyContextPublisher.this.statsUpdateTask.cancel(false);
                         return;
