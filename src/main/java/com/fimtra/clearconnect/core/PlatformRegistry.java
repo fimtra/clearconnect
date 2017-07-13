@@ -801,10 +801,13 @@ final class EventHandler
     final ConcurrentMap<RegistrationToken, PlatformServiceConnectionMonitor> connectionMonitors;
     final ConcurrentMap<String, Set<String>> connectionsPerServiceFamily;
     final AtomicInteger servicesRecordSize;
+
+    final Object connectionsLock;
     
     EventHandler(final PlatformRegistry registry)
     {
         this.registry = registry;
+        this.connectionsLock = new Object();
         this.startTimeMillis = System.currentTimeMillis();
 
         this.servicesRecordSize = new AtomicInteger(0);
@@ -1359,15 +1362,18 @@ final class EventHandler
 
         // remove connections - we need to scan the entire platform connections to find
         // matching connections from the publisher that is now dead
-        for (String connection : new HashSet<String>(this.registry.platformConnections.getSubMapKeys()))
+        synchronized(this.connectionsLock)
         {
-            final Map<String, IValue> subMap = this.registry.platformConnections.getOrCreateSubMap(connection);
-            final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);
-            if (iValue != null)
+            for (String connection : new HashSet<String>(this.registry.platformConnections.getSubMapKeys()))
             {
-                if (serviceInstanceId.equals(iValue.textValue()))
+                final Map<String, IValue> subMap = this.registry.platformConnections.getOrCreateSubMap(connection);
+                final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);
+                if (iValue != null)
                 {
-                    this.registry.platformConnections.removeSubMap(connection);
+                    if (serviceInstanceId.equals(iValue.textValue()))
+                    {
+                        this.registry.platformConnections.removeSubMap(connection);
+                    }
                 }
             }
         }
@@ -1803,7 +1809,7 @@ final class EventHandler
             Log.log(this, "WARNING: RPC call from unregistered agent ", agentName);
         }
     }
-
+    
     private void handleConnectionsUpdate_callInFamilyScope(final IRecordChange atomicChange, String serviceFamily,
         String serviceMember)
     {
@@ -1830,58 +1836,62 @@ final class EventHandler
         }
         connectionIds.addAll(atomicChange.getSubMapKeys());
 
-        IValue proxyId;
-        String agent = null;
-        IRecordChange subMapAtomicChange;
-        Map<String, IValue> connection;
-        for (String connectionId : atomicChange.getSubMapKeys())
-        {
-            subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
-            if ((proxyId = subMapAtomicChange.getRemovedEntries().get(
-                ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
-            {
-                if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX))
-                {
-                    agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
-                    // purge the runtimeStatus record
-                    this.registry.runtimeStatus.removeSubMap(agent);
-                    Log.log(this, "Agent disconnected: ", proxyId.textValue());
-                }
-            }
-
-            connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
-            subMapAtomicChange.applyTo(connection);
-            if (connection.isEmpty())
-            {
-                // purge the connection
-                this.registry.platformConnections.removeSubMap(connectionId);
-                connectionIds.remove(connectionId);
-            }
-        }
-
-        // aggregate stats at the service-level service, e.g. subscription, txQueue, msgs published
         long subscriptionCount = 0;
         long txQueue = 0;
         long msgsPublished = 0;
         long msgsPerSec = 0;
         double kbPerSec = 0;
         long kbPublished = 0;
-        for (String connectionId : connectionIds)
+        
+        synchronized(this.connectionsLock)
         {
-            connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
-            if(connection.isEmpty())
+            IValue proxyId;
+            String agent = null;
+            IRecordChange subMapAtomicChange;
+            Map<String, IValue> connection;
+            for (String connectionId : atomicChange.getSubMapKeys())
             {
-                this.registry.platformConnections.removeSubMap(connectionId);
-                continue;
+                subMapAtomicChange = atomicChange.getSubMapAtomicChange(connectionId);
+                if ((proxyId = subMapAtomicChange.getRemovedEntries().get(
+                    ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
+                {
+                    if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX))
+                    {
+                        agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
+                        // purge the runtimeStatus record
+                        this.registry.runtimeStatus.removeSubMap(agent);
+                        Log.log(this, "Agent disconnected: ", proxyId.textValue());
+                    }
+                }
+    
+                connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
+                subMapAtomicChange.applyTo(connection);
+                if (connection.isEmpty())
+                {
+                    // purge the connection
+                    this.registry.platformConnections.removeSubMap(connectionId);
+                    connectionIds.remove(connectionId);
+                }
             }
-            subscriptionCount += getLong(connection.get(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT));
-            msgsPublished += getLong(connection.get(IContextConnectionsRecordFields.MESSAGE_COUNT));
-            msgsPerSec += getLong(connection.get(IContextConnectionsRecordFields.MSGS_PER_SEC));
-            kbPerSec += getDouble(connection.get(IContextConnectionsRecordFields.KB_PER_SEC));
-            kbPublished += getLong(connection.get(IContextConnectionsRecordFields.KB_COUNT));
-            txQueue += getLong(connection.get(IContextConnectionsRecordFields.TX_QUEUE_SIZE));
+    
+            // aggregate stats at the service-level service, e.g. subscription, txQueue, msgs published
+            for (String connectionId : connectionIds)
+            {
+                connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
+                if(connection.isEmpty())
+                {
+                    this.registry.platformConnections.removeSubMap(connectionId);
+                    continue;
+                }
+                subscriptionCount += getLong(connection.get(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT));
+                msgsPublished += getLong(connection.get(IContextConnectionsRecordFields.MESSAGE_COUNT));
+                msgsPerSec += getLong(connection.get(IContextConnectionsRecordFields.MSGS_PER_SEC));
+                kbPerSec += getDouble(connection.get(IContextConnectionsRecordFields.KB_PER_SEC));
+                kbPublished += getLong(connection.get(IContextConnectionsRecordFields.KB_COUNT));
+                txQueue += getLong(connection.get(IContextConnectionsRecordFields.TX_QUEUE_SIZE));
+            }
         }
-
+        
         final Map<String, IValue> familyStats = this.registry.services.getOrCreateSubMap(serviceFamily);
         familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbPublished));
         familyStats.put(IServiceRecordFields.KB_PER_SEC, DoubleValue.valueOf(((long) ((kbPerSec * 10d)) / 10d)));
