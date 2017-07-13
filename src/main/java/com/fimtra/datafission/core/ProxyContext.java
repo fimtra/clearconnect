@@ -1057,17 +1057,6 @@ public final class ProxyContext implements IObserverContext
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
         
-        synchronized (this.firstUpdateExpected)
-        {
-            if (this.firstUpdateExpected.size() > 0)
-            {
-                if (this.firstUpdateExpected.remove(changeToApply.getName()))
-                {
-                    Log.log(ProxyContext.this, "(<-) First update [", changeToApply.getName() + "]");
-                }
-            }
-        }
-        
         if (logRx)
         {
             Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
@@ -1078,6 +1067,18 @@ public final class ProxyContext implements IObserverContext
             return;
         }
 
+        synchronized (this.firstUpdateExpected)
+        {
+            if (this.firstUpdateExpected.size() > 0)
+            {
+                if (this.firstUpdateExpected.remove(changeToApply.getName()))
+                {
+                    Log.log(ProxyContext.this, "(<-) First update from [", this.channel.getEndPointDescription(),
+                        "] for [", changeToApply.getName() + "]");
+                }
+            }
+        }
+        
         final String changeName = changeToApply.getName();
 
         if (changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
@@ -1316,7 +1317,7 @@ public final class ProxyContext implements IObserverContext
                 this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
             }
             
-            Log.log(this, "(->) re-sync ", name);
+            Log.log(this, "(->) re-sync to [", this.channel.getEndPointDescription(), "] for [", name, "]");
             this.firstUpdateExpected.add(name);
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
                 new String[] { substituteRemoteNameWithLocalName(name) }));
@@ -1622,8 +1623,8 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        Log.log(this, "(->) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
-            Arrays.toString(recordsToSubscribeFor));
+        Log.log(this, "(->) subscribe to [", this.channel.getEndPointDescription(), "] (", Integer.toString(current),
+            "/", Integer.toString(total), ") for ", Arrays.toString(recordsToSubscribeFor));
         
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
@@ -1671,8 +1672,8 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        Log.log(this, "(->) unsubscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
-            Arrays.toString(recordsToUnsubscribe));
+        Log.log(this, "(->) unsubscribe to [", this.channel.getEndPointDescription(), "] (", Integer.toString(current),
+            "/", Integer.toString(total), ") for ", Arrays.toString(recordsToUnsubscribe));
         
         finalEncodeAndSendToPublisher(
             ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
