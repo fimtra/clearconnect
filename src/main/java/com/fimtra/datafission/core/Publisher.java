@@ -145,7 +145,8 @@ public class Publisher
     }
 
     final Object lock;
-
+    final AtomicLong subscribeCounter = new AtomicLong();
+    
     /**
      * This converts each record's atomic change into the <code>byte[]</code> to transmit and
      * notifies the relevant {@link ProxyContextPublisher} objects that have subscribed for the
@@ -212,19 +213,22 @@ public class Publisher
                 handleRecordChange(atomicChange);
             }
         }
-
+        
         void handleRecordChange(IRecordChange atomicChange)
         {
+            // todo here is where we can log the busy records
+            
             // todo need some timings for this
             final AtomicChange[] parts = this.teleporter.split((AtomicChange) atomicChange);
             byte[] txMessage;
-            final ProxyContextPublisher[] clients = this.subscribers.getSubscribersFor(atomicChange.getName());
+            final String name = atomicChange.getName();
+            final ProxyContextPublisher[] clients = this.subscribers.getSubscribersFor(name);
             int j = 0;
             for (int i = 0; i < parts.length; i++)
             {
                 txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
 
-                int broadcastCount = this.service.broadcast(atomicChange.getName(), txMessage, clients);
+                int broadcastCount = this.service.broadcast(name, txMessage, clients);
 
                 Publisher.this.messagesPublished += broadcastCount;
                 Publisher.this.bytesPublished += (broadcastCount * txMessage.length);
@@ -232,7 +236,7 @@ public class Publisher
                 // even if the service is broadcast capable, perform this loop to capture stats
                 for (j = 0; j < clients.length; j++)
                 {
-                    clients[j].publish(txMessage, false);
+                    clients[j].publish(txMessage, false, name);
                 }
             }
         }
@@ -415,10 +419,11 @@ public class Publisher
 
         void publishImageOnSubscribe(final ProxyContextPublisher publisher, final AtomicChange change)
         {
+            final String name = change.getName();
             final AtomicChange[] parts = this.teleporter.split(change);
             for (int i = 0; i < parts.length; i++)
             {
-                publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true);
+                publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true, name);
             }
         }
     }
@@ -435,11 +440,13 @@ public class Publisher
     {
         final ITransportChannel channel;
         final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<String>());
+        final Set<String> firstPublishPending = Collections.synchronizedSet(new HashSet<String>());
+        final Set<String> firstPublishDone = Collections.synchronizedSet(new HashSet<String>());
         final long start;
         /**
          * NOTE: this is only used for handling subscribe and RPC commands. The
          * {@link ProxyContextMultiplexer}'s codec performs the wire-formatting for atomic changes
-         * that are sent to this publisher's {@link #publish(byte[], boolean)} method.
+         * that are sent to this publisher's {@link #publish(byte[], boolean, String)} method.
          */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
@@ -448,7 +455,7 @@ public class Publisher
         String identity;
         volatile boolean active;
         boolean codecSyncExpected;
-
+        
         ProxyContextPublisher(ITransportChannel channel, ICodec codec)
         {
             this.active = true;
@@ -456,7 +463,7 @@ public class Publisher
             this.codec = codec;
             this.start = System.currentTimeMillis();
             this.channel = channel;
-
+                    
             // add the connection record static parts
             final Map<String, IValue> submapConnections =
                 Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(channel));
@@ -495,6 +502,12 @@ public class Publisher
                 @Override
                 public void run()
                 {
+                    // log any records that have had their first publish done
+                    synchronized (ProxyContextPublisher.this.firstPublishPending)
+                    {
+                        logFirstPublishDone();
+                    }
+                    
                     final String transmissionStatisticsFieldName =
                         getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel);
                     if (!Publisher.this.connectionsRecord.getSubMapKeys().contains(transmissionStatisticsFieldName))
@@ -547,7 +560,7 @@ public class Publisher
             }, Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2, TimeUnit.MILLISECONDS);
         }
 
-        void publish(byte[] txMessage, boolean pointToPoint)
+        void publish(byte[] txMessage, boolean pointToPoint, String recordName)
         {
             if (pointToPoint)
             {
@@ -555,6 +568,33 @@ public class Publisher
             }
             this.bytesPublished += txMessage.length;
             this.messagesPublished++;
+            synchronized (this.firstPublishPending)
+            {
+                final int size = this.firstPublishPending.size();
+                if (size > 0)
+                {
+                    if (this.firstPublishPending.remove(recordName))
+                    {
+                        this.firstPublishDone.add(recordName);
+                        // size is 1 BEFORE the call to remove, which returned true so now
+                        // the size is 0 so no need to test for firstPublishPending.size()==0
+                        if (size == 1)
+                        {
+                            logFirstPublishDone();
+                        }
+                    }
+                }
+            }
+        }
+
+        void logFirstPublishDone()
+        {
+            if (this.firstPublishDone.size() > 0)
+            {
+                Log.log(ProxyContextPublisher.this, "(--) First publish to [", this.channel.getEndPointDescription(),
+                    "] done for ", this.firstPublishDone.toString());
+                this.firstPublishDone.clear();
+            }
         }
 
         void subscribe(Collection<String> names, String permissionToken, List<String> ackSubscribes,
@@ -563,6 +603,7 @@ public class Publisher
             try
             {
                 this.subscriptions.addAll(names);
+                this.firstPublishPending.addAll(names);
                 Publisher.this.multiplexer.addSubscriberFor(names, this, permissionToken, ackSubscribes,
                     nokSubscribes, task);
             }
@@ -577,6 +618,7 @@ public class Publisher
             try
             {
                 this.subscriptions.removeAll(names);
+                this.firstPublishPending.removeAll(names);
                 Publisher.this.multiplexer.removeSubscriberFor(names, this);
             }
             catch (Exception e)
@@ -713,7 +755,7 @@ public class Publisher
     final List<Runnable> subscribeTasks;
     final Runnable throttleTask;
     volatile boolean throttleRunning;
-
+    
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
      * {@link ProxyContext} objects.
@@ -1058,8 +1100,8 @@ public class Publisher
 
     void unsubscribe(List<String> recordNames, ITransportChannel client)
     {
-        Log.log(this, "(<-) unsubscribe ", ObjectUtils.safeToString(recordNames.toString()), " from ",
-            ObjectUtils.safeToString(client));
+        Log.log(this, "(<-) unsubscribe from [", client.getEndPointDescription(), "] for ",
+            ObjectUtils.safeToString(recordNames));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         proxyContextPublisher.unsubscribe(recordNames);
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
@@ -1067,8 +1109,8 @@ public class Publisher
 
     void resync(List<String> recordNames, ITransportChannel client)
     {
-        Log.log(this, "(<-) re-sync ", ObjectUtils.safeToString(recordNames.toString()), " from ",
-            ObjectUtils.safeToString(client));
+        Log.log(this, "(<-) re-sync from [", client.getEndPointDescription(), "] for ",
+            ObjectUtils.safeToString(recordNames));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
         synchronized (this.subscribeTasks)
@@ -1114,12 +1156,13 @@ public class Publisher
             subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
         }
     }
-
+    
     private void subscribeBatch(final List<String> recordNames, final ITransportChannel client,
         final String permissionToken, int current, int total)
     {
-        Log.log(this, "(<-) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
-            ObjectUtils.safeToString(recordNames.toString()), " from ", ObjectUtils.safeToString(client));
+        final String subscribeKey = Long.toString(this.subscribeCounter.incrementAndGet());
+        Log.log(this, "(<-) subscribe #", subscribeKey, " (", Integer.toString(current), "/", Integer.toString(total),
+            ") from [", client.getEndPointDescription(), "] for ", ObjectUtils.safeToString(recordNames));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new LinkedList<String>();
@@ -1131,6 +1174,8 @@ public class Publisher
             {
                 if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
                 {
+                    Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete: ",
+                        Integer.toString(ackSubscribes.size()), "/", Integer.toString(nokSubscribes.size()));
                     sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
                     sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
                 }
@@ -1170,7 +1215,8 @@ public class Publisher
             new AtomicChange(action + responseAction, puts, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
         if (log)
         {
-            Log.log(Publisher.this, "(->) ", ObjectUtils.safeToString(atomicChange));
+            Log.log(Publisher.this, "(->) ", ObjectUtils.safeToString(atomicChange), " to [",
+                client.getEndPointDescription(), "]");
         }
         client.send(proxyContextPublisher.codec.finalEncode(
             proxyContextPublisher.codec.getTxMessageForAtomicChange(atomicChange)));
@@ -1188,7 +1234,7 @@ public class Publisher
         if (proxyContextPublisher == null)
         {
             // ProxyContextPublisher only constructed on channel connection!
-            throw new NullPointerException(
+            throw new NullPointerException(                
                 "No ProxyContextPublisher for " + ObjectUtils.safeToString(client) + ", is the channel closed?");
         }
         return proxyContextPublisher;
