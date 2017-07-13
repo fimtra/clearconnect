@@ -201,7 +201,8 @@ public final class RpcInstance implements IRpcInstance
                     this.caller.send(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
-                    Log.log(CallReceiver.class, "(->) STARTED ", resultRecordName);
+                    Log.log(CallReceiver.class, "(->) STARTED [", this.caller.getEndPointDescription(), "] ",
+                        resultRecordName);
 
                     try
                     {
@@ -228,12 +229,13 @@ public final class RpcInstance implements IRpcInstance
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
                     if (logVerbose)
                     {
-                        Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName, " ",
-                            ContextUtils.mapToString(resultEntries));
+                        Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
+                            resultRecordName, " ", ContextUtils.mapToString(resultEntries));
                     }
                     else
                     {
-                        Log.log(CallReceiver.class, "(->) FINISHED ", resultRecordName);
+                        Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
+                            resultRecordName);
                     }
                 }
             }
@@ -306,11 +308,13 @@ public final class RpcInstance implements IRpcInstance
                     System.arraycopy(args, 0, callArgs, 0, args.length - 1);
                     if (logVerbose)
                     {
-                        Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName, " ", Arrays.toString(callArgs));
+                        Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(), "] ",
+                            this.rpcName, " ", Arrays.toString(callArgs));
                     }
                     else
                     {
-                        Log.log(Caller.class, "(->) RPC (no ack) ", this.rpcName);
+                        Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(), "] ",
+                            this.rpcName);
                     }
                     this.callReceiver.send(
                         this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName)));
@@ -323,11 +327,11 @@ public final class RpcInstance implements IRpcInstance
                         this.context.addObserver(resultHandler, resultMapName);
                         if (logVerbose)
                         {
-                            Log.log(Caller.class, "(->) ", resultMapName, " ", Arrays.toString(args));
+                            Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ", resultMapName, " ", Arrays.toString(args));
                         }
                         else
                         {
-                            Log.log(Caller.class, "(->) ", resultMapName);
+                            Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ", resultMapName);
                         }
                         
                         if (ContextUtils.isFrameworkThread())
@@ -392,11 +396,13 @@ public final class RpcInstance implements IRpcInstance
                         }
                         if (logVerbose)
                         {
-                            Log.log(Caller.class, "(<-) ", resultMapName, " ", ContextUtils.mapToString(resultMap));
+                            Log.log(Caller.class, "(<-) ", resultMapName, " from [",
+                                this.callReceiver.getEndPointDescription(), "] ", ContextUtils.mapToString(resultMap));
                         }
                         else
                         {
-                            Log.log(Caller.class, "(<-) ", resultMapName);
+                            Log.log(Caller.class, "(<-) ", resultMapName, " from [",
+                                this.callReceiver.getEndPointDescription(), "]");
                         }
                         return resultMap.get(RESULT);
                     }
