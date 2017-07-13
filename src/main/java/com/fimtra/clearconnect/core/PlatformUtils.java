@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -114,7 +115,22 @@ public class PlatformUtils
             Log.log(ClassUtils.class, "Could not get manifest resources", e);
         }
 
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
+        sb.append(SystemUtils.lineSeparator()).append("============ START System Properties ============").append(SystemUtils.lineSeparator());
+        TreeSet<String> sortedKeys = new TreeSet<String>();
+        final Enumeration<Object> keys = System.getProperties().keys();
+        while(keys.hasMoreElements())
+        {
+            sortedKeys.add(keys.nextElement().toString());
+        }
+        for (String key : sortedKeys)
+        {
+            sb.append(key).append("=").append(System.getProperty(key)).append(SystemUtils.lineSeparator());
+        }
+        sb.append("============ END System Properties ============");
+        Log.log(PlatformUtils.class, sb.toString());
+        
+        sb = new StringBuilder();
         sb.append("ClearConnect").append(SystemUtils.lineSeparator());
         sb.append(version).append(SystemUtils.lineSeparator());
         sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
