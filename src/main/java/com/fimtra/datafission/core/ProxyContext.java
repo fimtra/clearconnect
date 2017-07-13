@@ -477,7 +477,8 @@ public final class ProxyContext implements IObserverContext
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<String, String>();
         this.resyncs = Collections.synchronizedSet(new HashSet<String>());
-        this.firstUpdateExpected = Collections.synchronizedSet(new HashSet<String>());
+        // note: unsynchronized
+        this.firstUpdateExpected = new HashSet<String>();
         
         // add default permissions for system records
         for (String recordName : ContextUtils.SYSTEM_RECORDS)
@@ -1067,14 +1068,18 @@ public final class ProxyContext implements IObserverContext
             return;
         }
 
-        synchronized (this.firstUpdateExpected)
+        // peek at the size before attempting the synchronize block
+        if (this.firstUpdateExpected.size() > 0)
         {
-            if (this.firstUpdateExpected.size() > 0)
+            synchronized (this.firstUpdateExpected)
             {
-                if (this.firstUpdateExpected.remove(changeToApply.getName()))
+                if (this.firstUpdateExpected.size() > 0)
                 {
-                    Log.log(ProxyContext.this, "(<-) First update from [", this.channel.getEndPointDescription(),
-                        "] for [", changeToApply.getName() + "]");
+                    if (this.firstUpdateExpected.remove(changeToApply.getName()))
+                    {
+                        Log.log(ProxyContext.this, "(<-) First update from [", this.channel.getEndPointDescription(),
+                            "] for [", changeToApply.getName() + "]");
+                    }
                 }
             }
         }
@@ -1318,7 +1323,10 @@ public final class ProxyContext implements IObserverContext
             }
             
             Log.log(this, "(->) re-sync to [", this.channel.getEndPointDescription(), "] for [", name, "]");
-            this.firstUpdateExpected.add(name);
+            synchronized (this.firstUpdateExpected)
+            {
+                this.firstUpdateExpected.add(name);
+            }
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
                 new String[] { substituteRemoteNameWithLocalName(name) }));
             

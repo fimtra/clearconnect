@@ -440,7 +440,8 @@ public class Publisher
     {
         final ITransportChannel channel;
         final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<String>());
-        final Set<String> firstPublishPending = Collections.synchronizedSet(new HashSet<String>());
+        // note: unsynchronized
+        final Set<String> firstPublishPending = new HashSet<String>();
         final Set<String> firstPublishDone = Collections.synchronizedSet(new HashSet<String>());
         final long start;
         /**
@@ -568,19 +569,24 @@ public class Publisher
             }
             this.bytesPublished += txMessage.length;
             this.messagesPublished++;
-            synchronized (this.firstPublishPending)
+            
+            // peek at the size before attempting the synchronize block
+            if (this.firstPublishPending.size() > 0)
             {
-                final int size = this.firstPublishPending.size();
-                if (size > 0)
+                synchronized (this.firstPublishPending)
                 {
-                    if (this.firstPublishPending.remove(recordName))
+                    final int size = this.firstPublishPending.size();
+                    if (size > 0)
                     {
-                        this.firstPublishDone.add(recordName);
-                        // size is 1 BEFORE the call to remove, which returned true so now
-                        // the size is 0 so no need to test for firstPublishPending.size()==0
-                        if (size == 1)
+                        if (this.firstPublishPending.remove(recordName))
                         {
-                            logFirstPublishDone();
+                            this.firstPublishDone.add(recordName);
+                            // size is 1 BEFORE the call to remove, which returned true so now
+                            // the size is 0 so no need to test for firstPublishPending.size()==0
+                            if (size == 1)
+                            {
+                                logFirstPublishDone();
+                            }
                         }
                     }
                 }
