@@ -120,6 +120,9 @@ public abstract class TcpChannelUtils
     /** Handles all socket read operations for all {@link TcpChannel} instances */
     final static SelectorProcessor READER = new SelectorProcessor("tcp-channel-reader", SelectionKey.OP_READ);
 
+    /** Handles all socket write operations for all {@link TcpChannel} instances */
+    final static SelectorProcessor WRITER = new SelectorProcessor("tcp-channel-writer", SelectionKey.OP_WRITE);
+
     /** Handles all socket accept operations for all {@link TcpServer} instances */
     final static SelectorProcessor ACCEPT_PROCESSOR = new SelectorProcessor("tcp-channel-accept",
         SelectionKey.OP_ACCEPT);
@@ -181,7 +184,6 @@ public abstract class TcpChannelUtils
         // the format is: <4 bytes len><data><4 bytes len><data>
         int len;
         int position;
-        int framePtr = 0;
         while (buffer.position() < buffer.limit())
         {
             try
@@ -216,15 +218,14 @@ public abstract class TcpChannelUtils
             }
             else
             {
-                if (framePtr == decoded.length)
+                if (framesSize[0] == decoded.length)
                 {
                     decoded = Arrays.copyOf(decoded, decoded.length + 2);
                 }
-                decoded[framePtr++] = ByteBuffer.wrap(buffer.array(), position, len);
+                decoded[framesSize[0]++] = ByteBuffer.wrap(buffer.array(), position, len);
                 buffer.position(position + len);
             }
         }
-        framesSize[0] = framePtr;
         return decoded;
     }
 
@@ -288,14 +289,13 @@ public abstract class TcpChannelUtils
             for (i = 0; i < terminatorIndexPtr; i++)
             {
                 len = terminatorIndex[i] - lastTerminatorIndex;
-                if (i == decoded.length)
+                if (framesSize[0] == decoded.length)
                 {
                     decoded = Arrays.copyOf(decoded, decoded.length + 2);
                 }
-                decoded[i] = ByteBuffer.wrap(bufferArray, lastTerminatorIndex, len);
+                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, lastTerminatorIndex, len);
                 lastTerminatorIndex = terminatorIndex[i] + terminator.length;
             }
-            framesSize[0] = i;
             buffer.position(lastTerminatorIndex);
         }
         else
