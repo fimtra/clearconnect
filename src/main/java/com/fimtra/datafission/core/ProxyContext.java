@@ -371,7 +371,8 @@ public final class ProxyContext implements IObserverContext
     final String sessionContextName;
     final ISessionListener sessionListener;
     final NotifyingCache<ISessionListener, Pair<String, Boolean>> sessionCache;
-
+    final Set<String> firstUpdateExpected;
+    
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
      * and port.
@@ -428,7 +429,7 @@ public final class ProxyContext implements IObserverContext
     {
         super();
         this.codec = codec;
-        this.sessionContextName = sessionContextName;
+        this.sessionContextName = sessionContextName;        
         this.sessionListener = new ISessionListener()
         {
             @Override
@@ -476,7 +477,8 @@ public final class ProxyContext implements IObserverContext
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<String, String>();
         this.resyncs = Collections.synchronizedSet(new HashSet<String>());
-
+        this.firstUpdateExpected = Collections.synchronizedSet(new HashSet<String>());
+        
         // add default permissions for system records
         for (String recordName : ContextUtils.SYSTEM_RECORDS)
         {
@@ -1055,6 +1057,17 @@ public final class ProxyContext implements IObserverContext
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(data));
         
+        synchronized (this.firstUpdateExpected)
+        {
+            if (this.firstUpdateExpected.size() > 0)
+            {
+                if (this.firstUpdateExpected.remove(changeToApply.getName()))
+                {
+                    Log.log(ProxyContext.this, "(<-) First update [", changeToApply.getName() + "]");
+                }
+            }
+        }
+        
         if (logRx)
         {
             Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
@@ -1304,6 +1317,7 @@ public final class ProxyContext implements IObserverContext
             }
             
             Log.log(this, "(->) re-sync ", name);
+            this.firstUpdateExpected.add(name);
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
                 new String[] { substituteRemoteNameWithLocalName(name) }));
             
@@ -1591,17 +1605,28 @@ public final class ProxyContext implements IObserverContext
     private void subscribeBatch(final String permissionToken, final String[] recordsToSubscribeFor, int current,
         int total)
     {
+        int i;
         if (ProxyContext.this.channel instanceof ISubscribingChannel)
         {
-            for (int i = 0; i < recordsToSubscribeFor.length; i++)
+            for (i = 0; i < recordsToSubscribeFor.length; i++)
             {
                 ((ISubscribingChannel) ProxyContext.this.channel).contextSubscribed(recordsToSubscribeFor[i]);
             }
         }
-        finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
-            insertPermissionToken(permissionToken, recordsToSubscribeFor)));
+        
+        synchronized (this.firstUpdateExpected)
+        {
+            for (i = 0; i < recordsToSubscribeFor.length; i++)
+            {
+                this.firstUpdateExpected.add(recordsToSubscribeFor[i]);
+            }
+        }
+
         Log.log(this, "(->) subscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
             Arrays.toString(recordsToSubscribeFor));
+        
+        finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
+            insertPermissionToken(permissionToken, recordsToSubscribeFor)));
     }
     
     void unsubscribe(final String[] recordsToUnsubscribe)
@@ -1637,6 +1662,18 @@ public final class ProxyContext implements IObserverContext
                     recordsToUnsubscribe[i]);
             }
         }
+        
+        synchronized (this.firstUpdateExpected)
+        {
+            for (i = 0; i < recordsToUnsubscribe.length; i++)
+            {
+                this.firstUpdateExpected.remove(recordsToUnsubscribe[i]);
+            }
+        }
+
+        Log.log(this, "(->) unsubscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
+            Arrays.toString(recordsToUnsubscribe));
+        
         finalEncodeAndSendToPublisher(
             ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 
@@ -1644,8 +1681,6 @@ public final class ProxyContext implements IObserverContext
         {
             ProxyContext.this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
         }
-        Log.log(ProxyContext.this, "(->) unsubscribe (", Integer.toString(current), "/", Integer.toString(total), ") ",
-            Arrays.toString(recordsToUnsubscribe));
     }
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
