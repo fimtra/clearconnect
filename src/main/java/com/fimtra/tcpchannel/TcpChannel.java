@@ -20,9 +20,13 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fimtra.channel.ChannelUtils;
@@ -30,6 +34,7 @@ import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelProperties.Values;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -105,14 +110,23 @@ public class TcpChannel implements ITransportChannel
 
     /** Represents the ASCII code for CRLF */
     static final byte[] TERMINATOR = { 0xd, 0xa };
+    
+    /**
+     * Tracks which channels have TX frames to send. This is used as an equal-sending-opportunity
+     * mechanism.
+     */
+    static final List<TcpChannel> channelsWithTxFrames = new CopyOnWriteArrayList<TcpChannel>();
 
     int rxData;
     final IReceiver receiver;
     final ByteBuffer rxBytes;
-    ByteBuffer[] readFrames;
+    ByteBuffer[] readFrames = new ByteBuffer[10];
+    byte[][] resolvedFrames = new byte[10][];
     final int[] readFramesSize = new int[1];
-    byte[][] resolvedFrames;
-    int txFrames;
+    final Queue<ByteBuffer[]> txFrames = CollectionUtils.newDeque();    
+    final ByteBuffer[][] txFrameBufferPool = new ByteBuffer[][] { new ByteBuffer[2], new ByteBuffer[2],
+        new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], };
+    int txFrameBufferPoolPtr = 0;
     final SocketChannel socketChannel;
     final IFrameReaderWriter readerWriter;
     final ByteArrayFragmentResolver byteArrayFragmentResolver;
@@ -132,7 +146,8 @@ public class TcpChannel implements ITransportChannel
     private final AtomicBoolean onChannelClosedCalled;
 
     StateEnum state = StateEnum.IDLE;
-    
+
+
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
      * format.
@@ -196,8 +211,6 @@ public class TcpChannel implements ITransportChannel
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.readFrames = new ByteBuffer[10];
-        this.resolvedFrames = new byte[10][];
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
@@ -215,8 +228,6 @@ public class TcpChannel implements ITransportChannel
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
         this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
-        this.readFrames = new ByteBuffer[10];
-        this.resolvedFrames = new byte[10][];
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
@@ -241,7 +252,27 @@ public class TcpChannel implements ITransportChannel
         }
 
         TcpChannelUtils.setOptions(this.socketChannel);
+        
+        try
+        {
+            TcpChannelUtils.WRITER.register(this.socketChannel, new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    writeFrames();
+                }
+            });
 
+            TcpChannelUtils.WRITER.resetInterest(this.socketChannel);
+        }
+        catch (Exception e)
+        {
+            String message = this + " could not register for write operations";
+            Log.log(this, message, e);
+            throw new ConnectException(message);
+        }
+        
         try
         {
             TcpChannelUtils.READER.register(this.socketChannel, new Runnable()
@@ -256,15 +287,7 @@ public class TcpChannel implements ITransportChannel
                     }
                     catch (BufferOverflowException e)
                     {
-                        try
-                        {
-                            TcpChannel.this.socketChannel.close();
-                        }
-                        catch (IOException e2)
-                        {
-                            Log.log(this, "Error closing " + ObjectUtils.safeToString(TcpChannel.this.socketChannel),
-                                e2);
-                        }
+                        TcpChannel.this.destroy("Buffer overflow during frame decode", e);
                         throw e;
                     }
                 }
@@ -282,7 +305,7 @@ public class TcpChannel implements ITransportChannel
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
 
     }
-    
+        
     @Override
     public boolean send(byte[] toSend)
     {
@@ -293,21 +316,47 @@ public class TcpChannel implements ITransportChannel
 
             synchronized (this)
             {
-                this.txFrames += byteFragmentsToSend.length;
+                ByteBuffer[] buffer;
+                for (int i = 0; i < byteFragmentsToSend.length;)
+                {
+                    if (this.txFrameBufferPoolPtr < this.txFrameBufferPool.length)
+                    {
+                        buffer = this.txFrameBufferPool[this.txFrameBufferPoolPtr++];
+                    }
+                    else
+                    {
+                        buffer = new ByteBuffer[2];
+                    }
+                    buffer[0] = byteFragmentsToSend[i++];
+                    buffer[1] = byteFragmentsToSend[i++];
+                    this.txFrames.add(buffer);
+                }
+                switch(this.state)
+                {
+                    case DESTROYED:
+                        throw new ClosedChannelException();
+                    case IDLE:
+                        this.state = StateEnum.SENDING;
+                        channelsWithTxFrames.add(this);
+                        TcpChannelUtils.WRITER.setInterest(this.socketChannel);
+                        break;
+                    case SENDING:
+                    default :
+                        break;
+                }
+                
+                // NATURAL THROTTLE
                 try
                 {
-                    for (int i = 0; i < byteFragmentsToSend.length;)
-                    {
-                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i++],
-                            byteFragmentsToSend[i++]);
-                    }
+                    // the tcp-writer will notify when the frames are empty
+                    this.wait(this.txFrames.size() * channelsWithTxFrames.size()
+                        * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
                 }
-                finally
+                catch (InterruptedException e)
                 {
-                    this.txFrames -= byteFragmentsToSend.length;
+                    // don't care
                 }
             }
-
             return true;
         }
         catch (Exception e)
@@ -317,6 +366,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
+    
     @Override
     @Deprecated
     public boolean sendAsync(byte[] toSend)
@@ -351,6 +401,7 @@ public class TcpChannel implements ITransportChannel
         try
         {
             this.rxBytes.compact();
+            
             final int readCount = this.socketChannel.read(this.rxBytes);
 
             switch(readCount)
@@ -464,6 +515,105 @@ public class TcpChannel implements ITransportChannel
             }
         }
     }
+    
+    static void writeFrames()
+    {
+        /*
+         * This code logic will give equal opportunity for sending across all channels in the
+         * runtime. This prevents one channel starving out other channels by having a queue that is
+         * being fed as fast as it can be dequeued, which leads to starvation of other channels.
+         */
+        ByteBuffer[] data = null;
+        int i;
+        int size;
+        TcpChannel channel;
+        while ((size = channelsWithTxFrames.size()) > 0)
+        {
+            for (i = 0; i < size; i++)
+            {
+                channel = channelsWithTxFrames.get(i);
+                synchronized (channel)
+                {
+                    try
+                    {
+                        if (channel.state == StateEnum.DESTROYED)
+                        {
+                            channelsWithTxFrames.remove(i);
+                            i--;
+                            size--;
+                            continue;
+                        }
+                        data = channel.txFrames.poll();
+                        if (data != null)
+                        {
+                            try
+                            {
+                                ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data[0], data[1]);
+                                if (channel.txFrames.peek() == null)
+                                {
+                                    channel.state = StateEnum.IDLE;
+                                    try
+                                    {
+                                        TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
+                                    }
+                                    catch (CancelledKeyException e)
+                                    {
+                                        channel.destroy("Socket has been closed", e);
+                                    }
+                                    channelsWithTxFrames.remove(i);
+                                    i--;
+                                    size--;
+                                }
+                            }
+                            catch (IOException e)
+                            {
+                                channelsWithTxFrames.remove(i);
+                                i--;
+                                size--;
+                                channel.destroy("Could not write frames (" + e.toString() + ")");
+                            }
+                            catch (Exception e)
+                            {
+                                channelsWithTxFrames.remove(i);
+                                i--;
+                                size--;
+                                channel.destroy("Could not write frames", e);
+                            }
+                            finally
+                            {
+                                data[0] = null;
+                                data[1] = null;
+                                if (channel.txFrameBufferPoolPtr > 0)
+                                {
+                                    channel.txFrameBufferPool[--channel.txFrameBufferPoolPtr] = data;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // safety net when data == null
+                            channel.state = StateEnum.IDLE;
+                            try
+                            {
+                                TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
+                            }
+                            catch (CancelledKeyException e)
+                            {
+                                channel.destroy("Socket has been closed", e);
+                            }
+                            channelsWithTxFrames.remove(i);
+                            i--;
+                            size--;
+                        }
+                    }
+                    finally
+                    {
+                        channel.notify();
+                    }
+                }
+            }
+        }
+    }
 
     @Override
     public boolean isConnected()
@@ -501,6 +651,7 @@ public class TcpChannel implements ITransportChannel
             synchronized (this)
             {
                 this.state = StateEnum.DESTROYED;
+                this.txFrames.clear();
                 this.rxBytes.clear();
             }
 
@@ -508,6 +659,7 @@ public class TcpChannel implements ITransportChannel
             {
                 TcpChannelUtils.closeChannel(this.socketChannel);
                 TcpChannelUtils.READER.cancel(this.socketChannel);
+                TcpChannelUtils.WRITER.cancel(this.socketChannel);
             }
             
             this.receiver.onChannelClosed(this);
@@ -541,7 +693,7 @@ public class TcpChannel implements ITransportChannel
     @Override
     public int getTxQueueSize()
     {
-        return this.txFrames;
+        return this.txFrames.size();
     }
 }
 
@@ -575,7 +727,6 @@ interface IFrameReaderWriter
 abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 {
     int txLength;
-    int bytesWritten;
     final ByteBuffer[] buffers;
     final TcpChannel tcpChannel;
 
@@ -593,11 +744,10 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
      * @throws IOException
      */
     void writeBuffersToSocket() throws IOException
-    {
-        // todo loop to service other channels if bytes written is not completed
-        while (this.bytesWritten != this.txLength)
+    {       
+        while (this.buffers[0].hasRemaining() || this.buffers[1].hasRemaining())
         {
-            this.bytesWritten += this.tcpChannel.socketChannel.write(this.buffers);
+            this.tcpChannel.socketChannel.write(this.buffers);
         }
     }
 
@@ -629,7 +779,6 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
     @Override
     void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
-        this.bytesWritten = 0;        
         final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
         this.txLength = frameLen + TcpChannel.TERMINATOR.length;
         this.buffers[0] = header;
@@ -664,7 +813,6 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
     @Override
     void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
-        this.bytesWritten = 0;
         final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
         this.txLength = frameLen + 4;
         this.txLengthBuffer.putInt(0, frameLen);

@@ -836,9 +836,7 @@ public class TestTcpServer
 
         }, this.frameEncodingFormat);
         assertTrue("channel was not connected", channelConnectedLatch.await(STD_TIMEOUT, TimeUnit.SECONDS));
-        // todo re-enable
-//        final int messageSize = 65539;
-        final int messageSize = 1500;
+        final int messageSize = 65539;
         client.send(generateMassiveMessage(messageSize));
         final int timeout = 2;
         switch(this.frameEncodingFormat)

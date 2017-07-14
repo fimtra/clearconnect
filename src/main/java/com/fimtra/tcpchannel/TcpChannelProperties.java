@@ -91,6 +91,12 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.slsMaxShortLivedSocketTries=3</code>
          */
         String SLS_MAX_SHORT_LIVED_SOCKET_TRIES = BASE + "slsMaxShortLivedSocketTries";
+        /**
+         * The system property name to define the send factor (in milliseconds) to wait for a TCP
+         * message to be sent in {@link TcpChannel#send(byte[])}.<br>
+         * E.g. <code>-DtcpChannel.sendWaitFactorMillis=10</code>
+         */
+        String SEND_WAIT_FACTOR_MILLIS = BASE + "sendWaitFactorMillis";
     }
 
     /**
@@ -167,6 +173,14 @@ public abstract class TcpChannelProperties
          */
         int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
             Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
+
+        /**
+         * The send factor (in milliseconds) to wait for a TCP message to be sent in
+         * {@link TcpChannel#send(byte[])}.
+         * <p>
+         * Default is: 10
+         */
+        int SEND_WAIT_FACTOR_MILLIS = Integer.parseInt(System.getProperty(Names.SEND_WAIT_FACTOR_MILLIS, "10"));
     }
 
     private TcpChannelProperties()
