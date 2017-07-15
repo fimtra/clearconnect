@@ -27,7 +27,6 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -56,7 +55,6 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
-import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.IFtStatusListener;
 import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -305,13 +303,13 @@ public class PlatformTest
     void createAgent() throws IOException
     {
         this.agent =
-            new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(), this.registryHost, registryPort);
+            new PlatformRegistryAgent(getAgentName(), this.registryHost, registryPort);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
     }
 
     void createAgent008() throws IOException
     {
-        this.agent008 = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008", this.registryHost,
+        this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008", this.registryHost,
             registryPort);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
     }
@@ -319,7 +317,7 @@ public class PlatformTest
     @After
     public void teardown() throws InterruptedException
     {
-        Log.log(this, "============== START TEAR DOWN " + name.getMethodName() + " =============================");
+        Log.log(this, "============== START TEAR DOWN " + this.name.getMethodName() + " =============================");
 
         ThreadUtils.newThread(new Runnable()
         {
@@ -335,10 +333,11 @@ public class PlatformTest
                 {
                     PlatformTest.this.agent008.destroy();
                 }
+                
+                Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName() + " =============================");
             }
-        }, "tearDown").start();
+        }, "tearDown-" + this.name.getMethodName()).start();
 
-        Log.log(this, "============== END TEAR DOWN " + name.getMethodName() + " =============================");
 
         ChannelUtils.WATCHDOG.configure(5000);
     }
@@ -1093,7 +1092,7 @@ public class PlatformTest
         int newPort = registryPort += 1;
 
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
-        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+        this.agent = new PlatformRegistryAgent(getAgentName(),
             new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
@@ -1165,11 +1164,11 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+        this.agent = new PlatformRegistryAgent(getAgentName(),
             new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
-        this.agent008 = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName() + "_008",
+        this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008",
             new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
@@ -1339,7 +1338,7 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+        this.agent = new PlatformRegistryAgent(getAgentName(),
             new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
@@ -1448,7 +1447,7 @@ public class PlatformTest
         this.registry.destroy();
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost);
 
-        this.agent = new PlatformRegistryAgent(PlatformUtils.composeHostQualifiedName(),
+        this.agent = new PlatformRegistryAgent(getAgentName(),
             this.registry.publisher.getEndPointAddress().getNode());
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
@@ -1457,6 +1456,11 @@ public class PlatformTest
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertEquals(getPlatformName(),
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+    }
+
+    String getAgentName()
+    {
+        return PlatformUtils.composeHostQualifiedName() + "-" + this.name.getMethodName();
     }
 
     private String getPlatformName()
