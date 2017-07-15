@@ -29,7 +29,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 
@@ -46,13 +45,11 @@ public class TestTcpChannel
     @Before
     public void setUp() throws Exception
     {
-        ChannelUtils.WATCHDOG.configure(10);
     }
 
     @After
     public void tearDown() throws Exception
     {
-        ChannelUtils.WATCHDOG.configure(5000);
         if (server != null)
         {
             server.destroy();
@@ -125,9 +122,10 @@ public class TestTcpChannel
             size += bytes.length;
         }
 
-        assertTrue(latch.await(60, TimeUnit.SECONDS));
-        final long latency = System.nanoTime() - start;        
-        System.err.println("TCP max velocity: " + (max / (latency / 1000000000)) + " msgs/s, " + (size / (latency / 1000000000)) + " b/s");
+        assertTrue("Got: " + rxData.size(), latch.await(5, TimeUnit.SECONDS));
+        final long latency = System.nanoTime() - start;
+        System.err.println("TCP max velocity: " + (max / (latency / 1000000000)) + " msgs/s, "
+            + (size / (latency / 1000000000)) + " b/s");
         assertEquals("", data, rxData);
     }
 

@@ -247,7 +247,6 @@ public class TestTcpServer
             final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
             clients.add(client);
         }
-        String hostname = LOCALHOST;
 
         Thread.sleep(2000);
 
@@ -256,7 +255,8 @@ public class TestTcpServer
             assertFalse(client.isConnected());
         }
 
-        assertTrue(this.server.blacklistHosts.containsKey(hostname));
+        assertEquals("Got: " + this.server.blacklistHosts, 1, this.server.blacklistHosts.size());
+        final String hostname = this.server.blacklistHosts.keySet().iterator().next();
 
         Log.log(this, "**** STARTING TEST CONNECTIONS");
 
