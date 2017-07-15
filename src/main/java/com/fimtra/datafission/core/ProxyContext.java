@@ -823,7 +823,7 @@ public final class ProxyContext implements IObserverContext
                 // the channel can be null if destroying during a reconnection
                 if (this.channel != null)
                 {
-                    this.channel.destroy("ProxyContext destroyed");
+                    this.channel.destroy(getShortName() + " destroyed");
                 }
             }
         }
@@ -1000,7 +1000,7 @@ public final class ProxyContext implements IObserverContext
 
         final ITransportChannelBuilder channelBuilder = this.channelBuilderFactory.nextBuilder();
         this.currentEndPoint = channelBuilder.getEndPointAddress();
-        Log.log(this, "Constructing channel using ", ObjectUtils.safeToString(channelBuilder));
+        Log.log(this, "Constructing channel for ", getShortName(), " using ", ObjectUtils.safeToString(channelBuilder));
         final ITransportChannel channel = channelBuilder.buildChannel(receiver);
         return channel;
 
@@ -1322,7 +1322,7 @@ public final class ProxyContext implements IObserverContext
                 this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
             }
             
-            Log.log(this, "(->) re-sync to [", this.channel.getEndPointDescription(), "] for [", name, "]");
+            Log.log(this, "(->) re-sync to ", getEndPoint(), " for [", name, "]");
             synchronized (this.firstUpdateExpected)
             {
                 this.firstUpdateExpected.add(name);
@@ -1355,22 +1355,7 @@ public final class ProxyContext implements IObserverContext
 
         updateConnectionStatus(Connection.DISCONNECTED);
 
-        Log.log(this, "Lost connection for ", ObjectUtils.safeToString(this), ", scheduling reconnect task");
-
-        executeSequentialCoreTask(new ISequentialRunnable()
-        {
-            @Override
-            public void run()
-            {
-                setupReconnectTask();
-            }
-
-            @Override
-            public Object context()
-            {
-                return ProxyContext.this.getName();
-            }
-        });
+        setupReconnectTask();
     }
 
     @Override
@@ -1381,6 +1366,7 @@ public final class ProxyContext implements IObserverContext
         {
             return null;
         }
+        // todo maybe we can cache a template instance to clone for future calls
         final RpcInstance instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
         instance.setHandler(new RpcInstance.Remote.Caller(name, this.codec, this.channel, this.context,
             instance.remoteExecutionStartTimeoutMillis, instance.remoteExecutionDurationTimeoutMillis));
@@ -1424,24 +1410,20 @@ public final class ProxyContext implements IObserverContext
         {
             if (!this.active)
             {
-                Log.log(this, "Not setting up reconnect task for proxy as it is not active: ",
-                    ObjectUtils.safeToString(this));
+                Log.log(this, "Not setting up reconnect task for ", ObjectUtils.safeToString(this));
                 return;
             }
             if (this.reconnectTask != null)
             {
-                Log.log(this, "Reconnect still pending for ", ObjectUtils.safeToString(this));
+                Log.log(this, "Reconnect still pending for ", getEndPoint());
                 return;
             }
-
-            Log.log(this, "Setting up reconnection for ", ObjectUtils.safeToString(this));
 
             // Remove RPCs
             final IRecord rpcRecord = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
             if (rpcRecord.size() > 0)
             {
-                Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord), " from ",
-                    ObjectUtils.safeToString(this));
+                Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord.keySet()), " from ", getShortName());
                 synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())
                 {
                     rpcRecord.clear();
@@ -1449,8 +1431,8 @@ public final class ProxyContext implements IObserverContext
                 }
             }
 
-            Log.log(this, "Resubscribing in ", Long.toString(this.reconnectPeriodMillis), "ms ",
-                ObjectUtils.safeToString(this));
+            Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
+                Long.toString(this.reconnectPeriodMillis), "ms ");
 
             this.reconnectTask = RECONNECT_TASKS.schedule(new Runnable()
             {
@@ -1461,6 +1443,17 @@ public final class ProxyContext implements IObserverContext
                 }
             }, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
+    }
+
+
+    String getEndPoint()
+    {
+        return "[" + (this.channel == null ? "not connected yet" : this.channel.getEndPointDescription()) + "]";
+    }
+
+    String getShortName()
+    {
+        return "ProxyContext [" + this.context.getName() + "]";
     }
 
     /**
@@ -1517,7 +1510,7 @@ public final class ProxyContext implements IObserverContext
 
             if (!this.active)
             {
-                Log.log(this, "Not reconnecting proxy as it is not active: ", ObjectUtils.safeToString(this));
+                Log.log(this, "Not reconnecting proxy as it is not active: ", getShortName());
                 return;
             }
 
@@ -1631,7 +1624,7 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        Log.log(this, "(->) subscribe to [", this.channel.getEndPointDescription(), "] (", Integer.toString(current),
+        Log.log(this, "(->) subscribe to ", getEndPoint(), " (", Integer.toString(current),
             "/", Integer.toString(total), ") for ", Arrays.toString(recordsToSubscribeFor));
         
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
@@ -1680,7 +1673,7 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        Log.log(this, "(->) unsubscribe to [", this.channel.getEndPointDescription(), "] (", Integer.toString(current),
+        Log.log(this, "(->) unsubscribe to ", getEndPoint(), " (", Integer.toString(current),
             "/", Integer.toString(total), ") for ", Arrays.toString(recordsToUnsubscribe));
         
         finalEncodeAndSendToPublisher(
