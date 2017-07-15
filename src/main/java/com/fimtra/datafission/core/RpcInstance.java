@@ -396,13 +396,13 @@ public final class RpcInstance implements IRpcInstance
                         }
                         if (logVerbose)
                         {
-                            Log.log(Caller.class, "(<-) ", resultMapName, " from [",
-                                this.callReceiver.getEndPointDescription(), "] ", ContextUtils.mapToString(resultMap));
+                            Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
+                                resultMapName, " ", ContextUtils.mapToString(resultMap));
                         }
                         else
                         {
-                            Log.log(Caller.class, "(<-) ", resultMapName, " from [",
-                                this.callReceiver.getEndPointDescription(), "]");
+                            Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
+                                resultMapName);
                         }
                         return resultMap.get(RESULT);
                     }
