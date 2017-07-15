@@ -250,7 +250,7 @@ public class PlatformUtils
                 }
                 if (toLog.size() > 0)
                 {
-                    Log.log(logContext, "Services available (discovered): ", toLog.toString());
+                    Log.log(logContext, "Services available: ", toLog.toString());
                 }
                 toLog.clear();
                 final Set<String> removedServices = atomicChange.getRemovedEntries().keySet();
@@ -267,7 +267,7 @@ public class PlatformUtils
                 }
                 if (toLog.size() > 0)
                 {
-                    Log.log(logContext, "Services unavailable (lost): ", toLog.toString());
+                    Log.log(logContext, "Services lost: ", toLog.toString());
                 }
                 updateWaitLatch.countDown();
             }
@@ -339,7 +339,7 @@ public class PlatformUtils
                     }
                     if (toLog.size() > 0)
                     {
-                        Log.log(logContext, "Service instances available (discovered): ", toLog.toString());
+                        Log.log(logContext, "Service instances available: ", toLog.toString());
                     }
                     toLog.clear();
                     Set<String> removedServices = changesForService.getRemovedEntries().keySet();
@@ -354,7 +354,7 @@ public class PlatformUtils
                     }
                     if (toLog.size() > 0)
                     {
-                        Log.log(logContext, "Service instances unavailable (lost): ", toLog.toString());
+                        Log.log(logContext, "Service instances lost: ", toLog.toString());
                     }
                 }
                 updateWaitLatch.countDown();
