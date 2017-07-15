@@ -1056,7 +1056,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public String toString()
     {
-        return "PlatformRegistryAgent [" + this.platformName + "] " + this.registryProxy.getChannelString();
+        return "PlatformRegistryAgent [" + this.agentName + "] [" + this.platformName + "] "
+            + this.registryProxy.getChannelString();
     }
 
     @Override
@@ -1143,16 +1144,19 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
                         long executedFromLastPeriod;
                         long gcTimeLastPeriod;
+                        IRpcInstance rpc;
 
                         @Override
                         public void run()
                         {
                             try
                             {
-                                final IRpcInstance rpc =
-                                    ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
+                                if (this.rpc == null)
+                                {
+                                    this.rpc = ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
                                         PlatformRegistryAgent.this.registryProxy.getReconnectPeriodMillis(),
                                         PlatformRegistry.RUNTIME_DYNAMIC);
+                                }
 
                                 final long[] stats = ContextUtils.getCoreStats();
                                 final long qOverflow = stats[0];
@@ -1190,7 +1194,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 this.executedFromLastPeriod = qTotalExecuted;
                                 try
                                 {
-                                    rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
+                                    this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
                                         LongValue.valueOf(qOverflow), LongValue.valueOf(qTotalSubmitted),
                                         LongValue.valueOf(memUsed), LongValue.valueOf(memAvailable),
                                         LongValue.valueOf(threadCount), LongValue.valueOf(gcMillisInPeriod),
@@ -1198,7 +1202,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 }
                                 catch (Exception e)
                                 {
-                                    Log.log(PlatformRegistryAgent.this, "Could not invoke " + rpc, e);
+                                    Log.log(PlatformRegistryAgent.this, "Could not invoke " + this.rpc, e);
                                 }
                             }
                             catch (TimeOutException e1)
