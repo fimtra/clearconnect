@@ -15,8 +15,6 @@
  */
 package com.fimtra.thimble;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +22,8 @@ import java.util.Queue;
 import java.util.concurrent.Executor;
 
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.Log;
+import com.fimtra.util.ObjectUtils;
 
 /**
  * A ThimbleExecutor is a multi-thread {@link Executor} implementation that supports sequential and
@@ -93,11 +93,7 @@ public final class ThimbleExecutor implements Executor
                     }
                     catch (Exception e)
                     {
-                        StringWriter stringWriter = new StringWriter(1000);
-                        PrintWriter pw = new PrintWriter(stringWriter);
-                        pw.print(Thread.currentThread() + " could not execute " + this.task + " due to: ");
-                        e.printStackTrace(pw);
-                        System.err.print(stringWriter.toString());
+                        Log.log(this, "Could not execute " + ObjectUtils.safeToString(this.task), e);
                     }
                     finally
                     {
