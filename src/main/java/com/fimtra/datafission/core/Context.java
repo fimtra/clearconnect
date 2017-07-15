@@ -1129,7 +1129,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
     {
-        Log.log(this, ObjectUtils.safeToString(statusAttribute), " ", this.getName());
         final IRecord contextStatus = this.records.get(ISystemRecordNames.CONTEXT_STATUS);
         if (isSystemRecordReady(contextStatus))
         {

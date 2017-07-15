@@ -59,7 +59,6 @@ class PlatformServiceConnectionMonitor
             @Override
             public void onConnected(String platformServiceName, int identityHash)
             {
-                check(Connection.CONNECTED);
                 doConnected();
                 store(Connection.CONNECTED);
             }
@@ -67,7 +66,6 @@ class PlatformServiceConnectionMonitor
             @Override
             public void onReconnecting(String platformServiceName, int identityHash)
             {
-                check(Connection.RECONNECTING);
                 doReconnected();
                 store(Connection.RECONNECTING);
             }
@@ -75,7 +73,6 @@ class PlatformServiceConnectionMonitor
             @Override
             public void onDisconnected(String platformServiceName, int identityHash)
             {
-                check(Connection.DISCONNECTED);
                 doDisconnected();
                 store(Connection.DISCONNECTED);
             }
@@ -91,15 +88,6 @@ class PlatformServiceConnectionMonitor
         catch (Exception e)
         {
             Log.log(this, "Could not destroy connection monitor for " + this.serviceInstanceId, e);
-        }
-    }
-
-    final void check(Connection status)
-    {
-        if (status != this.previous)
-        {
-            Log.log(this, "Status of service ", this.serviceInstanceId, " is ", ObjectUtils.safeToString(status),
-                ", previously ", ObjectUtils.safeToString(this.previous));
         }
     }
 
@@ -120,7 +108,6 @@ class PlatformServiceConnectionMonitor
             this.callbackLock.lock();
             try
             {
-                Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceConnected ", this.serviceInstanceId);
                 onPlatformServiceConnected();
             }
             catch (Exception e)
@@ -149,8 +136,6 @@ class PlatformServiceConnectionMonitor
                         PlatformServiceConnectionMonitor.this.callbackLock.lock();
                         try
                         {
-                            Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceDisconnected ",
-                                PlatformServiceConnectionMonitor.this.serviceInstanceId);
                             onPlatformServiceDisconnected();
                         }
                         finally
@@ -165,7 +150,6 @@ class PlatformServiceConnectionMonitor
             this.callbackLock.lock();
             try
             {
-                Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceReconnecting ", this.serviceInstanceId);
                 onPlatformServiceReconnecting();
             }
             catch (Exception e)
@@ -192,7 +176,6 @@ class PlatformServiceConnectionMonitor
             this.callbackLock.lock();
             try
             {
-                Log.log(PlatformServiceConnectionMonitor.this, "onPlatformServiceDisconnected ", this.serviceInstanceId);
                 onPlatformServiceDisconnected();
             }
             catch (Exception e)
