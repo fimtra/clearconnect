@@ -228,7 +228,10 @@ public class TcpServer implements IEndPointService
                                 }
                                 finally
                                 {
-                                    checkShortLivedSocket(hostAndStartTime);
+                                    if (hostAndStartTime != null)
+                                    {
+                                        checkShortLivedSocket(hostAndStartTime);
+                                    }
                                 }
                             }
                         }, clientSocketRxBufferSize, frameEncodingFormat),
