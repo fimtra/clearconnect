@@ -93,7 +93,10 @@ public abstract class TcpChannelProperties
         String SLS_MAX_SHORT_LIVED_SOCKET_TRIES = BASE + "slsMaxShortLivedSocketTries";
         /**
          * The system property name to define the send factor (in milliseconds) to wait for a TCP
-         * message to be sent in {@link TcpChannel#send(byte[])}.<br>
+         * message to be sent in {@link TcpChannel#send(byte[])}.
+         * <p>
+         * Use a value of 0 for no blocking during send (i.e. send asynchronously).
+         * <p>
          * E.g. <code>-DtcpChannel.sendWaitFactorMillis=10</code>
          */
         String SEND_WAIT_FACTOR_MILLIS = BASE + "sendWaitFactorMillis";
@@ -176,7 +179,7 @@ public abstract class TcpChannelProperties
 
         /**
          * The send factor (in milliseconds) to wait for a TCP message to be sent in
-         * {@link TcpChannel#send(byte[])}.
+         * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
          * <p>
          * Default is: 10
          */

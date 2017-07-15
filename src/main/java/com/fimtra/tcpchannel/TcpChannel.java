@@ -144,6 +144,7 @@ public class TcpChannel implements ITransportChannel
      * only called once.
      */
     private final AtomicBoolean onChannelClosedCalled;
+    private final Object lock = new Object();
 
     StateEnum state = StateEnum.IDLE;
 
@@ -314,7 +315,7 @@ public class TcpChannel implements ITransportChannel
             final ByteBuffer[] byteFragmentsToSend =
                 this.byteArrayFragmentResolver.getByteFragmentsToSend(toSend, TcpChannelProperties.Values.TX_SEND_SIZE);
 
-            synchronized (this)
+            synchronized (this.lock)
             {
                 ByteBuffer[] buffer;
                 for (int i = 0; i < byteFragmentsToSend.length;)
@@ -348,9 +349,14 @@ public class TcpChannel implements ITransportChannel
                 // NATURAL THROTTLE
                 try
                 {
-                    // the tcp-writer will notify when the frames are empty
-                    this.wait(this.txFrames.size() * channelsWithTxFrames.size()
-                        * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
+                    if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS > 0)
+                    {
+                        // the tcp-writer will notify when the frames are empty
+                        final int channelsWaitingSize = channelsWithTxFrames.size();
+                        final int txSize = this.txFrames.size();
+                        this.lock.wait((txSize == 0 ? 1 : txSize) * (channelsWaitingSize == 0 ? 1 : channelsWaitingSize)
+                            * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
+                    }
                 }
                 catch (InterruptedException e)
                 {
@@ -532,7 +538,7 @@ public class TcpChannel implements ITransportChannel
             for (i = 0; i < size; i++)
             {
                 channel = channelsWithTxFrames.get(i);
-                synchronized (channel)
+                synchronized (channel.lock)
                 {
                     try
                     {
@@ -608,7 +614,7 @@ public class TcpChannel implements ITransportChannel
                     }
                     finally
                     {
-                        channel.notify();
+                        channel.lock.notify();
                     }
                 }
             }
@@ -648,7 +654,7 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            synchronized (this)
+            synchronized (this.lock)
             {
                 this.state = StateEnum.DESTROYED;
                 this.txFrames.clear();
