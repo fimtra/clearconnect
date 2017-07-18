@@ -352,9 +352,7 @@ public class TcpChannel implements ITransportChannel
                     if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS > 0)
                     {
                         // the tcp-writer will notify when the frames are empty
-                        final int channelsWaitingSize = channelsWithTxFrames.size();
-                        final int txSize = this.txFrames.size();
-                        this.lock.wait((txSize == 0 ? 1 : txSize) * (channelsWaitingSize == 0 ? 1 : channelsWaitingSize)
+                        this.lock.wait((byteFragmentsToSend.length == 0 ? 1 : byteFragmentsToSend.length)
                             * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
                     }
                 }
