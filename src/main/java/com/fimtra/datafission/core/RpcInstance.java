@@ -324,7 +324,14 @@ public final class RpcInstance implements IRpcInstance
                 {
                     try
                     {
-                        this.context.addObserver(resultHandler, resultMapName);
+                        try
+                        {
+                            this.context.addObserver(resultHandler, resultMapName).get();
+                        }
+                        catch (Exception e2)
+                        {
+                            throw new ExecutionException(e2);
+                        }
                         if (logVerbose)
                         {
                             Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ", resultMapName, " ", Arrays.toString(args));

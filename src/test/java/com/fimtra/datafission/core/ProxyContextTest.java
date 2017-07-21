@@ -276,6 +276,17 @@ public class ProxyContextTest
         
         ChannelUtils.WATCHDOG.configure(5000);
     }
+    
+    @Test
+    public void testAddObserverCountDownLatchIsTriggeredForDuplicateSubscription() throws Exception
+    {
+        createComponents();
+        IRecordListener observer = new TestCachingAtomicChangeObserver();
+        Map<String, Boolean> result = this.candidate.addObserver(observer, "one").get();
+        assertTrue(Boolean.TRUE.equals(result.get("one")));
+        result = this.candidate.addObserver(observer, "one").get();
+        assertTrue(result.isEmpty());
+    }
 
     @Test
     public void testAddObserverCountDownLatchIsTriggeredWhenAddingListenerDuringDisconnect() throws Exception

@@ -740,9 +740,12 @@ public final class ProxyContext implements IObserverContext
 
                 executeTask(recordsToSubscribeFor, SUBSCRIBE, task, futureResult, subscribeResults);
             }
+            else
+            {
+                futureResult.run();
+            }
         }
         return futureResult;
-
     }
 
     @Override
