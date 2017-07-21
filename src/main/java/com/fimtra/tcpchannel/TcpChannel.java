@@ -26,7 +26,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fimtra.channel.ChannelUtils;
@@ -49,7 +48,7 @@ import com.fimtra.util.ObjectUtils;
 public class TcpChannel implements ITransportChannel
 {
     private static final double _INVERSE_1000000 = 1 / 1000000d;
-
+    
     /** Expresses the encoding format for the data frames */
     public static enum FrameEncodingFormatEnum
     {
@@ -112,11 +111,67 @@ public class TcpChannel implements ITransportChannel
     static final byte[] TERMINATOR = { 0xd, 0xa };
     
     /**
-     * Tracks which channels have TX frames to send. This is used as an equal-sending-opportunity
-     * mechanism.
+     * This is the start of the logical linked-list of TcpChannels with data to send. This is an
+     * equal-sending-opportunity mechanism. The list is traversed from start to end, each channel
+     * has one frame sent, looping back to the start and continuing sending one frame for each
+     * channel. If a channel has no more frames to sent, it is unlinked by
+     * {@link #unlinkChannel(TcpChannel)}
      */
-    static final List<TcpChannel> channelsWithTxFrames = new CopyOnWriteArrayList<TcpChannel>();
+    static TcpChannel first;
+    /**
+     * The end of the logical linked-list of TcpChannels with data to send.
+     * 
+     * @see #first
+     */
+    static TcpChannel last;
 
+    private synchronized static final void linkChannel(TcpChannel channel)
+    {
+        if (channel.prev == null && channel.next == null && first != channel)
+        {
+            if (first == null)
+            {
+                first = channel;
+                last = channel;
+                channel.prev = null;
+                channel.next = null;
+            }
+            else
+            {
+                last.next = channel;
+                channel.prev = last;
+                channel.next = null;
+                last = channel;
+            }
+        }
+    }
+    
+    private synchronized static final void unlinkChannel(TcpChannel channel)
+    {
+        if (channel.next != null)
+        {
+            channel.next.prev = channel.prev;
+        }
+        if (channel.prev != null)
+        {
+            channel.prev.next = channel.next;
+        }
+        if (channel == first)
+        {
+            first = channel.next;
+        }
+        if (channel == last)
+        {
+            last = channel.prev;
+        }
+        channel.next = null;
+        channel.prev = null;
+    }
+    
+  
+    TcpChannel next;
+    TcpChannel prev;
+    
     int rxData;
     final IReceiver receiver;
     final ByteBuffer rxBytes;
@@ -338,7 +393,7 @@ public class TcpChannel implements ITransportChannel
                         throw new ClosedChannelException();
                     case IDLE:
                         this.state = StateEnum.SENDING;
-                        channelsWithTxFrames.add(this);
+                        linkChannel(this);
                         TcpChannelUtils.WRITER.setInterest(this.socketChannel);
                         break;
                     case SENDING:
@@ -346,19 +401,19 @@ public class TcpChannel implements ITransportChannel
                         break;
                 }
                 
-                // NATURAL THROTTLE
-                try
+                if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS > 0)
                 {
-                    if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS > 0)
+                    // NATURAL THROTTLE
+                    try
                     {
                         // the tcp-writer will notify when the frames are empty
                         this.lock.wait((byteFragmentsToSend.length == 0 ? 1 : byteFragmentsToSend.length)
                             * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
                     }
-                }
-                catch (InterruptedException e)
-                {
-                    // don't care
+                    catch (InterruptedException e)
+                    {
+                        // don't care
+                    }
                 }
             }
             return true;
@@ -369,7 +424,6 @@ public class TcpChannel implements ITransportChannel
             return false;
         }
     }
-
     
     @Override
     @Deprecated
@@ -520,7 +574,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
     
-    static void writeFrames()
+    static final void writeFrames()
     {
         /*
          * This code logic will give equal opportunity for sending across all channels in the
@@ -528,94 +582,84 @@ public class TcpChannel implements ITransportChannel
          * being fed as fast as it can be dequeued, which leads to starvation of other channels.
          */
         ByteBuffer[] data = null;
-        int i;
-        int size;
-        TcpChannel channel;
-        while ((size = channelsWithTxFrames.size()) > 0)
+        TcpChannel channel = null;
+        while (first != null)
         {
-            for (i = 0; i < size; i++)
+            if (channel == null)
             {
-                channel = channelsWithTxFrames.get(i);
-                synchronized (channel.lock)
+                channel = first;
+            }
+            else
+            {
+                channel = channel.next;
+            }
+            if (channel == null)
+            {
+                break;
+            }
+
+            synchronized (channel.lock)
+            {
+                try
                 {
-                    try
+                    if (channel.state == StateEnum.DESTROYED)
                     {
-                        if (channel.state == StateEnum.DESTROYED)
+                        unlinkChannel(channel);
+                        continue;
+                    }
+                    data = channel.txFrames.poll();
+                    if (data != null)
+                    {
+                        try
                         {
-                            channelsWithTxFrames.remove(i);
-                            i--;
-                            size--;
-                            continue;
-                        }
-                        data = channel.txFrames.poll();
-                        if (data != null)
-                        {
-                            try
+                            ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data[0], data[1]);
+                            if (channel.txFrames.peek() == null)
                             {
-                                ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data[0], data[1]);
-                                if (channel.txFrames.peek() == null)
-                                {
-                                    channel.state = StateEnum.IDLE;
-                                    try
-                                    {
-                                        TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
-                                    }
-                                    catch (CancelledKeyException e)
-                                    {
-                                        channel.destroy("Socket has been closed", e);
-                                    }
-                                    channelsWithTxFrames.remove(i);
-                                    i--;
-                                    size--;
-                                }
-                            }
-                            catch (IOException e)
-                            {
-                                channelsWithTxFrames.remove(i);
-                                i--;
-                                size--;
-                                channel.destroy("Could not write frames (" + e.toString() + ")");
-                            }
-                            catch (Exception e)
-                            {
-                                channelsWithTxFrames.remove(i);
-                                i--;
-                                size--;
-                                channel.destroy("Could not write frames", e);
-                            }
-                            finally
-                            {
-                                data[0] = null;
-                                data[1] = null;
-                                if (channel.txFrameBufferPoolPtr > 0)
-                                {
-                                    channel.txFrameBufferPool[--channel.txFrameBufferPoolPtr] = data;
-                                }
+                                setChannelIdle(channel);
                             }
                         }
-                        else
+                        catch (IOException e)
                         {
-                            // safety net when data == null
-                            channel.state = StateEnum.IDLE;
-                            try
+                            channel.destroy("Could not write frames (" + e.toString() + ")");
+                        }
+                        catch (Exception e)
+                        {
+                            channel.destroy("Could not write frames", e);
+                        }
+                        finally
+                        {
+                            data[0] = null;
+                            data[1] = null;
+                            if (channel.txFrameBufferPoolPtr > 0)
                             {
-                                TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
+                                channel.txFrameBufferPool[--channel.txFrameBufferPoolPtr] = data;
                             }
-                            catch (CancelledKeyException e)
-                            {
-                                channel.destroy("Socket has been closed", e);
-                            }
-                            channelsWithTxFrames.remove(i);
-                            i--;
-                            size--;
                         }
                     }
-                    finally
+                    else
                     {
-                        channel.lock.notify();
+                        setChannelIdle(channel);
                     }
                 }
+                finally
+                {
+                    channel.lock.notify();
+                }
             }
+        }
+    }
+
+    private static final void setChannelIdle(TcpChannel channel)
+    {
+        channel.state = StateEnum.IDLE;
+        unlinkChannel(channel);
+        try
+        {
+            TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
+        }
+        catch (CancelledKeyException e)
+        {
+            channel.destroy("Socket has been closed", e);
         }
     }
 
@@ -657,7 +701,10 @@ public class TcpChannel implements ITransportChannel
                 this.state = StateEnum.DESTROYED;
                 this.txFrames.clear();
                 this.rxBytes.clear();
+                
+                unlinkChannel(this);
             }
+            
 
             if (this.socketChannel != null)
             {
