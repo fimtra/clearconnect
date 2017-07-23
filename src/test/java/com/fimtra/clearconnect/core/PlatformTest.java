@@ -1478,7 +1478,7 @@ public class PlatformTest
         createAgent();
         createAgent008();
 
-        final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<CountDownLatch>(new CountDownLatch(2));
+        final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<IRecord> serviceRecordImage = new AtomicReference<IRecord>();
         IRecordListener serviceListener = new IRecordListener()
         {
