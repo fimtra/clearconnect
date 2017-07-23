@@ -729,7 +729,7 @@ class PlatformDesktop
             this.memory.setMaximum(100);
 
             this.msgsPerSec = new JProgressBar();
-            this.msgsPerSec.setMaximum(0);
+            this.msgsPerSec.setMaximum(50);
             this.msgsPerSec.setStringPainted(true);
 
             final String name = registryProxy.getName();
@@ -759,12 +759,7 @@ class PlatformDesktop
                                         @Override
                                         public void run()
                                         {
-                                            final int v = (int) msgsPerSec.longValue() * 10;
-                                            if (DesktopSummaryPanel.this.msgsPerSec.getMaximum() < v)
-                                            {
-                                                DesktopSummaryPanel.this.msgsPerSec.setMaximum(v);
-                                            }
-                                            DesktopSummaryPanel.this.msgsPerSec.setValue(v);
+                                            DesktopSummaryPanel.this.msgsPerSec.setValue((int) msgsPerSec.longValue());
                                             DesktopSummaryPanel.this.msgsPerSec.setString(msgsPerSec.textValue() + " (" + kbsPerSec.textValue() + " kb/s)");
                                         }
                                     });
