@@ -244,12 +244,10 @@ public final class PlatformRegistry
         
         /** Prefix for the rpcs-per-service-instance record */
         String PREFIX_RPCS_PER_INSTANCE = "InstanceRpcs:";
-
+        
         /**
          * <pre>
          * key: serviceFamily, value: redundancy mode of the service (string value of {@link RedundancyModeEnum})
-         * sub-map key: serviceFamily
-         * sub-map structure: {RecordCount, RpcCount, ServiceInstancesCount}
          * </pre>
          * 
          * Agents subscribe for this to have a live view of the services that exist, each service
@@ -258,6 +256,18 @@ public final class PlatformRegistry
          * @see IServiceRecordFields
          */
         String SERVICES = "Services";
+
+        /**
+         * The statistics per logical service family existing on the platform.
+         * 
+         * <pre>
+         * sub-map key: serviceFamily
+         * sub-map structure: {key=one of the fields in {@link IServiceRecordFields}, value=attribute value}
+         * </pre>
+         * 
+         * @see IServiceRecordFields
+         */
+        String SERVICE_STATS = "Service Statistics";
 
         /**
          * The service instances per service family on the platform
@@ -284,7 +294,7 @@ public final class PlatformRegistry
          * 
          * <pre>
          * sub-map key: serviceInstanceID
-         * sub-map structure: {key=statistic attribute, value=attribute value}
+         * sub-map structure: {key=one of the fields in {@link IServiceRecordFields}, value=attribute value}
          * </pre>
          * 
          * @see IServiceStatsRecordFields
@@ -327,6 +337,8 @@ public final class PlatformRegistry
     int reconnectPeriodMillis = DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS;
     /** @see IRegistryRecordNames#SERVICES */
     final IRecord services;
+    /** @see IRegistryRecordNames#SERVICE_STATS */
+    final IRecord serviceStats;
     /** @see IRegistryRecordNames#SERVICE_INSTANCES_PER_SERVICE_FAMILY */
     final IRecord serviceInstancesPerServiceFamily;
     /** @See {@link IRegistryRecordNames#SERVICE_INSTANCES_PER_AGENT */
@@ -399,6 +411,7 @@ public final class PlatformRegistry
         this.eventHandler = new EventHandler(this);
 
         this.services = this.context.createRecord(IRegistryRecordNames.SERVICES);
+        this.serviceStats = this.context.createRecord(IRegistryRecordNames.SERVICE_STATS);
         this.serviceInstancesPerServiceFamily =
             this.context.createRecord(IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
         this.serviceInstancesPerAgent = this.context.createRecord(IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT);
@@ -480,7 +493,7 @@ public final class PlatformRegistry
         createRuntimeStaticRpc();
         createRuntimeDynamicRpc();
 
-        final Map<String, IValue> registryServiceSubMap = this.services.getOrCreateSubMap(SERVICE_NAME);
+        final Map<String, IValue> registryServiceSubMap = this.serviceStats.getOrCreateSubMap(SERVICE_NAME);
         registryServiceSubMap.put(IServiceRecordFields.RPC_COUNT,
             LongValue.valueOf(this.context.getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
         registryServiceSubMap.put(IServiceRecordFields.SERVICE_INSTANCE_COUNT, LongValue.valueOf(1));
@@ -1382,7 +1395,6 @@ final class EventHandler
 
         removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
 
-        boolean publishServices = false;
         // remove the service instance from the instances-per-service
         Map<String, IValue> serviceInstances = Collections.emptyMap();
         if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
@@ -1396,9 +1408,9 @@ final class EventHandler
             }
             else
             {
-                this.registry.services.getOrCreateSubMap(serviceFamily).put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
+                this.registry.serviceStats.getOrCreateSubMap(serviceFamily).put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
                     LongValue.valueOf(serviceInstances.size()));
-                publishServices = true;
+                publishTimed(this.registry.serviceStats);
             }
         }
 
@@ -1429,7 +1441,7 @@ final class EventHandler
                 this.pendingMasterInstancePerFtService.remove(serviceFamily);
                 this.confirmedMasterInstancePerFtService.remove(serviceFamily);
                 this.connectionsPerServiceFamily.remove(serviceFamily);
-                publishServices = true;
+                publishTimed(this.registry.services);
             }
         }
         else
@@ -1440,10 +1452,7 @@ final class EventHandler
                 selectNextInstance_callInFamilyScope(serviceFamily, "deregister " + registrationToken);
             }
         }
-        if (publishServices)
-        {
-            publishTimed(this.registry.services);
-        }
+
         publishTimed(this.registry.serviceInstancesPerServiceFamily);
         publishTimed(this.registry.serviceInstancesPerAgent);
 
@@ -1767,13 +1776,14 @@ final class EventHandler
         publishTimed(this.registry.serviceInstancesPerAgent);
 
         this.registry.services.put(serviceFamily, redundancyModeEnum.name());
-        this.registry.services.getOrCreateSubMap(serviceFamily).put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
+        this.registry.serviceStats.getOrCreateSubMap(serviceFamily).put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
             LongValue.valueOf(servicesInstancesForFamilySubMap.size()));
 
         // as the service has now been declared to be of a specific redundancy type, it does not
         // matter if duplicate instances of the same family are registering simultaneously
         this.pendingPlatformServices.remove(serviceFamily);
 
+        publishTimed(this.registry.serviceStats);
         publishTimed(this.registry.services);
     }
 
@@ -1893,7 +1903,7 @@ final class EventHandler
             }
         }
         
-        final Map<String, IValue> familyStats = this.registry.services.getOrCreateSubMap(serviceFamily);
+        final Map<String, IValue> familyStats = this.registry.serviceStats.getOrCreateSubMap(serviceFamily);
         familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbPublished));
         familyStats.put(IServiceRecordFields.KB_PER_SEC, DoubleValue.valueOf(((long) ((kbPerSec * 10d)) / 10d)));
         familyStats.put(IServiceRecordFields.MESSAGE_COUNT, LongValue.valueOf(msgsPublished));
@@ -1901,7 +1911,7 @@ final class EventHandler
         familyStats.put(IServiceRecordFields.SUBSCRIPTION_COUNT, LongValue.valueOf(subscriptionCount));
         familyStats.put(IServiceRecordFields.TX_QUEUE_SIZE, LongValue.valueOf(txQueue));
 
-        publishTimed(this.registry.services);
+        publishTimed(this.registry.serviceStats);
         publishTimed(this.registry.runtimeStatus);
         publishTimed(this.registry.platformConnections);
     }
@@ -2144,9 +2154,9 @@ final class EventHandler
                 }
                 publishTimed(serviceObjects);
 
-                EventHandler.this.registry.services.getOrCreateSubMap(serviceFamily).put(servicesObjectCountField,
+                EventHandler.this.registry.serviceStats.getOrCreateSubMap(serviceFamily).put(servicesObjectCountField,
                     LongValue.valueOf(serviceObjects.size()));
-                publishTimed(EventHandler.this.registry.services);
+                publishTimed(EventHandler.this.registry.serviceStats);
             }
         }
         catch (Exception e)
@@ -2173,7 +2183,7 @@ final class EventHandler
             {
                 // if the SERVICES record size is unchanged, skip an immediate publish and schedule
                 // a pending publish (otherwise we start pumping out updates due to record changes
-                // in the service which cause the registry to become quite chatty on the network to
+                // in the service which causes the registry to become quite chatty on the network to
                 // its agents - agents subscribe for the SERVICES record by default) 
                 publishServiceRecordImmediately = false;
             }
@@ -2439,12 +2449,12 @@ final class EventHandler
         publishTimed(getRecordsPerServiceInstance(registryInstanceName));
 
         final Map<String, IValue> registryServiceSubMap =
-            this.registry.services.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
+            this.registry.serviceStats.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
         final LongValue recordCounts =
             LongValue.valueOf(this.registry.context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size());
         if (!recordCounts.equals(registryServiceSubMap.put(IServiceRecordFields.RECORD_COUNT, recordCounts)))
         {
-            publishTimed(this.registry.services);
+            publishTimed(this.registry.serviceStats);
         }
     }
 

@@ -24,6 +24,7 @@ import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICES;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT;
 import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCE_STATS;
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.SERVICE_STATS;
 import static com.fimtra.clearconnect.core.PlatformUtils.decomposeClientFromProxyName;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.AVG_MSG_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.KB_COUNT;
@@ -391,15 +392,26 @@ public final class PlatformMetaDataModel
     final ThimbleExecutor coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
 
     final CoalescingRecordListener _servicesRecordListener =
+            new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                {
+                    checkReset();
+                    handlePlatformServicesUpdate(imageCopy, atomicChange);
+                }
+            }, SERVICES);
+    
+    final CoalescingRecordListener _serviceStatsRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
         {
             @Override
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
                 checkReset();
-                handlePlatformServicesUpdate(imageCopy, atomicChange);
+                handlePlatformServiceStatsUpdate(imageCopy, atomicChange);
             }
-        }, SERVICES);
+        }, SERVICE_STATS);
 
     final CoalescingRecordListener _serviceInstancesPerAgentRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
@@ -587,6 +599,11 @@ public final class PlatformMetaDataModel
     {
         this.agent.registryProxy.addObserver(this._servicesRecordListener, SERVICES);
     }
+    
+    Future<Map<String, Boolean>> registerListener_SERVICE_STATS()
+    {
+        return this.agent.registryProxy.addObserver(this._serviceStatsRecordListener, SERVICE_STATS);
+    }
 
     void checkReset()
     {
@@ -670,6 +687,7 @@ public final class PlatformMetaDataModel
     public IObserverContext getPlatformServicesContext()
     {
         registerListener_SERVICES();
+        registerListener_SERVICE_STATS();
         return this.servicesContext;
     }
 
@@ -870,25 +888,6 @@ public final class PlatformMetaDataModel
             redundancyMode = entry.getValue();
             serviceRecord = this.servicesContext.getOrCreateRecord(serviceFamilyName);
             serviceRecord.put(ServiceMetaDataRecordDefinition.Mode.toString(), redundancyMode.textValue());
-            final Map<String, IValue> serviceRecordsRpcs = imageCopy.getOrCreateSubMap(serviceFamilyName);
-            serviceRecord.put(ServiceMetaDataRecordDefinition.RecordCount.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.RECORD_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.RpcCount.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.RPC_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.InstanceCount.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.SERVICE_INSTANCE_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.MsgsPerSec.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.MSGS_PER_SEC));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.KbPerSec.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.KB_PER_SEC));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.MessagesSent.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.MESSAGE_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.KbSent.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.KB_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.SubscriptionCount.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
-            serviceRecord.put(ServiceMetaDataRecordDefinition.TxQueue.toString(),
-                serviceRecordsRpcs.get(IServiceRecordFields.TX_QUEUE_SIZE));
 
             this.servicesContext.publishAtomicChange(serviceFamilyName);
         }
@@ -898,6 +897,42 @@ public final class PlatformMetaDataModel
             atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
         {
             removeService(it.next().getKey());
+        }
+    }
+
+    void handlePlatformServiceStatsUpdate(IRecord imageCopy, IRecordChange atomicChange)
+    {
+        final Set<String> serviceNames = atomicChange.getSubMapKeys();
+        IRecord serviceRecord;
+        Map<String, IValue> serviceStats;
+        for (String serviceFamilyName : serviceNames)
+        {
+            // note: only SERVICE record updates cause a servicesContext record to be created
+            serviceRecord = this.servicesContext.getRecord(serviceFamilyName);
+            if (serviceRecord != null)
+            {
+                serviceStats = imageCopy.getOrCreateSubMap(serviceFamilyName);
+                serviceRecord.put(ServiceMetaDataRecordDefinition.RecordCount.toString(),
+                    serviceStats.get(IServiceRecordFields.RECORD_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.RpcCount.toString(),
+                    serviceStats.get(IServiceRecordFields.RPC_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.InstanceCount.toString(),
+                    serviceStats.get(IServiceRecordFields.SERVICE_INSTANCE_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.MsgsPerSec.toString(),
+                    serviceStats.get(IServiceRecordFields.MSGS_PER_SEC));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.KbPerSec.toString(),
+                    serviceStats.get(IServiceRecordFields.KB_PER_SEC));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.MessagesSent.toString(),
+                    serviceStats.get(IServiceRecordFields.MESSAGE_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.KbSent.toString(),
+                    serviceStats.get(IServiceRecordFields.KB_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.SubscriptionCount.toString(),
+                    serviceStats.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
+                serviceRecord.put(ServiceMetaDataRecordDefinition.TxQueue.toString(),
+                    serviceStats.get(IServiceRecordFields.TX_QUEUE_SIZE));
+
+                this.servicesContext.publishAtomicChange(serviceFamilyName);
+            }
         }
     }
 
