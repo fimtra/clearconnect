@@ -25,7 +25,6 @@ import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
-import com.fimtra.util.ObjectUtils;
 
 /**
  * A template class that monitors the connection to a single platform service.

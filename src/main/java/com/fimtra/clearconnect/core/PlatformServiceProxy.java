@@ -336,7 +336,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
         this.proxyContext.destroy();
         this.recordAvailableNotifyingCache.destroy();
-        // todo notify listeners disconnected 
+        // todo notify listeners disconnected? 
+        // todo What about notifying other listeners (e.g rpc available listeners) - need to think this through...
         this.recordConnectionStatusNotifyingCache.destroy();
         this.rpcAvailableNotifyingCache.destroy();
         this.serviceConnectionStatusNotifyingCache.destroy();

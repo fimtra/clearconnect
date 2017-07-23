@@ -1180,7 +1180,6 @@ final class EventHandler
             LongValue.valueOf(serviceInstanceCount));
 
         this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
-            // todo this is over reporting the size
             LongValue.valueOf(this.registry.platformConnections.getSubMapKeys().size()));
 
         final long uptimeSecs = (long) ((System.currentTimeMillis() - this.startTimeMillis) * 0.001);
