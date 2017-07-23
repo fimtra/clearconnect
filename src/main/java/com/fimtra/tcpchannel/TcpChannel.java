@@ -117,13 +117,13 @@ public class TcpChannel implements ITransportChannel
      * channel. If a channel has no more frames to sent, it is unlinked by
      * {@link #unlinkChannel(TcpChannel)}
      */
-    static TcpChannel first;
+    static volatile TcpChannel first;
     /**
      * The end of the logical linked-list of TcpChannels with data to send.
      * 
      * @see #first
      */
-    static TcpChannel last;
+    static volatile TcpChannel last;
 
     private synchronized static final void linkChannel(TcpChannel channel)
     {
