@@ -597,7 +597,7 @@ public class Publisher
         {
             if (this.firstPublishDone.size() > 0)
             {
-                Log.log(ProxyContextPublisher.this, "(--) First publish to [", this.channel.getEndPointDescription(),
+                Log.log(ProxyContextPublisher.this, "(->) First publish to [", this.channel.getEndPointDescription(),
                     "] done for ", this.firstPublishDone.toString());
                 this.firstPublishDone.clear();
             }
