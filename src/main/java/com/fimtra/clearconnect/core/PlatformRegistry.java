@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -355,7 +354,8 @@ public final class PlatformRegistry
     final ThimbleExecutor coalescingExecutor;
     final EventHandler eventHandler;
     final AtomicLong serviceSequence;
-
+    final AtomicLong registrationTokenCounter;
+    
     /**
      * Construct the platform registry using the default platform registry port.
      * 
@@ -402,6 +402,7 @@ public final class PlatformRegistry
         final String registryInstanceId = platformName + "@" + host + ":" + port;
         Log.log(this, "Creating ", registryInstanceId);
         this.serviceSequence = new AtomicLong(0);
+        this.registrationTokenCounter = new AtomicLong();
 
         this.platformName = platformName;
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
@@ -615,7 +616,10 @@ public final class PlatformRegistry
                 try
                 {
                     PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(
-                        new RegistrationToken(UUID.randomUUID(), serviceInstanceId), serviceFamily, agentName,
+                        new RegistrationToken(
+                            "token#" + PlatformRegistry.this.registrationTokenCounter.incrementAndGet(),
+                            serviceInstanceId),
+                        serviceFamily, agentName,
                         serviceInstanceId, redundancyModeEnum, TransportTechnologyEnum.valueOf(tte),
                         serviceRecordStructure, args);
                 }
