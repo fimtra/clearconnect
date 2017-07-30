@@ -507,16 +507,22 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     
     public final void destroy()
     {
-        this.destructor.destroy(this);
-        this.writeLock.lock();
         try
         {
-            this.listeners = Collections.emptyList();
-            this.cache.clear();
+            this.destructor.destroy(this);
         }
         finally
         {
-            this.writeLock.unlock();
+            this.writeLock.lock();
+            try
+            {
+                this.listeners = Collections.emptyList();
+                this.cache.clear();
+            }
+            finally
+            {
+                this.writeLock.unlock();
+            }
         }
     }
 
