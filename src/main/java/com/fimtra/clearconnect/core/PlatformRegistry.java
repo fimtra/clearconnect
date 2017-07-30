@@ -773,7 +773,16 @@ final class EventHandler
     private static final ThreadFactory IO_EXECUTOR_THREAD_FACTORY = ThreadUtils.newDaemonThreadFactory("io-executor");
     private static final ThreadFactory PUBLISH_EXECUTOR_THREAD_FACTORY =
         ThreadUtils.newDaemonThreadFactory("publish-executor");
-
+    
+    private final static IRecordListener NOOP_OBSERVER = new IRecordListener()
+    {
+        @Override
+        public void onChange(IRecord image, IRecordChange atomicChange)
+        {
+            // noop
+        }
+    };
+    
     private static interface IDescriptiveRunnable extends ISequentialRunnable
     {
         String getDescription();
@@ -1551,6 +1560,9 @@ final class EventHandler
         serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
 
         this.monitoredServiceInstances.put(registrationToken, serviceProxy);
+        
+        // add a noop observer for the RPC record (stops subscribe-unsubscribe for RPCs)
+        serviceProxy.addObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
 
         // setup monitoring of the service instance via the proxy
         final PlatformServiceConnectionMonitor monitor = createConnectionMonitor(registrationToken, serviceFamily,
@@ -2408,6 +2420,8 @@ final class EventHandler
                 });
             }
         }, REMOTE_CONTEXT_RPCS);
+        // remove the NOOP observer as we have a real listener attached to the RPC record now
+        serviceProxy.removeObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
     }
 
     @SuppressWarnings("unchecked")
