@@ -389,7 +389,6 @@ public final class ProxyContext implements IObserverContext
      *            the end-point node of the publisher process
      * @param publisherPort
      *            the end-point port of the publisher process
-     * @throws IOException
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort)
     {
@@ -413,7 +412,6 @@ public final class ProxyContext implements IObserverContext
      *            the transport technology to use
      * @param sessionContextName
      *            the name given to the "session" between this proxy and its remote context.
-     * @throws IOException
      */
     public ProxyContext(String name, ICodec codec, final String publisherNode, final int publisherPort,
         TransportTechnologyEnum transportTechnology, String sessionContextName)
@@ -1080,7 +1078,7 @@ public final class ProxyContext implements IObserverContext
                 {
                     if (this.firstUpdateExpected.remove(changeToApply.getName()))
                     {
-                        Log.log(ProxyContext.this, "(<-) First update from [", this.channel.getEndPointDescription(),
+                        Log.log(ProxyContext.this, "(<-) first update from [", this.channel.getEndPointDescription(),
                             "] for [", changeToApply.getName() + "]");
                     }
                 }
