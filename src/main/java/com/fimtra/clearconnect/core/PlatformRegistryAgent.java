@@ -659,10 +659,12 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             throw new RegisterRpcNotAvailableException();
         }
 
+        // FT services always start as standby
+        serviceInstance.setFtState(Boolean.FALSE);
+        
         final CountDownLatch latch = new CountDownLatch(1);
         final IServiceInstanceAvailableListener listener = new IServiceInstanceAvailableListener()
         {
-
             @Override
             public void onServiceInstanceAvailable(String serviceInstanceId)
             {

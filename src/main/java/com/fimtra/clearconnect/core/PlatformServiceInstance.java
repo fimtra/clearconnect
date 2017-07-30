@@ -222,27 +222,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 @Override
                 public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
                 {
-                    // todo do we really need to use a utility executor?
-                    PlatformServiceInstance.this.context.getUtilityExecutor().execute(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            final Boolean isMaster = Boolean.valueOf(args[0].textValue());
-                            if (!isMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
-                            {
-                                PlatformServiceInstance.this.isFtMasterInstance = isMaster;
-                                final boolean isFtMaster =
-                                    PlatformServiceInstance.this.isFtMasterInstance.booleanValue();
-                                Log.banner(PlatformServiceInstance.this, PlatformServiceInstance.this.toString() + " "
-                                    + (isFtMaster ? "ACTIVE" : "STANDBY"));
-
-                                notifyFtStatusListeners(isFtMaster);
-                            }
-                        }
-                    });
+                    setFtState(Boolean.valueOf(args[0].textValue()));
                     return PlatformUtils.OK;
                 }
+
             }, TypeEnum.TEXT, RPC_FT_SERVICE_STATUS, TypeEnum.TEXT);
             this.context.createRpc(rpc);
         }
@@ -605,6 +588,31 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.context.getName();
     }
 
+
+    void setFtState(final Boolean isMaster)
+    {
+        if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
+        {
+            // todo do we really need to use a utility executor?
+            PlatformServiceInstance.this.context.getUtilityExecutor().execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    if (!isMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
+                    {
+                        PlatformServiceInstance.this.isFtMasterInstance = isMaster;
+                        final boolean isFtMaster = PlatformServiceInstance.this.isFtMasterInstance.booleanValue();
+                        Log.banner(PlatformServiceInstance.this,
+                            PlatformServiceInstance.this.toString() + " " + (isFtMaster ? "ACTIVE" : "STANDBY"));
+
+                        notifyFtStatusListeners(isFtMaster);
+                    }
+                }
+            });
+        }
+    }
+    
     void notifyFtStatusListeners(final boolean isFtMaster)
     {
         for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
