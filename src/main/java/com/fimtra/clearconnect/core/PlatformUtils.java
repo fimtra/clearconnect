@@ -322,7 +322,6 @@ public class PlatformUtils
                  */
                 IRecordChange changesForService;
                 String serviceInstanceId;
-                final List<String> toLog = new LinkedList<String>();
                 for (String serviceFamily : atomicChange.getSubMapKeys())
                 {
                     changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
@@ -331,30 +330,15 @@ public class PlatformUtils
                     {
                         serviceInstanceId =
                             PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        if (serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
-                            serviceInstanceId))
-                        {
-                            toLog.add(serviceInstanceId);
-                        }
+                        serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
+                            serviceInstanceId);
                     }
-                    if (toLog.size() > 0)
-                    {
-                        Log.log(logContext, "Service instances available: ", toLog.toString());
-                    }
-                    toLog.clear();
                     Set<String> removedServices = changesForService.getRemovedEntries().keySet();
                     for (String serviceMember : removedServices)
                     {
                         serviceInstanceId =
                             PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        if (serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId))
-                        {
-                            toLog.add(serviceInstanceId);
-                        }
-                    }
-                    if (toLog.size() > 0)
-                    {
-                        Log.log(logContext, "Service instances lost: ", toLog.toString());
+                        serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId);
                     }
                 }
                 updateWaitLatch.countDown();
