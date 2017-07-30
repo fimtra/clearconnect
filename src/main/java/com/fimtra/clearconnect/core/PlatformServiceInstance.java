@@ -228,31 +228,16 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         @Override
                         public void run()
                         {
-                            PlatformServiceInstance.this.isFtMasterInstance =
-                                Boolean.valueOf(args[0].textValue());
-                            Log.banner(PlatformServiceInstance.this, PlatformServiceInstance.this.toString() + " "
-                                + (PlatformServiceInstance.this.isFtMasterInstance.booleanValue() ? "ACTIVE" : "STANDBY"));
-
-                            for (IFtStatusListener iFtStatusListener : PlatformServiceInstance.this.ftStatusListeners)
+                            final Boolean isMaster = Boolean.valueOf(args[0].textValue());
+                            if (!isMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
                             {
-                                try
-                                {
-                                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
-                                    {
-                                        iFtStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
-                                            PlatformServiceInstance.this.serviceMember);
-                                    }
-                                    else
-                                    {
-                                        iFtStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
-                                            PlatformServiceInstance.this.serviceMember);
-                                    }
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(PlatformServiceInstance.this,
-                                        "Could not notify " + ObjectUtils.safeToString(iFtStatusListener), e);
-                                }
+                                PlatformServiceInstance.this.isFtMasterInstance = isMaster;
+                                final boolean isFtMaster =
+                                    PlatformServiceInstance.this.isFtMasterInstance.booleanValue();
+                                Log.banner(PlatformServiceInstance.this, PlatformServiceInstance.this.toString() + " "
+                                    + (isFtMaster ? "ACTIVE" : "STANDBY"));
+
+                                notifyFtStatusListeners(isFtMaster);
                             }
                         }
                     });
@@ -618,5 +603,27 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     public String getComponentName()
     {
         return this.context.getName();
+    }
+
+    void notifyFtStatusListeners(final boolean isFtMaster)
+    {
+        for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
+        {
+            try
+            {
+                if (isFtMaster)
+                {
+                    iFtStatusListener.onActive(this.serviceFamily, this.serviceMember);
+                }
+                else
+                {
+                    iFtStatusListener.onStandby(this.serviceFamily, this.serviceMember);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not notify " + ObjectUtils.safeToString(iFtStatusListener), e);
+            }
+        }
     }
 }
