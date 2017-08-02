@@ -272,7 +272,8 @@ public final class AtomicChange implements IRecordChange
         // sub-map vars
         Set<String> subMapKeysToMerge;
         Iterator<String> subMapKeysToMergeIterator;
-        final Map<String, List<IRecordChange>> subMapChangesToMerge = new HashMap<String, List<IRecordChange>>();
+        Map<String, List<IRecordChange>> subMapChangesToMerge = null;
+
         List<IRecordChange> subMapChangesList;
         String subMapKey;
 
@@ -280,6 +281,8 @@ public final class AtomicChange implements IRecordChange
         subsequentChanges.add(0, this);
 
         boolean isImage = false;
+        boolean newPutEntriesSizeGreaterThan0;
+        boolean newRemovedEntriesSizeGreaterThan0;
         // process the changes in order, building up an aggregated atomic change
         IRecordChange subsequentChange;
         for (int i = 0; i < subsequentChanges.size(); i++)
@@ -300,21 +303,52 @@ public final class AtomicChange implements IRecordChange
             newOverwrittenEntries = subsequentChange.getOverwrittenEntries();
             newRemovedEntries = subsequentChange.getRemovedEntries();
 
-            putEntries.putAll(newPutEntries);
-            overwrittenEntries.putAll(newOverwrittenEntries);
-            removedEntries.putAll(newRemovedEntries);
+            newPutEntriesSizeGreaterThan0 = newPutEntries.size() > 0;
+            newRemovedEntriesSizeGreaterThan0 = newRemovedEntries.size() > 0;
 
-            ultimatelyAddedKeys.addAll(newPutEntries.keySet());
-            ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
+            // NOTE: it is not possible to optimise this by grouping by the put/remove size > 0
+            // checks - the order of adding/removing must be maintained to ensure the
+            // ultimatelyAdded/Removed keys are correct
+            if (newPutEntriesSizeGreaterThan0)
+            {
+                putEntries.putAll(newPutEntries);
+            }
+            if (newOverwrittenEntries.size() > 0)
+            {
+                overwrittenEntries.putAll(newOverwrittenEntries);
+            }
+            if (newRemovedEntriesSizeGreaterThan0)
+            {
+                removedEntries.putAll(newRemovedEntries);
+            }
 
-            ultimatelyRemovedKeys.addAll(newRemovedEntries.keySet());
-            ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
+            if (newPutEntriesSizeGreaterThan0)
+            {
+                ultimatelyAddedKeys.addAll(newPutEntries.keySet());
+            }
+            if (newRemovedEntriesSizeGreaterThan0)
+            {
+                ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
+            }
+
+            if (newRemovedEntriesSizeGreaterThan0)
+            {
+                ultimatelyRemovedKeys.addAll(newRemovedEntries.keySet());
+            }
+            if (newPutEntriesSizeGreaterThan0)
+            {
+                ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
+            }
 
             // build up the map of the list of sub-map changes, keyed by sub-map key
             // this VASTLY improves performance of merging
             subMapKeysToMerge = subsequentChange.getSubMapKeys();
             if (subMapKeysToMerge.size() > 0)
             {
+                if (subMapChangesToMerge == null)
+                {
+                    subMapChangesToMerge = new HashMap<String, List<IRecordChange>>();
+                }
                 for (subMapKeysToMergeIterator = subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext();)
                 {
                     subMapKey = subMapKeysToMergeIterator.next();
@@ -330,17 +364,22 @@ public final class AtomicChange implements IRecordChange
         }
 
         // determine what keys were ultimately added - remove them from the removedEntries
-        ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
-        for (String addedKey : ultimatelyAddedKeys)
+        if (ultimatelyRemovedKeys.size() > 0)
         {
-            removedEntries.remove(addedKey);
+            ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
+            // remove any puts/overwritten that were ultimately removed
+            for (String removedKey : ultimatelyRemovedKeys)
+            {
+                putEntries.remove(removedKey);
+                overwrittenEntries.remove(removedKey);
+            }
         }
-
-        // remove any puts/overwritten that were ultimately removed
-        for (String removedKey : ultimatelyRemovedKeys)
+        if (ultimatelyAddedKeys.size() > 0)
         {
-            putEntries.remove(removedKey);
-            overwrittenEntries.remove(removedKey);
+            for (String addedKey : ultimatelyAddedKeys)
+            {
+                removedEntries.remove(addedKey);
+            }
         }
 
         synchronized (this)
@@ -356,10 +395,11 @@ public final class AtomicChange implements IRecordChange
         setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());
 
         // now coalesce the sub-maps in each list per sub-map key
-        if (subMapChangesToMerge.size() > 0)
+        if (subMapChangesToMerge != null && subMapChangesToMerge.size() > 0)
         {
             Map.Entry<String, List<IRecordChange>> entry = null;
-            for (Iterator<Map.Entry<String, List<IRecordChange>>> it = subMapChangesToMerge.entrySet().iterator(); it.hasNext();)
+            for (Iterator<Map.Entry<String, List<IRecordChange>>> it =
+                subMapChangesToMerge.entrySet().iterator(); it.hasNext();)
             {
                 entry = it.next();
                 internalGetSubMapAtomicChange(entry.getKey()).coalesce(entry.getValue());
@@ -390,7 +430,7 @@ public final class AtomicChange implements IRecordChange
     {
         return this.sequence.get().longValue();
     }
-    
+
     void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
     {
         internalGetPutEntries().put(key, current);
@@ -416,7 +456,7 @@ public final class AtomicChange implements IRecordChange
         internalGetOverwrittenEntries().remove(key);
         internalGetRemovedEntries().put(key, value);
     }
-    
+
     void removeEntry_onlyCallFromCodec(String key, IValue value)
     {
         this.removedEntries.put(key, value);
@@ -446,7 +486,7 @@ public final class AtomicChange implements IRecordChange
                 this.putEntries = new HashMap<String, IValue>(2);
             }
             return this.putEntries;
-        }        
+        }
     }
 
     Map<String, IValue> internalGetRemovedEntries()
@@ -549,7 +589,8 @@ public final class AtomicChange implements IRecordChange
         }
         applyTo(record);
         Map<String, IValue> subMap;
-        final Set<String> subMapKeys = this.subMapAtomicChanges == null ? ContextUtils.EMPTY_STRING_SET :  this.subMapAtomicChanges.keySet();
+        final Set<String> subMapKeys =
+            this.subMapAtomicChanges == null ? ContextUtils.EMPTY_STRING_SET : this.subMapAtomicChanges.keySet();
         for (String subMapKey : subMapKeys)
         {
             subMap = record.getOrCreateSubMap(subMapKey);
