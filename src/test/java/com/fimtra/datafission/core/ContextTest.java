@@ -22,9 +22,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -863,8 +866,37 @@ public class ContextTest
 
         // wait for
         assertTrue(latch.await(5, TimeUnit.SECONDS));
+        
+        executor.shutdown();
     }
+    
+    @Test
+    public void testPublishMergeRecord()
+    {
+        IRecordListener listener = mock(IRecordListener.class);
+        IRecord record = this.candidate.createRecord("testPublishMergeRecord-rec1");
+        this.candidate.addObserver(listener, record.getName());
 
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeAtomicChange(record.getName());
+
+        record.put("key2", TextValue.valueOf("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeAtomicChange(record.getName());
+
+        record.put("key2", TextValue.valueOf("value2"));
+        this.candidate.publishMergeAtomicChange(record.getName());
+
+        record.put("key2", TextValue.valueOf("value3"));
+        this.candidate.publishMergeAtomicChange(record.getName());
+
+        // this is not a change
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeAtomicChange(record.getName());
+
+        Mockito.verify(listener, atMost(4)).onChange(any(IRecord.class), any(IRecordChange.class));
+    }
+    
     @Test
     public void testPublishAtomicChangesForNoChange() throws InterruptedException
     {

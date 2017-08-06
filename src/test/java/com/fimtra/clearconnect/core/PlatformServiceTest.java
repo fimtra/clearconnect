@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
@@ -275,7 +276,7 @@ public class PlatformServiceTest
         assertTrue(this.candidate.createRecord(record1));
         assertNotNull(this.candidate.getRecord(record1));
     }
-
+    
     @Test
     public void testUpdateRecord() throws InterruptedException
     {
@@ -283,18 +284,46 @@ public class PlatformServiceTest
         this.candidate.addRecordListener(listener, record1);
         assertTrue(this.candidate.createRecord(record1));
         IRecord record = this.candidate.getRecord(record1);
-
+        
         record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
-
+        
         record.put("key2", TextValue.valueOf("value1"));
         record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
-
+        
         // this is not a change
         record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
         verify(listener, times(3)).onChange(any(IRecord.class), any(IRecordChange.class));
+    }
+
+    @Test
+    public void testPublishMergeRecord()
+    {
+        IRecordListener listener = mock(IRecordListener.class);
+        this.candidate.addRecordListener(listener, record1);
+        assertTrue(this.candidate.createRecord(record1));
+        IRecord record = this.candidate.getRecord(record1);
+
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeRecord(record);
+
+        record.put("key2", TextValue.valueOf("value1"));
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeRecord(record);
+        
+        record.put("key2", TextValue.valueOf("value2"));
+        this.candidate.publishMergeRecord(record);
+
+        record.put("key2", TextValue.valueOf("value3"));
+        this.candidate.publishMergeRecord(record);
+
+        // this is not a change
+        record.put("key1", TextValue.valueOf("value1"));
+        this.candidate.publishMergeRecord(record);
+        
+        verify(listener, atMost(4)).onChange(any(IRecord.class), any(IRecordChange.class));
     }
 
     @Test
