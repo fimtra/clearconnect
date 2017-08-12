@@ -72,6 +72,7 @@ public class ContextThrottleTest
         {
         }
         final CountDownLatch latch = new CountDownLatch(1);
+        final CountDownLatch latch2 = new CountDownLatch(1);
         new Thread(new Runnable()
         {
             @Override
@@ -82,6 +83,7 @@ public class ContextThrottleTest
                     ContextThrottleTest.this.candidate.eventFinish();
                     latch.countDown();
                 }
+                latch2.countDown();
             }
         }).start();
         latch.await();
@@ -91,6 +93,14 @@ public class ContextThrottleTest
         time.set(System.currentTimeMillis() - start);
         assertTrue("Was: " + time.get(), time.get() < 100);
 
+        latch2.await();
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+        }
         // should not be an exception thread anymore
         assertTrue("Got: " + this.candidate.exemptThreads, this.candidate.exemptThreads.isEmpty());
     }

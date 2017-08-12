@@ -621,9 +621,9 @@ public class PlatformServiceProxyTest
 
         record = this.service.getOrCreateRecord(record1);
         record.put("time", System.currentTimeMillis());
+        latch.set(new CountDownLatch(1));
         this.service.publishRecord(record);
 
-        latch.set(new CountDownLatch(1));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
     }
 
