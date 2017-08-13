@@ -601,13 +601,11 @@ public class PlatformTest
             serviceListener.verifyNoMoreInteractions();
 
             verify(ftStatusListener3, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
-            verify(ftStatusListener3, times(1)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener3, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
 
             Log.log(this, ">>>>> destroying SERVICE1 PRIMARY (AGAIN)");
             // destroy it (again!)
             this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
-
-            verify(ftStatusListener2, times(1)).onStandby(eq(SERVICE1), eq(this.secondary));
 
             serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
             serviceListener.verifyNoMoreInteractions();
@@ -1460,7 +1458,7 @@ public class PlatformTest
         return PlatformUtils.composeHostQualifiedName() + "-" + this.name.getMethodName();
     }
 
-    private String getPlatformName()
+    String getPlatformName()
     {
         return TEST_PLATFORM + this.name.getMethodName();
     }
