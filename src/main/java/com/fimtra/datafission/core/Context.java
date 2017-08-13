@@ -771,15 +771,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return;
         }
 
-        this.throttle.eventStart(name, false);
-
         try
         {
             final IRecord record = this.records.get(name);
             if (record == null)
             {
                 Log.log(this, "Ignoring publish of non-existent record [", name, "]");
-                this.throttle.eventFinish();
                 return;
             }
 
@@ -790,7 +787,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // data
                 if ((atomicChange == null || atomicChange.isEmpty()))
                 {
-                    this.throttle.eventFinish();
                     return;
                 }
 
@@ -810,7 +806,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
         catch (RuntimeException e)
         {
-            this.throttle.eventFinish();
             throw e;
         }
     }
