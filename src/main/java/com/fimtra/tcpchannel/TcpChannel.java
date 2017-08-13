@@ -401,7 +401,7 @@ public class TcpChannel implements ITransportChannel
                         break;
                 }
                 
-                if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS > 0)
+                if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
                 {
                     // NATURAL THROTTLE
                     try
@@ -643,7 +643,10 @@ public class TcpChannel implements ITransportChannel
                 }
                 finally
                 {
-                    channel.lock.notify();
+                    if(TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
+                    {
+                        channel.lock.notify();
+                    }
                 }
             }
         }

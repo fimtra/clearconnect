@@ -181,9 +181,9 @@ public abstract class TcpChannelProperties
          * The send factor (in milliseconds) to wait for a TCP message to be sent in
          * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
          * <p>
-         * Default is: 10
+         * Default is: 0
          */
-        int SEND_WAIT_FACTOR_MILLIS = Integer.parseInt(System.getProperty(Names.SEND_WAIT_FACTOR_MILLIS, "10"));
+        int SEND_WAIT_FACTOR_MILLIS = Integer.parseInt(System.getProperty(Names.SEND_WAIT_FACTOR_MILLIS, "0"));
     }
 
     private TcpChannelProperties()
