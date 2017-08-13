@@ -100,6 +100,13 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.sendWaitFactorMillis=10</code>
          */
         String SEND_WAIT_FACTOR_MILLIS = BASE + "sendWaitFactorMillis";
+        /**
+         * The system property name to define writing to the TCP socket using the application
+         * thread.
+         * <p>
+         * E.g. <code>-DtcpChannel.writeToSocketUsingApplicationThread=true</code>
+         */
+        String WRITE_TO_SOCKET_USING_APPLICATION_THREAD = BASE + "writeToSocketUsingApplicationThread";
     }
 
     /**
@@ -176,7 +183,7 @@ public abstract class TcpChannelProperties
          */
         int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
             Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
-
+        
         /**
          * The send factor (in milliseconds) to wait for a TCP message to be sent in
          * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
@@ -184,6 +191,15 @@ public abstract class TcpChannelProperties
          * Default is: 0
          */
         int SEND_WAIT_FACTOR_MILLIS = Integer.parseInt(System.getProperty(Names.SEND_WAIT_FACTOR_MILLIS, "0"));
+
+        /**
+         * Defines whether writing to the socket in the {@link TcpChannel#send(byte[])} is performed
+         * using the application thread or the TCP writer thread.
+         * <p>
+         * Default is: false (use the TCP writer thread)
+         */
+        boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD =
+            Boolean.getBoolean(Names.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
     }
 
     private TcpChannelProperties()

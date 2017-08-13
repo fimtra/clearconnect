@@ -39,6 +39,8 @@ import com.fimtra.channel.ITransportChannel;
  */
 public class TestTcpChannel
 {
+    static int SERVER_PORT = 20000;
+    
     TcpServer server;
     TcpChannel c1;
 
@@ -50,13 +52,13 @@ public class TestTcpChannel
     @After
     public void tearDown() throws Exception
     {
-        if (server != null)
+        if (this.server != null)
         {
-            server.destroy();
+            this.server.destroy();
         }
-        if (c1 != null)
+        if (this.c1 != null)
         {
-            c1.destroy("end test");
+            this.c1.destroy("end test");
         }
     }
 
@@ -65,7 +67,7 @@ public class TestTcpChannel
     public void testAttemptConnectToNonExistentServer() throws IOException
     {
         IReceiver receiver = mock(IReceiver.class);
-        new TcpChannel("localhost", 20000, receiver);
+        new TcpChannel("localhost", SERVER_PORT, receiver);
     }
 
     @Test
@@ -110,8 +112,8 @@ public class TestTcpChannel
 
             }
         };
-        TcpServer server = new TcpServer("127.0.0.1", 20000, receiver);
-        TcpChannel c1 = new TcpChannel("127.0.0.1", 20000, mock(IReceiver.class));
+        this.server = new TcpServer("127.0.0.1", SERVER_PORT, receiver);
+        TcpChannel c1 = new TcpChannel("127.0.0.1", SERVER_PORT, mock(IReceiver.class));
 
         long start = System.nanoTime();
         for (int i = 0; i < max; i++)
@@ -122,7 +124,7 @@ public class TestTcpChannel
             size += bytes.length;
         }
 
-        assertTrue("Got: " + rxData.size(), latch.await(5, TimeUnit.SECONDS));
+        assertTrue("Got: " + rxData.size(), latch.await(10, TimeUnit.SECONDS));
         final long latency = System.nanoTime() - start;
         System.err.println("TCP max velocity: " + (max / (latency / 1000000000)) + " msgs/s, "
             + (size / (latency / 1000000000)) + " b/s");

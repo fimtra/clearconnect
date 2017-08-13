@@ -48,7 +48,7 @@ import com.fimtra.util.ObjectUtils;
 public class TcpChannel implements ITransportChannel
 {
     private static final double _INVERSE_1000000 = 1 / 1000000d;
-    
+
     /** Expresses the encoding format for the data frames */
     public static enum FrameEncodingFormatEnum
     {
@@ -63,7 +63,7 @@ public class TcpChannel implements ITransportChannel
              *  data = 1*OCTET ; the data
              * </pre>
              */
-        LENGTH_BASED,
+            LENGTH_BASED,
 
             /**
              * Terminator-based frame encoding, in the following format (ABNF notation):
@@ -77,7 +77,7 @@ public class TcpChannel implements ITransportChannel
              * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
              * </pre>
              */
-        TERMINATOR_BASED;
+            TERMINATOR_BASED;
 
         /**
          * @param tcpChannel
@@ -109,7 +109,7 @@ public class TcpChannel implements ITransportChannel
 
     /** Represents the ASCII code for CRLF */
     static final byte[] TERMINATOR = { 0xd, 0xa };
-    
+
     /**
      * This is the start of the logical linked-list of TcpChannels with data to send. This is an
      * equal-sending-opportunity mechanism. The list is traversed from start to end, each channel
@@ -145,7 +145,7 @@ public class TcpChannel implements ITransportChannel
             }
         }
     }
-    
+
     private synchronized static final void unlinkChannel(TcpChannel channel)
     {
         if (channel.next != null)
@@ -167,18 +167,17 @@ public class TcpChannel implements ITransportChannel
         channel.next = null;
         channel.prev = null;
     }
-    
-  
+
     TcpChannel next;
     TcpChannel prev;
-    
+
     int rxData;
     final IReceiver receiver;
     final ByteBuffer rxBytes;
     ByteBuffer[] readFrames = new ByteBuffer[10];
     byte[][] resolvedFrames = new byte[10][];
     final int[] readFramesSize = new int[1];
-    final Queue<ByteBuffer[]> txFrames = CollectionUtils.newDeque();    
+    final Queue<ByteBuffer[]> txFrames = CollectionUtils.newDeque();
     final ByteBuffer[][] txFrameBufferPool = new ByteBuffer[][] { new ByteBuffer[2], new ByteBuffer[2],
         new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], };
     int txFrameBufferPoolPtr = 0;
@@ -201,8 +200,9 @@ public class TcpChannel implements ITransportChannel
     private final AtomicBoolean onChannelClosedCalled;
     private final Object lock = new Object();
 
-    StateEnum state = StateEnum.IDLE;
+    private final boolean writeToSocketUsingApplicationThread;
 
+    StateEnum state = StateEnum.IDLE;
 
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
@@ -226,9 +226,10 @@ public class TcpChannel implements ITransportChannel
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver, int rxBufferSize) throws ConnectException
     {
-        this(serverHost, serverPort, receiver, rxBufferSize, TcpChannelProperties.Values.FRAME_ENCODING);
+        this(serverHost, serverPort, receiver, rxBufferSize, TcpChannelProperties.Values.FRAME_ENCODING,
+            TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
     }
-
+    
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
      * format.
@@ -239,7 +240,22 @@ public class TcpChannel implements ITransportChannel
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
         FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException
     {
-        this(serverHost, serverPort, receiver, TcpChannelProperties.Values.RX_BUFFER_SIZE, frameEncodingFormat);
+        this(serverHost, serverPort, receiver, TcpChannelProperties.Values.RX_BUFFER_SIZE, frameEncodingFormat,
+            TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
+    }
+
+    /**
+     * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
+     * format.
+     * 
+     * @see TcpChannelProperties#RX_BUFFER_SIZE
+     * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
+     */
+    public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
+    {
+        this(serverHost, serverPort, receiver, TcpChannelProperties.Values.RX_BUFFER_SIZE, frameEncodingFormat,
+            writeToSocketUsingApplicationThread);
     }
 
     /**
@@ -259,15 +275,19 @@ public class TcpChannel implements ITransportChannel
      *            the size of the receive buffer in bytes
      * @param frameEncodingFormat
      *            the enum for the frame format for this channel
+     * @param writeToSocketUsingApplicationThread
+     *            flag to indicate if frames are written to the TCP socket using the application
+     *            thread calling {@link #send(byte[])} or by the TCP writer thread.
      * @throws ConnectException
      *             if the TCP connection could not be established
      */
     public TcpChannel(final String serverHost, final int serverPort, final IReceiver receiver, int rxBufferSize,
-        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
+        this.writeToSocketUsingApplicationThread = writeToSocketUsingApplicationThread;
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
         this.endPointSocketDescription = serverHost + ":" + serverPort;
@@ -279,12 +299,13 @@ public class TcpChannel implements ITransportChannel
 
     /** Internally used constructor for server-side channels */
     TcpChannel(SocketChannel socketChannel, IReceiver receiver, int rxBufferSize,
-        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
         this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
+        this.writeToSocketUsingApplicationThread = writeToSocketUsingApplicationThread;
         this.receiver = receiver;
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
 
@@ -308,7 +329,7 @@ public class TcpChannel implements ITransportChannel
         }
 
         TcpChannelUtils.setOptions(this.socketChannel);
-        
+
         try
         {
             TcpChannelUtils.WRITER.register(this.socketChannel, new Runnable()
@@ -328,7 +349,7 @@ public class TcpChannel implements ITransportChannel
             Log.log(this, message, e);
             throw new ConnectException(message);
         }
-        
+
         try
         {
             TcpChannelUtils.READER.register(this.socketChannel, new Runnable()
@@ -361,7 +382,7 @@ public class TcpChannel implements ITransportChannel
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
 
     }
-        
+
     @Override
     public boolean send(byte[] toSend)
     {
@@ -385,8 +406,22 @@ public class TcpChannel implements ITransportChannel
                     }
                     buffer[0] = byteFragmentsToSend[i++];
                     buffer[1] = byteFragmentsToSend[i++];
-                    this.txFrames.add(buffer);
+                    if (this.writeToSocketUsingApplicationThread)
+                    {
+                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(buffer[0], buffer[1]);
+                        this.txFrameBufferPoolPtr--;
+                    }
+                    else
+                    {
+                        this.txFrames.add(buffer);
+                    }
                 }
+                
+                if (this.writeToSocketUsingApplicationThread)
+                {
+                    return true;
+                }
+                
                 switch(this.state)
                 {
                     case DESTROYED:
@@ -400,7 +435,7 @@ public class TcpChannel implements ITransportChannel
                     default :
                         break;
                 }
-                
+
                 if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
                 {
                     // NATURAL THROTTLE
@@ -424,7 +459,7 @@ public class TcpChannel implements ITransportChannel
             return false;
         }
     }
-    
+
     @Override
     @Deprecated
     public boolean sendAsync(byte[] toSend)
@@ -459,7 +494,7 @@ public class TcpChannel implements ITransportChannel
         try
         {
             this.rxBytes.compact();
-            
+
             final int readCount = this.socketChannel.read(this.rxBytes);
 
             switch(readCount)
@@ -499,7 +534,7 @@ public class TcpChannel implements ITransportChannel
             ByteBuffer frame;
             byte[] data;
             size = this.readFramesSize[0];
-            int i = 0;            
+            int i = 0;
             int resolvedFramesSize = 0;
             for (i = 0; i < size; i++)
             {
@@ -573,7 +608,7 @@ public class TcpChannel implements ITransportChannel
             }
         }
     }
-    
+
     static final void writeFrames()
     {
         /*
@@ -643,7 +678,7 @@ public class TcpChannel implements ITransportChannel
                 }
                 finally
                 {
-                    if(TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
+                    if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
                     {
                         channel.lock.notify();
                     }
@@ -704,10 +739,9 @@ public class TcpChannel implements ITransportChannel
                 this.state = StateEnum.DESTROYED;
                 this.txFrames.clear();
                 this.rxBytes.clear();
-                
+
                 unlinkChannel(this);
             }
-            
 
             if (this.socketChannel != null)
             {
@@ -715,7 +749,7 @@ public class TcpChannel implements ITransportChannel
                 TcpChannelUtils.READER.cancel(this.socketChannel);
                 TcpChannelUtils.WRITER.cancel(this.socketChannel);
             }
-            
+
             this.receiver.onChannelClosed(this);
         }
         catch (Exception e1)
@@ -798,7 +832,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
      * @throws IOException
      */
     void writeBuffersToSocket() throws IOException
-    {       
+    {
         while (this.buffers[0].hasRemaining() || this.buffers[1].hasRemaining())
         {
             this.tcpChannel.socketChannel.write(this.buffers);

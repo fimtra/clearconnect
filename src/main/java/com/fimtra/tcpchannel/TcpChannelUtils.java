@@ -105,6 +105,29 @@ public abstract class TcpChannelUtils
     {
         return ChannelUtils.getNextAvailableServicePort();
     }
+    
+    /**
+     * Set whether {@link TcpChannel} instances should be constructed to handle TCP socket writing
+     * using the application thread or use the TCP writer thread to handle.
+     * 
+     * @param useApplicationThread
+     *            <code>true</code> for application thread to handle the TCP socket writing,
+     *            <code>false</code> for the TCP writer thread to handle it
+     */
+    public static void setWriteToSocketUsingApplicationThread(boolean useApplicationThread)
+    {
+        WRITE_TO_SOCKET_USING_APPLICATION_THREAD = useApplicationThread;
+    }
+
+    /**
+     * @see #setWriteToSocketUsingApplicationThread(boolean)
+     */
+    public static boolean isWriteToSocketUsingApplicationThread()
+    {
+        return WRITE_TO_SOCKET_USING_APPLICATION_THREAD;
+    }
+
+    private static boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD = TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD;
 
     /**
      * Handles the connection result for a call to
