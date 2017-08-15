@@ -396,23 +396,23 @@ public class TcpChannel implements ITransportChannel
                 ByteBuffer[] buffer;
                 for (int i = 0; i < byteFragmentsToSend.length;)
                 {
-                    if (this.txFrameBufferPoolPtr < this.txFrameBufferPool.length)
-                    {
-                        buffer = this.txFrameBufferPool[this.txFrameBufferPoolPtr++];
-                    }
-                    else
-                    {
-                        buffer = new ByteBuffer[2];
-                    }
-                    buffer[0] = byteFragmentsToSend[i++];
-                    buffer[1] = byteFragmentsToSend[i++];
                     if (this.writeToSocketUsingApplicationThread)
                     {
-                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(buffer[0], buffer[1]);
-                        this.txFrameBufferPoolPtr--;
+                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i++],
+                            byteFragmentsToSend[i++]);
                     }
                     else
                     {
+                        if (this.txFrameBufferPoolPtr < this.txFrameBufferPool.length)
+                        {
+                            buffer = this.txFrameBufferPool[this.txFrameBufferPoolPtr++];
+                        }
+                        else
+                        {
+                            buffer = new ByteBuffer[2];
+                        }
+                        buffer[0] = byteFragmentsToSend[i++];
+                        buffer[1] = byteFragmentsToSend[i++];
                         this.txFrames.add(buffer);
                     }
                 }
