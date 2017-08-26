@@ -69,8 +69,8 @@ public abstract class TcpChannelUtils
             }
             catch (Exception e)
             {
-                Log.log(TcpChannelUtils.class, "Could not read socket option " + ObjectUtils.safeToString(key)
-                    + " from system properties", e);
+                Log.log(TcpChannelUtils.class,
+                    "Could not read socket option " + ObjectUtils.safeToString(key) + " from system properties", e);
             }
         }
         Log.log(TcpChannelUtils.class, "Socket options: ", ObjectUtils.safeToString(SOCKET_OPTIONS));
@@ -105,7 +105,7 @@ public abstract class TcpChannelUtils
     {
         return ChannelUtils.getNextAvailableServicePort();
     }
-    
+
     /**
      * Set whether {@link TcpChannel} instances should be constructed to handle TCP socket writing
      * using the application thread or use the TCP writer thread to handle.
@@ -127,7 +127,8 @@ public abstract class TcpChannelUtils
         return WRITE_TO_SOCKET_USING_APPLICATION_THREAD;
     }
 
-    private static boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD = TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD;
+    private static boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD =
+        TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD;
 
     /**
      * Handles the connection result for a call to
@@ -140,15 +141,51 @@ public abstract class TcpChannelUtils
         void onConnectionFailed(Exception e);
     }
 
-    /** Handles all socket read operations for all {@link TcpChannel} instances */
-    final static SelectorProcessor READER = new SelectorProcessor("tcp-channel-reader", SelectionKey.OP_READ);
+    /** Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin. */
+    private final static SelectorProcessor[] READER;
+    private static int currentReader = 0;
+    static
+    {
+        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
+        for (int i = 0; i < READER.length; i++)
+        {
+            READER[i] = new SelectorProcessor("tcp-channel-reader-" + i, SelectionKey.OP_READ);
+        }
+    }
 
-    /** Handles all socket write operations for all {@link TcpChannel} instances */
-    final static SelectorProcessor WRITER = new SelectorProcessor("tcp-channel-writer", SelectionKey.OP_WRITE);
+    static final synchronized SelectorProcessor nextReader()
+    {
+        if (currentReader == READER.length)
+        {
+            currentReader = 0;
+        }
+        return READER[currentReader++];
+    }
+
+    /** Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin. */
+    private final static SelectorProcessor[] WRITER;
+    private static int currentWriter = 0;
+    static
+    {
+        WRITER = new SelectorProcessor[TcpChannelProperties.Values.WRITER_THREAD_COUNT];
+        for (int i = 0; i < WRITER.length; i++)
+        {
+            WRITER[i] = new SelectorProcessor("tcp-channel-writer-" + i, SelectionKey.OP_WRITE);
+        }
+    }
+
+    static final synchronized SelectorProcessor nextWriter()
+    {
+        if (currentWriter == WRITER.length)
+        {
+            currentWriter = 0;
+        }
+        return WRITER[currentWriter++];
+    }
 
     /** Handles all socket accept operations for all {@link TcpServer} instances */
-    final static SelectorProcessor ACCEPT_PROCESSOR = new SelectorProcessor("tcp-channel-accept",
-        SelectionKey.OP_ACCEPT);
+    final static SelectorProcessor ACCEPT_PROCESSOR =
+        new SelectorProcessor("tcp-channel-accept", SelectionKey.OP_ACCEPT);
 
     /**
      * The public facing IP for the local host
@@ -280,8 +317,8 @@ public abstract class TcpChannelUtils
      * @throws BufferOverflowException
      *             if the buffer size cannot hold a complete frame
      */
-    static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] terminator)
-        throws BufferOverflowException
+    static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer,
+        byte[] terminator) throws BufferOverflowException
     {
         ByteBuffer[] decoded = frames;
         framesSize[0] = 0;

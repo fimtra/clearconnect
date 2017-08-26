@@ -107,6 +107,18 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.writeToSocketUsingApplicationThread=true</code>
          */
         String WRITE_TO_SOCKET_USING_APPLICATION_THREAD = BASE + "writeToSocketUsingApplicationThread";
+        /**
+         * The system property name to define the number of threads to use for TCP socket reading.
+         * <p>
+         * E.g. <code>-DtcpChannel.readerThreadCount=4</code>
+         */
+        String READER_THREAD_COUNT = BASE + "readerThreadCount";
+        /**
+         * The system property name to define the number of threads to use for TCP socket sending.
+         * <p>
+         * E.g. <code>-DtcpChannel.writerThreadCount=4</code>
+         */
+        String WRITER_THREAD_COUNT = BASE + "writerThreadCount";
     }
 
     /**
@@ -146,7 +158,7 @@ public abstract class TcpChannelProperties
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
             Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
-        
+
         /**
          * The threshold value for logging when RX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP RX handling.
@@ -157,7 +169,7 @@ public abstract class TcpChannelProperties
          */
         long SLOW_RX_FRAME_THRESHOLD_NANOS =
             Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
-        
+
         /**
          * The value for the minimum alive time, in milliseconds, for a socket before it is
          * classified as a "short-lived socket" and increases the short-lived socket count for the
@@ -183,7 +195,7 @@ public abstract class TcpChannelProperties
          */
         int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
             Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
-        
+
         /**
          * The send factor (in milliseconds) to wait for a TCP message to be sent in
          * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
@@ -200,6 +212,20 @@ public abstract class TcpChannelProperties
          */
         boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD =
             Boolean.getBoolean(Names.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
+
+        /**
+         * The number of threads to use for TCP socket reading.
+         * <p>
+         * Default is: 4
+         */
+        int READER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.READER_THREAD_COUNT, "4"));
+
+        /**
+         * The number of threads to use for TCP socket writing.
+         * <p>
+         * Default is: 4
+         */
+        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "4"));
     }
 
     private TcpChannelProperties()

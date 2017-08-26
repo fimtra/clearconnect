@@ -24,7 +24,9 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -111,43 +113,71 @@ public class TcpChannel implements ITransportChannel
     static final byte[] TERMINATOR = { 0xd, 0xa };
 
     /**
-     * This is the start of the logical linked-list of TcpChannels with data to send. This is an
-     * equal-sending-opportunity mechanism. The list is traversed from start to end, each channel
-     * has one frame sent, looping back to the start and continuing sending one frame for each
-     * channel. If a channel has no more frames to sent, it is unlinked by
-     * {@link #unlinkChannel(TcpChannel)}
-     */
-    static volatile TcpChannel first;
-    /**
-     * The end of the logical linked-list of TcpChannels with data to send.
+     * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
+     * the same {@link SelectorProcessor}.
      * 
-     * @see #first
+     * @author Ramon Servadei
      */
-    static volatile TcpChannel last;
+    private static final class SendChannelChain
+    {
+        SendChannelChain()
+        {
+        }
+        
+        /**
+         * This is the start of the logical linked-list of TcpChannels with data to send. This is an
+         * equal-sending-opportunity mechanism. The list is traversed from start to end, each
+         * channel has one frame sent, looping back to the start and continuing sending one frame
+         * for each channel. If a channel has no more frames to sent, it is unlinked by
+         * {@link #unlinkChannel(TcpChannel)}
+         */
+        volatile TcpChannel first;
+        /**
+         * The end of the logical linked-list of TcpChannels with data to send.
+         * 
+         * @see #first
+         */
+        volatile TcpChannel last;
+    }
+
+    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =
+        new HashMap<SelectorProcessor, SendChannelChain>();
 
     private synchronized static final void linkChannel(TcpChannel channel)
     {
-        if (channel.prev == null && channel.next == null && first != channel)
+        SendChannelChain chain = sendChannelChains.get(channel.writer);
+        if (chain == null)
         {
-            if (first == null)
+            chain = new SendChannelChain();
+            sendChannelChains.put(channel.writer, chain);
+        }
+        if (channel.prev == null && channel.next == null && chain.first != channel)
+        {
+            if (chain.first == null)
             {
-                first = channel;
-                last = channel;
+                chain.first = channel;
+                chain.last = channel;
                 channel.prev = null;
                 channel.next = null;
             }
             else
             {
-                last.next = channel;
-                channel.prev = last;
+                chain.last.next = channel;
+                channel.prev = chain.last;
                 channel.next = null;
-                last = channel;
+                chain.last = channel;
             }
         }
     }
 
     private synchronized static final void unlinkChannel(TcpChannel channel)
     {
+        SendChannelChain chain = sendChannelChains.get(channel.writer);
+        if (chain == null)
+        {
+            chain = new SendChannelChain();
+            sendChannelChains.put(channel.writer, chain);
+        }
         if (channel.next != null)
         {
             channel.next.prev = channel.prev;
@@ -156,13 +186,13 @@ public class TcpChannel implements ITransportChannel
         {
             channel.prev.next = channel.next;
         }
-        if (channel == first)
+        if (channel == chain.first)
         {
-            first = channel.next;
+            chain.first = channel.next;
         }
-        if (channel == last)
+        if (channel == chain.last)
         {
-            last = channel.prev;
+            chain.last = channel.prev;
         }
         channel.next = null;
         channel.prev = null;
@@ -171,6 +201,8 @@ public class TcpChannel implements ITransportChannel
     TcpChannel next;
     TcpChannel prev;
 
+    final SelectorProcessor reader;
+    final SelectorProcessor writer;
     int rxData;
     final IReceiver receiver;
     final ByteBuffer rxBytes;
@@ -229,7 +261,7 @@ public class TcpChannel implements ITransportChannel
         this(serverHost, serverPort, receiver, rxBufferSize, TcpChannelProperties.Values.FRAME_ENCODING,
             TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
     }
-    
+
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
      * format.
@@ -252,7 +284,8 @@ public class TcpChannel implements ITransportChannel
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
-        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread)
+        throws ConnectException
     {
         this(serverHost, serverPort, receiver, TcpChannelProperties.Values.RX_BUFFER_SIZE, frameEncodingFormat,
             writeToSocketUsingApplicationThread);
@@ -282,13 +315,16 @@ public class TcpChannel implements ITransportChannel
      *             if the TCP connection could not be established
      */
     public TcpChannel(final String serverHost, final int serverPort, final IReceiver receiver, int rxBufferSize,
-        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread)
+        throws ConnectException
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.rxBytes = ByteBuffer.wrap(new byte[rxBufferSize]);
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.writeToSocketUsingApplicationThread = writeToSocketUsingApplicationThread;
         this.receiver = receiver;
+        this.reader = TcpChannelUtils.nextReader();
+        this.writer = TcpChannelUtils.nextWriter();
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
         this.endPointSocketDescription = serverHost + ":" + serverPort;
         this.socketChannel = TcpChannelUtils.createAndConnectNonBlockingSocketChannel(serverHost, serverPort);
@@ -299,7 +335,8 @@ public class TcpChannel implements ITransportChannel
 
     /** Internally used constructor for server-side channels */
     TcpChannel(SocketChannel socketChannel, IReceiver receiver, int rxBufferSize,
-        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread) throws ConnectException
+        FrameEncodingFormatEnum frameEncodingFormat, boolean writeToSocketUsingApplicationThread)
+        throws ConnectException
     {
         this.onChannelClosedCalled = new AtomicBoolean();
         this.socketChannel = socketChannel;
@@ -307,6 +344,8 @@ public class TcpChannel implements ITransportChannel
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.writeToSocketUsingApplicationThread = writeToSocketUsingApplicationThread;
         this.receiver = receiver;
+        this.reader = TcpChannelUtils.nextReader();
+        this.writer = TcpChannelUtils.nextWriter();
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
 
         final Socket socket = this.socketChannel.socket();
@@ -332,16 +371,16 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            TcpChannelUtils.WRITER.register(this.socketChannel, new Runnable()
+            this.writer.register(this.socketChannel, new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    writeFrames();
+                    writeFrames(TcpChannel.this.writer);
                 }
             });
 
-            TcpChannelUtils.WRITER.resetInterest(this.socketChannel);
+            this.writer.resetInterest(this.socketChannel);
         }
         catch (Exception e)
         {
@@ -352,12 +391,11 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            TcpChannelUtils.READER.register(this.socketChannel, new Runnable()
+            this.reader.register(this.socketChannel, new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    // todo multithread?
                     try
                     {
                         readFrames();
@@ -416,12 +454,12 @@ public class TcpChannel implements ITransportChannel
                         this.txFrames.add(buffer);
                     }
                 }
-                
+
                 if (this.writeToSocketUsingApplicationThread)
                 {
                     return true;
                 }
-                
+
                 switch(this.state)
                 {
                     case DESTROYED:
@@ -429,7 +467,7 @@ public class TcpChannel implements ITransportChannel
                     case IDLE:
                         this.state = StateEnum.SENDING;
                         linkChannel(this);
-                        TcpChannelUtils.WRITER.setInterest(this.socketChannel);
+                        this.writer.setInterest(this.socketChannel);
                         break;
                     case SENDING:
                     default :
@@ -522,8 +560,7 @@ public class TcpChannel implements ITransportChannel
                 catch (Exception e)
                 {
                     Log.log(this, ObjectUtils.safeToString(this) + " receiver "
-                        + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected",
-                        e);
+                        + ObjectUtils.safeToString(this.receiver) + " threw exception during onChannelConnected", e);
                 }
                 connected = System.nanoTime();
             }
@@ -609,7 +646,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
-    static final void writeFrames()
+    static final void writeFrames(SelectorProcessor writer)
     {
         /*
          * This code logic will give equal opportunity for sending across all channels in the
@@ -618,11 +655,21 @@ public class TcpChannel implements ITransportChannel
          */
         ByteBuffer[] data = null;
         TcpChannel channel = null;
-        while (first != null)
+        final SendChannelChain chain;
+        synchronized (TcpChannel.class)
+        {
+            chain = sendChannelChains.get(writer);
+        }
+        // should never happen but do this to be defensive
+        if (chain == null)
+        {
+            return;
+        }
+        while (chain.first != null)
         {
             if (channel == null)
             {
-                channel = first;
+                channel = chain.first;
             }
             else
             {
@@ -693,7 +740,7 @@ public class TcpChannel implements ITransportChannel
         unlinkChannel(channel);
         try
         {
-            TcpChannelUtils.WRITER.resetInterest(channel.socketChannel);
+            channel.writer.resetInterest(channel.socketChannel);
         }
         catch (CancelledKeyException e)
         {
@@ -746,8 +793,8 @@ public class TcpChannel implements ITransportChannel
             if (this.socketChannel != null)
             {
                 TcpChannelUtils.closeChannel(this.socketChannel);
-                TcpChannelUtils.READER.cancel(this.socketChannel);
-                TcpChannelUtils.WRITER.cancel(this.socketChannel);
+                this.reader.cancel(this.socketChannel);
+                this.writer.cancel(this.socketChannel);
             }
 
             this.receiver.onChannelClosed(this);
