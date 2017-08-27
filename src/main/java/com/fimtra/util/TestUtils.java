@@ -97,6 +97,14 @@ public abstract class TestUtils
 
     private static boolean check(EventChecker check)
     {
-        return !is.eq(check.got(), check.expect());
+        try
+        {
+            return !is.eq(check.got(), check.expect());
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
     }
 }
