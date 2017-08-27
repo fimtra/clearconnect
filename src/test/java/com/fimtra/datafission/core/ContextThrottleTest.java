@@ -59,7 +59,7 @@ public class ContextThrottleTest
         }
         time.set(System.currentTimeMillis() - start);
 
-        assertTrue("Was: " + time.get(), time.get() > 1000);
+        assertTrue("Was: " + time.get(), time.get() >= 1000);
         assertEquals(LIMIT * 4, this.candidate.eventCount.get());
         assertEquals("Got: " + this.candidate.exemptThreads, 1, this.candidate.exemptThreads.size());
 
