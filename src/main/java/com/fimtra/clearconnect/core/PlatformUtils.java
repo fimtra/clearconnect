@@ -67,6 +67,7 @@ import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.tcpchannel.TcpChannelProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
 import com.fimtra.util.LazyObject.IDestructor;
@@ -89,6 +90,7 @@ public class PlatformUtils
     static
     {
         String version = "";
+        final String newline = SystemUtils.lineSeparator();
         try
         {
             final Enumeration<URL> manifests = PlatformUtils.class.getClassLoader().getResources(JarFile.MANIFEST_NAME);
@@ -97,7 +99,7 @@ public class PlatformUtils
                 version = ClassUtils.getManifestEntriesAsString(manifests.nextElement(), ClassUtils.fimtraVersionKeys);
                 if (version.toLowerCase().contains("clearconnect@fimtra.com"))
                 {
-                    final String[] tokens = version.split(SystemUtils.lineSeparator());
+                    final String[] tokens = version.split(newline);
                     for (String token : tokens)
                     {
                         if (token.toLowerCase().startsWith("version"))
@@ -116,7 +118,7 @@ public class PlatformUtils
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append(SystemUtils.lineSeparator()).append("============ START System Properties ============").append(SystemUtils.lineSeparator());
+        sb.append(newline).append("============ START System Properties ============").append(newline);
         TreeSet<String> sortedKeys = new TreeSet<String>();
         final Enumeration<Object> keys = System.getProperties().keys();
         while(keys.hasMoreElements())
@@ -125,22 +127,22 @@ public class PlatformUtils
         }
         for (String key : sortedKeys)
         {
-            sb.append(key).append("=").append(System.getProperty(key)).append(SystemUtils.lineSeparator());
+            sb.append(key).append("=").append(System.getProperty(key)).append(newline);
         }
         sb.append("============ END System Properties ============");
         Log.log(PlatformUtils.class, sb.toString());
-        
+
         sb = new StringBuilder();
-        sb.append("ClearConnect").append(SystemUtils.lineSeparator());
-        sb.append(version).append(SystemUtils.lineSeparator());
+        sb.append("ClearConnect").append(newline);
+        sb.append(version).append(newline);
         sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
-            SystemUtils.lineSeparator());
-        sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(SystemUtils.lineSeparator());
-        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(
-            SystemUtils.lineSeparator());
-        sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(
-            SystemUtils.lineSeparator());
-        sb.append("CPU count: ").append(Runtime.getRuntime().availableProcessors());
+            newline);
+        sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
+        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
+        sb.append("TCP writer thread count: ").append(TcpChannelProperties.Values.WRITER_THREAD_COUNT).append(newline);
+        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
+        sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(newline);
+        sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors());
         Log.banner(PlatformUtils.class, sb.toString());
 
         String versionNumber = "?.?.?";
