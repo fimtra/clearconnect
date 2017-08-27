@@ -2054,6 +2054,7 @@ final class EventHandler
         }
         catch (Exception e)
         {
+            Log.log(this,  "Could not execute FT service RPC", e);
             executeDeregisterPlatformServiceInstance(registrationToken, serviceFamily, activeServiceInstanceId,
                 "could not signal " + (active ? "MASTER" : "STANDBY") + " FT status:" + e.toString());
             return false;
