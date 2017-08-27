@@ -825,49 +825,55 @@ public class ContextUtils
     public static IRpcInstance getRpc(final ProxyContext proxy, long discoveryTimeoutMillis, final String rpcName)
         throws TimeOutException
     {
-        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
-        rpcRef.set(proxy.getRpc(rpcName));
-        if (rpcRef.get() == null)
+        final IRpcInstance rpc = proxy.getRpc(rpcName);
+        if (rpc != null)
         {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final IRecordListener observer = new IRecordListener()
+            return rpc;
+        }
+
+        // NOTE: even though the ProxyContext subscribes for the ContextRpcs record on construction,
+        // race conditions may mean that the record has not been fully received yet, hence if the
+        // record does not have the rpc name we add our own listener (then remove it).
+        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
+        final CountDownLatch latch = new CountDownLatch(1);
+        final IRecordListener observer = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                final IRpcInstance rpc = proxy.getRpc(rpcName);
+                if (rpc != null)
                 {
-                    if (proxy.getRpc(rpcName) != null)
+                    try
                     {
-                        try
-                        {
-                            rpcRef.set(proxy.getRpc(rpcName));
-                        }
-                        finally
-                        {
-                            latch.countDown();
-                        }
+                        rpcRef.set(rpc);
+                    }
+                    finally
+                    {
+                        latch.countDown();
                     }
                 }
-            };
+            }
+        };
+        try
+        {
+            proxy.addObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
             try
             {
-                proxy.addObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                try
+                if (!latch.await(discoveryTimeoutMillis, TimeUnit.MILLISECONDS))
                 {
-                    if (!latch.await(discoveryTimeoutMillis, TimeUnit.MILLISECONDS))
-                    {
-                        throw new TimeOutException("No RPC found with name [" + rpcName + "] during discovery period "
-                            + discoveryTimeoutMillis + "ms");
-                    }
-                }
-                catch (InterruptedException e)
-                {
-                    // we don't care!
+                    throw new TimeOutException("No RPC found with name [" + rpcName + "] during discovery period "
+                        + discoveryTimeoutMillis + "ms");
                 }
             }
-            finally
+            catch (InterruptedException e)
             {
-                proxy.removeObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                // we don't care!
             }
+        }
+        finally
+        {
+            proxy.removeObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         }
         return rpcRef.get();
     }

@@ -966,54 +966,56 @@ public class PlatformUtils
     public static IRpcInstance getRpc(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException
     {
-        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
-        rpcRef.set(component.getRpc(rpcName));
-        if (rpcRef.get() == null)
+        final IRpcInstance rpc = component.getRpc(rpcName);
+        if (rpc != null)
         {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final IRpcAvailableListener rpcListener = new IRpcAvailableListener()
-            {
-                @Override
-                public void onRpcUnavailable(IRpcInstance rpc)
-                {
-                }
+            return rpc;
+        }
 
-                @Override
-                public void onRpcAvailable(IRpcInstance rpc)
+        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
+        final CountDownLatch latch = new CountDownLatch(1);
+        final IRpcAvailableListener rpcListener = new IRpcAvailableListener()
+        {
+            @Override
+            public void onRpcUnavailable(IRpcInstance rpc)
+            {
+            }
+
+            @Override
+            public void onRpcAvailable(IRpcInstance rpc)
+            {
+                if (is.eq(rpc.getName(), rpcName) && rpcArgs.length == rpc.getArgTypes().length)
                 {
-                    if (is.eq(rpc.getName(), rpcName) && rpcArgs.length == rpc.getArgTypes().length)
+                    try
                     {
-                        try
-                        {
-                            rpcRef.set(rpc);
-                        }
-                        finally
-                        {
-                            latch.countDown();
-                        }
+                        rpcRef.set(rpc);
+                    }
+                    finally
+                    {
+                        latch.countDown();
                     }
                 }
-            };
+            }
+        };
+        try
+        {
+            component.addRpcAvailableListener(rpcListener);
             try
             {
-                component.addRpcAvailableListener(rpcListener);
-                try
+                if (!latch.await(discoveryTimeoutMillis, TimeUnit.MILLISECONDS))
                 {
-                    if (!latch.await(discoveryTimeoutMillis, TimeUnit.MILLISECONDS))
-                    {
-                        throw new TimeOutException("No RPC found with name [" + rpcName + "] during discovery period "
-                            + discoveryTimeoutMillis + "ms");
-                    }
-                }
-                catch (InterruptedException e)
-                {
-                    // we don't care!
+                    throw new TimeOutException("No RPC found with name [" + rpcName + "] and [" + rpcArgs.length
+                        + "] arguments during discovery period " + discoveryTimeoutMillis + "ms");
                 }
             }
-            finally
+            catch (InterruptedException e)
             {
-                component.removeRpcAvailableListener(rpcListener);
+                // we don't care!
             }
+        }
+        finally
+        {
+            component.removeRpcAvailableListener(rpcListener);
         }
         return rpcRef.get();
     }
