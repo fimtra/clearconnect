@@ -55,7 +55,7 @@ import com.fimtra.util.SerializationUtils;
  * @author Ramon Servadei
  */
 @SuppressWarnings("rawtypes")
-public final class RpcInstance implements IRpcInstance
+public final class RpcInstance implements IRpcInstance, Cloneable
 {
     /**
      * Controls verbose logging of RPC responses
@@ -182,11 +182,16 @@ public final class RpcInstance implements IRpcInstance
                 final IValue[] args = decodeArgs(callDetails);
                 final String resultRecordName = decodeResultRecordName(callDetails);
 
+                final IRpcInstance rpc = this.context.getRpc(rpcName);
                 if (NO_ACK.textValue().equals(resultRecordName))
                 {
                     try
                     {
-                        this.context.getRpc(rpcName).execute(args);
+                        if (rpc == null)
+                        {
+                            throw new NullPointerException("RPC [" + rpcName + "] does not exist");
+                        }
+                        rpc.execute(args);
                     }
                     catch (Exception e)
                     {
@@ -206,7 +211,11 @@ public final class RpcInstance implements IRpcInstance
 
                     try
                     {
-                        IValue result = this.context.getRpc(rpcName).execute(args);
+                        if (rpc == null)
+                        {
+                            throw new NullPointerException("RPC [" + rpcName + "] does not exist");
+                        }
+                        IValue result = rpc.execute(args);
                         resultEntries.put(RESULT, result);
                     }
                     catch (Exception e)
@@ -753,5 +762,18 @@ public final class RpcInstance implements IRpcInstance
     public void setRemoteExecutionDurationTimeoutMillis(long remoteExecutionDurationTimeoutMillis)
     {
         this.remoteExecutionDurationTimeoutMillis.set(Long.valueOf(remoteExecutionDurationTimeoutMillis));
+    }
+
+    @Override
+    protected RpcInstance clone()
+    {
+        try
+        {
+            return (RpcInstance) super.clone();
+        }
+        catch (CloneNotSupportedException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 }

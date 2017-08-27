@@ -242,6 +242,15 @@ public final class ProxyContext implements IObserverContext
         }
     };
 
+    static final IRecordListener NOOP_LISTENER = new IRecordListener()
+    {
+        @Override
+        public void onChange(IRecord image, IRecordChange atomicChange)
+        {
+            // NOOP
+        }
+    };
+    
     // constructs to handle mapping of local system record names to remote names
     static final Map<String, String> remoteToLocalSystemRecordNameConversions;
     static final Map<String, String> localToRemoteSystemRecordNameConversions;
@@ -372,6 +381,11 @@ public final class ProxyContext implements IObserverContext
     final ISessionListener sessionListener;
     final NotifyingCache<ISessionListener, Pair<String, Boolean>> sessionCache;
     final Set<String> firstUpdateExpected;
+    /**
+     * Keeps an instance of each RPC that is requested so it can be used for cloning on any
+     * subsequent requests for the same RPC.
+     */
+    final Map<String, RpcInstance> rpcTemplates;
     
     /**
      * Construct the proxy context and connect it to a {@link Publisher} using the specified host
@@ -427,7 +441,8 @@ public final class ProxyContext implements IObserverContext
     {
         super();
         this.codec = codec;
-        this.sessionContextName = sessionContextName;        
+        this.sessionContextName = sessionContextName;
+        this.rpcTemplates = new ConcurrentHashMap<String, RpcInstance>();
         this.sessionListener = new ISessionListener()
         {
             @Override
@@ -486,6 +501,7 @@ public final class ProxyContext implements IObserverContext
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+        this.context.addObserver(NOOP_LISTENER, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -1358,17 +1374,25 @@ public final class ProxyContext implements IObserverContext
 
         setupReconnectTask();
     }
-
+    
     @Override
     public IRpcInstance getRpc(final String name)
     {
         final IValue definition = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).get(name);
         if (definition == null)
         {
+            this.rpcTemplates.remove(name);
             return null;
         }
-        // todo maybe we can cache a template instance to clone for future calls
-        final RpcInstance instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
+
+        RpcInstance instance = this.rpcTemplates.get(name);
+        if (instance == null)
+        {
+            instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
+            this.rpcTemplates.put(name, instance);
+        }
+
+        instance = instance.clone();
         instance.setHandler(new RpcInstance.Remote.Caller(name, this.codec, this.channel, this.context,
             instance.remoteExecutionStartTimeoutMillis, instance.remoteExecutionDurationTimeoutMillis));
         return instance;
@@ -1428,6 +1452,7 @@ public final class ProxyContext implements IObserverContext
                 synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())
                 {
                     rpcRecord.clear();
+                    this.rpcTemplates.clear();
                     this.context.publishAtomicChange(rpcRecord);
                 }
             }

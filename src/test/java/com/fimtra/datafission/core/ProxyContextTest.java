@@ -320,27 +320,28 @@ public class ProxyContextTest
     @Test
     public void testGetSubscribedRecords() throws Exception
     {
+        // NOTE: RPC record is always subscribed
         createComponents();
-        assertEquals(0, this.candidate.getSubscribedRecords().size());
+        assertEquals(1, this.candidate.getSubscribedRecords().size());
         IRecordListener observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         // check no double-counting
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "three");
-        assertEquals(1, this.candidate.getSubscribedRecords().size());
+        assertEquals(2, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "three");
-        assertEquals(1, this.candidate.getSubscribedRecords().size());
+        assertEquals(2, this.candidate.getSubscribedRecords().size());
 
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "two", "three");
-        assertEquals(0, this.candidate.getSubscribedRecords().size());
+        assertEquals(1, this.candidate.getSubscribedRecords().size());
     }
 
     @Test
