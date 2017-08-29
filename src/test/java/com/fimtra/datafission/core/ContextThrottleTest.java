@@ -91,7 +91,7 @@ public class ContextThrottleTest
         start = System.currentTimeMillis();
         this.candidate.eventStart("some record name", false);
         time.set(System.currentTimeMillis() - start);
-        assertTrue("Was: " + time.get(), time.get() < 100);
+        assertTrue("Was: " + time.get(), time.get() <= 100);
 
         latch2.await();
         try

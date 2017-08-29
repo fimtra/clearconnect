@@ -624,7 +624,7 @@ public class PlatformServiceProxyTest
         latch.set(new CountDownLatch(1));
         this.service.publishRecord(record);
 
-        assertTrue(latch.get().await(1, TimeUnit.SECONDS));
+        assertTrue(latch.get().await(2, TimeUnit.SECONDS));
     }
 
     @Test
