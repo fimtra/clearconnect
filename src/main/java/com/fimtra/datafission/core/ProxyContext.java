@@ -242,15 +242,6 @@ public final class ProxyContext implements IObserverContext
         }
     };
 
-    static final IRecordListener NOOP_LISTENER = new IRecordListener()
-    {
-        @Override
-        public void onChange(IRecord image, IRecordChange atomicChange)
-        {
-            // NOOP
-        }
-    };
-    
     // constructs to handle mapping of local system record names to remote names
     static final Map<String, String> remoteToLocalSystemRecordNameConversions;
     static final Map<String, String> localToRemoteSystemRecordNameConversions;
@@ -501,7 +492,14 @@ public final class ProxyContext implements IObserverContext
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver(NOOP_LISTENER, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+        this.context.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord image, IRecordChange atomicChange)
+            {
+                updateRpcTemplates(atomicChange);
+            }
+        }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -1390,6 +1388,7 @@ public final class ProxyContext implements IObserverContext
         {
             instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
             this.rpcTemplates.put(name, instance);
+            Log.log(this, "Created RPC template: ", instance.toString());
         }
 
         instance = instance.clone();
@@ -1417,6 +1416,39 @@ public final class ProxyContext implements IObserverContext
         return this.context.getUtilityExecutor();
     }
 
+    void updateRpcTemplates(IRecordChange atomicChange)
+    {
+        // remove RPC templates
+        Map<String, IValue> entries = atomicChange.getRemovedEntries();
+        if (entries.size() > 0)
+        {
+            for (String rpcName : entries.keySet())
+            {
+                this.rpcTemplates.remove(rpcName);
+            }
+        }
+
+        // remove updated RPC templates (update them from the put entries)
+        entries = atomicChange.getOverwrittenEntries();
+        if (entries.size() > 0)
+        {
+            for (String rpcName : entries.keySet())
+            {
+                this.rpcTemplates.remove(rpcName);
+            }
+        }
+
+        // add/update RPC templates
+        entries = atomicChange.getPutEntries();
+        if (entries.size() > 0)
+        {
+            for (String rpcName : entries.keySet())
+            {
+                getRpc(rpcName);
+            }
+        }
+    }
+    
     void cancelReconnectTask()
     {
         synchronized (this.lock)
