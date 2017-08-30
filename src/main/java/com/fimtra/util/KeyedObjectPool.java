@@ -124,7 +124,8 @@ public class KeyedObjectPool<K, T>
     @Override
     public String toString()
     {
-        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.pool.size() + "/" + this.maxSize + "]";
+        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.pool.size() + "/"
+            + (this.maxSize == 0 ? "inf" : Integer.toString(this.maxSize)) + "]";
     }
 
     public final T get(K k)
