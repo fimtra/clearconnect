@@ -234,6 +234,9 @@ public class TcpChannel implements ITransportChannel
 
     private final boolean writeToSocketUsingApplicationThread;
 
+    /** Flag to indicate if a send operation expects to be signalled when sending is complete */
+    boolean waitingForNotify = false;
+    
     StateEnum state = StateEnum.IDLE;
 
     /**
@@ -420,7 +423,7 @@ public class TcpChannel implements ITransportChannel
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
 
     }
-
+    
     @Override
     public boolean send(byte[] toSend)
     {
@@ -474,19 +477,20 @@ public class TcpChannel implements ITransportChannel
                         break;
                 }
 
-                if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
+                if (TcpChannelProperties.Values.TX_SEND_QUEUE_THRESHOLD > 0
+                    && this.txFrames.size() > TcpChannelProperties.Values.TX_SEND_QUEUE_THRESHOLD)
                 {
-                    // NATURAL THROTTLE
+                    this.waitingForNotify = true;
                     try
                     {
                         // the tcp-writer will notify when the frames are empty
-                        this.lock.wait((byteFragmentsToSend.length == 0 ? 1 : byteFragmentsToSend.length)
-                            * TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS);
+                        this.lock.wait(this.txFrames.size());
                     }
                     catch (InterruptedException e)
                     {
                         // don't care
                     }
+                    this.waitingForNotify = false;
                 }
             }
             return true;
@@ -677,7 +681,7 @@ public class TcpChannel implements ITransportChannel
             }
             if (channel == null)
             {
-                break;
+                continue;
             }
 
             synchronized (channel.lock)
@@ -725,7 +729,7 @@ public class TcpChannel implements ITransportChannel
                 }
                 finally
                 {
-                    if (TcpChannelProperties.Values.SEND_WAIT_FACTOR_MILLIS != 0)
+                    if (channel.waitingForNotify && channel.txFrames.size() == 0)
                     {
                         channel.lock.notify();
                     }

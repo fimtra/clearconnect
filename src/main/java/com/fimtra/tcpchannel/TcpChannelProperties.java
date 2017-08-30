@@ -92,14 +92,14 @@ public abstract class TcpChannelProperties
          */
         String SLS_MAX_SHORT_LIVED_SOCKET_TRIES = BASE + "slsMaxShortLivedSocketTries";
         /**
-         * The system property name to define the send factor (in milliseconds) to wait for a TCP
-         * message to be sent in {@link TcpChannel#send(byte[])}.
+         * The system property name to define the TX queue threshold that causes an application
+         * thread to block in {@link TcpChannel#send(byte[])} until the queue clears.
          * <p>
          * Use a value of 0 for no blocking during send (i.e. send asynchronously).
          * <p>
-         * E.g. <code>-DtcpChannel.sendWaitFactorMillis=10</code>
+         * E.g. <code>-DtcpChannel.txSendQueueThreshold=40</code>
          */
-        String SEND_WAIT_FACTOR_MILLIS = BASE + "sendWaitFactorMillis";
+        String TX_SEND_QUEUE_THRESHOLD = BASE + "txSendQueueThreshold";
         /**
          * The system property name to define writing to the TCP socket using the application
          * thread.
@@ -197,12 +197,12 @@ public abstract class TcpChannelProperties
             Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
 
         /**
-         * The send factor (in milliseconds) to wait for a TCP message to be sent in
+         * The size of the TX queue that causes an application thread to block in
          * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
          * <p>
-         * Default is: 0
+         * Default is: 40
          */
-        int SEND_WAIT_FACTOR_MILLIS = Integer.parseInt(System.getProperty(Names.SEND_WAIT_FACTOR_MILLIS, "0"));
+        int TX_SEND_QUEUE_THRESHOLD = Integer.parseInt(System.getProperty(Names.TX_SEND_QUEUE_THRESHOLD, "40"));
 
         /**
          * Defines whether writing to the socket in the {@link TcpChannel#send(byte[])} is performed
@@ -225,7 +225,7 @@ public abstract class TcpChannelProperties
          * <p>
          * Default is: 4
          */
-        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "4"));
+        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "1"));
     }
 
     private TcpChannelProperties()
