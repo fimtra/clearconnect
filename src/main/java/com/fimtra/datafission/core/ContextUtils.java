@@ -27,6 +27,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.nio.CharBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,6 +57,7 @@ import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.thimble.TaskStatistics;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.ArrayUtils;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
@@ -74,7 +76,7 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei, Paul Mackinlay
  */
-public class ContextUtils
+public final class ContextUtils
 {
 
     /**
@@ -766,7 +768,7 @@ public class ContextUtils
      */
     public static boolean isSystemThread()
     {
-        return SYSTEM_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
+        return Arrays.binarySearch(SYSTEM_THREAD_IDS, Thread.currentThread().getId()) > -1;
     }
 
     /**
@@ -774,7 +776,7 @@ public class ContextUtils
      */
     public static boolean isCoreThread()
     {
-        return CORE_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
+        return Arrays.binarySearch(CORE_THREAD_IDS, Thread.currentThread().getId()) > -1;
     }
 
     /**
@@ -782,7 +784,7 @@ public class ContextUtils
      */
     public static boolean isRpcThread()
     {
-        return RPC_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
+        return Arrays.binarySearch(RPC_THREAD_IDS, Thread.currentThread().getId()) > -1;
     }
 
     /**
@@ -794,7 +796,7 @@ public class ContextUtils
      */
     public static boolean isFrameworkThread()
     {
-        return FRAMEWORK_THREAD_IDS.contains(Long.valueOf(Thread.currentThread().getId()));
+        return Arrays.binarySearch(FRAMEWORK_THREAD_IDS, Thread.currentThread().getId()) > -1;
     }
 
     /**
@@ -926,12 +928,16 @@ public class ContextUtils
         return false;
     }
 
-    final static Set<Long> FRAMEWORK_THREAD_IDS = new HashSet<Long>();
-    final static Set<Long> CORE_THREAD_IDS = new HashSet<Long>();
-    final static Set<Long> SYSTEM_THREAD_IDS = new HashSet<Long>();
-    final static Set<Long> RPC_THREAD_IDS = new HashSet<Long>();
+    final static long[] FRAMEWORK_THREAD_IDS;
+    final static long[] CORE_THREAD_IDS;
+    final static long[] SYSTEM_THREAD_IDS;
+    final static long[] RPC_THREAD_IDS;
     static
     {
+        long[] coreThreadIds = new long[0];
+        long[] rpcThreadIds = new long[0];
+        long[] systemThreadIds = new long[0];
+        long[] frameworkThreadIds = new long[0];
         final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
         final long[] allThreadIds = threadMXBean.getAllThreadIds();
         for (int i = 0; i < allThreadIds.length; i++)
@@ -939,22 +945,29 @@ public class ContextUtils
             long threadId = allThreadIds[i];
             final ThreadInfo threadInfo = threadMXBean.getThreadInfo(threadId);
             final String name = threadInfo.getThreadName();
-            final Long threadIdAsLong = Long.valueOf(threadId);
             if (name.startsWith(FISSION_CORE, 0))
             {
-                CORE_THREAD_IDS.add(threadIdAsLong);
-                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+                coreThreadIds = ArrayUtils.add(threadId, coreThreadIds);
+                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
             }
             else if (name.startsWith(FISSION_RPC, 0))
             {
-                RPC_THREAD_IDS.add(threadIdAsLong);
-                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+                rpcThreadIds = ArrayUtils.add(threadId, rpcThreadIds);
+                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
             }
             else if (name.startsWith(FISSION_SYSTEM, 0))
             {
-                SYSTEM_THREAD_IDS.add(threadIdAsLong);
-                FRAMEWORK_THREAD_IDS.add(threadIdAsLong);
+                systemThreadIds = ArrayUtils.add(threadId, systemThreadIds);
+                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
             }
         }
+        Arrays.sort(coreThreadIds);
+        Arrays.sort(rpcThreadIds);
+        Arrays.sort(systemThreadIds);
+        Arrays.sort(frameworkThreadIds);
+        CORE_THREAD_IDS = coreThreadIds;
+        RPC_THREAD_IDS = rpcThreadIds;
+        SYSTEM_THREAD_IDS = systemThreadIds;
+        FRAMEWORK_THREAD_IDS = frameworkThreadIds;
     }
 }
