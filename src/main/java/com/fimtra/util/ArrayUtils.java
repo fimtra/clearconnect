@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.util.Arrays;
+
 /**
  * Utilities for working with arrays
  * 
@@ -42,5 +44,17 @@ public abstract class ArrayUtils
             }
         }
         return false;
+    }
+
+    /**
+     * Increase the array size by one and append the long.
+     * 
+     * @return the expanded array with the appended long
+     */
+    public static long[] add(long l, long[] arr)
+    {
+        final long[] expandedArr = Arrays.copyOf(arr, arr.length + 1);
+        expandedArr[expandedArr.length - 1] = l;
+        return expandedArr;
     }
 }
