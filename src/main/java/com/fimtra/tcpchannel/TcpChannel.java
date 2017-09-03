@@ -49,6 +49,8 @@ import com.fimtra.util.ObjectUtils;
  */
 public class TcpChannel implements ITransportChannel
 {
+    private static final boolean TX_SEND_QUEUE_THRESHOLD_ACTIVE =
+        TcpChannelProperties.Values.TX_SEND_QUEUE_THRESHOLD > 0;
     private static final double _INVERSE_1000000 = 1 / 1000000d;
 
     /** Expresses the encoding format for the data frames */
@@ -234,8 +236,8 @@ public class TcpChannel implements ITransportChannel
 
     private final boolean writeToSocketUsingApplicationThread;
 
-    /** Flag to indicate if a send operation expects to be signalled when sending is complete */
-    boolean waitingForNotify = false;
+    /** Counter to indicate if a send operation expects to be signalled when sending is complete */
+    int waitingForNotify;
     
     StateEnum state = StateEnum.IDLE;
 
@@ -477,10 +479,10 @@ public class TcpChannel implements ITransportChannel
                         break;
                 }
 
-                if (TcpChannelProperties.Values.TX_SEND_QUEUE_THRESHOLD > 0
+                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE
                     && this.txFrames.size() > TcpChannelProperties.Values.TX_SEND_QUEUE_THRESHOLD)
                 {
-                    this.waitingForNotify = true;
+                    this.waitingForNotify++;
                     try
                     {
                         // the tcp-writer will notify when the frames are empty
@@ -490,7 +492,7 @@ public class TcpChannel implements ITransportChannel
                     {
                         // don't care
                     }
-                    this.waitingForNotify = false;
+                    this.waitingForNotify--;
                 }
             }
             return true;
@@ -729,9 +731,9 @@ public class TcpChannel implements ITransportChannel
                 }
                 finally
                 {
-                    if (channel.waitingForNotify && channel.txFrames.size() == 0)
+                    if (channel.waitingForNotify > 0 && channel.txFrames.size() == 0)
                     {
-                        channel.lock.notify();
+                        channel.lock.notifyAll();
                     }
                 }
             }
