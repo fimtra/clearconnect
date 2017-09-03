@@ -15,7 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -71,9 +72,9 @@ public class ContextThrottleTest
         catch (InterruptedException e)
         {
         }
-        final CountDownLatch latch = new CountDownLatch(LIMIT);
-        final CountDownLatch latch2 = new CountDownLatch(1);
-        new Thread(new Runnable()
+             
+        final CountDownLatch latch = new CountDownLatch(5);
+        final Thread t2 = new Thread(new Runnable()
         {
             @Override
             public void run()
@@ -82,27 +83,24 @@ public class ContextThrottleTest
                 {
                     ContextThrottleTest.this.candidate.eventFinish();
                     latch.countDown();
+                    try
+                    {
+                        Thread.sleep(1);
+                    }
+                    catch (InterruptedException e)
+                    {
+                    }
                 }
-                latch2.countDown();
             }
-        }).start();
+        });
+        t2.start();
         latch.await();
-
+        
         start = System.currentTimeMillis();
         this.candidate.eventStart("some record name", false);
         time.set(System.currentTimeMillis() - start);
         assertTrue("Was: " + time.get(), time.get() < 100);
-
-        latch2.await();
-        try
-        {
-            Thread.sleep(1000);
-        }
-        catch (InterruptedException e)
-        {
-        }
-        // should not be an exception thread anymore
-        assertTrue("Got: " + this.candidate.exemptThreads, this.candidate.exemptThreads.isEmpty());
+        assertEquals("Got: " + this.candidate.exemptThreads, 0, this.candidate.exemptThreads.size());
     }
 
     @Test

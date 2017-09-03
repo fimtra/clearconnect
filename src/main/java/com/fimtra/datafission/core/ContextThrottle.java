@@ -66,44 +66,47 @@ class ContextThrottle
      */
     void eventStart(String recordName, boolean forcePublish)
     {
-        if (!forcePublish && this.eventCount.get() > this.threshold
-        // throttling only activated for application threads
-            && !ContextUtils.isFrameworkThread()
-            // throttling only activated for non-system records
-            && !ContextUtils.isSystemRecordName(recordName))
+        if (!forcePublish)
         {
-            final Long threadId = Long.valueOf(Thread.currentThread().getId());
-            final Long exemptionStartNanos = this.exemptThreads.get(threadId);
-            if (exemptionStartNanos == null ||
-            // has the exemption expired?
-                System.nanoTime() - exemptionStartNanos.longValue() > ONE_SECOND_NANOS)
+            final int eventCountAtStart = this.eventCount.get();
+            if (eventCountAtStart > this.threshold
+                // throttling only activated for application threads
+                && !ContextUtils.isFrameworkThread()
+                // throttling only activated for non-system records
+                && !ContextUtils.isSystemRecordName(recordName))
             {
-                final int eventCountAtStart = this.eventCount.get();
-                final long startTimeNanos = System.nanoTime();
-                long loopTimeNanos = 0;
-                do
+                final Long threadId = Long.valueOf(Thread.currentThread().getId());
+                final Long exemptionStartNanos = this.exemptThreads.get(threadId);
+                if (exemptionStartNanos == null ||
+                // has the exemption expired?
+                    System.nanoTime() - exemptionStartNanos.longValue() > ONE_SECOND_NANOS)
                 {
-                    LockSupport.parkNanos(eventCountAtStart);
-                }
-                while (
-                // the event count has not gone down since the loop started
-                this.eventCount.get() >= eventCountAtStart &&
-                // the loop has been going for less than 1 second
-                    ((loopTimeNanos = (System.nanoTime() - startTimeNanos)) < ONE_SECOND_NANOS));
-
-                if (loopTimeNanos >= ONE_SECOND_NANOS && this.eventCount.get() >= eventCountAtStart)
-                {
-                    // mark the thread exempt to prevent event processing deadlock
-                    Log.log(this, "Adding thread to throttle exemptions, eventCount=",
-                        Integer.toString(this.eventCount.get()));
-                    this.exemptThreads.put(threadId, Long.valueOf(System.nanoTime()));
-                }
-                else
-                {
-                    if (exemptionStartNanos != null)
+                    final long startTimeNanos = System.nanoTime();
+                    long loopTimeNanos = 0;
+                    do
                     {
-                        Log.log(this, "Removing thread from throttle exemptions");
-                        this.exemptThreads.remove(threadId);
+                        LockSupport.parkNanos(eventCountAtStart);
+                    }
+                    while (
+                    // the event count has not gone down since the loop started
+                    this.eventCount.get() >= eventCountAtStart &&
+                    // the loop has been going for less than 1 second
+                        ((loopTimeNanos = (System.nanoTime() - startTimeNanos)) < ONE_SECOND_NANOS));
+
+                    if (loopTimeNanos >= ONE_SECOND_NANOS && this.eventCount.get() >= eventCountAtStart)
+                    {
+                        // mark the thread exempt to prevent event processing deadlock
+                        Log.log(this, "Adding thread to throttle exemptions, eventCount=",
+                            Integer.toString(this.eventCount.get()));
+                        this.exemptThreads.put(threadId, Long.valueOf(System.nanoTime()));
+                    }
+                    else
+                    {
+                        if (exemptionStartNanos != null)
+                        {
+                            Log.log(this, "Removing thread from throttle exemptions");
+                            this.exemptThreads.remove(threadId);
+                        }
                     }
                 }
             }
