@@ -554,7 +554,7 @@ public class PlatformTest
             // check primary is active
             verify(ftStatusListener1, timeout(activateTimeout)).onActive(eq(SERVICE1), eq(this.primary));
 
-            verify(ftStatusListener1, times(1)).onStandby(eq(SERVICE1), eq(this.primary));
+            verify(ftStatusListener1, atMost(1)).onStandby(eq(SERVICE1), eq(this.primary));
 
             // create secondary after primary is confirmed (so we know that secondary is standby for
             // the test)
