@@ -281,12 +281,15 @@ public class PlatformServiceTest
     public void testUpdateRecord() throws InterruptedException
     {
         IRecordListener listener = mock(IRecordListener.class);
-        this.candidate.addRecordListener(listener, record1);
         assertTrue(this.candidate.createRecord(record1));
         IRecord record = this.candidate.getRecord(record1);
+
+        this.candidate.addRecordListener(listener, record1);
+        verify(listener, timeout(1000).times(1)).onChange(any(IRecord.class), any(IRecordChange.class));
         
         record.put("key1", TextValue.valueOf("value1"));
         assertTrue(this.candidate.publishRecord(record).await(1, TimeUnit.SECONDS));
+
         
         record.put("key2", TextValue.valueOf("value1"));
         record.put("key1", TextValue.valueOf("value1"));
@@ -302,9 +305,11 @@ public class PlatformServiceTest
     public void testPublishMergeRecord()
     {
         IRecordListener listener = mock(IRecordListener.class);
-        this.candidate.addRecordListener(listener, record1);
         assertTrue(this.candidate.createRecord(record1));
         IRecord record = this.candidate.getRecord(record1);
+
+        this.candidate.addRecordListener(listener, record1);
+        verify(listener, timeout(1000).times(1)).onChange(any(IRecord.class), any(IRecordChange.class));
 
         record.put("key1", TextValue.valueOf("value1"));
         this.candidate.publishMergeRecord(record);
