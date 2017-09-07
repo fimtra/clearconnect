@@ -119,23 +119,6 @@ public interface IPlatformServiceInstance extends IPlatformServiceComponent
      *         <code>null</code>.
      */
     CountDownLatch publishRecord(IRecord record);
-
-    /**
-     * Publish changes made to a record, merging with a previous pending publish if there is one in
-     * progress. Calling this method will publish changes in the record since the last call to this
-     * method.
-     * <p>
-     * This method can cause multiple calls to be resolved into a single coalesced update of the
-     * record.
-     * <p>
-     * This method blocks any changes to the record whilst the method executes.
-     * 
-     * @see IPlatformServiceProxy#addRecordListener(com.fimtra.datafission.IRecordListener,
-     *      String...)
-     * @param record
-     *            the record to publish
-     */
-    void publishMergeRecord(IRecord record);
     
     /**
      * Delete a record.

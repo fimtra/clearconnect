@@ -97,18 +97,6 @@ public interface IPublisherContext extends IObserverContext
      *         still triggered.
      */
     CountDownLatch publishAtomicChange(IRecord record);
-
-    /**
-     * Similar to {@link #publishAtomicChange(IRecord)} but will merge the current atomic change
-     * with any pending atomic changes that are still to be processed. Typically, this will benefit
-     * scenarios where publishing frequency is high and the record updates are able to be coalesced.
-     * This does not return a latch to indicate when the actual publish occurs - its not possible as
-     * updates may be merged.
-     * 
-     * @param name
-     *            the name of the record to publish
-     */
-    void publishMergeAtomicChange(String name);
         
     /**
      * Create the RPC in this context. The name of the RPC is added to the

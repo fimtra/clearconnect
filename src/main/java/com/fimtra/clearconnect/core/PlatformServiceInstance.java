@@ -368,16 +368,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         }
         return this.context.publishAtomicChange(record.getName());
     }
-    
-    @Override
-    public void publishMergeRecord(IRecord record)
-    {
-        if (record == null || !is.eq(record.getContextName(), this.context.getName()))
-        {
-            return;
-        }
-        this.context.publishMergeAtomicChange(record.getName());
-    }
 
     @Override
     public boolean deleteRecord(IRecord record)

@@ -871,33 +871,6 @@ public class ContextTest
     }
     
     @Test
-    public void testPublishMergeRecord()
-    {
-        IRecordListener listener = mock(IRecordListener.class);
-        IRecord record = this.candidate.createRecord("testPublishMergeRecord-rec1");
-        this.candidate.addObserver(listener, record.getName());
-
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeAtomicChange(record.getName());
-
-        record.put("key2", TextValue.valueOf("value1"));
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeAtomicChange(record.getName());
-
-        record.put("key2", TextValue.valueOf("value2"));
-        this.candidate.publishMergeAtomicChange(record.getName());
-
-        record.put("key2", TextValue.valueOf("value3"));
-        this.candidate.publishMergeAtomicChange(record.getName());
-
-        // this is not a change
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeAtomicChange(record.getName());
-
-        Mockito.verify(listener, atMost(4)).onChange(any(IRecord.class), any(IRecordChange.class));
-    }
-    
-    @Test
     public void testPublishAtomicChangesForNoChange() throws InterruptedException
     {
         final Map<String, IValue> instance = createRecordWaitForUpdate(name);

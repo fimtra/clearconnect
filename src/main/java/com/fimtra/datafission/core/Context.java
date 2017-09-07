@@ -529,6 +529,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // starting at 0
         this.sequences.put(name, new AtomicLong(-1));
         getPendingAtomicChangesForWrite(name);
+        
+        // todo this resolves to d0 atomic change...
+        
         // this will set off an atomic change for the construction
         record.putAll(initialData);
 
@@ -755,61 +758,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
      
-    
-    @Override
-    public void publishMergeAtomicChange(final String name)
-    {
-        if (name == null)
-        {
-            throw new NullPointerException("Null record name not allowed");
-        }
-
-        // Note: system records must be published serially
-        if (ContextUtils.isSystemRecordName(name))
-        {
-            publishAtomicChange(name);
-            return;
-        }
-
-        try
-        {
-            final IRecord record = this.records.get(name);
-            if (record == null)
-            {
-                Log.log(this, "Ignoring publish of non-existent record [", name, "]");
-                return;
-            }
-
-            synchronized (record.getWriteLock())
-            {
-                IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
-                // need to prevent empty changes BUT also allow the initial create if it had blank
-                // data
-                if ((atomicChange == null || atomicChange.isEmpty()))
-                {
-                    return;
-                }
-
-                List<IRecordChange> list = this.coalescingChanges.get(name);
-                if (list == null)
-                {
-                    list = new LinkedList<IRecordChange>();
-                    this.coalescingChanges.put(name, list);
-                    // schedule a coalescing task
-                    scheduleCoalescingUpdateTask(name, record);
-                }
-                list.add(atomicChange);
-
-                // update the sequence (version) of the record when publishing
-                ((Record) record).setSequence(atomicChange.getSequence());
-            }
-        }
-        catch (RuntimeException e)
-        {
-            throw e;
-        }
-    }
-
     @Override
     public Future<Map<String, Boolean>> addObserver(final IRecordListener observer, final String... recordNames)
     {
@@ -928,6 +876,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                 Log.log(this, "Notifying initial image [", name, "], listener=",
                                     ObjectUtils.safeToString(observer));
                             }
+
+                            // TODO - createRecordInternal_callWithLock adds a blank image
+                            // - then createRecord triggers a publish atomic change - seq d0
+                            // - so if race condition hits, subscriber gets i0 and d0
+                            //
                             final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
 
                             if (imageSnapshot != null)
@@ -1423,49 +1376,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
             }
         }
-    }
-
-    private void scheduleCoalescingUpdateTask(final String name, final IRecord record)
-    {
-        final ICoalescingRunnable notifyTask = new ICoalescingRunnable()
-        {
-            @Override
-            public void run()
-            {
-                try
-                {
-                    final List<IRecordChange> recordChanges;
-                    synchronized (record.getWriteLock())
-                    {
-                        recordChanges = Context.this.coalescingChanges.remove(name);
-                    }
-
-                    if (recordChanges == null)
-                    {
-                        return;
-                    }
-                    
-                    final IRecordChange coalescedAtomicChange = recordChanges.remove(0);
-                    if (recordChanges.size() > 0)
-                    {
-                        coalescedAtomicChange.coalesce(recordChanges);
-                    }
-
-                    doPublishChange(name, coalescedAtomicChange);
-                }
-                finally
-                {
-                    Context.this.throttle.eventFinish();
-                }
-            }
-
-            @Override
-            public Object context()
-            {
-                return name;
-            }
-        };
-        this.coreExecutor.execute(notifyTask);
     }
 }
 

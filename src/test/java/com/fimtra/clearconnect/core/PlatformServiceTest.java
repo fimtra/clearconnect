@@ -302,36 +302,6 @@ public class PlatformServiceTest
     }
 
     @Test
-    public void testPublishMergeRecord()
-    {
-        IRecordListener listener = mock(IRecordListener.class);
-        assertTrue(this.candidate.createRecord(record1));
-        IRecord record = this.candidate.getRecord(record1);
-
-        this.candidate.addRecordListener(listener, record1);
-        verify(listener, timeout(1000).times(1)).onChange(any(IRecord.class), any(IRecordChange.class));
-
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeRecord(record);
-
-        record.put("key2", TextValue.valueOf("value1"));
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeRecord(record);
-        
-        record.put("key2", TextValue.valueOf("value2"));
-        this.candidate.publishMergeRecord(record);
-
-        record.put("key2", TextValue.valueOf("value3"));
-        this.candidate.publishMergeRecord(record);
-
-        // this is not a change
-        record.put("key1", TextValue.valueOf("value1"));
-        this.candidate.publishMergeRecord(record);
-        
-        verify(listener, atMost(4)).onChange(any(IRecord.class), any(IRecordChange.class));
-    }
-
-    @Test
     public void testDeleteRecord()
     {
         assertTrue(this.candidate.createRecord(record1));
