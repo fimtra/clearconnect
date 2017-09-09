@@ -963,12 +963,11 @@ public class ContextTest
         final int size = observer.changes.size();
         assertEquals("Got: " + observer.changes, 0, size);
 
-        final int size2 = observer2.changes.size();
-        assertEquals("Got: " + observer2.changes, 1, size2);
-        assertEquals(record, observer2.images.get(0));
-        assertEquals(2, observer2.changes.get(0).getPutEntries().size());
-        assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
-        assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
+        assertEquals(record, observer2.getLatestImage());
+        final IRecordChange latestChanges = observer2.changes.get(observer2.changes.size() - 1);
+        assertEquals(2, latestChanges.getPutEntries().size());
+        assertEquals(0, latestChanges.getOverwrittenEntries().size());
+        assertEquals(0, latestChanges.getRemovedEntries().size());
 
         this.candidate.removeObserver(observer2, name);
         assertEquals(0, this.candidate.recordObservers.getSubscribersFor(name).length);

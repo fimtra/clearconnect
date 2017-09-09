@@ -1260,7 +1260,7 @@ public final class ProxyContext implements IObserverContext
                         }
                         else
                         {
-                            record = ProxyContext.this.context.createRecordSilently(name);
+                            record = ProxyContext.this.context.createRecordSilently_callInRecordContext(name);
                         }
                     }
 

@@ -96,8 +96,8 @@ public class ProxyContextTest
     @Rule
     public TestName name = new TestName();
 
-    // note: the cipher protocol takes longer to initialise so increase to 3 secs
-    private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 3000;
+    // note: the cipher protocol takes longer to initialise so increase to 5 secs
+    private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 5000;
 
     static List<TestLongValueSequenceCheckingAtomicChangeObserver> observers =
         new ArrayList<TestLongValueSequenceCheckingAtomicChangeObserver>();
@@ -308,7 +308,6 @@ public class ProxyContextTest
         assertTrue(addObserverLatch.get(10, TimeUnit.SECONDS).size() == 2);
 
         this.publisher.destroy();
-        Thread.sleep(1200);
 
         addObserverLatch = this.candidate.addObserver(observer, "lasers, record!");
 
@@ -2223,7 +2222,6 @@ public class ProxyContextTest
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
 
-        Thread.sleep(500);
         this.candidate.destroy();
 
         // NOTE: at least once because the JVM has a single SessionContexts which is accessed by
@@ -2283,7 +2281,6 @@ public class ProxyContextTest
 
         verify(listener, timeout(5000)).onSessionOpen(eq(sessionContextName), eq(sessionId));
 
-        Thread.sleep(500);
         this.publisher.destroy();
 
         // NOTE: at least once because the JVM has a single SessionContexts which is accessed by
@@ -2339,6 +2336,7 @@ public class ProxyContextTest
         {
             while (true)
             {
+                Thread.sleep(100);
                 Socket s = null;
                 try
                 {
@@ -2350,7 +2348,6 @@ public class ProxyContextTest
                     {
                         s.close();
                     }
-                    Thread.sleep(500);
                 }
             }
         }
@@ -2406,6 +2403,40 @@ public class ProxyContextTest
         assertEquals(simpleRecord, result.get().get(simpleRecord).textValue());
     }
 
+
+    @Test
+    public void testCreateThenUpdateRecord_imageFirstThenDelta() throws Exception
+    {
+        createComponents();
+        final String name = "recImageThenDelta";
+        final AtomicReference<IRecordChange> result = new AtomicReference<IRecordChange>();
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>();
+        latch.set(new CountDownLatch(1));
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                System.out.println(imageCopy + ", " + atomicChange);
+                result.set(atomicChange);
+                latch.get().countDown();
+            }
+        }, name);
+        
+        final IRecord record = this.context.createRecord(name);
+        final int timeout = TIMEOUT;
+        assertTrue(latch.get().await(timeout, TimeUnit.SECONDS));
+        assertEquals(IRecordChange.IMAGE_SCOPE.charValue(), result.get().getScope());
+        
+        // now update and check its a delta
+        latch.set(new CountDownLatch(1));
+        record.put("key1", "value1");
+        this.context.publishAtomicChange(record);
+        
+        assertTrue(latch.get().await(timeout, TimeUnit.SECONDS));
+        assertEquals(IRecordChange.DELTA_SCOPE.charValue(), result.get().getScope());
+    }
+    
     @Test
     public void testRecordNameWithSpecialChars() throws Exception
     {

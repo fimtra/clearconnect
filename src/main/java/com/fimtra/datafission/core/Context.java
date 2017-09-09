@@ -493,7 +493,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
         }
-
+        
         // always force a publish for the initial create - guaranteed to be sequence 0
         publishAtomicChange(name, true);
 
@@ -504,10 +504,18 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * Create a blank record with this name - no listeners are notified of the record's existence in
      * this method.
      */
-    IRecord createRecordSilently(String name)
+    IRecord createRecordSilently_callInRecordContext(final String name)
     {
         synchronized (this.recordCreateLock)
         {
+            /*
+             * This is only called when receiving a non-empty remote record for the first time. We
+             * need to insert a blank image because the sequence will not be 0 so an image would
+             * never be inserted when publishing the change. Note: this method is called in the
+             * record context so the image is inserted by the same thread context as it would be for
+             * the publish change logic.
+             */
+            this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, this.noopChangeManager));
             return createRecordInternal_callWithLock(name, ContextUtils.EMPTY_MAP);
         }
     }
@@ -528,30 +536,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus
         // starting at 0
         this.sequences.put(name, new AtomicLong(-1));
-        getPendingAtomicChangesForWrite(name);
-        
-        // todo this resolves to d0 atomic change...
+        getPendingAtomicChangesForWrite(name).setScope(IRecordChange.IMAGE_SCOPE_CHAR);
         
         // this will set off an atomic change for the construction
         record.putAll(initialData);
-
-        // update the image cache in the context of the record - this prevents clashes with
-        // concurrent record listeners being added
-        executeSequentialCoreTask(new ISequentialRunnable()
-        {
-            @Override
-            public void run()
-            {
-                Context.this.imageCache.put(name,
-                    new Record(name, ContextUtils.EMPTY_MAP, Context.this.noopChangeManager));
-            }
-
-            @Override
-            public Object context()
-            {
-                return name;
-            }
-        });
 
         if (log)
         {
@@ -696,7 +684,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             throw new NullPointerException("Null record name not allowed");
         }
-        
+
         this.throttle.eventStart(name, forcePublish);
         
         try
@@ -723,8 +711,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
                 
                 // update the sequence (version) of the record when publishing
-                ((Record) record).setSequence(atomicChange.getSequence());
-                
+                final long sequence = atomicChange.getSequence();
+                ((Record) record).setSequence(sequence);
+
                 final ISequentialRunnable notifyTask = new ISequentialRunnable()
                 {
                     @Override
@@ -732,7 +721,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     {
                         try
                         {
-                            doPublishChange(name, atomicChange);
+                            doPublishChange(name, atomicChange, sequence);
                         }
                         finally
                         {
@@ -877,12 +866,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                     ObjectUtils.safeToString(observer));
                             }
 
-                            // TODO - createRecordInternal_callWithLock adds a blank image
-                            // - then createRecord triggers a publish atomic change - seq d0
-                            // - so if race condition hits, subscriber gets i0 and d0
-                            //
                             final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
-
                             if (imageSnapshot != null)
                             {
                                 final long start = System.nanoTime();
@@ -1306,8 +1290,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return Collections.unmodifiableMap(this.rpcInstances);
     }
 
-    void doPublishChange(final String name, final IRecordChange atomicChange)
+    void doPublishChange(final String name, final IRecordChange atomicChange, long sequence)
     {
+        if (sequence == 0)
+        {
+            Context.this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, Context.this.noopChangeManager));
+        }
+        
         // update the image with the atomic changes in the runnable
         final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
         
