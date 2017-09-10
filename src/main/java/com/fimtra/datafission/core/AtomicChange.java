@@ -571,12 +571,17 @@ public final class AtomicChange implements IRecordChange
     @Override
     public void applyTo(Map<String, IValue> target)
     {
-        final Set<String> removed = this.removedEntries == null ? EMPTY_MAP.keySet() : this.removedEntries.keySet();
-        for (String objectName : removed)
+        if (this.removedEntries != null)
         {
-            target.remove(objectName);
+            for (String objectName : this.removedEntries.keySet())
+            {
+                target.remove(objectName);
+            }
         }
-        target.putAll(this.putEntries == null ? EMPTY_MAP : this.putEntries);
+        if (this.putEntries != null)
+        {
+            target.putAll(this.putEntries);
+        }
     }
 
     @Override
@@ -587,17 +592,20 @@ public final class AtomicChange implements IRecordChange
         {
             ((Record) record).setSequence(this.sequence.get().longValue());
         }
+        
         applyTo(record);
-        Map<String, IValue> subMap;
-        final Set<String> subMapKeys =
-            this.subMapAtomicChanges == null ? ContextUtils.EMPTY_STRING_SET : this.subMapAtomicChanges.keySet();
-        for (String subMapKey : subMapKeys)
+        
+        if (this.subMapAtomicChanges != null)
         {
-            subMap = record.getOrCreateSubMap(subMapKey);
-            getSubMapAtomicChange(subMapKey).applyTo(subMap);
-            if (subMap.size() == 0)
+            Map<String, IValue> subMap;
+            for (String subMapKey : this.subMapAtomicChanges.keySet())
             {
-                record.removeSubMap(subMapKey);
+                subMap = record.getOrCreateSubMap(subMapKey);
+                getSubMapAtomicChange(subMapKey).applyTo(subMap);
+                if (subMap.size() == 0)
+                {
+                    record.removeSubMap(subMapKey);
+                }
             }
         }
     }
