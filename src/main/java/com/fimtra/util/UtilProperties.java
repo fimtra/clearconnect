@@ -101,6 +101,12 @@ public abstract class UtilProperties
          * E.g. <code>-Dutil.objectPoolLogPeriodMins=10</code>
          */
         String OBJECT_POOL_SIZE_LOG_PERIOD_MINS = BASE + "objectPoolLogPeriodMins";
+
+        /**
+         * The system property name to define if rolled log files are compressed.<br>
+         * E.g. <code>-Dutil.compressRolledLogs=true</code>
+         */
+        String COMPRESS_ROLLED_LOGS = BASE + "compressRolledLogs";
     }
 
     /**
@@ -176,6 +182,12 @@ public abstract class UtilProperties
          */
         int OBJECT_POOL_SIZE_LOG_PERIOD_MINS = Integer.parseInt(System.getProperty(
             Names.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, "10"));
+
+        /**
+         * Defines if rolled logs files are compressed. <br>
+         * Default is <code>true</code>.
+         */
+        boolean COMPRESS_ROLLED_LOGS = Boolean.parseBoolean(System.getProperty(Names.COMPRESS_ROLLED_LOGS, "true"));
 
     }
 

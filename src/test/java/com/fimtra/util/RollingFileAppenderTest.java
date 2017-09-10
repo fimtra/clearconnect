@@ -78,7 +78,7 @@ public class RollingFileAppenderTest
             "This is some more text", 13, 17).append("This is some more text", 17, 22);
         this.candidate.flush();
 
-        final File[] files = FileUtils.readFiles(new File("."), new FileUtils.ExtensionFileFilter("logged"));
+        final File[] files = FileUtils.readFiles(new File("."), new FileUtils.ExtensionFileFilter("logged.gz"));
         assertEquals(4, files.length);
     }
 

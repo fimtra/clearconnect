@@ -204,17 +204,33 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
                 final String rolledFileName = this.name + "." + this.rollCount++ + ".logged";
                 this.writer.append("file closed as ").append(rolledFileName);
                 this.writer.close();
-                if (this.currentFile.renameTo(new File(this.parent, rolledFileName)))
+                final File rolledFile = new File(this.parent, rolledFileName);
+                if (this.currentFile.renameTo(rolledFile))
                 {
                     this.currentFile = new File(this.parent, this.name);
                     checkFileWriteable(this.currentFile);
                     this.currentCharCount = charCount;
                     this.writer = new BufferedWriter(new FileWriter(this.currentFile));
+
+                    if (UtilProperties.Values.COMPRESS_ROLLED_LOGS)
+                    {
+                        if (FileUtils.gzip(rolledFile, new File(this.parent)))
+                        {
+                            if (!rolledFile.delete())
+                            {
+                                System.out.println("Could not delete: " + rolledFile);
+                            }
+                        }
+                        else
+                        {
+                            System.out.println("Could not gzip: " + rolledFile);
+                        }
+                    }
                 }
                 else
                 {
                     throw new IOException("Could not rename " + this.currentFile + " to "
-                        + new File(this.parent, rolledFileName));
+                        + rolledFile);
                 }
             }
         }
