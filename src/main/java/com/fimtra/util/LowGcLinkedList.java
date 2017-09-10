@@ -42,7 +42,7 @@ import com.fimtra.util.UtilProperties.Values;
  * 
  * @author Ramon Servadei
  */
-public class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deque<E>, Serializable
+public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deque<E>, Serializable
 {
     private static final long serialVersionUID = 1L;
 
