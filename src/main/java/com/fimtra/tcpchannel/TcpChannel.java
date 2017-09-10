@@ -437,14 +437,19 @@ public class TcpChannel implements ITransportChannel
             synchronized (this.lock)
             {
                 ByteBuffer[] buffer;
-                for (int i = 0; i < byteFragmentsToSend.length;)
+                
+                if (this.writeToSocketUsingApplicationThread)
                 {
-                    if (this.writeToSocketUsingApplicationThread)
+                    for (int i = 0; i < byteFragmentsToSend.length;)
                     {
                         ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i++],
                             byteFragmentsToSend[i++]);
                     }
-                    else
+                    return true;
+                }
+                else
+                {
+                    for (int i = 0; i < byteFragmentsToSend.length;)
                     {
                         if (this.txFrameBufferPoolPtr < this.txFrameBufferPool.length)
                         {
@@ -458,11 +463,6 @@ public class TcpChannel implements ITransportChannel
                         buffer[1] = byteFragmentsToSend[i++];
                         this.txFrames.add(buffer);
                     }
-                }
-
-                if (this.writeToSocketUsingApplicationThread)
-                {
-                    return true;
                 }
 
                 switch(this.state)
