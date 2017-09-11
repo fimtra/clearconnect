@@ -157,6 +157,26 @@ public abstract class AbstractValue implements IValue
     @Override
     public byte[] byteValue()
     {
-        return toBytes(this, ByteBuffer.allocate(8));
+        switch(getType())
+        {
+            case DOUBLE:
+            {
+                final ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
+                reuse8ByteBuffer.putLong(Double.doubleToRawLongBits(doubleValue()));
+                return reuse8ByteBuffer.array();
+            }
+            case LONG:
+            {
+                final ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
+                reuse8ByteBuffer.putLong(longValue());
+                return reuse8ByteBuffer.array();
+            }
+            case TEXT:
+                return textValue().getBytes(UTF8);
+            case BLOB:
+                return ((BlobValue) this).value;
+            default :
+                throw new UnsupportedOperationException("Unhandled type: " + getType());
+        }
     }
 }

@@ -170,7 +170,7 @@ public class ValueTest
         for (int i = 0; i < MAX; i++)
         {
             val = LongValue.valueOf(i);
-            bytes = AbstractValue.toBytes(val, reuse8ByteBuffer);
+            bytes = val.byteValue();
             assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
             reuse8ByteBuffer.clear();
         }
@@ -185,7 +185,7 @@ public class ValueTest
         for (int i = 0; i < MAX; i++)
         {
             val = new DoubleValue(i);
-            bytes = AbstractValue.toBytes(val, reuse8ByteBuffer);
+            bytes = val.byteValue();
             assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
             reuse8ByteBuffer.clear();
         }
@@ -198,7 +198,7 @@ public class ValueTest
         ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
         byte[] bytes;
         val = TextValue.valueOf("" + System.currentTimeMillis() + "-" + new Random().nextDouble());
-        bytes = AbstractValue.toBytes(val, reuse8ByteBuffer);
+        bytes = val.byteValue();
         assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
         reuse8ByteBuffer.clear();
     }
@@ -210,7 +210,7 @@ public class ValueTest
         ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
         byte[] bytes;
         val = new BlobValue("1a0f3416");
-        bytes = AbstractValue.toBytes(val, reuse8ByteBuffer);
+        bytes = val.byteValue();
         assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
         reuse8ByteBuffer.clear();
     }
