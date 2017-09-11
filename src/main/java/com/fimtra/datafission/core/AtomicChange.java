@@ -483,7 +483,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.putEntries == null)
             {
-                this.putEntries = new HashMap<String, IValue>(2);
+                this.putEntries = new HashMap<String, IValue>();
             }
             return this.putEntries;
         }
@@ -499,7 +499,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.removedEntries == null)
             {
-                this.removedEntries = new HashMap<String, IValue>(2);
+                this.removedEntries = new HashMap<String, IValue>();
             }
             return this.removedEntries;
         }
@@ -515,7 +515,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.overwrittenEntries == null)
             {
-                this.overwrittenEntries = new HashMap<String, IValue>(2);
+                this.overwrittenEntries = new HashMap<String, IValue>();
             }
             return this.overwrittenEntries;
         }
@@ -527,7 +527,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.subMapAtomicChanges == null)
             {
-                this.subMapAtomicChanges = new HashMap<String, AtomicChange>(1);
+                this.subMapAtomicChanges = new HashMap<String, AtomicChange>(4);
             }
             AtomicChange subMapAtomicChange = this.subMapAtomicChanges.get(subMapKey);
             if (subMapAtomicChange == null)
