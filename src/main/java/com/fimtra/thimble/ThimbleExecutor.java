@@ -189,7 +189,7 @@ public final class ThimbleExecutor implements Executor
         this.size = size;
         this.stats = new TaskStatistics(this.name);
         this.taskRunners = CollectionUtils.newDeque();
-        this.taskQueue = new TaskQueue();
+        this.taskQueue = new TaskQueue(this.name);
         for (int i = 0; i < size; i++)
         {
             final String threadName = this.name + i;
