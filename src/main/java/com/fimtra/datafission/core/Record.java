@@ -99,7 +99,7 @@ final class Record implements IRecord, Cloneable
         }
     }
 
-    private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = CollectionUtils.newMap(1);
+    private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = CollectionUtils.newMap(2);
     /**
      * A pool for the keys. Keys across records stand a VERY good chance of being repeated many
      * times so this is a valuable memory optimisation.
@@ -159,7 +159,7 @@ final class Record implements IRecord, Cloneable
             {
                 it.next().getValue().clear();
             }
-            this.data = CollectionUtils.newMap(2);
+            this.data = CollectionUtils.newMap(4);
             this.subMaps = EMPTY_SUBMAP;
         }
     }
@@ -424,7 +424,7 @@ final class Record implements IRecord, Cloneable
             {
                 if (this.subMaps == EMPTY_SUBMAP)
                 {
-                    this.subMaps = CollectionUtils.newMap(1);
+                    this.subMaps = CollectionUtils.newMap(4);
                 }
                 final String internKey = keysPool.intern(key);
                 submap = new SubMap(this, internKey);
@@ -697,7 +697,7 @@ final class SubMap implements Map<String, IValue>
     {
         this.subMapKey = subMapKey;
         this.record = record;
-        this.subMap = CollectionUtils.newMap(2);
+        this.subMap = CollectionUtils.newMap(4);
     }
 
     private SubMap(Record record, String subMapKey, Map<String, IValue> subMap)
