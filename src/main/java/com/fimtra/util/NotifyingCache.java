@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -516,6 +517,13 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             this.writeLock.lock();
             try
             {
+                // remove all data from the cache and trigger listeners
+                for (Iterator<Map.Entry<String, DATA>> it =
+                    new HashMap<String, DATA>(this.cache).entrySet().iterator(); it.hasNext();)
+                {
+                    notifyListenersDataRemoved(it.next().getKey());
+                }
+
                 this.listeners = Collections.emptyList();
                 this.cache.clear();
             }
