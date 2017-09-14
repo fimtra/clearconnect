@@ -168,7 +168,7 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.deltaCountLogThreshold=6</code>
          */
         String DELTA_COUNT_LOG_THRESHOLD = BASE + "deltaCountLogThreshold";
-        
+
         /**
          * The number of microseconds to delay the processing of each subscribe message. This
          * reduces image flooding when a {@link ProxyContext} reconnects to a bounced
@@ -191,16 +191,21 @@ public abstract class DataFissionProperties
          * this value. Only affects application threads. <br>
          * E.g. <code>-DdataFission.pendingEventThrottleThreshold=200</code>
          */
-        String PENDING_EVENT_THROTTLE_THRESHOLD = "pendingEventThrottleThreshold";
+        String PENDING_EVENT_THROTTLE_THRESHOLD = BASE + "pendingEventThrottleThreshold";
 
-        
         /**
          * The name of the system property to define the period, in milliseconds, for a
          * {@link Publisher} to publish updates to the
          * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
          * E.g. <code>-DdataFission.connectionsRecordPublishPeriodMillis=10000</code>
          */
-        String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = "connectionsRecordPublishPeriodMillis";
+        String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = BASE + "connectionsRecordPublishPeriodMillis";
+
+        /**
+         * The maximum size for the publish tasks pool in a {@link Context}.<br>
+         * E.g. <code>-DdataFission.publishTasksMaxPoolSize=1000</code>
+         */
+        String PUBLISH_TASKS_MAX_POOL_SIZE = BASE + "publishTasksMaxPoolSize";
     }
 
     /**
@@ -388,7 +393,7 @@ public abstract class DataFissionProperties
          * @see Names#DELTA_COUNT_LOG_THRESHOLD
          */
         int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
-        
+
         /**
          * The delay, in micro seconds, between handling subsequent subscribe messages.
          * <p>
@@ -397,7 +402,7 @@ public abstract class DataFissionProperties
          * @see Names#SUBSCRIBE_DELAY_MICROS
          */
         int SUBSCRIBE_DELAY_MICROS = Integer.parseInt(System.getProperty(Names.SUBSCRIBE_DELAY_MICROS, "0"));
-        
+
         /**
          * The batch size for handling mass subscribes.
          * <p>
@@ -416,7 +421,8 @@ public abstract class DataFissionProperties
          * 
          * @see Names#PENDING_EVENT_THROTTLE_THRESHOLD
          */
-        int PENDING_EVENT_THROTTLE_THRESHOLD = Integer.parseInt(System.getProperty(Names.PENDING_EVENT_THROTTLE_THRESHOLD, "200"));
+        int PENDING_EVENT_THROTTLE_THRESHOLD =
+            Integer.parseInt(System.getProperty(Names.PENDING_EVENT_THROTTLE_THRESHOLD, "200"));
 
         /**
          * The period, in milliseconds, for a {@link Publisher} to publish updates to the
@@ -428,6 +434,16 @@ public abstract class DataFissionProperties
          */
         long CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS =
             Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "10000"));
+
+        /**
+         * The maximum size for the publish tasks pool in a {@link Context}.<br>
+         * <p>
+         * Default is 1000.
+         * 
+         * @see Names#PUBLISH_TASKS_MAX_POOL_SIZE
+         */
+        int PUBLISH_TASKS_MAX_POOL_SIZE =
+            Integer.parseInt(System.getProperty(Names.PUBLISH_TASKS_MAX_POOL_SIZE, "1000"));
     }
 
     private DataFissionProperties()

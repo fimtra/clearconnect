@@ -59,6 +59,7 @@ import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
+import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
@@ -92,8 +93,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * <li>add/remove listener
      * <li>notify initial image
      * </ul>
-     * This can be useful to improve performance for situations where there is high-throughput of
-     * record creates
      */
     public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
 
@@ -165,6 +164,67 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     static IRecord getRecordInternal(IObserverContext context, String name)
     {
         return ((Context) context).records.get(name);
+    }
+
+    /**
+     * Encapsulates a re-usable task to handle publishing of a record.
+     * 
+     * @author Ramon Servadei
+     */
+    private final class SequentialPublishTask implements ISequentialRunnable
+    {
+        private String name;
+        private long sequence;
+        private AtomicChange atomicChange;
+        private CountDownLatch latch;
+
+        SequentialPublishTask()
+        {
+        }
+
+        void initialise(CountDownLatch latch, String name, AtomicChange atomicChange, long sequence)
+        {
+            this.latch = latch;
+            this.name = name;
+            this.atomicChange = atomicChange;
+            this.sequence = sequence;
+        }
+
+        @Override
+        public void run()
+        {
+            try
+            {
+                doPublishChange(this.name, this.atomicChange, this.sequence);
+            }
+            finally
+            {
+                Context.this.throttle.eventFinish();
+                this.latch.countDown();
+
+                if (Context.this.publishTaskPool.size() < DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE)
+                {
+                    this.latch = null;
+                    this.name = null;
+                    this.atomicChange = null;
+                    this.sequence = -1;
+
+                    synchronized (Context.this.publishTaskPool)
+                    {
+                        if (Context.this.publishTaskPool.size() < DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE)
+                        {
+                            Context.this.publishTaskPool.add(this);
+                        }
+                    }
+                }
+            }
+        }
+
+        @Override
+        public Object context()
+        {
+            return this.name;
+        }
     }
 
     /**
@@ -297,7 +357,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final ConcurrentMap<String, AtomicChange> pendingAtomicChanges;
     final ConcurrentMap<String, IRpcInstance> rpcInstances;
     final ConcurrentMap<String, AtomicLong> sequences;
-    final ConcurrentMap<String, List<IRecordChange>> coalescingChanges;    
+    final ConcurrentMap<String, List<IRecordChange>> coalescingChanges;
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
@@ -326,7 +386,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     int listenersBeingNotifiedWithInitialImages;
 
     final ContextThrottle throttle;
-    
+
+    final LowGcLinkedList<SequentialPublishTask> publishTaskPool;
+    long publishTaskCreateCount;
+
     /** Construct the context with the given name */
     public Context(String name)
     {
@@ -375,9 +438,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.pendingAtomicChanges = new ConcurrentHashMap<String, AtomicChange>(initialSize);
         this.tokenPerRecord = new ConcurrentHashMap<String, String>(initialSize);
         this.coalescingChanges = new ConcurrentHashMap<String, List<IRecordChange>>(initialSize);
-        
         this.rpcInstances = new ConcurrentHashMap<String, IRpcInstance>();
         this.validators = new CopyOnWriteArraySet<IValidator>();
+        this.publishTaskPool = new LowGcLinkedList<Context.SequentialPublishTask>(
+            DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE);
 
         this.listenersToNotifyWithInitialImages =
             Collections.synchronizedMap(new HashMap<IRecordListener, Set<String>>());
@@ -493,7 +557,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
             publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
         }
-        
+
         // always force a publish for the initial create - guaranteed to be sequence 0
         publishAtomicChange(name, true);
 
@@ -537,7 +601,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // starting at 0
         this.sequences.put(name, new AtomicLong(-1));
         getPendingAtomicChangesForWrite(name).setScope(IRecordChange.IMAGE_SCOPE_CHAR);
-        
+
         // this will set off an atomic change for the construction
         record.putAll(initialData);
 
@@ -677,7 +741,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         return publishAtomicChange(name, false);
     }
- 
+
     private CountDownLatch publishAtomicChange(final String name, boolean forcePublish)
     {
         if (name == null)
@@ -686,7 +750,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         this.throttle.eventStart(name, forcePublish);
-        
+
         try
         {
             final CountDownLatch latch = new CountDownLatch(1);
@@ -698,45 +762,24 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 this.throttle.eventFinish();
                 return latch;
             }
-            
+
             synchronized (record.getWriteLock())
             {
-                final IRecordChange atomicChange = this.pendingAtomicChanges.remove(name);
-                // need to prevent empty changes BUT also allow the initial create if it had blank data
+                final AtomicChange atomicChange = this.pendingAtomicChanges.remove(name);
+                // need to prevent empty changes BUT also allow the initial create if it had blank
+                // data
                 if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
                 {
                     latch.countDown();
                     this.throttle.eventFinish();
                     return latch;
                 }
-                
+
                 // update the sequence (version) of the record when publishing
                 final long sequence = atomicChange.getSequence();
                 ((Record) record).setSequence(sequence);
 
-                final ISequentialRunnable notifyTask = new ISequentialRunnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        try
-                        {
-                            doPublishChange(name, atomicChange, sequence);
-                        }
-                        finally
-                        {
-                            Context.this.throttle.eventFinish();
-                            latch.countDown();
-                        }
-                    }
-                    
-                    @Override
-                    public Object context()
-                    {
-                        return name;
-                    }
-                };
-                executeSequentialCoreTask(notifyTask);
+                executeSequentialCoreTask(prepareSequentialPublishTask(name, latch, atomicChange, sequence));
                 return latch;
             }
         }
@@ -746,7 +789,28 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw e;
         }
     }
-     
+
+    SequentialPublishTask prepareSequentialPublishTask(final String name, final CountDownLatch latch,
+        final AtomicChange atomicChange, final long sequence)
+    {
+        SequentialPublishTask task;
+        synchronized (this.publishTaskPool)
+        {
+            task = this.publishTaskPool.poll();
+        }
+        if (task == null)
+        {
+            if (++this.publishTaskCreateCount % 1000 == 0)
+            {
+                Log.log(this, this.name, " publish task pool size too small, task create count: "
+                    + Long.valueOf(this.publishTaskCreateCount));
+            }
+            task = new SequentialPublishTask();
+        }
+        task.initialise(latch, name, atomicChange, sequence);
+        return task;
+    }
+
     @Override
     public Future<Map<String, Boolean>> addObserver(final IRecordListener observer, final String... recordNames)
     {
@@ -1294,33 +1358,33 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         if (sequence == 0)
         {
-            Context.this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, Context.this.noopChangeManager));
+            this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, this.noopChangeManager));
         }
-        
+
         // update the image with the atomic changes in the runnable
-        final IRecord notifyImage = Context.this.imageCache.updateInstance(name, atomicChange);
-        
+        final IRecord notifyImage = this.imageCache.updateInstance(name, atomicChange);
+
         // this can happen if there is a concurrent delete
         if (notifyImage == null)
         {
             return;
         }
-        
-        if (Context.this.validators.size() > 0)
+
+        if (this.validators.size() > 0)
         {
-            for (IValidator validator : Context.this.validators)
+            for (IValidator validator : this.validators)
             {
                 validator.validate(notifyImage, atomicChange);
             }
         }
-        
+
         long start;
         IRecordListener listener = null;
-        IRecordListener[] subscribersForRecord = Context.this.recordObservers.getSubscribersFor(name);
-        
+        IRecordListener[] subscribersForRecord = this.recordObservers.getSubscribersFor(name);
+
         // if there are any pending initial images waiting, we need to ensure we
         // don't notify this update to the registered listener
-        if (Context.this.listenersBeingNotifiedWithInitialImages > 0)
+        if (this.listenersBeingNotifiedWithInitialImages > 0)
         {
             // work out who to notify, i.e. listeners NOT expecting an image
             Set<String> initialImagePending;
@@ -1328,12 +1392,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             for (int i = 0; i < subscribersForRecord.length; i++)
             {
                 listener = subscribersForRecord[i];
-                
+
                 // NOTE: cannot optimise by locking
                 // listenersToNotifyWithInitialImages outside the loop - this can
                 // lead to a deadlock as the lock order with initialImagePending
                 // will then become broken
-                initialImagePending = Context.this.listenersToNotifyWithInitialImages.get(listener);
+                initialImagePending = this.listenersToNotifyWithInitialImages.get(listener);
                 if (initialImagePending != null && initialImagePending.contains(name))
                 {
                     // don't notify - let the initial image task do this
@@ -1346,10 +1410,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     listenersNotExpectingImage.add(listener);
                 }
             }
-            subscribersForRecord = listenersNotExpectingImage.toArray(
-                new IRecordListener[listenersNotExpectingImage.size()]);
+            subscribersForRecord =
+                listenersNotExpectingImage.toArray(new IRecordListener[listenersNotExpectingImage.size()]);
         }
-        
+
         for (int i = 0; i < subscribersForRecord.length; i++)
         {
             try
@@ -1357,8 +1421,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 listener = subscribersForRecord[i];
                 start = System.nanoTime();
                 listener.onChange(notifyImage, atomicChange);
-                ContextUtils.measureTask(name, "local record update", listener,
-                    (System.nanoTime() - start));
+                ContextUtils.measureTask(name, "local record update", listener, (System.nanoTime() - start));
             }
             catch (Exception e)
             {
