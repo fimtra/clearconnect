@@ -25,6 +25,8 @@ import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -403,11 +405,14 @@ public final class DeadlockDetector
     private ThreadInfoWrapper[] getThreadInfoWrappersFor(long[] deadlockedThreadIds)
     {
         ThreadInfo[] threadInfos = this.threadMxBean.getThreadInfo(deadlockedThreadIds, true, true);
-        ThreadInfoWrapper[] wrappers = new ThreadInfoWrapper[threadInfos.length];
-        for (int i = 0; i < wrappers.length; i++)
+        List<ThreadInfoWrapper> wrappers = new LinkedList<ThreadInfoWrapper>();
+        for (int i = 0; i < threadInfos.length; i++)
         {
-            wrappers[i] = new ThreadInfoWrapper(threadInfos[i]);
+            if (threadInfos[i] != null)
+            {
+                wrappers.add(new ThreadInfoWrapper(threadInfos[i]));
+            }
         }
-        return wrappers;
+        return wrappers.toArray(new ThreadInfoWrapper[wrappers.size()]);
     }
 }
