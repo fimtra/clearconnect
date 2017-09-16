@@ -62,24 +62,14 @@ abstract class ByteArrayFragmentResolver
         @Override
         byte[] resolve(ByteBuffer byteFragmentTxData)
         {
-            return resolveInternal(ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
+            return resolveInternal(
+                ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
         }
 
         @Override
-        ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
+        ByteBuffer[] prepareBuffersToSend(TxByteArrayFragment byteArrayFragment)
         {
-            final ByteArrayFragment[] fragments =
-                ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            final ByteBuffer[] fragmentsToSend = new ByteBuffer[fragments.length * 2];
-            ByteBuffer[] parts;
-            int k = 0;
-            for (int i = 0; i < fragments.length; i++)
-            {
-                parts = fragments[i].toTxBytesRawByteHeader();
-                fragmentsToSend[k++] = parts[0];
-                fragmentsToSend[k++] = parts[1];
-            }
-            return fragmentsToSend;
+            return byteArrayFragment.toTxBytesRawByteHeader();
         }
     }
 
@@ -89,24 +79,14 @@ abstract class ByteArrayFragmentResolver
         @Override
         byte[] resolve(ByteBuffer byteFragmentTxData)
         {
-            return resolveInternal(ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
+            return resolveInternal(
+                ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
         }
 
         @Override
-        ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize)
+        ByteBuffer[] prepareBuffersToSend(TxByteArrayFragment byteArrayFragment)
         {
-            final ByteArrayFragment[] fragments =
-                ByteArrayFragment.getFragmentsForTxData(toSend, maxFragmentInternalByteSize);
-            final ByteBuffer[] fragmentsToSend = new ByteBuffer[fragments.length * 2];
-            ByteBuffer[] parts;
-            int k = 0;
-            for (int i = 0; i < fragments.length; i++)
-            {
-                parts = fragments[i].toTxBytesUTF8Header();
-                fragmentsToSend[k++] = parts[0];
-                fragmentsToSend[k++] = parts[1];
-            }
-            return fragmentsToSend;
+            return byteArrayFragment.toTxBytesUTF8Header();
         }
     }
 
@@ -122,16 +102,12 @@ abstract class ByteArrayFragmentResolver
     abstract byte[] resolve(ByteBuffer byteFragmentTxData);
 
     /**
-     * Convenience method to split a byte[] into the transmission {@link ByteBuffer} objects
-     * representing the byte array fragments for the whole message.
+     * Get the header and data {@link ByteBuffer} to send from the fragment
      * 
-     * @param toSend
-     *            the data to send
-     * @param maxFragmentInternalByteSize
-     *            the maximum size of each {@link ByteArrayFragment} instance's internal byte[]
-     * @return the array of {@link ByteBuffer} objects to send
+     * @param byteArrayFragment
+     * @return an array holding the header and data as {@link ByteBuffer} objects
      */
-    abstract ByteBuffer[] getByteFragmentsToSend(byte[] toSend, int maxFragmentInternalByteSize);
+    abstract ByteBuffer[] prepareBuffersToSend(TxByteArrayFragment byteArrayFragment);
 
     byte[] resolveInternal(final ByteArrayFragment fragment)
     {
@@ -140,15 +116,23 @@ abstract class ByteArrayFragmentResolver
         {
             if (fragment.isLastElement())
             {
-                final ByteArrayFragment current = this.fragments.remove(fragment);
-                if (current == null)
+                if (fragment.sequenceId == 0)
                 {
                     // the fragment holds the full data (it was never fragmented)
                     resolvedData = fragment.getData();
                 }
                 else
                 {
-                    resolvedData = current.merge(fragment).getData();
+                    final ByteArrayFragment current = this.fragments.remove(fragment);
+                    if (current == null)
+                    {
+                        // the fragment holds the full data (it was never fragmented)
+                        resolvedData = fragment.getData();
+                    }
+                    else
+                    {
+                        resolvedData = current.merge(fragment).getData();
+                    }
                 }
             }
             else

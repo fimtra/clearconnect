@@ -119,6 +119,14 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.writerThreadCount=4</code>
          */
         String WRITER_THREAD_COUNT = BASE + "writerThreadCount";
+        
+        /**
+         * The system property name to define the maximum size of the pool to hold re-usable tx
+         * frame objects.
+         * <p>
+         * E.g. <code>-DtcpChannel.txFramePoolMaxSize=50</code>
+         */
+        String TX_FRAME_POOL_MAX_SIZE = BASE + "txFramePoolMaxSize";
     }
 
     /**
@@ -226,6 +234,13 @@ public abstract class TcpChannelProperties
          * Default is: 4
          */
         int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "1"));
+        
+        /**
+         * The maximum size of the pool to hold re-usable tx frame objects.
+         * <p>
+         * Default is: 50
+         */
+        int TX_FRAME_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.TX_FRAME_POOL_MAX_SIZE, "50"));
     }
 
     private TcpChannelProperties()

@@ -37,6 +37,7 @@ import com.fimtra.tcpchannel.TcpChannelProperties.Values;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
+import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
 
 /**
@@ -125,7 +126,7 @@ public class TcpChannel implements ITransportChannel
         SendChannelChain()
         {
         }
-        
+
         /**
          * This is the start of the logical linked-list of TcpChannels with data to send. This is an
          * equal-sending-opportunity mechanism. The list is traversed from start to end, each
@@ -211,10 +212,9 @@ public class TcpChannel implements ITransportChannel
     ByteBuffer[] readFrames = new ByteBuffer[10];
     byte[][] resolvedFrames = new byte[10][];
     final int[] readFramesSize = new int[1];
-    final Queue<ByteBuffer[]> txFrames = CollectionUtils.newDeque();
-    final ByteBuffer[][] txFrameBufferPool = new ByteBuffer[][] { new ByteBuffer[2], new ByteBuffer[2],
-        new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], new ByteBuffer[2], };
-    int txFrameBufferPoolPtr = 0;
+    final Queue<TxByteArrayFragment> txFrames = CollectionUtils.newDeque();
+    final TxByteArrayFragment[][][] txFragmentsArrayPool = new TxByteArrayFragment[1][2][];
+    final LowGcLinkedList<TxByteArrayFragment> txFragmentsPool = new LowGcLinkedList<TxByteArrayFragment>();
     final SocketChannel socketChannel;
     final IFrameReaderWriter readerWriter;
     final ByteArrayFragmentResolver byteArrayFragmentResolver;
@@ -238,7 +238,7 @@ public class TcpChannel implements ITransportChannel
 
     /** Counter to indicate if a send operation expects to be signalled when sending is complete */
     int waitingForNotify;
-    
+
     StateEnum state = StateEnum.IDLE;
 
     /**
@@ -352,7 +352,6 @@ public class TcpChannel implements ITransportChannel
         this.reader = TcpChannelUtils.nextReader();
         this.writer = TcpChannelUtils.nextWriter();
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
-
         final Socket socket = this.socketChannel.socket();
         this.endPointSocketDescription = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
         this.shortSocketDescription = socket.getLocalSocketAddress() + "<-" + getEndPointDescription();
@@ -425,43 +424,35 @@ public class TcpChannel implements ITransportChannel
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
 
     }
-    
+
     @Override
     public boolean send(byte[] toSend)
     {
         try
         {
-            final ByteBuffer[] byteFragmentsToSend =
-                this.byteArrayFragmentResolver.getByteFragmentsToSend(toSend, TcpChannelProperties.Values.TX_SEND_SIZE);
-
             synchronized (this.lock)
             {
-                ByteBuffer[] buffer;
-                
+                final TxByteArrayFragment[] byteFragmentsToSend = TxByteArrayFragment.getFragmentsForTxData(toSend,
+                    TcpChannelProperties.Values.TX_SEND_SIZE, this.txFragmentsArrayPool, this.txFragmentsPool);
+
                 if (this.writeToSocketUsingApplicationThread)
                 {
-                    for (int i = 0; i < byteFragmentsToSend.length;)
+                    ByteBuffer[] buffer;
+                    for (int i = 0; i < byteFragmentsToSend.length; i++)
                     {
-                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(byteFragmentsToSend[i++],
-                            byteFragmentsToSend[i++]);
+                        buffer = this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
+                        ((AbstractFrameReaderWriter) this.readerWriter).writeNextFrame(buffer[0], buffer[1]);
+                        byteFragmentsToSend[i].reset();
+                        this.txFragmentsPool.push(byteFragmentsToSend[i]);
                     }
                     return true;
                 }
                 else
                 {
-                    for (int i = 0; i < byteFragmentsToSend.length;)
+                    for (int i = 0; i < byteFragmentsToSend.length; i++)
                     {
-                        if (this.txFrameBufferPoolPtr < this.txFrameBufferPool.length)
-                        {
-                            buffer = this.txFrameBufferPool[this.txFrameBufferPoolPtr++];
-                        }
-                        else
-                        {
-                            buffer = new ByteBuffer[2];
-                        }
-                        buffer[0] = byteFragmentsToSend[i++];
-                        buffer[1] = byteFragmentsToSend[i++];
-                        this.txFrames.add(buffer);
+                        this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
+                        this.txFrames.add(byteFragmentsToSend[i]);
                     }
                 }
 
@@ -574,15 +565,13 @@ public class TcpChannel implements ITransportChannel
             this.readFrames = this.readerWriter.readFrames(this.rxBytes, this.readFrames, this.readFramesSize);
             decodeFrames = System.nanoTime();
 
-            ByteBuffer frame;
             byte[] data;
             size = this.readFramesSize[0];
             int i = 0;
             int resolvedFramesSize = 0;
             for (i = 0; i < size; i++)
             {
-                frame = this.readFrames[i];
-                if ((data = this.byteArrayFragmentResolver.resolve(frame)) != null)
+                if ((data = this.byteArrayFragmentResolver.resolve(this.readFrames[i])) != null)
                 {
                     if (resolvedFramesSize == this.resolvedFrames.length)
                     {
@@ -590,16 +579,16 @@ public class TcpChannel implements ITransportChannel
                     }
                     this.resolvedFrames[resolvedFramesSize++] = data;
                 }
+                this.readFrames[i] = null;
             }
             resolveFrames = System.nanoTime();
 
             for (i = 0; i < resolvedFramesSize; i++)
             {
-                data = this.resolvedFrames[i];
-                switch(data.length)
+                switch(this.resolvedFrames[i].length)
                 {
                     case 1:
-                        if (ChannelUtils.isHeartbeatSignal(data))
+                        if (ChannelUtils.isHeartbeatSignal(this.resolvedFrames[i]))
                         {
                             ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
                             break;
@@ -608,7 +597,7 @@ public class TcpChannel implements ITransportChannel
                     default :
                         try
                         {
-                            this.receiver.onDataReceived(data, this);
+                            this.receiver.onDataReceived(this.resolvedFrames[i], this);
                         }
                         catch (Exception e)
                         {
@@ -617,6 +606,7 @@ public class TcpChannel implements ITransportChannel
                                 e);
                         }
                 }
+                this.resolvedFrames[i] = null;
             }
             processFrames = System.nanoTime();
         }
@@ -659,7 +649,7 @@ public class TcpChannel implements ITransportChannel
          * runtime. This prevents one channel starving out other channels by having a queue that is
          * being fed as fast as it can be dequeued, which leads to starvation of other channels.
          */
-        ByteBuffer[] data = null;
+        TxByteArrayFragment data = null;
         TcpChannel channel = null;
         final SendChannelChain chain;
         synchronized (TcpChannel.class)
@@ -700,7 +690,8 @@ public class TcpChannel implements ITransportChannel
                     {
                         try
                         {
-                            ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data[0], data[1]);
+                            ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data.txDataWithHeader[0],
+                                data.txDataWithHeader[1]);
                             if (channel.txFrames.peek() == null)
                             {
                                 setChannelIdle(channel);
@@ -716,11 +707,11 @@ public class TcpChannel implements ITransportChannel
                         }
                         finally
                         {
-                            data[0] = null;
-                            data[1] = null;
-                            if (channel.txFrameBufferPoolPtr > 0)
+                            // return the fragment to the pool
+                            if (channel.txFragmentsPool.size() < TcpChannelProperties.Values.TX_FRAME_POOL_MAX_SIZE)
                             {
-                                channel.txFrameBufferPool[--channel.txFrameBufferPoolPtr] = data;
+                                data.reset();
+                                channel.txFragmentsPool.push(data);
                             }
                         }
                     }
