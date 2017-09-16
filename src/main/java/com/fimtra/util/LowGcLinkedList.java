@@ -573,14 +573,14 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     @Override
     public boolean offerFirst(E e)
     {
-        addFirst(e);
+        linkFirst(e);
         return true;
     }
 
     @Override
     public boolean offerLast(E e)
     {
-        addLast(e);
+        linkLast(e);
         return true;
     }
 
@@ -615,7 +615,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     @Override
     public void push(E e)
     {
-        addFirst(e);
+        linkFirst(e);
     }
 
     @Override
