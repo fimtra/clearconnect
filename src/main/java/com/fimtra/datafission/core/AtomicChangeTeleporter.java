@@ -283,19 +283,19 @@ final class AtomicChangeTeleporter
      * 
      * @param change
      *            the change to split
-     * @return an array holding the parts for the change
+     * @return an array holding the parts for the change, <code>null</code> if the change is not split
      */
     AtomicChange[] split(AtomicChange change)
     {
         final int totalChangeCount = change.getSize();
         if (totalChangeCount == 0 || totalChangeCount < this.maxChangesPerPart)
         {
-            return new AtomicChange[] { change };
+            return null;
         }
 
         final String name = change.getName();
         final AtomicChange[] parts =
-            new AtomicChange[(int) Math.ceil((double) totalChangeCount / this.maxChangesPerPart)];
+            new AtomicChange[(int) Math.ceil(totalChangeCount * (1d / this.maxChangesPerPart))];
         int partsIndex = 0;
         final AtomicInteger changeCounter = new AtomicInteger();
 

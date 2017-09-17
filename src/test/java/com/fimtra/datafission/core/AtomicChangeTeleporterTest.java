@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.util.Map;
 
@@ -87,7 +88,7 @@ public class AtomicChangeTeleporterTest
         expected.setScope(IRecordChange.IMAGE_SCOPE);
         expected.setSequence(System.currentTimeMillis());
 
-        doPartsTest(expected);
+        doPartsTest(expected, true);
     }
 
     @Test
@@ -100,7 +101,7 @@ public class AtomicChangeTeleporterTest
         putEntries.put(K1, V1);
         putEntries.put(K2, V2);
 
-        doPartsTest(expected);
+        doPartsTest(expected, true);
     }
 
     @Test
@@ -114,7 +115,7 @@ public class AtomicChangeTeleporterTest
         putEntries.put(K2, V2);
         putEntries.put(K3, V3);
 
-        doPartsTest(expected);
+        doPartsTest(expected, false);
     }
 
     @Test
@@ -129,7 +130,7 @@ public class AtomicChangeTeleporterTest
         putEntries.put(K3, V3);
         putEntries.put(K4, V4);
 
-        doPartsTest(expected);
+        doPartsTest(expected, false);
     }
     
     @Test
@@ -146,7 +147,7 @@ public class AtomicChangeTeleporterTest
         putEntries.put(K5, V5);
         putEntries.put(K6, V6);
 
-        doPartsTest(expected);
+        doPartsTest(expected, false);
     }
     
     @Test
@@ -160,7 +161,7 @@ public class AtomicChangeTeleporterTest
         populateChange(expected.internalGetSubMapAtomicChange("subMap2"));
         populateChange(expected.internalGetSubMapAtomicChange("subMap3"));
         
-        doPartsTest(expected);
+        doPartsTest(expected, false);
     }
 
     @Test(expected=IncorrectSequenceException.class)
@@ -200,9 +201,14 @@ public class AtomicChangeTeleporterTest
         }
     }
 
-    void doPartsTest(AtomicChange expected) throws IncorrectSequenceException
+    void doPartsTest(AtomicChange expected, boolean noSplitExpected) throws IncorrectSequenceException
     {
         AtomicChange[] parts = this.candidate.split(expected);
+        if(noSplitExpected)
+        {
+            assertNull(parts);
+            return;
+        }
         AtomicChange result = null;
         for (int i = 0; i < parts.length; i++)
         {

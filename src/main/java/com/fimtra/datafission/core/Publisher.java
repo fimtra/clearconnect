@@ -216,22 +216,47 @@ public class Publisher
         
         void handleRecordChange(IRecordChange atomicChange)
         {
-            // todo here is where we can log the busy records
-            
-            // todo need some timings for this
             final AtomicChange[] parts = this.teleporter.split((AtomicChange) atomicChange);
             byte[] txMessage;
             final String name = atomicChange.getName();
             final ProxyContextPublisher[] clients = this.subscribers.getSubscribersFor(name);
             int j = 0;
-            for (int i = 0; i < parts.length; i++)
-            {
-                txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
+            int broadcastCount = 0;
 
-                int broadcastCount = this.service.broadcast(name, txMessage, clients);
+            //
+            // note: for efficiency, we have almost duplicate code here for both parts rather than a
+            // method
+            //
+            if (parts != null)
+            {
+                int bytesPublished = 0;
+                int loopBroadcastCount = 0;
+                for (int i = 0; i < parts.length; i++)
+                {
+                    txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
+
+                    loopBroadcastCount += this.service.broadcast(name, txMessage, clients);
+                    bytesPublished +=  loopBroadcastCount * txMessage.length;
+                    broadcastCount += loopBroadcastCount;
+                   
+                    // even if the service is broadcast capable, perform this loop to capture stats
+                    for (j = 0; j < clients.length; j++)
+                    {
+                        clients[j].publish(txMessage, false, name);
+                    }
+                }
+                
+                Publisher.this.messagesPublished += broadcastCount;
+                Publisher.this.bytesPublished += bytesPublished;
+            }
+            else
+            {
+                txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(atomicChange);
+
+                broadcastCount = this.service.broadcast(name, txMessage, clients);
 
                 Publisher.this.messagesPublished += broadcastCount;
-                Publisher.this.bytesPublished += (broadcastCount * txMessage.length);
+                Publisher.this.bytesPublished += broadcastCount * txMessage.length;
 
                 // even if the service is broadcast capable, perform this loop to capture stats
                 for (j = 0; j < clients.length; j++)
@@ -421,9 +446,16 @@ public class Publisher
         {
             final String name = change.getName();
             final AtomicChange[] parts = this.teleporter.split(change);
-            for (int i = 0; i < parts.length; i++)
+            if (parts != null)
             {
-                publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true, name);
+                for (int i = 0; i < parts.length; i++)
+                {
+                    publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true, name);
+                }
+            }
+            else
+            {
+                publisher.publish(publisher.codec.getTxMessageForAtomicChange(change), true, name);
             }
         }
     }
