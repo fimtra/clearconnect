@@ -1137,86 +1137,90 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         });
 
         // tell the registry about the runtime dynamic attributes (periodic call)
-        if (this.dynamicAttributeUpdateTask == null)
+        if (this.dynamicAttributeUpdateTask != null)
         {
-            this.dynamicAttributeUpdateTask =
-                this.agentExecutor.scheduleWithFixedDelay(
-                    new Runnable()
-                    {
-                        final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
-                        long executedFromLastPeriod;
-                        long gcTimeLastPeriod;
-                        IRpcInstance rpc;
-
-                        @Override
-                        public void run()
-                        {
-                            try
-                            {
-                                if (this.rpc == null)
-                                {
-                                    this.rpc = ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
-                                        PlatformRegistryAgent.this.registryProxy.getReconnectPeriodMillis(),
-                                        PlatformRegistry.RUNTIME_DYNAMIC);
-                                }
-
-                                final long[] stats = ContextUtils.getCoreStats();
-                                final long qOverflow = stats[0];
-                                final long qTotalSubmitted = stats[1];
-                                final Runtime runtime = Runtime.getRuntime();
-                                final double MB = 1d / (1024 * 1024);
-                                final long memUsed = (long) ((runtime.totalMemory() - runtime.freeMemory()) * MB);
-                                final long memAvailable = (long) (runtime.freeMemory() * MB);
-                                final long threadCount = this.threadMxBean.getThreadCount();
-
-                                long gcMillisInPeriod = 0;
-                                long time = 0;
-                                for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
-                                {
-                                    time = gcMxBean.getCollectionTime();
-                                    if (time > -1)
-                                    {
-                                        gcMillisInPeriod += time;
-                                    }
-                                }
-                                // store and work out delta of gc times
-                                time = this.gcTimeLastPeriod;
-                                this.gcTimeLastPeriod = gcMillisInPeriod;
-                                gcMillisInPeriod -= time;
-                                final double inverseLoggingPeriodSecs =
-                                    1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
-                                // this is now the "% GC duty cycle per minute"
-                                gcMillisInPeriod = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
-
-                                final long qTotalExecuted = stats[2];
-                                final long eventsPerSec =
-                                    (long) ((qTotalExecuted - this.executedFromLastPeriod) * inverseLoggingPeriodSecs);
-                                final long uptime =
-                                    (System.currentTimeMillis() - PlatformRegistryAgent.this.startTime) / 1000;
-                                this.executedFromLastPeriod = qTotalExecuted;
-                                try
-                                {
-                                    this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
-                                        LongValue.valueOf(qOverflow), LongValue.valueOf(qTotalSubmitted),
-                                        LongValue.valueOf(memUsed), LongValue.valueOf(memAvailable),
-                                        LongValue.valueOf(threadCount), LongValue.valueOf(gcMillisInPeriod),
-                                        LongValue.valueOf(eventsPerSec), LongValue.valueOf(uptime));
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(PlatformRegistryAgent.this, "Could not invoke " + this.rpc, e);
-                                }
-                            }
-                            catch (TimeOutException e1)
-                            {
-                                Log.log(PlatformRegistryAgent.this, "RPC not available from platform registry: "
-                                    + PlatformRegistry.RUNTIME_DYNAMIC, e1);
-                            }
-
-                        }
-                    }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
-                    DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
+            try
+            {
+                this.dynamicAttributeUpdateTask.cancel(false);
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
+            }
         }
+        
+        this.dynamicAttributeUpdateTask = this.agentExecutor.scheduleWithFixedDelay(new Runnable()
+        {
+            final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
+            long executedFromLastPeriod;
+            long gcTimeLastPeriod;
+            IRpcInstance rpc;
+
+            @Override
+            public void run()
+            {
+                try
+                {
+                    if (this.rpc == null)
+                    {
+                        this.rpc = ContextUtils.getRpc(PlatformRegistryAgent.this.registryProxy,
+                            PlatformRegistryAgent.this.registryProxy.getReconnectPeriodMillis(),
+                            PlatformRegistry.RUNTIME_DYNAMIC);
+                    }
+
+                    final long[] stats = ContextUtils.getCoreStats();
+                    final long qOverflow = stats[0];
+                    final long qTotalSubmitted = stats[1];
+                    final Runtime runtime = Runtime.getRuntime();
+                    final double MB = 1d / (1024 * 1024);
+                    final long memUsed = (long) ((runtime.totalMemory() - runtime.freeMemory()) * MB);
+                    final long memAvailable = (long) (runtime.freeMemory() * MB);
+                    final long threadCount = this.threadMxBean.getThreadCount();
+
+                    long gcMillisInPeriod = 0;
+                    long time = 0;
+                    for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
+                    {
+                        time = gcMxBean.getCollectionTime();
+                        if (time > -1)
+                        {
+                            gcMillisInPeriod += time;
+                        }
+                    }
+                    // store and work out delta of gc times
+                    time = this.gcTimeLastPeriod;
+                    this.gcTimeLastPeriod = gcMillisInPeriod;
+                    gcMillisInPeriod -= time;
+                    final double inverseLoggingPeriodSecs = 1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
+                    // this is now the "% GC duty cycle per minute"
+                    gcMillisInPeriod = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
+
+                    final long qTotalExecuted = stats[2];
+                    final long eventsPerSec =
+                        (long) ((qTotalExecuted - this.executedFromLastPeriod) * inverseLoggingPeriodSecs);
+                    final long uptime = (System.currentTimeMillis() - PlatformRegistryAgent.this.startTime) / 1000;
+                    this.executedFromLastPeriod = qTotalExecuted;
+                    try
+                    {
+                        this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
+                            LongValue.valueOf(qOverflow), LongValue.valueOf(qTotalSubmitted),
+                            LongValue.valueOf(memUsed), LongValue.valueOf(memAvailable), LongValue.valueOf(threadCount),
+                            LongValue.valueOf(gcMillisInPeriod), LongValue.valueOf(eventsPerSec),
+                            LongValue.valueOf(uptime));
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(PlatformRegistryAgent.this, "Could not invoke " + this.rpc, e);
+                    }
+                }
+                catch (TimeOutException e1)
+                {
+                    Log.log(PlatformRegistryAgent.this,
+                        "RPC not available from platform registry: " + PlatformRegistry.RUNTIME_DYNAMIC, e1);
+                }
+            }
+        }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
+            DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
     }
 
     @Deprecated
