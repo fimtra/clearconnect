@@ -231,7 +231,7 @@ public abstract class TcpChannelProperties
         /**
          * The number of threads to use for TCP socket writing.
          * <p>
-         * Default is: 4
+         * Default is: 1
          */
         int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "1"));
         
