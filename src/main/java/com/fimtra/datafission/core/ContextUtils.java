@@ -200,8 +200,8 @@ public final class ContextUtils
     final static ScheduledExecutorService UTILITY_SCHEDULER =
         ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    static Map<Object, TaskStatistics> coreSequentialStats;
-    static RollingFileAppender statisticsLog =
+    final static Map<Object, TaskStatistics> coreSequentialStats = CORE_EXECUTOR.getSequentialTaskStatistics();
+    final static RollingFileAppender statisticsLog =
         RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
 
     static
@@ -222,21 +222,19 @@ public final class ContextUtils
             @Override
             public void run()
             {
-                // todo log ALL ThimbleExecutors?
-                coreSequentialStats = CORE_EXECUTOR.getSequentialTaskStatistics();
-                StringBuilder sb = new StringBuilder(1024);
-                sb.append(this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(
-                    ", fission-core coalescing queue, ").append(getStats(CORE_EXECUTOR.getCoalescingTaskStatistics()));
-                sb.append(SystemUtils.lineSeparator());
-                sb.append(this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(
-                    ", fission-core sequential queue, ").append(getStats(coreSequentialStats));
-                sb.append(SystemUtils.lineSeparator());
-                sb.append(this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(
-                    ", fission-rpc coalescing queue, ").append(getStats(RPC_EXECUTOR.getCoalescingTaskStatistics()));
-                sb.append(SystemUtils.lineSeparator());
-                sb.append(this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis())).append(
-                    ", fission-rpc sequential queue, ").append(getStats(RPC_EXECUTOR.getSequentialTaskStatistics()));
-                sb.append(SystemUtils.lineSeparator());
+
+                final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
+                final StringBuilder sb = new StringBuilder(1024);
+                final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
+                for (ThimbleExecutor thimbleExecutor : executors)
+                {
+                    sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
+                        " coalescing queue, ").append(getStats(thimbleExecutor.getCoalescingTaskStatistics())).append(
+                            SystemUtils.lineSeparator());
+                    sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
+                        " sequential queue, ").append(getStats(thimbleExecutor.getSequentialTaskStatistics())).append(
+                            SystemUtils.lineSeparator());
+                }
                 try
                 {
                     statisticsLog.append(sb.toString());

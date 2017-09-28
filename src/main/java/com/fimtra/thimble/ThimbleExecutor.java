@@ -16,9 +16,12 @@
 package com.fimtra.thimble;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 import com.fimtra.util.CollectionUtils;
@@ -56,7 +59,14 @@ import com.fimtra.util.ObjectUtils;
 public final class ThimbleExecutor implements Executor
 {
     public static final String QUEUE_LEVEL_STATS = "QueueLevelStats";
-
+    
+    public static Set<ThimbleExecutor> getExecutors()
+    {
+        return Collections.unmodifiableSet(EXECUTORS);
+    }
+    
+    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new HashSet<ThimbleExecutor>());
+    
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
      * and executing them.
@@ -196,6 +206,7 @@ public final class ThimbleExecutor implements Executor
             this.taskRunners.offer(new TaskRunner(threadName));
         }
         this.taskRunnersRef = new ArrayList<TaskRunner>(this.taskRunners);
+        EXECUTORS.add(this);
     }
 
     @Override
@@ -285,6 +296,7 @@ public final class ThimbleExecutor implements Executor
                 // noop - drain the queue
             }
         }
+        EXECUTORS.remove(this);
     }
 
     /**
