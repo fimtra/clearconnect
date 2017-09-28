@@ -63,6 +63,7 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
@@ -593,44 +594,45 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            // todo do we really need to use a utility executor?
-            PlatformServiceInstance.this.context.getUtilityExecutor().execute(new Runnable()
+            ThreadUtils.newThread(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    if (!isMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
-                    {
-                        PlatformServiceInstance.this.isFtMasterInstance = isMaster;
-                        final boolean isFtMaster = PlatformServiceInstance.this.isFtMasterInstance.booleanValue();
-                        Log.banner(PlatformServiceInstance.this,
-                            PlatformServiceInstance.this.toString() + " " + (isFtMaster ? "ACTIVE" : "STANDBY"));
-
-                        notifyFtStatusListeners(isFtMaster);
-                    }
+                    doSetFtState(isMaster);
                 }
-            });
+            }, "setFtState-"
+                + PlatformUtils.composePlatformServiceInstanceID(this.serviceFamily, this.serviceMember)).start();
         }
     }
     
-    void notifyFtStatusListeners(final boolean isFtMaster)
+    void doSetFtState(final Boolean isFtMaster)
     {
-        for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
+        if (!isFtMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
         {
-            try
+            this.isFtMasterInstance = isFtMaster;
+            
+            final boolean isMaster = isFtMaster.booleanValue();
+            
+            Log.banner(this, this.toString() + " " + (isMaster ? "ACTIVE" : "STANDBY"));
+
+            for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
             {
-                if (isFtMaster)
+                try
                 {
-                    iFtStatusListener.onActive(this.serviceFamily, this.serviceMember);
+                    if (isMaster)
+                    {
+                        iFtStatusListener.onActive(this.serviceFamily, this.serviceMember);
+                    }
+                    else
+                    {
+                        iFtStatusListener.onStandby(this.serviceFamily, this.serviceMember);
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    iFtStatusListener.onStandby(this.serviceFamily, this.serviceMember);
+                    Log.log(this, "Could not notify " + ObjectUtils.safeToString(iFtStatusListener), e);
                 }
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not notify " + ObjectUtils.safeToString(iFtStatusListener), e);
             }
         }
     }

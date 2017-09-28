@@ -286,13 +286,8 @@ public class Publisher
                                     {
                                         // NOTE: adding the observer ends up calling
                                         // addDeltaToSubscriptionCount which publishes the image
-                                        if (!Publisher.this.context.addObserver(
-                                            // todo NOTE: we need to actually use a system-level
-                                            // token here - the permission check has already been
-                                            // done at the start of the for loop - need to find a
-                                            // way to pass in a system-level permission
-                                            permissionToken, ProxyContextMultiplexer.this, name).get().get(
-                                                name).booleanValue())
+                                        if (!Publisher.this.context.addObserver(permissionToken,
+                                            ProxyContextMultiplexer.this, name).get().get(name).booleanValue())
                                         {
                                             throw new IllegalStateException(
                                                 "Could not add ProxyContextMultiplexer as a listener for recordName="
