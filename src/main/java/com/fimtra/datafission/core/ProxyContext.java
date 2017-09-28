@@ -24,10 +24,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -347,7 +348,7 @@ public final class ProxyContext implements IObserverContext
      * TODO If there is no response for a subscription action, there is a memory leak as the list is
      * left in the map
      */
-    final ConcurrentMap<String, List<CountDownLatch>> actionResponseLatches;
+    final ConcurrentMap<String, Queue<CountDownLatch>> actionResponseLatches;
     /**
      * When all responses for a subscribe action are received, the future in this map is triggered.
      */
@@ -476,7 +477,7 @@ public final class ProxyContext implements IObserverContext
         this.lock = new Object();
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
         this.actionSubscribeResults = new ConcurrentHashMap<CountDownLatch, Map<String, Boolean>>();
-        this.actionResponseLatches = new ConcurrentHashMap<String, List<CountDownLatch>>();
+        this.actionResponseLatches = new ConcurrentHashMap<String, Queue<CountDownLatch>>();
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<String, String>();
@@ -1121,7 +1122,7 @@ public final class ProxyContext implements IObserverContext
                 {
                     Log.log(this, "(<-) ", SUBSCRIBE, NOK, ObjectUtils.safeToString(recordNames));
                 }
-                List<CountDownLatch> latches;
+                Queue<CountDownLatch> latches;
                 String recordName;
                 final int recordNameCount = recordNames.size();
                 for (int i = 0; i < recordNameCount; i++)
@@ -1149,8 +1150,6 @@ public final class ProxyContext implements IObserverContext
                         }
                     }
                 }
-
-                return;
             }
             else
             {
@@ -1202,8 +1201,6 @@ public final class ProxyContext implements IObserverContext
                             return changeName;
                         }
                     });
-                    
-                    return;
                 }
             }
         }
@@ -1590,11 +1587,11 @@ public final class ProxyContext implements IObserverContext
         RunnableFuture<Map<String, Boolean>> subscribeFutureResult, Map<String, Boolean> subscribeResults)
     {
         CountDownLatch latch = new CountDownLatch(recordNames.length);
-        List<CountDownLatch> latches;
-        CopyOnWriteArrayList<CountDownLatch> pending;
+        Queue<CountDownLatch> latches;
+        Queue<CountDownLatch> pending;
         for (int i = 0; i < recordNames.length; i++)
         {
-            pending = new CopyOnWriteArrayList<CountDownLatch>();
+            pending = new ConcurrentLinkedQueue<CountDownLatch>();
             latches = this.actionResponseLatches.putIfAbsent(action + recordNames[i], pending);
             if (latches == null)
             {
