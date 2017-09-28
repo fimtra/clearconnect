@@ -135,10 +135,16 @@ public final class ObjectSerializer
                 object = this.refs.get(name);
                 if (object == null)
                 {
-                    // todo on an empty update image there will be no submap, so we get an NPE
-                    final String className = record.getOrCreateSubMap(CLASS_TEMPLATE).get(CLASS_NAME).textValue();
-                    object = Class.forName(className).newInstance();
-                    this.refs.put(name, object);
+                    final IValue classNameFieldValue = record.getOrCreateSubMap(CLASS_TEMPLATE).get(CLASS_NAME);
+                    if (classNameFieldValue != null)
+                    {
+                        object = Class.forName(classNameFieldValue.textValue()).newInstance();
+                        this.refs.put(name, object);
+                    }
+                    else
+                    {
+                        throw new NullPointerException("No class name defined: " + record);
+                    }
                 }
             }
         }

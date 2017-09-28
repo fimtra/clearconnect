@@ -926,7 +926,6 @@ public class PlatformUtils
     public static IValue executeRpc(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException, ExecutionException
     {
-        // todo throw exception if is fission thread
         return getRpc(component, discoveryTimeoutMillis, rpcName, rpcArgs).execute(rpcArgs);
     }
 

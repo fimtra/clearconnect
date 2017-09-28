@@ -121,8 +121,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 @Override
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    // todo should batch handling be added? (situations where 100's of records are
-                    // being viewed are UNLIKELY)
                     final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
                     for (String removedRecordName : removedRecords)
                     {
@@ -293,7 +291,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 {
                     checkAddFieldRow(changedKey, inserts);
                 }
-                // todo what happens if a sub-map is removed?
                 for (String changedKey : atomicChange.getSubMapKeys())
                 {
                     checkAddFieldRow(changedKey, inserts);

@@ -54,7 +54,7 @@ import com.fimtra.util.is;
  */
 public class BenchmarkService
 {
-    static final WireProtocolEnum WIRE_PROTOCOL = WireProtocolEnum.STRING;
+    static final WireProtocolEnum WIRE_PROTOCOL = WireProtocolEnum.GZIP;
     private static final int TIMEOUT_SECS = 10;
 
     @SuppressWarnings("unused")
@@ -107,7 +107,6 @@ public class BenchmarkService
         Log.log(this, "Waiting 5 seconds for echo services discovery...");
         Thread.sleep(5000);
 
-        // todo parameterise these
         final int maxRecords = 16;
         final int maxFields = 21;
         final int fieldIncrease = 5;

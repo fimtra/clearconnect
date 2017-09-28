@@ -319,7 +319,6 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 {
                     checkAddColumn(changedKey, stuctureChanged);
                 }
-                // todo what happens if a sub-map is removed?
                 for (String changedKey : atomicChange.getSubMapKeys())
                 {
                     checkAddColumn(changedKey, stuctureChanged);

@@ -116,7 +116,6 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     public StringProtocolCodec()
     {
-        // todo add a way to select what type of session sync protocol to use
         this(new SimpleSessionProtocol());
     }
 

@@ -27,7 +27,7 @@ import com.fimtra.util.ObjectUtils;
  */
 public final class TransportChannelBuilderFactoryLoader
 {
-    // todo the frame encoding is for TCP only...
+    // Note: the frame encoding is for TCP only...
     public static ITransportChannelBuilderFactory load(FrameEncodingFormatEnum frameEncodingFormat,
         EndPointAddress... endPoints)
     {
