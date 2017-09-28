@@ -49,12 +49,16 @@ public class SessionContexts
             return new String[] { "defaults" };
         }
     };
+    
+    /**
+     * The default implementation that performs no session validation and accepts all session
+     * credentials. Essentially an open access system.
+     */
     public static final ISessionManager DEFAULT_MANAGER = new ISessionManager()
     {
         @Override
         public String createSession(String[] details)
         {
-            // TODO NOTE: the default manager provides an OPEN access system
             return "default-session";
         }
 
@@ -104,7 +108,8 @@ public class SessionContexts
      * 
      * @param sessionContextName
      *            the name of the session context the manager will operate over
-     * @return the session manager for the session context
+     * @return the session manager for the session context, if there is no session manager setup
+     *         then the {@link #DEFAULT_MANAGER} is returned
      */
     public static ISessionManager getSessionManager(String sessionContextName)
     {
