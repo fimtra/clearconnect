@@ -344,9 +344,6 @@ public final class ProxyContext implements IObserverContext
     /**
      * Tracks responses to subscription actions so that a subscription is known to have been
      * processed by the receiver.
-     * <p>
-     * TODO If there is no response for a subscription action, there is a memory leak as the list is
-     * left in the map
      */
     final ConcurrentMap<String, Queue<CountDownLatch>> actionResponseLatches;
     /**

@@ -817,7 +817,7 @@ public final class PlatformMetaDataModel
             return this.agent.registryProxy;
         }
 
-        // todo this leaves a connection leak if the proxy is not destroyed when no more components
+        // NOTE: this leaves a connection leak if the proxy is not destroyed when no more components
         // need it from the model
         return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0],
             family_member[1])).proxyContext;
