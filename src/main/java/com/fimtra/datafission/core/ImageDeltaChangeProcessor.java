@@ -87,7 +87,6 @@ final class ImageDeltaChangeProcessor
                             Long.toString(changeToApply.getSequence()), ", record.seq=",
                             Long.toString(record.getSequence()));
 
-                        // todo should this be a NOOP instead?
                         this.imageReceived.remove(name);
                         return RESYNC;
                     }
