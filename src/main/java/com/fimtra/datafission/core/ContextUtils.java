@@ -268,7 +268,7 @@ public final class ContextUtils
     public final static Map<String, IValue> EMPTY_MAP = Collections.emptyMap();
 
     static final Set<String> EMPTY_STRING_SET = Collections.emptySet();
-    static final String PROTOCOL_PREFIX = "_";
+    static final char PROTOCOL_PREFIX = '_';
 
     /**
      * @return a long[] for the sequential tasks statistics, format {queue-overflow,
@@ -461,7 +461,7 @@ public final class ContextUtils
      */
     public static boolean isSystemRecordName(String name)
     {
-        if (name != null && name.startsWith(ISystemRecordNames.CONTEXT, 0))
+        if (name != null && name.length() > 7 && name.charAt(0) == 'C' && name.charAt(6) == 't')
         {
             return SYSTEM_RECORDS.contains(name);
         }
@@ -918,7 +918,7 @@ public final class ContextUtils
      */
     static boolean isProtocolPrefixed(String name)
     {
-        if (name.startsWith(PROTOCOL_PREFIX, 0))
+        if (name.charAt(0) == PROTOCOL_PREFIX)
         {
             return name.startsWith(ProxyContext.ACK, 0) || name.startsWith(ProxyContext.NOK, 0)
                 || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);

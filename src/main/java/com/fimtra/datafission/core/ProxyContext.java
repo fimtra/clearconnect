@@ -1099,7 +1099,7 @@ public final class ProxyContext implements IObserverContext
         
         final String changeName = changeToApply.getName();
 
-        if (changeName.startsWith(ContextUtils.PROTOCOL_PREFIX, 0))
+        if (changeName.charAt(0) == ContextUtils.PROTOCOL_PREFIX)
         {
             final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
             if (subscribeResult.booleanValue() || changeName.startsWith(NOK, 0))
@@ -1248,9 +1248,16 @@ public final class ProxyContext implements IObserverContext
                     {
                         if (changeToApply.isEmpty())
                         {
-                            // this creates the record AND notifies any listeners
-                            // (publishAtomicChange would publish nothing)
-                            record = ProxyContext.this.context.createRecord(name);
+                            if (ContextUtils.isProtocolPrefixed(name))
+                            {
+                                record = ProxyContext.this.context.createRecordSilently_callInRecordContext(name);
+                            }
+                            else
+                            {
+                                // this creates the record AND notifies any listeners
+                                // (publishAtomicChange would publish nothing)
+                                record = ProxyContext.this.context.createRecord(name);
+                            }
                         }
                         else
                         {
