@@ -37,6 +37,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
+import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
 
 /**
@@ -224,17 +225,45 @@ public class StringProtocolCodec implements ICodec<char[]>
         return decodeAtomicChange(decode(data));
     }
 
+    static final LowGcLinkedList<char[]> TEMP_ARR_CACHE = new LowGcLinkedList<char[]>();
+    static final LowGcLinkedList<int[][]> BIJ_TOKEN_OFFSET_CACHE = new LowGcLinkedList<int[][]>();
+    static final LowGcLinkedList<int[][]> BIJ_TOKEN_LIMIT_CACHE = new LowGcLinkedList<int[][]>();
+    static final LowGcLinkedList<int[]> BIJ_TOKEN_LEN_CACHE = new LowGcLinkedList<int[]>();
+    
     static IRecordChange decodeAtomicChange(char[] decodedMessage)
     {
+        char[] tempArr;
+        // use bijectional arrays to track the offset+len of each token
+        // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d
+        // array
+        int[][] bijTokenOffset;
+        int[][] bijTokenLimit;
+        int[] bijTokenLen;
+        synchronized (TEMP_ARR_CACHE)
+        {
+            tempArr = TEMP_ARR_CACHE.poll();
+            if (tempArr == null)
+            {
+                tempArr = new char[50];
+            }
+            bijTokenOffset = BIJ_TOKEN_OFFSET_CACHE.poll();
+            if (bijTokenOffset == null)
+            {
+                bijTokenOffset = new int[1][10];
+            }
+            bijTokenLimit = BIJ_TOKEN_LIMIT_CACHE.poll();
+            if (bijTokenLimit == null)
+            {
+                bijTokenLimit = new int[1][10];
+            }
+            bijTokenLen = BIJ_TOKEN_LEN_CACHE.poll();
+            if (bijTokenLen == null)
+            {
+                bijTokenLen = new int[1];
+            }
+        }
         try
         {
-            char[] tempArr = new char[50];
-            // use bijectional arrays to track the offset+len of each token
-            // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d array
-            final int[][] bijTokenOffset = new int[1][10];
-            final int[][] bijTokenLimit = new int[1][10];
-            final int[] bijTokenLen = new int[1];
-
             findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
             final String name = stringFromCharBuffer(decodedMessage, bijTokenOffset[0][1], bijTokenLimit[0][1]);
             final AtomicChange atomicChange = new AtomicChange(name);
@@ -342,41 +371,88 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             throw new RuntimeException("Could not decode '" + new String(decodedMessage) + "'", e);
         }
+        finally
+        {
+            synchronized (TEMP_ARR_CACHE)
+            {
+                TEMP_ARR_CACHE.push(tempArr);
+                BIJ_TOKEN_OFFSET_CACHE.push(bijTokenOffset);
+                BIJ_TOKEN_LIMIT_CACHE.push(bijTokenLimit);
+                BIJ_TOKEN_LEN_CACHE.push(bijTokenLen);
+            }
+        }
     }
 
+    final static LowGcLinkedList<char[]> CHAR_ARRAY_CACHE = new LowGcLinkedList<char[]>();
+    final static LowGcLinkedList<CharArrayReference> CHAR_ARRAY_REF_CACHE = new LowGcLinkedList<CharArrayReference>();
+    final static LowGcLinkedList<StringBuilder> BUILDER_CACHE = new LowGcLinkedList<StringBuilder>();
+    
     static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
     {
-        final CharArrayReference chars = new CharArrayReference(new char[CHARRAY_SIZE]);
 
         final Map<String, IValue> putEntries = atomicChange.getPutEntries();
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
         final Set<String> subMapKeys = atomicChange.getSubMapKeys();
-        // todo replace string builder with char[] mechanics - reduces method calls
-        final StringBuilder sb =
-            new StringBuilder(30 * (putEntries.size() + removedEntries.size() + subMapKeys.size()));
-        sb.append(preamble);
-        escape(atomicChange.getName(), sb, chars);
-        // add the sequence
-        sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-        addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, chars);
-        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, chars);
-        IRecordChange subMapAtomicChange;
-        if (subMapKeys.size() > 0)
+        CharArrayReference charArrayRef;
+        char[] escapedChars;
+        StringBuilder sb;
+        synchronized (BUILDER_CACHE)
         {
-            for (String subMapKey : subMapKeys)
+            sb = BUILDER_CACHE.poll();
+            if (sb == null)
             {
-                subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
-                sb.append(DELIMITER_SUBMAP_CODE);
-                escape(subMapKey, sb, chars);
-                addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, chars);
-                addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, chars);
+                sb = new StringBuilder(1000);
+            }
+            else
+            {
+                sb.setLength(0);
+            }
+            charArrayRef = CHAR_ARRAY_REF_CACHE.poll();
+            if (charArrayRef == null)
+            {
+                charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+            }
+            escapedChars = CHAR_ARRAY_CACHE.poll();
+            if (escapedChars == null)
+            {
+                escapedChars = new char[2];
             }
         }
-        return sb.toString().getBytes(charSet);
+        try
+        {
+            sb.append(preamble);
+            escape(atomicChange.getName(), sb, charArrayRef, escapedChars);
+            // add the sequence
+            sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
+            addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars);
+            addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars);
+            IRecordChange subMapAtomicChange;
+            if (subMapKeys.size() > 0)
+            {
+                for (String subMapKey : subMapKeys)
+                {
+                    subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
+                    sb.append(DELIMITER_SUBMAP_CODE);
+                    escape(subMapKey, sb, charArrayRef, escapedChars);
+                    addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, charArrayRef, escapedChars);
+                    addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, charArrayRef, escapedChars);
+                }
+            }
+            return sb.toString().getBytes(charSet);
+        }
+        finally
+        {
+            synchronized (BUILDER_CACHE)
+            {
+                BUILDER_CACHE.push(sb);
+                CHAR_ARRAY_CACHE.push(escapedChars);
+                CHAR_ARRAY_REF_CACHE.push(charArrayRef);
+            }
+        }
     }
 
     private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
-        final StringBuilder txString, final CharArrayReference chars)
+        final StringBuilder txString, final CharArrayReference chars, final char[] escapedChars)
     {
         if (entries != null && entries.size() > 0)
         {
@@ -388,7 +464,6 @@ public class StringProtocolCodec implements ICodec<char[]>
             int length;
             char charAt;
             char[] cbuf;
-            char[] escapedChars = new char[2];
             escapedChars[0] = CHAR_ESCAPE;
             boolean needToEscape;
             txString.append(changeType);
@@ -485,7 +560,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                         case TEXT:
                         default :
                             txString.append(IValue.TEXT_CODE);
-                            escape(value.textValue(), txString, chars);
+                            escape(value.textValue(), txString, chars, escapedChars);
                             break;
                     }
                 }
@@ -497,7 +572,7 @@ public class StringProtocolCodec implements ICodec<char[]>
      * Escape special chars in the value-to-send, ultimately adding the escaped value into the
      * destination StringBuilder
      */
-    static void escape(String valueToSend, StringBuilder dest, CharArrayReference charsRef)
+    static void escape(String valueToSend, StringBuilder dest, CharArrayReference charsRef, char[] escapedChars)
     {
         try
         {
@@ -509,7 +584,6 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
 
             final char[] chars = charsRef.ref;
-            final char[] escapedChars = new char[2];
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
 
             escapedChars[0] = CHAR_ESCAPE;
@@ -675,7 +749,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     static String getEncodedNamesForCommandMessage(String commandWithDelimiter, String... recordNames)
     {
         final CharArrayReference chars = new CharArrayReference(new char[CHARRAY_SIZE]);
-
+        char[] escapedChars = new char[2];
+        
         if (recordNames.length == 0)
         {
             return commandWithDelimiter;
@@ -684,11 +759,11 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             StringBuilder sb = new StringBuilder(recordNames.length * 20);
             sb.append(commandWithDelimiter);
-            escape(recordNames[0], sb, chars);
+            escape(recordNames[0], sb, chars, escapedChars);
             for (int i = 1; i < recordNames.length; i++)
             {
                 sb.append(DELIMITER);
-                escape(recordNames[i], sb, chars);
+                escape(recordNames[i], sb, chars, escapedChars);
             }
             return sb.toString();
         }

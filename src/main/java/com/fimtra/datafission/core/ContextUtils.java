@@ -556,14 +556,15 @@ public final class ContextUtils
 
         final CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
 
+        final char[] escapedChars = new char[2]; 
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
-            StringProtocolCodec.escape(key, sb, chars);
+            StringProtocolCodec.escape(key, sb, chars, escapedChars);
             sb.append('=');
-            StringProtocolCodec.escape(value.toString(), sb, chars);
+            StringProtocolCodec.escape(value.toString(), sb, chars, escapedChars);
             sb.append(ContextUtils.LINE_SEPARATOR);
         }
         writer.write(sb.toString());
