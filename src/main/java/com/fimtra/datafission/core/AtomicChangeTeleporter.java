@@ -58,7 +58,7 @@ final class AtomicChangeTeleporter
 
     static boolean startsWithFragmentPrefix(String name)
     {
-        return name.startsWith(PART_INDEX_PREFIX, 0);
+        return name.charAt(0) == 0xa && name.charAt(1) == 0xb;
     }
     
     static String getRecordName(String recordName)
@@ -137,21 +137,23 @@ final class AtomicChangeTeleporter
      */
     private static void merge(AtomicChange source, AtomicChange receivedPart) throws IncorrectSequenceException
     {
-        if (source.sequence.get().longValue() != -1
-            && source.sequence.get().longValue() != receivedPart.sequence.get().longValue())
         {
-            throw new IncorrectSequenceException(source.getName(),
-                source.getName() + " expected fragment with sequence: " + source.sequence.get().longValue()
-                    + " but got: " + receivedPart.sequence.get().longValue());
+            final long sourceSequence = source.sequence.get().longValue();
+            if (sourceSequence != -1 && sourceSequence != receivedPart.sequence.get().longValue())
+            {
+                throw new IncorrectSequenceException(source.getName(),
+                    source.getName() + " expected fragment with sequence: " + sourceSequence + " but got: "
+                        + receivedPart.sequence.get().longValue());
+            }
         }
-        
+
         source.scope = receivedPart.scope;
         source.sequence = receivedPart.sequence;
 
         mergeEntries(EntryEnum.PUT, source, receivedPart, null);
         mergeEntries(EntryEnum.OVERWRITTEN, source, receivedPart, null);
         mergeEntries(EntryEnum.REMOVED, source, receivedPart, null);
-        Set<String> subMapKeys = receivedPart.getSubMapKeys();
+        final Set<String> subMapKeys = receivedPart.getSubMapKeys();
         if (subMapKeys.size() > 0)
         {
             AtomicChange receivedSubMap;
@@ -172,7 +174,7 @@ final class AtomicChangeTeleporter
     {
         if (subMapKey == null)
         {
-            Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
+            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
             if (entriesToCopy.size() > 0)
             {
                 type.getEntriesToWrite(source).putAll(entriesToCopy);
@@ -180,7 +182,7 @@ final class AtomicChangeTeleporter
         }
         else
         {
-            Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
+            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
             if (entriesToCopy.size() > 0)
             {
                 type.getEntriesToWrite(source.internalGetSubMapAtomicChange(subMapKey)).putAll(entriesToCopy);

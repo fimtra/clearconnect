@@ -1147,58 +1147,61 @@ public final class ProxyContext implements IObserverContext
                         }
                     }
                 }
+                
+                // EARLY RETURN
+                return;
             }
-            else
+            else if (changeName.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
             {
-                if (changeName.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
+                // RPC results must be handled by a dedicated thread
+                this.context.executeRpcTask(new ISequentialRunnable()
                 {
-                    // RPC results must be handled by a dedicated thread
-                    this.context.executeRpcTask(new ISequentialRunnable()
+                    @Override
+                    public void run()
                     {
-                        @Override
-                        public void run()
+                        if (log)
                         {
-                            if (log)
+                            if (!logRx)
                             {
-                                if (!logRx)
-                                {
-                                    Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
-                                }
-                            }                      
-                            final IRecordListener[] subscribersFor =
-                                ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
-                            IRecordListener iAtomicChangeObserver = null;
-                            long start;
-                            final int size = subscribersFor.length;
-                            if (size == 0)
-                            {
-                                Log.log(ProxyContext.this, "*** Unexpected RPC result for ", changeName);
-                            }
-                            for (int i = 0; i < size; i++)
-                            {
-                                try
-                                {
-                                    iAtomicChangeObserver = subscribersFor[i];
-                                    start = System.nanoTime();
-                                    iAtomicChangeObserver.onChange(null, changeToApply);
-                                    ContextUtils.measureTask(changeName, "remote record update", iAtomicChangeObserver,
-                                        (System.nanoTime() - start));
-                                }
-                                catch (Exception e)
-                                {
-                                    Log.log(ProxyContext.this,
-                                        "Could not notify " + iAtomicChangeObserver + " with " + changeToApply, e);
-                                }
+                                Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(changeToApply));
                             }
                         }
+                        final IRecordListener[] subscribersFor =
+                            ProxyContext.this.context.recordObservers.getSubscribersFor(changeName);
+                        IRecordListener iAtomicChangeObserver = null;
+                        long start;
+                        final int size = subscribersFor.length;
+                        if (size == 0)
+                        {
+                            Log.log(ProxyContext.this, "*** Unexpected RPC result for ", changeName);
+                        }
+                        for (int i = 0; i < size; i++)
+                        {
+                            try
+                            {
+                                iAtomicChangeObserver = subscribersFor[i];
+                                start = System.nanoTime();
+                                iAtomicChangeObserver.onChange(null, changeToApply);
+                                ContextUtils.measureTask(changeName, "remote record update", iAtomicChangeObserver,
+                                    (System.nanoTime() - start));
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(ProxyContext.this,
+                                    "Could not notify " + iAtomicChangeObserver + " with " + changeToApply, e);
+                            }
+                        }
+                    }
 
-                        @Override
-                        public Object context()
-                        {
-                            return changeName;
-                        }
-                    });
-                }
+                    @Override
+                    public Object context()
+                    {
+                        return changeName;
+                    }
+                });
+                
+                // EARLY RETURN                
+                return;
             }
         }
 
@@ -1248,16 +1251,9 @@ public final class ProxyContext implements IObserverContext
                     {
                         if (changeToApply.isEmpty())
                         {
-                            if (ContextUtils.isProtocolPrefixed(name))
-                            {
-                                record = ProxyContext.this.context.createRecordSilently_callInRecordContext(name);
-                            }
-                            else
-                            {
-                                // this creates the record AND notifies any listeners
-                                // (publishAtomicChange would publish nothing)
-                                record = ProxyContext.this.context.createRecord(name);
-                            }
+                            // this creates the record AND notifies any listeners
+                            // (publishAtomicChange would publish nothing)
+                            record = ProxyContext.this.context.createRecord(name);
                         }
                         else
                         {

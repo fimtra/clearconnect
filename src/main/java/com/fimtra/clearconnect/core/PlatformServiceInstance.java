@@ -63,7 +63,6 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
@@ -594,18 +593,17 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            ThreadUtils.newThread(new Runnable()
+            this.context.getUtilityExecutor().execute(new Runnable()
             {
                 @Override
                 public void run()
                 {
                     doSetFtState(isMaster);
                 }
-            }, "setFtState-"
-                + PlatformUtils.composePlatformServiceInstanceID(this.serviceFamily, this.serviceMember)).start();
+            });
         }
     }
-    
+
     void doSetFtState(final Boolean isFtMaster)
     {
         if (!isFtMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
