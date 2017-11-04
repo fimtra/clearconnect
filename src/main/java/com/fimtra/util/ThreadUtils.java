@@ -47,6 +47,7 @@ public abstract class ThreadUtils
      * 
      * @author Ramon Servadei
      */
+    // todo pool version to reduce object churn..again...
     public static final class ExceptionLoggingRunnable implements Runnable
     {
         private final Runnable command;
@@ -63,7 +64,7 @@ public abstract class ThreadUtils
             {
                 this.command.run();
             }
-            catch (Exception e)
+            catch (Throwable e)
             {
                 Log.log(this, "Could not complete execution of " + ObjectUtils.safeToString(this.command), e);
             }
