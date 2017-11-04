@@ -121,7 +121,7 @@ public class PlatformUtils
         sb.append(newline).append("============ START System Properties ============").append(newline);
         TreeSet<String> sortedKeys = new TreeSet<String>();
         final Enumeration<Object> keys = System.getProperties().keys();
-        while(keys.hasMoreElements())
+        while (keys.hasMoreElements())
         {
             sortedKeys.add(keys.nextElement().toString());
         }
@@ -133,10 +133,12 @@ public class PlatformUtils
         Log.log(PlatformUtils.class, sb.toString());
 
         sb = new StringBuilder();
-        sb.append("ClearConnect").append(newline);
-        sb.append(version).append(newline);
-        sb.append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
-            newline);
+        sb.append("ClearConnect ").append(version).append(newline);
+        sb.append(newline).append("Licensed under the Apache License, Version 2.0 (the \"License\");").append(newline);
+        sb.append("\thttp://www.apache.org/licenses/LICENSE-2.0").append(newline);
+        sb.append(newline).append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
+            newline).append(newline);
+
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
         sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
