@@ -23,9 +23,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadInfo;
-import java.lang.management.ThreadMXBean;
 import java.nio.CharBuffer;
 import java.util.Arrays;
 import java.util.Collections;
@@ -937,13 +934,15 @@ public final class ContextUtils
         long[] rpcThreadIds = new long[0];
         long[] systemThreadIds = new long[0];
         long[] frameworkThreadIds = new long[0];
-        final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
-        final long[] allThreadIds = threadMXBean.getAllThreadIds();
-        for (int i = 0; i < allThreadIds.length; i++)
+        Map.Entry<String, Long> entry = null;
+        String name = null;
+        long threadId;
+        for (Iterator<Map.Entry<String, Long>> it = ThimbleExecutor.getThreadIds().entrySet().iterator(); it.hasNext();)
         {
-            long threadId = allThreadIds[i];
-            final ThreadInfo threadInfo = threadMXBean.getThreadInfo(threadId);
-            final String name = threadInfo.getThreadName();
+            entry = it.next();
+            name = entry.getKey();
+            threadId = entry.getValue().longValue();
+
             if (name.startsWith(FISSION_CORE, 0))
             {
                 coreThreadIds = ArrayUtils.add(threadId, coreThreadIds);

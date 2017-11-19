@@ -17,6 +17,7 @@ package com.fimtra.thimble;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,16 @@ import com.fimtra.util.ObjectUtils;
  */
 public final class ThimbleExecutor implements Executor
 {
+    final static Map<String, Long> threadIds = Collections.synchronizedMap(new HashMap<String, Long>());
+
+    public static Map<String, Long> getThreadIds()
+    {
+        synchronized (threadIds)
+        {
+            return new HashMap<String, Long>(threadIds);
+        }
+    }
+    
     public static final String QUEUE_LEVEL_STATS = "QueueLevelStats";
     
     public static Set<ThimbleExecutor> getExecutors()
@@ -88,6 +99,7 @@ public final class ThimbleExecutor implements Executor
             this.workerThread = new Thread(this, name);
             this.workerThread.setDaemon(true);
             this.workerThread.start();
+            threadIds.put(name, Long.valueOf(this.workerThread.getId()));
         }
 
         @Override
@@ -101,7 +113,7 @@ public final class ThimbleExecutor implements Executor
                     {
                         this.task.run();
                     }
-                    catch (Exception e)
+                    catch (Throwable e)
                     {
                         Log.log(this, "Could not execute " + ObjectUtils.safeToString(this.task), e);
                     }
@@ -163,6 +175,7 @@ public final class ThimbleExecutor implements Executor
                     // noop
                 }
             });
+            threadIds.remove(this.workerThread.getName());
         }
     }
 

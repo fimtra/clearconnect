@@ -36,6 +36,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
@@ -325,5 +328,73 @@ public class ContextUtilsTest
     public void shouldNotGetRecordFromFile() {
         File recordFile = new File("test.someext");
         assertNull(ContextUtils.getRecordNameFromFile(recordFile));
+    }
+    
+    @Test
+    public void testFrameworkThreads() throws InterruptedException
+    {
+        final AtomicReference<CountDownLatch> specificLatch = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> frameworkLatch = new AtomicReference<CountDownLatch>();
+
+        specificLatch.set(new CountDownLatch(1));
+        frameworkLatch.set(new CountDownLatch(1));
+        ContextUtils.CORE_EXECUTOR.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (ContextUtils.isCoreThread())
+                {
+                    specificLatch.get().countDown();
+                }
+                if (ContextUtils.isFrameworkThread())
+                {
+                    frameworkLatch.get().countDown();
+                }
+            }
+        });
+        assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));
+        assertTrue(frameworkLatch.get().await(1, TimeUnit.SECONDS));
+
+        specificLatch.set(new CountDownLatch(1));
+        frameworkLatch.set(new CountDownLatch(1));
+        ContextUtils.RPC_EXECUTOR.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (ContextUtils.isRpcThread())
+                {
+                    specificLatch.get().countDown();
+                }
+                if (ContextUtils.isFrameworkThread())
+                {
+                    frameworkLatch.get().countDown();
+                }
+            }
+        });
+        assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));
+        assertTrue(frameworkLatch.get().await(1, TimeUnit.SECONDS));
+        
+        specificLatch.set(new CountDownLatch(1));
+        frameworkLatch.set(new CountDownLatch(1));
+        ContextUtils.SYSTEM_RECORD_EXECUTOR.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (ContextUtils.isSystemThread())
+                {
+                    specificLatch.get().countDown();
+                }
+                if (ContextUtils.isFrameworkThread())
+                {
+                    frameworkLatch.get().countDown();
+                }
+            }
+        });
+        assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));
+        assertTrue(frameworkLatch.get().await(1, TimeUnit.SECONDS));
+        
     }
 }
