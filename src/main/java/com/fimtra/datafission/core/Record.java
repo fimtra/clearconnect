@@ -32,6 +32,7 @@ import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.Context.NoopAtomicChangeManager;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -328,17 +329,43 @@ final class Record implements IRecord, Cloneable
     @Override
     public void putAll(Map<? extends String, ? extends IValue> t)
     {
-        synchronized (this)
+        if (this.context instanceof NoopAtomicChangeManager)
         {
             Map.Entry<String, IValue> entry = null;
             String key = null;
             IValue value = null;
+            String internKey;
             for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
             {
                 entry = (Map.Entry<String, IValue>) it.next();
                 key = entry.getKey();
                 value = entry.getValue();
-                corePut_callWithWriteLock(key, value);
+                internKey = keysPool.intern(key);
+                if (value != null)
+                {
+                    this.data.put(internKey, value);
+                }
+                else
+                {
+                    // a null is treated as if it removes the key
+                    this.data.remove(internKey);
+                }
+            }
+        }
+        else
+        {
+            synchronized (this)
+            {
+                Map.Entry<String, IValue> entry = null;
+                String key = null;
+                IValue value = null;
+                for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
+                {
+                    entry = (Map.Entry<String, IValue>) it.next();
+                    key = entry.getKey();
+                    value = entry.getValue();
+                    corePut_callWithWriteLock(key, value);
+                }
             }
         }
     }
@@ -348,11 +375,18 @@ final class Record implements IRecord, Cloneable
     {
         if (key instanceof String)
         {
-            synchronized (this)
+            if (this.context instanceof NoopAtomicChangeManager)
             {
-                if (this.data.containsKey(key))
+                this.data.remove(key);
+            }
+            else
+            {
+                synchronized (this)
                 {
-                    return coreRemove_callWithWriteLock(key);
+                    if (this.data.containsKey(key))
+                    {
+                        return coreRemove_callWithWriteLock(key);
+                    }
                 }
             }
         }
@@ -833,28 +867,61 @@ final class SubMap implements Map<String, IValue>
     @Override
     public IValue remove(Object key)
     {
-        synchronized (this.record)
+        if (this.record.context instanceof NoopAtomicChangeManager)
         {
-            final IValue previous = this.subMap.remove(key);
-            this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
-            return previous;
+            return this.subMap.remove(key);
+        }
+        else
+        {
+            synchronized (this.record)
+            {
+                final IValue previous = this.subMap.remove(key);
+                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
+                return previous;
+            }
         }
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        synchronized (this.record)
+        if (this.record.context instanceof NoopAtomicChangeManager)
         {
             Map.Entry<?, ?> entry = null;
             String key = null;
             IValue value = null;
+            String internKey;
             for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
             {
                 entry = (Map.Entry<?, ?>) it.next();
                 key = (String) entry.getKey();
                 value = (IValue) entry.getValue();
-                corePut_callWithWriteLock(key, value);
+                internKey = Record.keysPool.intern(key);
+                if (value != null)
+                {
+                    this.subMap.put(internKey, value);
+                }
+                else
+                {
+                    // a null is treated as if it removes the key
+                    this.subMap.remove(internKey);
+                }
+            }
+        }
+        else
+        {
+            synchronized (this.record)
+            {
+                Map.Entry<?, ?> entry = null;
+                String key = null;
+                IValue value = null;
+                for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
+                {
+                    entry = (Map.Entry<?, ?>) it.next();
+                    key = (String) entry.getKey();
+                    value = (IValue) entry.getValue();
+                    corePut_callWithWriteLock(key, value);
+                }
             }
         }
     }
