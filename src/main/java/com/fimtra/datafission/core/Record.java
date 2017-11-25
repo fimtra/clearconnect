@@ -288,7 +288,33 @@ final class Record implements IRecord, Cloneable
         }
         synchronized (this)
         {
-            return corePut_callWithWriteLock(key, value);
+            final String internKey = keysPool.intern(key);
+            if (value != null)
+            {
+                final IValue previous = this.data.put(internKey, value);
+                // if there is no change, we perform no update
+                if (this.context != null)
+                {
+                    if (previous == null || !previous.equals(value))
+                    {
+                        this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
+                    }
+                }
+                return previous;
+            }
+            else
+            {
+                // a null is treated as if it removes the key
+                final IValue previous = this.data.remove(internKey);
+                if (this.context != null)
+                {
+                    if (previous != null)
+                    {
+                        this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
+                    }
+                }
+                return previous;
+            }
         }
     }
 
@@ -329,42 +355,67 @@ final class Record implements IRecord, Cloneable
     @Override
     public void putAll(Map<? extends String, ? extends IValue> t)
     {
-        if (this.context instanceof NoopAtomicChangeManager)
+        synchronized (this)
         {
-            Map.Entry<String, IValue> entry = null;
-            String key = null;
-            IValue value = null;
+            Map.Entry<String, IValue> entry;
+            String key;
+            IValue value;
             String internKey;
-            for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
+
+            if (this.context instanceof NoopAtomicChangeManager)
             {
-                entry = (Map.Entry<String, IValue>) it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                internKey = keysPool.intern(key);
-                if (value != null)
-                {
-                    this.data.put(internKey, value);
-                }
-                else
-                {
-                    // a null is treated as if it removes the key
-                    this.data.remove(internKey);
-                }
-            }
-        }
-        else
-        {
-            synchronized (this)
-            {
-                Map.Entry<String, IValue> entry = null;
-                String key = null;
-                IValue value = null;
                 for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
                 {
                     entry = (Map.Entry<String, IValue>) it.next();
                     key = entry.getKey();
                     value = entry.getValue();
-                    corePut_callWithWriteLock(key, value);
+                    internKey = keysPool.intern(key);
+                    
+                    if (value != null)
+                    {
+                        this.data.put(internKey, value);
+                    }
+                    else
+                    {
+                        // a null is treated as if it removes the key
+                        this.data.remove(internKey);
+                    }
+                }
+            }
+            else
+            {
+                IValue previous;
+                for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
+                {
+                    entry = (Map.Entry<String, IValue>) it.next();
+                    key = entry.getKey();
+                    value = entry.getValue();
+                    internKey = keysPool.intern(key);
+                    
+                    if (value != null)
+                    {
+                        previous = this.data.put(internKey, value);
+                        // if there is no change, we perform no update
+                        if (this.context != null)
+                        {
+                            if (previous == null || !previous.equals(value))
+                            {
+                                this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // a null is treated as if it removes the key
+                        previous = this.data.remove(internKey);
+                        if (this.context != null)
+                        {
+                            if (previous != null)
+                            {
+                                this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -373,19 +424,21 @@ final class Record implements IRecord, Cloneable
     @Override
     public IValue remove(Object key)
     {
-        if (key instanceof String)
+        synchronized (this)
         {
-            if (this.context instanceof NoopAtomicChangeManager)
+            if (key instanceof String)
             {
-                this.data.remove(key);
-            }
-            else
-            {
-                synchronized (this)
+                if (this.context instanceof NoopAtomicChangeManager)
+                {
+                    this.data.remove(key);
+                }
+                else
                 {
                     if (this.data.containsKey(key))
                     {
-                        return coreRemove_callWithWriteLock(key);
+                        final IValue value = this.data.remove(key);
+                        addEntryRemovedToAtomicChange((String) key, value);
+                        return value;
                     }
                 }
             }
@@ -589,44 +642,6 @@ final class Record implements IRecord, Cloneable
     public long getSequence()
     {
         return this.sequence.longValue();
-    }
-
-    IValue corePut_callWithWriteLock(String key, IValue value)
-    {
-        final String internKey = keysPool.intern(key);
-        if (value != null)
-        {
-            final IValue previous = this.data.put(internKey, value);
-            // if there is no change, we perform no update
-            if (this.context != null)
-            {
-                if (previous == null || !previous.equals(value))
-                {
-                    this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
-                }
-            }
-            return previous;
-        }
-        else
-        {
-            // a null is treated as if it removes the key
-            final IValue previous = this.data.remove(internKey);
-            if (this.context != null)
-            {
-                if (previous != null)
-                {
-                    this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
-                }
-            }
-            return previous;
-        }
-    }
-
-    IValue coreRemove_callWithWriteLock(Object key)
-    {
-        final IValue value = this.data.remove(key);
-        addEntryRemovedToAtomicChange((String) key, value);
-        return value;
     }
 
     Set<Entry<String, IValue>> getSnapshotOfBackingEntrySet()
@@ -840,40 +855,35 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            return corePut_callWithWriteLock(key, value);
-        }
-    }
-
-    IValue corePut_callWithWriteLock(String key, IValue value)
-    {
-        final String internKey = Record.keysPool.intern(key);
-        if (value != null)
-        {
-            final IValue previous = this.subMap.put(internKey, value);
-            if (previous == null || !previous.equals(value))
+            final String internKey = Record.keysPool.intern(key);
+            if (value != null)
             {
-                this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
+                final IValue previous = this.subMap.put(internKey, value);
+                if (previous == null || !previous.equals(value))
+                {
+                    this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
+                }
+                return previous;
             }
-            return previous;
-        }
-        else
-        {
-            final IValue previous = this.subMap.remove(internKey);
-            this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
-            return previous;
+            else
+            {
+                final IValue previous = this.subMap.remove(internKey);
+                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
+                return previous;
+            }
         }
     }
 
     @Override
     public IValue remove(Object key)
     {
-        if (this.record.context instanceof NoopAtomicChangeManager)
+        synchronized (this.record)
         {
-            return this.subMap.remove(key);
-        }
-        else
-        {
-            synchronized (this.record)
+            if (this.record.context instanceof NoopAtomicChangeManager)
+            {
+                return this.subMap.remove(key);
+            }
+            else
             {
                 final IValue previous = this.subMap.remove(key);
                 this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
@@ -885,42 +895,56 @@ final class SubMap implements Map<String, IValue>
     @Override
     public void putAll(Map<? extends String, ? extends IValue> m)
     {
-        if (this.record.context instanceof NoopAtomicChangeManager)
+        synchronized (this.record)
         {
-            Map.Entry<?, ?> entry = null;
-            String key = null;
-            IValue value = null;
+            Map.Entry<?, ?> entry;
+            String key;
+            IValue value;
             String internKey;
-            for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
+
+            if (this.record.context instanceof NoopAtomicChangeManager)
             {
-                entry = (Map.Entry<?, ?>) it.next();
-                key = (String) entry.getKey();
-                value = (IValue) entry.getValue();
-                internKey = Record.keysPool.intern(key);
-                if (value != null)
-                {
-                    this.subMap.put(internKey, value);
-                }
-                else
-                {
-                    // a null is treated as if it removes the key
-                    this.subMap.remove(internKey);
-                }
-            }
-        }
-        else
-        {
-            synchronized (this.record)
-            {
-                Map.Entry<?, ?> entry = null;
-                String key = null;
-                IValue value = null;
                 for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
                 {
                     entry = (Map.Entry<?, ?>) it.next();
                     key = (String) entry.getKey();
                     value = (IValue) entry.getValue();
-                    corePut_callWithWriteLock(key, value);
+                    internKey = Record.keysPool.intern(key);
+                    
+                    if (value != null)
+                    {
+                        this.subMap.put(internKey, value);
+                    }
+                    else
+                    {
+                        // a null is treated as if it removes the key
+                        this.subMap.remove(internKey);
+                    }
+                }
+            }
+            else
+            {
+                IValue previous;
+                for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
+                {
+                    entry = (Map.Entry<?, ?>) it.next();
+                    key = (String) entry.getKey();
+                    value = (IValue) entry.getValue();
+                    internKey = Record.keysPool.intern(key);
+                    
+                    if (value != null)
+                    {
+                        previous = this.subMap.put(internKey, value);
+                        if (previous == null || !previous.equals(value))
+                        {
+                            this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
+                        }
+                    }
+                    else
+                    {
+                        previous = this.subMap.remove(internKey);
+                        this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
+                    }
                 }
             }
         }
