@@ -385,6 +385,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     final static LowGcLinkedList<char[]> CHAR_ARRAY_CACHE = new LowGcLinkedList<char[]>();
     final static LowGcLinkedList<CharArrayReference> CHAR_ARRAY_REF_CACHE = new LowGcLinkedList<CharArrayReference>();
+    final static LowGcLinkedList<CharArrayReference> KEY_CHAR_ARRAY_REF_CACHE = new LowGcLinkedList<CharArrayReference>();
     final static LowGcLinkedList<StringBuilder> BUILDER_CACHE = new LowGcLinkedList<StringBuilder>();
     
     static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
@@ -394,6 +395,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
         final Set<String> subMapKeys = atomicChange.getSubMapKeys();
         CharArrayReference charArrayRef;
+        CharArrayReference keyCharArrayRef;
         char[] escapedChars;
         StringBuilder sb;
         synchronized (BUILDER_CACHE)
@@ -412,6 +414,13 @@ public class StringProtocolCodec implements ICodec<char[]>
             {
                 charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
             }
+            keyCharArrayRef = KEY_CHAR_ARRAY_REF_CACHE.poll();
+            if (keyCharArrayRef == null)
+            {
+                keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+                keyCharArrayRef.ref[0] = NULL_CHAR;
+                keyCharArrayRef.ref[1] = NULL_CHAR;
+            }
             escapedChars = CHAR_ARRAY_CACHE.poll();
             if (escapedChars == null)
             {
@@ -424,8 +433,8 @@ public class StringProtocolCodec implements ICodec<char[]>
             escape(atomicChange.getName(), sb, charArrayRef, escapedChars);
             // add the sequence
             sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-            addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars);
-            addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars);
+            addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
+            addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
             IRecordChange subMapAtomicChange;
             if (subMapKeys.size() > 0)
             {
@@ -434,8 +443,8 @@ public class StringProtocolCodec implements ICodec<char[]>
                     subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
                     sb.append(DELIMITER_SUBMAP_CODE);
                     escape(subMapKey, sb, charArrayRef, escapedChars);
-                    addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, charArrayRef, escapedChars);
-                    addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, charArrayRef, escapedChars);
+                    addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, charArrayRef, escapedChars, keyCharArrayRef);
+                    addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, charArrayRef, escapedChars, keyCharArrayRef);
                 }
             }
             return sb.toString().getBytes(charSet);
@@ -447,12 +456,13 @@ public class StringProtocolCodec implements ICodec<char[]>
                 BUILDER_CACHE.push(sb);
                 CHAR_ARRAY_CACHE.push(escapedChars);
                 CHAR_ARRAY_REF_CACHE.push(charArrayRef);
+                KEY_CHAR_ARRAY_REF_CACHE.push(keyCharArrayRef);
             }
         }
     }
 
     private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
-        final StringBuilder txString, final CharArrayReference chars, final char[] escapedChars)
+        final StringBuilder txString, final CharArrayReference chars, final char[] escapedChars, final CharArrayReference keyChars)
     {
         if (entries != null && entries.size() > 0)
         {
@@ -462,11 +472,11 @@ public class StringProtocolCodec implements ICodec<char[]>
             int i = 0;
             int last;
             int length;
-            char charAt;
             char[] cbuf;
             escapedChars[0] = CHAR_ESCAPE;
             boolean needToEscape;
             txString.append(changeType);
+
             for (Iterator<Map.Entry<String, IValue>> it = entries.entrySet().iterator(); it.hasNext();)
             {
                 entry = it.next();
@@ -479,19 +489,23 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
                 else
                 {
-                    cbuf = new char[key.length() + DOUBLE_KEY_PREAMBLE_LENGTH];
-                    cbuf[0] = NULL_CHAR;
-                    cbuf[1] = NULL_CHAR;
+                    length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
+                    if (keyChars.ref.length < length)
+                    {
+                        // resize
+                        keyChars.ref = new char[length];
+                        keyChars.ref[0] = NULL_CHAR;
+                        keyChars.ref[1] = NULL_CHAR;
+                    }
+                    cbuf = keyChars.ref;
                     key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
-
+                    
                     // NOTE: for efficiency, we have *almost* inlined versions of the same escape
                     // switch statements
                     needToEscape = false;
-                    length = cbuf.length;
                     for (i = 0; i < length; i++)
                     {
-                        charAt = cbuf[i];
-                        switch(charAt)
+                        switch(cbuf[i])
                         {
                             case CR:
                             case LF:
@@ -507,8 +521,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                         last = 0;
                         for (i = 0; i < length; i++)
                         {
-                            charAt = cbuf[i];
-                            switch(charAt)
+                            switch(cbuf[i])
                             {
                                 case CR:
                                     txString.append(cbuf, last, i - last);
@@ -526,7 +539,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                                 case CHAR_TOKEN_DELIM:
                                 case CHAR_KEY_VALUE_SEPARATOR:
                                     txString.append(cbuf, last, i - last);
-                                    escapedChars[1] = charAt;
+                                    escapedChars[1] = cbuf[i];
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
@@ -537,7 +550,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     }
                     else
                     {
-                        txString.append(cbuf);
+                        txString.append(cbuf, 0, length);
                     }
                 }
 
