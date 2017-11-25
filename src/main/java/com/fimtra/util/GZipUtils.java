@@ -32,7 +32,7 @@ import java.util.zip.GZIPOutputStream;
  */
 public abstract class GZipUtils
 {
-    private static final byte[] LENGTH_PLACEHOLDER = new byte[] {0,0,0,0};
+    private static final byte[] LENGTH_PLACEHOLDER = new byte[] { 0, 0, 0, 0 };
 
     /**
      * Provides access to the internal byte[]
@@ -104,9 +104,10 @@ public abstract class GZipUtils
                     buffer.position(buffer.position() + count);
                 }
                 return uncompressedData;
-            } finally
+            }
+            finally
             {
-               gZipIn.close(); 
+                gZipIn.close();
             }
         }
         catch (IOException e)
@@ -116,19 +117,24 @@ public abstract class GZipUtils
         }
     }
 
-	/**
-	 * Compresses the data in the inputStream to the outputStream.
-	 */
-	public static void compressInputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException {
-		GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
-		try {
-			byte[] buffer = new byte[1024];
-			int length;
-			while ((length = inputStream.read(buffer)) != -1) {
-				gzipOutputStream.write(buffer, 0, length);
-			}
-		} finally {
-			gzipOutputStream.close();
-		}
-	}
+    /**
+     * Compresses the data in the inputStream to the outputStream.
+     */
+    public static void compressInputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException
+    {
+        GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
+        try
+        {
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1)
+            {
+                gzipOutputStream.write(buffer, 0, length);
+            }
+        }
+        finally
+        {
+            gzipOutputStream.close();
+        }
+    }
 }
