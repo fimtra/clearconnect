@@ -425,6 +425,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             if (escapedChars == null)
             {
                 escapedChars = new char[2];
+                escapedChars[0] = CHAR_ESCAPE;
             }
         }
         try
@@ -593,13 +594,12 @@ public class StringProtocolCodec implements ICodec<char[]>
             if (charsRef.ref.length < length)
             {
                 // resize
-                charsRef.ref = (new char[length]);
+                charsRef.ref = new char[length];
             }
 
             final char[] chars = charsRef.ref;
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
 
-            escapedChars[0] = CHAR_ESCAPE;
             char charAt;
             int last = 0;
             for (int i = 0; i < length; i++)
@@ -762,7 +762,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     static String getEncodedNamesForCommandMessage(String commandWithDelimiter, String... recordNames)
     {
         final CharArrayReference chars = new CharArrayReference(new char[CHARRAY_SIZE]);
-        char[] escapedChars = new char[2];
+        final char[] escapedChars = new char[2];
+        escapedChars[0] = CHAR_ESCAPE;
         
         if (recordNames.length == 0)
         {

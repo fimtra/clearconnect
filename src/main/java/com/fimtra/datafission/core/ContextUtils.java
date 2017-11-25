@@ -553,7 +553,9 @@ public final class ContextUtils
 
         final CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
 
-        final char[] escapedChars = new char[2]; 
+        final char[] escapedChars = new char[2];
+        escapedChars[0] = StringProtocolCodec.CHAR_ESCAPE;
+        
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
