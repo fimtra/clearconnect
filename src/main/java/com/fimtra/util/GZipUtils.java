@@ -65,9 +65,15 @@ public abstract class GZipUtils
                 new ByteArrayOutputStreamExtension(uncompressedData.length);
             // placeholder for the size
             outStream.write(LENGTH_PLACEHOLDER, 0, 4);
-            final GZIPOutputStream gZipOut = new GZIPOutputStream(outStream);
-            gZipOut.write(uncompressedData);
-            gZipOut.close();
+            GZIPOutputStream gZipOut = new GZIPOutputStream(outStream);
+            try
+            {
+                gZipOut.write(uncompressedData);
+            }
+            finally
+            {
+                gZipOut.close();
+            }
             final byte[] compressedData = outStream.getBuffer();
             ByteBuffer.wrap(compressedData).putInt(uncompressedData.length);
             return compressedData;
@@ -90,15 +96,16 @@ public abstract class GZipUtils
         try
         {
             final int uncompressedSize = ByteBuffer.wrap(compressedData).getInt();
-            byte[] uncompressedData = new byte[uncompressedSize];
-            ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
-            ByteArrayInputStream inStream = new ByteArrayInputStream(compressedData, 4, compressedData.length - 4);
-            byte[] tempBuf = new byte[uncompressedSize > 1024 ? uncompressedSize >> 1 : uncompressedSize];
+            final byte[] uncompressedData = new byte[uncompressedSize];
+            final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
+            final ByteArrayInputStream inStream =
+                new ByteArrayInputStream(compressedData, 4, compressedData.length - 4);
+            final byte[] tempBuf = new byte[uncompressedSize > 1024 ? 1024 : uncompressedSize];
             GZIPInputStream gZipIn = new GZIPInputStream(inStream);
             try
             {
                 int count = 0;
-                while ((count = gZipIn.read(tempBuf)) != -1)
+                while ((count = gZipIn.read(tempBuf, 0, tempBuf.length)) != -1)
                 {
                     System.arraycopy(tempBuf, 0, buffer.array(), buffer.position(), count);
                     buffer.position(buffer.position() + count);
