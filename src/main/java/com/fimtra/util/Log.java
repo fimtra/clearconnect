@@ -20,6 +20,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,7 +43,7 @@ public abstract class Log
     /** Controls logging to std.err, default is <code>false</code> for performance reasons */
     private static final boolean LOG_TO_STDERR = UtilProperties.Values.LOG_TO_STDERR;
     private static final String DELIM = "|";
-    private static final String MESSAGE_DELIM = DELIM + "\t";
+    private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR = ThreadUtils.newScheduledExecutorService("LogAsyncFileAppender", 1);
     private static final Lock lock = new ReentrantLock();
     private static PrintStream consoleStream = System.err;
@@ -115,9 +116,23 @@ public abstract class Log
                 }
             }
             final StringBuilder sb = new StringBuilder(len);
-            sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(this.source instanceof Class
-                ? ((Class<?>) this.source).getName() : this.source.getClass().getName()).append(":").append(
-                    Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
+            final Class<?> c = (this.source instanceof Class<?> ? (Class<?>) this.source : this.source.getClass());
+            String classSimpleName = cachedSimpleNames.get(c);
+            if (classSimpleName == null)
+            {
+                if (c.isAnonymousClass())
+                {
+                    classSimpleName = c.getName();
+                    classSimpleName = classSimpleName.substring(classSimpleName.lastIndexOf(".") + 1);
+                }
+                else
+                {
+                    classSimpleName = c.getSimpleName();
+                }
+                cachedSimpleNames.put(c, classSimpleName);
+            }
+            sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(classSimpleName).append(
+                ":").append(Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
             for (int i = 0; i < this.messages.length; i++)
             {
                 sb.append(this.messages[i]);
@@ -129,6 +144,8 @@ public abstract class Log
             return this.formattedMessage;
         }
     }
+
+    final static ConcurrentHashMap<Class<?>, String> cachedSimpleNames = new ConcurrentHashMap<Class<?>, String>();
 
     static
     {
