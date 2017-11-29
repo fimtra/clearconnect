@@ -93,6 +93,16 @@ public class Publisher
      * Controls logging of outbound traffic. Only the first 200 bytes per message are logged.
      */
     public static boolean logTx = Boolean.getBoolean("logTx." + ProxyContextPublisher.class.getCanonicalName());
+    
+    /**
+     * Controls logging of:
+     * <ul>
+     * <li>Subscribes received
+     * <li>First update published
+     * <ul>
+     */
+    public static boolean logVerboseSubscribes =
+        Boolean.getBoolean("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName());
 
     /**
      * Delimiter for statistics attributes published for each proxy context connection in the
@@ -531,9 +541,12 @@ public class Publisher
                 public void run()
                 {
                     // log any records that have had their first publish done
-                    synchronized (ProxyContextPublisher.this.firstPublishPending)
+                    if (logVerboseSubscribes)
                     {
-                        logFirstPublishDone();
+                        synchronized (ProxyContextPublisher.this.firstPublishPending)
+                        {
+                            logFirstPublishDone();
+                        }
                     }
                     
                     final String transmissionStatisticsFieldName =
@@ -598,7 +611,7 @@ public class Publisher
             this.messagesPublished++;
             
             // peek at the size before attempting the synchronize block
-            if (this.firstPublishPending.size() > 0)
+            if (logVerboseSubscribes && this.firstPublishPending.size() > 0)
             {
                 synchronized (this.firstPublishPending)
                 {
@@ -636,7 +649,13 @@ public class Publisher
             try
             {
                 this.subscriptions.addAll(names);
-                this.firstPublishPending.addAll(names);
+                if (logVerboseSubscribes)
+                {
+                    synchronized (this.firstPublishPending)
+                    {
+                        this.firstPublishPending.addAll(names);
+                    }
+                }
                 Publisher.this.multiplexer.addSubscriberFor(names, this, permissionToken, ackSubscribes,
                     nokSubscribes, task);
             }
@@ -651,7 +670,13 @@ public class Publisher
             try
             {
                 this.subscriptions.removeAll(names);
-                this.firstPublishPending.removeAll(names);
+                if (logVerboseSubscribes)
+                {
+                    synchronized (this.firstPublishPending)
+                    {
+                        this.firstPublishPending.removeAll(names);
+                    }
+                }
                 Publisher.this.multiplexer.removeSubscriberFor(names, this);
             }
             catch (Exception e)
@@ -1134,7 +1159,7 @@ public class Publisher
     void unsubscribe(List<String> recordNames, ITransportChannel client)
     {
         Log.log(this, "(<-) unsubscribe from [", client.getEndPointDescription(), "] for ",
-            ObjectUtils.safeToString(recordNames));
+            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         proxyContextPublisher.unsubscribe(recordNames);
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
@@ -1143,7 +1168,7 @@ public class Publisher
     void resync(List<String> recordNames, ITransportChannel client)
     {
         Log.log(this, "(<-) re-sync from [", client.getEndPointDescription(), "] for ",
-            ObjectUtils.safeToString(recordNames));
+            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
         synchronized (this.subscribeTasks)
@@ -1195,7 +1220,8 @@ public class Publisher
     {
         final String subscribeKey = Long.toString(this.subscribeCounter.incrementAndGet());
         Log.log(this, "(<-) subscribe #", subscribeKey, " (", Integer.toString(current), "/", Integer.toString(total),
-            ") from [", client.getEndPointDescription(), "] for ", ObjectUtils.safeToString(recordNames));
+            ") from [", client.getEndPointDescription(), "]",
+            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : ""));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new LinkedList<String>();
@@ -1207,8 +1233,8 @@ public class Publisher
             {
                 if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
                 {
-                    Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete: ",
-                        Integer.toString(ackSubscribes.size()), "/", Integer.toString(nokSubscribes.size()));
+                    Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete ",
+                        Integer.toString(ackSubscribes.size()), ":", Integer.toString(nokSubscribes.size()));
                     sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
                     sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
                 }
