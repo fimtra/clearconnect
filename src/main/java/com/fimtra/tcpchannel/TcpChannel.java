@@ -851,21 +851,23 @@ interface IFrameReaderWriter
 
 /**
  * Base class for {@link IFrameReaderWriter} implementations. This class handles partial writing of
- * data buffers to a socket. The {@link #writeBuffersToSocket()} method will continually attempt to
+ * data buffers to a socket. The {@link #writeBufferToSocket()} method will continually attempt to
  * write the buffers to the socket until all data has been sent.
  * 
  * @author Ramon Servadei
  */
 abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 {
-    int txLength;
-    final ByteBuffer[] buffers;
+    // note: the header will never by this large, but we just use it to ensure we have enough so the
+    // txBuffer never resizes
+    private static final int HEADER_SPACE = 1024;
+
     final TcpChannel tcpChannel;
+    final ByteBuffer txBuffer = ByteBuffer.allocateDirect(TcpChannelProperties.Values.TX_SEND_SIZE + HEADER_SPACE);
 
     AbstractFrameReaderWriter(TcpChannel tcpChannel)
     {
         super();
-        this.buffers = new ByteBuffer[3];
         this.tcpChannel = tcpChannel;
     }
 
@@ -875,11 +877,11 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
      * 
      * @throws IOException
      */
-    void writeBuffersToSocket() throws IOException
+    void writeBufferToSocket(ByteBuffer buffer) throws IOException
     {
-        while (this.buffers[0].hasRemaining() || this.buffers[1].hasRemaining())
+        while (buffer.hasRemaining())
         {
-            this.tcpChannel.socketChannel.write(this.buffers);
+            this.tcpChannel.socketChannel.write(buffer);
         }
     }
 
@@ -894,12 +896,9 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
  */
 final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
 {
-    private final ByteBuffer terminatorByteBuffer = ByteBuffer.wrap(TcpChannel.TERMINATOR);
-
     TerminatorBasedReaderWriter(TcpChannel tcpChannel)
     {
         super(tcpChannel);
-        this.buffers[2] = this.terminatorByteBuffer;
     }
 
     @Override
@@ -911,12 +910,16 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
     @Override
     void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
-        final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
-        this.txLength = frameLen + TcpChannel.TERMINATOR.length;
-        this.buffers[0] = header;
-        this.buffers[1] = data;
-        writeBuffersToSocket();
-        this.terminatorByteBuffer.flip();
+        final int dataLen = data.limit() - data.position();
+        final int headerLen = header.limit() - header.position();
+        
+        this.txBuffer.put(header.array(), header.position(), headerLen);
+        this.txBuffer.put(data.array(), data.position(), dataLen);
+        this.txBuffer.put(TcpChannel.TERMINATOR);
+        
+        this.txBuffer.flip();
+        writeBufferToSocket(this.txBuffer);
+        this.txBuffer.compact();
     }
 }
 
@@ -928,12 +931,9 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
  */
 final class LengthBasedWriter extends AbstractFrameReaderWriter
 {
-    private final ByteBuffer txLengthBuffer = ByteBuffer.wrap(new byte[4]);
-
     LengthBasedWriter(TcpChannel tcpChannel)
     {
         super(tcpChannel);
-        this.buffers[0] = this.txLengthBuffer;
     }
 
     @Override
@@ -945,12 +945,15 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
     @Override
     void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException
     {
-        final int frameLen = (header.limit() - header.position()) + (data.limit() - data.position());
-        this.txLength = frameLen + 4;
-        this.txLengthBuffer.putInt(0, frameLen);
-        this.buffers[1] = header;
-        this.buffers[2] = data;
-        writeBuffersToSocket();
-        this.txLengthBuffer.flip();
+        final int dataLen = data.limit() - data.position();
+        final int headerLen = header.limit() - header.position();
+
+        this.txBuffer.putInt(headerLen + dataLen);
+        this.txBuffer.put(header.array(), header.position(), headerLen);
+        this.txBuffer.put(data.array(), data.position(), dataLen);
+        
+        this.txBuffer.flip();
+        writeBufferToSocket(this.txBuffer);
+        this.txBuffer.compact();
     }
 }
