@@ -877,11 +877,19 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
      * 
      * @throws IOException
      */
-    void writeBufferToSocket(ByteBuffer buffer) throws IOException
+    void writeBufferToSocket() throws IOException
     {
-        while (buffer.hasRemaining())
+        this.txBuffer.flip();
+        try
         {
-            this.tcpChannel.socketChannel.write(buffer);
+            while (this.txBuffer.hasRemaining())
+            {
+                this.tcpChannel.socketChannel.write(this.txBuffer);
+            }
+        }
+        finally
+        {
+            this.txBuffer.compact();
         }
     }
 
@@ -917,9 +925,7 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
         this.txBuffer.put(data.array(), data.position(), dataLen);
         this.txBuffer.put(TcpChannel.TERMINATOR);
         
-        this.txBuffer.flip();
-        writeBufferToSocket(this.txBuffer);
-        this.txBuffer.compact();
+        writeBufferToSocket();
     }
 }
 
@@ -952,8 +958,6 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
         this.txBuffer.put(header.array(), header.position(), headerLen);
         this.txBuffer.put(data.array(), data.position(), dataLen);
         
-        this.txBuffer.flip();
-        writeBufferToSocket(this.txBuffer);
-        this.txBuffer.compact();
+        writeBufferToSocket();
     }
 }
