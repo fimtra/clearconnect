@@ -230,12 +230,14 @@ public abstract class TcpChannelUtils
      *            used as a reference to pass back the size of the array
      * @param buffer
      *            a bytebuffer holding any number of frames or <b>partial frames</b>
+     * @param bufferArray
+     *            the array of bytes extracted from the buffer
      * @return the array with the decoded frames, different to the frames argument if the array was
      *         resized
      * @throws BufferOverflowException
      *             if the buffer size cannot hold a complete frame
      */
-    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer) throws BufferOverflowException
+    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] bufferArray) throws BufferOverflowException
     {
         ByteBuffer[] decoded = frames;
         framesSize[0] = 0;
@@ -282,7 +284,7 @@ public abstract class TcpChannelUtils
                 {
                     decoded = Arrays.copyOf(decoded, decoded.length + 2);
                 }
-                decoded[framesSize[0]++] = ByteBuffer.wrap(buffer.array(), position, len);
+                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, position, len);
                 buffer.position(position + len);
             }
         }
@@ -310,6 +312,8 @@ public abstract class TcpChannelUtils
      *            used as a reference to pass back the size of the array
      * @param buffer
      *            a bytebuffer holding any number of frames or <b>partial frames</b>
+     * @param bufferArray
+     *            the array of bytes extracted from the buffer
      * @param terminator
      *            the byte sequence for the end of a frame
      * @return the array with the decoded frames, different to the frames argument if the array was
@@ -318,12 +322,11 @@ public abstract class TcpChannelUtils
      *             if the buffer size cannot hold a complete frame
      */
     static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer,
-        byte[] terminator) throws BufferOverflowException
+        byte[] bufferArray, byte[] terminator) throws BufferOverflowException
     {
         ByteBuffer[] decoded = frames;
         framesSize[0] = 0;
         buffer.flip();
-        final byte[] bufferArray = buffer.array();
         int[] terminatorIndex = new int[2];
         int terminatorIndexPtr = 0;
         final int limit = buffer.limit();

@@ -64,14 +64,14 @@ public class TestTcpChannelUtils
         buffer.put(unfinished.getBytes());
 
         ByteBuffer[] result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
         assertEquals(2, this.readFramesSize[0]);
         assertEquals(hello, new String(ByteBufferUtils.asBytes(result[0])));
         assertEquals(world, new String(ByteBufferUtils.asBytes(result[1])));
         buffer.compact();
 
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
         assertEquals(0, this.readFramesSize[0]);
         buffer.compact();
 
@@ -79,14 +79,14 @@ public class TestTcpChannelUtils
         buffer.put(terminator);
         buffer.put(terminator);
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
         assertEquals(2, this.readFramesSize[0]);
         assertEquals(unfinished + finished, new String(ByteBufferUtils.asBytes(result[0])));
         assertEquals("", new String(ByteBufferUtils.asBytes(result[1])));
         buffer.compact();
 
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
         assertEquals(0, buffer.position());
         assertEquals(0, this.readFramesSize[0]);
     }
@@ -115,7 +115,7 @@ public class TestTcpChannelUtils
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
         ByteBuffer[] decode = new ByteBuffer[2];
-        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer);
+        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer, data);
         assertEquals(1, this.readFramesSize[0]);
         byte[] expected = new byte[2];
         expected[0] = (byte) 5;
@@ -152,7 +152,7 @@ public class TestTcpChannelUtils
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
         ByteBuffer[] decode = new ByteBuffer[2];
-        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer);
+        decode = TcpChannelUtils.decode(decode, this.readFramesSize, buffer, data);
     }
 
     @Test(expected = BufferOverflowException.class)
@@ -172,6 +172,6 @@ public class TestTcpChannelUtils
         final ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.put(data);
         ByteBuffer[] decode = new ByteBuffer[2];
-        decode = TcpChannelUtils.decodeUsingTerminator(decode, this.readFramesSize, buffer, terminator);
+        decode = TcpChannelUtils.decodeUsingTerminator(decode, this.readFramesSize, buffer, data, terminator);
     }
 }
