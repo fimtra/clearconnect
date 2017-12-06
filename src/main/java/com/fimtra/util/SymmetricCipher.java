@@ -27,6 +27,8 @@ import javax.crypto.SecretKey;
 /**
  * This allows encryption and decryption of data between two "end points" using a symmetrical
  * encryption mechanism.
+ * <p>
+ * Thread-safe.
  * 
  * @author Ramon Servadei
  */
@@ -77,7 +79,7 @@ public final class SymmetricCipher
      * @throws RuntimeException
      *             if there is a problem encrypting
      */
-    public byte[] encrypt(byte[] data)
+    public synchronized byte[] encrypt(byte[] data)
     {
         try
         {
@@ -96,7 +98,7 @@ public final class SymmetricCipher
      * @throws RuntimeException
      *             if there is a problem decrypting
      */
-    public byte[] decrypt(byte[] data)
+    public synchronized byte[] decrypt(byte[] data)
     {
         try
         {
