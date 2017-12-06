@@ -23,7 +23,7 @@ import com.fimtra.util.SymmetricCipher;
 /**
  * Synchronises a session using encrypted messages and encrypts all data transfer for a session.
  * 
- * @se {@link EncryptedSessionSyncProtocol}
+ * @see {@link EncryptedSessionSyncProtocol}
  * @author Ramon Servadei
  */
 public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionSyncProtocol
