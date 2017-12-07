@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.lang.ref.WeakReference;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class KeyedObjectPool<K, T>
 {
-    final static List<KeyedObjectPool<?, ?>> pools = new LowGcLinkedList<KeyedObjectPool<?, ?>>();
+    final static List<WeakReference<KeyedObjectPool<?, ?>>> pools = new LowGcLinkedList<WeakReference<KeyedObjectPool<?, ?>>>();
     static
     {
         ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(new Runnable()
@@ -37,21 +39,35 @@ public class KeyedObjectPool<K, T>
             @Override
             public void run()
             {
+
                 synchronized (pools)
                 {
-                    for (KeyedObjectPool<?, ?> pool : pools)
+                    for (Iterator<WeakReference<KeyedObjectPool<?, ?>>> iterator =
+                        pools.iterator(); iterator.hasNext();)
                     {
-                        Log.log(KeyedObjectPool.class, pool.toString());
+                        final WeakReference<KeyedObjectPool<?, ?>> weakReference = iterator.next();
+                        final KeyedObjectPool<?, ?> object = weakReference.get();
+                        if (object == null)
+                        {
+                            // GC'ed as no other references so remove
+                            iterator.remove();
+                        }
+                        else
+                        {
+                            Log.log(KeyedObjectPool.class, object.toString());
+                        }
                     }
                 }
+            
             }
-        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
+        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.SECONDS);
     }
 
     private final String name;
     private final ConcurrentMap<K, T> pool;
     private final LowGcLinkedList<T> order;
     private final int maxSize;
+    private final WeakReference<KeyedObjectPool<?, ?>> weakRef;
 
     /**
      * Construct with unlimited size
@@ -71,9 +87,10 @@ public class KeyedObjectPool<K, T>
         this.maxSize = maxSize;
         this.pool = new ConcurrentHashMap<K, T>();
         this.order = (maxSize > 0 ? new LowGcLinkedList<T>() : null);
+        this.weakRef = new WeakReference<KeyedObjectPool<?,?>>(this);
         synchronized (pools)
         {
-            pools.add(this);
+            pools.add(this.weakRef);
         }
     }
 
@@ -81,7 +98,7 @@ public class KeyedObjectPool<K, T>
     {
         synchronized (pools)
         {
-            pools.remove(this);
+            pools.remove(this.weakRef);
         }
     }
 
