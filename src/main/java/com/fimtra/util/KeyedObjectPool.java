@@ -60,7 +60,7 @@ public class KeyedObjectPool<K, T>
                 }
             
             }
-        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.SECONDS);
+        }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
     }
 
     private final String name;
@@ -96,6 +96,12 @@ public class KeyedObjectPool<K, T>
 
     public final void destroy()
     {
+        synchronized (this.order)
+        {
+            this.order.clear();
+            this.pool.clear();
+        }
+        
         synchronized (pools)
         {
             pools.remove(this.weakRef);
