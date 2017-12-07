@@ -143,11 +143,13 @@ public final class ReusableObjectPool<T>
     }
 
     /**
-     * Return a re-usable object back to this pool. The object is reset if it is added to the pool.
+     * Return a re-usable object back to this pool (if the pool has space).
+     * <p>
+     * The object is reset regardless of whether it is added to the pool.
      * 
      * @see IReusableObjectFinalizer
      */
-    public void push(T instance)
+    public void offer(T instance)
     {
         this.finalizer.reset(instance);
         synchronized (this)
