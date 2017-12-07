@@ -37,8 +37,10 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
-import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.ReusableObjectPool;
+import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
+import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -225,43 +227,46 @@ public class StringProtocolCodec implements ICodec<char[]>
         return decodeAtomicChange(decode(data));
     }
 
-    static final LowGcLinkedList<char[]> TEMP_ARR_CACHE = new LowGcLinkedList<char[]>();
-    static final LowGcLinkedList<int[][]> BIJ_TOKEN_OFFSET_CACHE = new LowGcLinkedList<int[][]>();
-    static final LowGcLinkedList<int[][]> BIJ_TOKEN_LIMIT_CACHE = new LowGcLinkedList<int[][]>();
-    static final LowGcLinkedList<int[]> BIJ_TOKEN_LEN_CACHE = new LowGcLinkedList<int[]>();
-    
-    static IRecordChange decodeAtomicChange(char[] decodedMessage)
+    static class DecodingBuffers
     {
         char[] tempArr;
-        // use bijectional arrays to track the offset+len of each token
-        // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d
-        // array
         int[][] bijTokenOffset;
         int[][] bijTokenLimit;
         int[] bijTokenLen;
-        synchronized (TEMP_ARR_CACHE)
-        {
-            tempArr = TEMP_ARR_CACHE.poll();
-            if (tempArr == null)
+    }
+    
+    final static ReusableObjectPool<DecodingBuffers> DECODING_BUFFERS =
+        new ReusableObjectPool<StringProtocolCodec.DecodingBuffers>("StringProtocolCodec-DecodingBuffers",
+            new IReusableObjectBuilder<DecodingBuffers>()
             {
-                tempArr = new char[50];
-            }
-            bijTokenOffset = BIJ_TOKEN_OFFSET_CACHE.poll();
-            if (bijTokenOffset == null)
+                @Override
+                public DecodingBuffers newInstance()
+                {
+                    final DecodingBuffers instance = new DecodingBuffers();
+                    instance.tempArr = new char[50];
+                    instance.bijTokenOffset = new int[1][10];
+                    instance.bijTokenLimit = new int[1][10];
+                    instance.bijTokenLen = new int[1];
+                    return instance;
+                }
+            }, new IReusableObjectFinalizer<DecodingBuffers>()
             {
-                bijTokenOffset = new int[1][10];
-            }
-            bijTokenLimit = BIJ_TOKEN_LIMIT_CACHE.poll();
-            if (bijTokenLimit == null)
-            {
-                bijTokenLimit = new int[1][10];
-            }
-            bijTokenLen = BIJ_TOKEN_LEN_CACHE.poll();
-            if (bijTokenLen == null)
-            {
-                bijTokenLen = new int[1];
-            }
-        }
+                @Override
+                public void reset(DecodingBuffers instance)
+                {
+                }
+            });
+    
+    static IRecordChange decodeAtomicChange(char[] decodedMessage)
+    {
+        final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
+        // use bijectional arrays to track the offset+len of each token
+        // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d
+        // array
+        final int[][] bijTokenOffset = decodingBuffers.bijTokenOffset;
+        final int[][] bijTokenLimit = decodingBuffers.bijTokenLimit;
+        final int[] bijTokenLen = decodingBuffers.bijTokenLen;
+
         try
         {
             findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
@@ -316,9 +321,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                         len += position;
                         for (j = position; j < len; j++)
                         {
-                            if (tempArr.length < len)
+                            if (decodingBuffers.tempArr.length < len)
                             {
-                                tempArr = new char[len];
+                                decodingBuffers.tempArr = new char[len];
                             }
                             switch(decodedMessage[j])
                             {
@@ -331,14 +336,14 @@ public class StringProtocolCodec implements ICodec<char[]>
                                             if (put)
                                             {
                                                 atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
-                                                    decodeKey(decodedMessage, position, j, true, tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, tempArr), null);
+                                                    decodeKey(decodedMessage, position, j, true, decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr), null);
                                             }
                                             else
                                             {
                                                 atomicChange.mergeSubMapEntryRemovedChange(subMapName,
-                                                    decodeKey(decodedMessage, position, j, true, tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, tempArr));
+                                                    decodeKey(decodedMessage, position, j, true, decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
                                             }
                                         }
                                         else
@@ -346,13 +351,13 @@ public class StringProtocolCodec implements ICodec<char[]>
                                             if (put)
                                             {
                                                 atomicChange.addEntry_onlyCallFromCodec(
-                                                    decodeKey(decodedMessage, position, j, true, tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, tempArr));
+                                                    decodeKey(decodedMessage, position, j, true, decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
                                             }
                                             else
                                             {
                                                 atomicChange.removeEntry_onlyCallFromCodec(
-                                                    decodeKey(decodedMessage, position, j, true, tempArr), null);
+                                                    decodeKey(decodedMessage, position, j, true, decodingBuffers.tempArr), null);
                                             }
                                         }
                                         j = decodedMessage.length;
@@ -373,61 +378,59 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
         finally
         {
-            synchronized (TEMP_ARR_CACHE)
-            {
-                TEMP_ARR_CACHE.push(tempArr);
-                BIJ_TOKEN_OFFSET_CACHE.push(bijTokenOffset);
-                BIJ_TOKEN_LIMIT_CACHE.push(bijTokenLimit);
-                BIJ_TOKEN_LEN_CACHE.push(bijTokenLen);
-            }
+            DECODING_BUFFERS.offer(decodingBuffers);
         }
     }
 
-    final static LowGcLinkedList<char[]> CHAR_ARRAY_CACHE = new LowGcLinkedList<char[]>();
-    final static LowGcLinkedList<CharArrayReference> CHAR_ARRAY_REF_CACHE = new LowGcLinkedList<CharArrayReference>();
-    final static LowGcLinkedList<CharArrayReference> KEY_CHAR_ARRAY_REF_CACHE = new LowGcLinkedList<CharArrayReference>();
-    final static LowGcLinkedList<StringBuilder> BUILDER_CACHE = new LowGcLinkedList<StringBuilder>();
-    
-    static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
+    static class EncodingBuffers
     {
-
-        final Map<String, IValue> putEntries = atomicChange.getPutEntries();
-        final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
-        final Set<String> subMapKeys = atomicChange.getSubMapKeys();
         CharArrayReference charArrayRef;
         CharArrayReference keyCharArrayRef;
         char[] escapedChars;
         StringBuilder sb;
-        synchronized (BUILDER_CACHE)
-        {
-            sb = BUILDER_CACHE.poll();
-            if (sb == null)
+    }
+
+    final static ReusableObjectPool<EncodingBuffers> ENCODING_BUFFERS =
+        new ReusableObjectPool<StringProtocolCodec.EncodingBuffers>("StringProtocolCodec-EncodingBuffers",
+            new IReusableObjectBuilder<EncodingBuffers>()
             {
-                sb = new StringBuilder(1000);
-            }
-            else
+                @Override
+                public EncodingBuffers newInstance()
+                {
+                    final EncodingBuffers instance = new EncodingBuffers();
+                    instance.sb = new StringBuilder(1000);
+                    instance.charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+
+                    instance.keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+                    instance.keyCharArrayRef.ref[0] = NULL_CHAR;
+                    instance.keyCharArrayRef.ref[1] = NULL_CHAR;
+
+                    instance.escapedChars = new char[2];
+                    instance.escapedChars[0] = CHAR_ESCAPE;
+
+                    return instance;
+                }
+            }, new IReusableObjectFinalizer<EncodingBuffers>()
             {
-                sb.setLength(0);
-            }
-            charArrayRef = CHAR_ARRAY_REF_CACHE.poll();
-            if (charArrayRef == null)
-            {
-                charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
-            }
-            keyCharArrayRef = KEY_CHAR_ARRAY_REF_CACHE.poll();
-            if (keyCharArrayRef == null)
-            {
-                keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
-                keyCharArrayRef.ref[0] = NULL_CHAR;
-                keyCharArrayRef.ref[1] = NULL_CHAR;
-            }
-            escapedChars = CHAR_ARRAY_CACHE.poll();
-            if (escapedChars == null)
-            {
-                escapedChars = new char[2];
-                escapedChars[0] = CHAR_ESCAPE;
-            }
-        }
+                @Override
+                public void reset(EncodingBuffers instance)
+                {
+                    instance.sb.setLength(0);
+                }
+            });
+    
+    static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
+    {
+        final Map<String, IValue> putEntries = atomicChange.getPutEntries();
+        final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
+        final Set<String> subMapKeys = atomicChange.getSubMapKeys();
+
+        final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
+        final CharArrayReference charArrayRef = encodingBuffers.charArrayRef;
+        final CharArrayReference keyCharArrayRef = encodingBuffers.keyCharArrayRef;
+        final char[] escapedChars = encodingBuffers.escapedChars;
+        final StringBuilder sb = encodingBuffers.sb;
+
         try
         {
             sb.append(preamble);
@@ -448,17 +451,33 @@ public class StringProtocolCodec implements ICodec<char[]>
                     addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb, charArrayRef, escapedChars, keyCharArrayRef);
                 }
             }
-            return sb.toString().getBytes(charSet);
+            
+            if (charSet == GZipProtocolCodec.ISO_8859_1)
+            {
+                // NOTE: this is less expensive than String.getBytes(Charset) which creates 2x
+                // arrays during encoding
+                final int length = sb.length();
+                if (charArrayRef.ref.length < length)
+                {
+                    charArrayRef.ref = new char[length];
+                }
+                sb.getChars(0, length, charArrayRef.ref, 0);
+                final byte[] bytes = new byte[length];
+                final char[] ref = charArrayRef.ref;
+                for (int i = 0; i < length; i++)
+                {
+                    bytes[i] = (byte) ref[i];
+                }
+                return bytes;
+            }
+            else
+            {
+                return sb.toString().getBytes(charSet);
+            }
         }
         finally
         {
-            synchronized (BUILDER_CACHE)
-            {
-                BUILDER_CACHE.push(sb);
-                CHAR_ARRAY_CACHE.push(escapedChars);
-                CHAR_ARRAY_REF_CACHE.push(charArrayRef);
-                KEY_CHAR_ARRAY_REF_CACHE.push(keyCharArrayRef);
-            }
+            ENCODING_BUFFERS.offer(encodingBuffers);
         }
     }
 
