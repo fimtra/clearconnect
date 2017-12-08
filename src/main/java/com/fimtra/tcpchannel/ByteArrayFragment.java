@@ -18,6 +18,9 @@ package com.fimtra.tcpchannel;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
+import com.fimtra.util.ReusableObjectPool;
+import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
+import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
 import com.fimtra.util.is;
 
 /**
@@ -34,6 +37,23 @@ import com.fimtra.util.is;
 class ByteArrayFragment
 {
     static final Charset UTF8 = Charset.forName("UTF-8");
+
+    static ReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL = new ReusableObjectPool<ByteArrayFragment>(
+        "ByteArrayFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
+        {
+            @Override
+            public ByteArrayFragment newInstance()
+            {
+                return new ByteArrayFragment();
+            }
+        }, new IReusableObjectFinalizer<ByteArrayFragment>()
+        {
+            @Override
+            public void reset(ByteArrayFragment instance)
+            {
+                instance.initialise(-1, -1, (byte) -1, null, -1, -1);
+            }
+        });
 
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
@@ -138,7 +158,7 @@ class ByteArrayFragment
         final int sequenceId = rxData.getInt();
         final byte lastElement = rxData.get();
 
-        return new ByteArrayFragment(id, sequenceId, lastElement, rxData.array(), rxData.position(),
+        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(), rxData.position(),
             rxData.limit() - rxData.position());
     }
 
@@ -169,7 +189,7 @@ class ByteArrayFragment
         final int sequenceId = parts[1];
         final byte lastElement = (byte) parts[2];
 
-        return new ByteArrayFragment(id, sequenceId, lastElement, rxData.array(), rxData.position(),
+        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(), rxData.position(),
             rxData.limit() - rxData.position());
     }
 
@@ -180,13 +200,12 @@ class ByteArrayFragment
     int sequenceId;
     byte[] data;
 
-    ByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
+    ByteArrayFragment()
     {
         super();
-        initialise(id, sequenceId, lastElement, data, offset, len);
     }
 
-    final void initialise(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
+    final ByteArrayFragment initialise(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
         this.id = id;
         this.sequenceId = sequenceId;
@@ -194,6 +213,7 @@ class ByteArrayFragment
         this.data = data;
         this.offset = offset;
         this.length = len;
+        return this;
     }
 
     /**
@@ -271,5 +291,10 @@ class ByteArrayFragment
     {
         return getClass().getSimpleName() + " [id=" + this.id + ", sequenceId=" + this.sequenceId + ", lastElement="
             + this.lastElement + ", data=" + this.length + "]";
+    }
+
+    void free()
+    {
+        ByteArrayFragment.BYTE_ARRAY_FRAGMENT_POOL.offer(this);        
     }
 }

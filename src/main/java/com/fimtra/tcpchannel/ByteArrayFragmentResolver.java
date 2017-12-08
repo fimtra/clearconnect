@@ -132,8 +132,10 @@ abstract class ByteArrayFragmentResolver
                     else
                     {
                         resolvedData = current.merge(fragment).getData();
+                        current.free();
                     }
                 }
+                fragment.free();
             }
             else
             {
@@ -148,6 +150,7 @@ abstract class ByteArrayFragmentResolver
                 else
                 {
                     current.merge(fragment);
+                    fragment.free();
                 }
             }
             return resolvedData;

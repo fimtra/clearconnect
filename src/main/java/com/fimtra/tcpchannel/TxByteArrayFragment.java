@@ -89,7 +89,8 @@ final class TxByteArrayFragment extends ByteArrayFragment
 
     TxByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
-        super(id, sequenceId, lastElement, data, offset, len);
+        super();
+        initialise(id, sequenceId, lastElement, data, offset, len);
         this.header = new byte[9];
         this.txDataWithHeader = new ByteBuffer[2];
         this.txDataWithHeader[0] = ByteBuffer.wrap(this.header, 0, this.header.length);
