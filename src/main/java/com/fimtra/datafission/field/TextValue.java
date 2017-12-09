@@ -18,7 +18,7 @@ package com.fimtra.datafission.field;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.CharSubArrayKeyedPool;
-import com.fimtra.util.ObjectPool;
+import com.fimtra.util.KeyedObjectPool;
 import com.fimtra.util.is;
 
 /**
@@ -30,16 +30,16 @@ import com.fimtra.util.is;
  */
 public final class TextValue extends AbstractValue
 {
-    static final ObjectPool<TextValue> pool = new ObjectPool<TextValue>("TextValues",
+    static final KeyedObjectPool<String, TextValue> pool = new KeyedObjectPool<String, TextValue>("TextValues",
         DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE);
 
     static final CharSubArrayKeyedPool<TextValue> charSubArraysPool = new CharSubArrayKeyedPool<TextValue>(
         "TextValues-charSubArrays", DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE, pool)
     {
         @Override
-        public TextValue newInstance(char[] chars, int offset, int count)
+        public TextValue newInstance(String string)
         {
-            return new TextValue(new String(chars, offset, count));
+            return new TextValue(string);
         }
     };
 
@@ -57,7 +57,12 @@ public final class TextValue extends AbstractValue
     {
         if (value != null && value.length() <= DataFissionProperties.Values.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL)
         {
-            return pool.intern(new TextValue(value));
+            final TextValue textValue = pool.get(value);
+            if (textValue != null)
+            {
+                return textValue;
+            }
+            return pool.intern(value, new TextValue(value));
         }
         return new TextValue(value);
     }

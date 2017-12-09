@@ -25,9 +25,9 @@ public abstract class CharSubArrayKeyedPool<T>
     /** The pool of objects keyed by the {@link CharSubArray} */
     final KeyedObjectPool<CharSubArray, T> pool;
     /** Reference to the backing object pool that holds the objects */
-    final ObjectPool<T> objectPool;
+    final KeyedObjectPool<String, T> objectPool;
 
-    public CharSubArrayKeyedPool(String name, int poolSize, ObjectPool<T> objectPool)
+    public CharSubArrayKeyedPool(String name, int poolSize, KeyedObjectPool<String, T> objectPool)
     {
         this.pool = new KeyedObjectPool<CharSubArray, T>(name, poolSize);
         this.objectPool = objectPool;
@@ -43,7 +43,8 @@ public abstract class CharSubArrayKeyedPool<T>
         T object = this.pool.get(charArrRef);
         if (object == null)
         {
-            object = this.objectPool.intern(newInstance(chars, offset, count));
+            final String string = new String(chars, offset, count);
+            object = this.objectPool.intern(string, newInstance(string));
             // VERY IMPORTANT make a new, exact size, copy of the char array
             final char[] charArray = new char[count];
             System.arraycopy(chars, offset, charArray, 0, count);
@@ -52,5 +53,5 @@ public abstract class CharSubArrayKeyedPool<T>
         return object;
     }
 
-    public abstract T newInstance(char[] chars, int offset, int count);
+    public abstract T newInstance(String string);
 }
