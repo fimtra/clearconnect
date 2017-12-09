@@ -48,7 +48,7 @@ public abstract class AbstractValue implements IValue
         switch(type)
         {
             case DOUBLE:
-                return new DoubleValue(Double.longBitsToDouble(buffer.getLong()));
+                return DoubleValue.valueOf(Double.longBitsToDouble(buffer.getLong()));
             case LONG:
                 return LongValue.valueOf(buffer.getLong());
             case TEXT:

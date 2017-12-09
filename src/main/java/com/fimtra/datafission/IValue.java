@@ -58,7 +58,7 @@ public interface IValue extends Comparable<IValue>
             switch(this)
             {
                 case DOUBLE:
-                    return new DoubleValue(Double.parseDouble(value));
+                    return DoubleValue.valueOf(Double.parseDouble(value));
                 case LONG:
                     return LongValue.valueOf(Long.parseLong(value));
                 case TEXT:

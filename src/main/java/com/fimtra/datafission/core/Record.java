@@ -337,7 +337,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public IValue put(String key, double value)
     {
-        return put(key, new DoubleValue(value));
+        return put(key, DoubleValue.valueOf(value));
     }
 
     /**
