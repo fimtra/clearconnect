@@ -32,8 +32,6 @@ import java.util.zip.GZIPOutputStream;
  */
 public abstract class GZipUtils
 {
-    private static final byte[] LENGTH_PLACEHOLDER = new byte[] { 0, 0, 0, 0 };
-
     /**
      * Provides access to the internal byte[]
      * 
@@ -63,19 +61,12 @@ public abstract class GZipUtils
         {
             final ByteArrayOutputStreamExtension outStream =
                 new ByteArrayOutputStreamExtension(uncompressedData.length);
-            // placeholder for the size
-            outStream.write(LENGTH_PLACEHOLDER, 0, 4);
             GZIPOutputStream gZipOut = new GZIPOutputStream(outStream);
-            try
-            {
-                gZipOut.write(uncompressedData);
-            }
-            finally
-            {
-                gZipOut.close();
-            }
-            final byte[] compressedData = outStream.getBuffer();
+            gZipOut.write(uncompressedData);
+            gZipOut.close();
+            byte[] compressedData = new byte[outStream.size() + 4];
             ByteBuffer.wrap(compressedData).putInt(uncompressedData.length);
+            System.arraycopy(outStream.getBuffer(), 0, compressedData, 4, outStream.size());
             return compressedData;
         }
         catch (IOException e)
