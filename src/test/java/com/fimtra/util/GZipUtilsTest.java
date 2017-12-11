@@ -60,6 +60,7 @@ public class GZipUtilsTest
         final String s = sb.toString();
         final byte[] zipped = GZipUtils.compress(s.getBytes());
         System.err.println("Zipped []=" + zipped.length + ", original=" + s.length());
+        assertTrue("Zipped []=" + zipped.length + ", original=" + s.length(), zipped.length < s.length());
         final byte[] unzipped = GZipUtils.uncompress(zipped);
         assertEquals(s, new String(unzipped));
     }
