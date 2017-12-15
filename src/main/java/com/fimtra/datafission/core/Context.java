@@ -240,7 +240,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     instance.initialise(null, null, null, -1, null, null);
                 }
-            }, DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE);
+            }, DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE, ReusableObjectPool.MULTI_THREADED);
 
     /**
      * Noop implementation

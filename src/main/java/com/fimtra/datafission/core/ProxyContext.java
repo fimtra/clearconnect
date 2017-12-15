@@ -329,7 +329,7 @@ public final class ProxyContext implements IObserverContext
             (permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN : permissionToken);
         return permissionAndRecords;
     }
-    
+
     /**
      * Handles RPC results
      * 
@@ -493,19 +493,28 @@ public final class ProxyContext implements IObserverContext
     }
 
     /**
-     * Handles the received TCP frame data. If the data is an atomic change, this will be passed
-     * to a {@link RxAtomicChangeHandler}
+     * Handles the received TCP frame data. If the data is an atomic change, this will be passed to
+     * a {@link RxAtomicChangeHandler}
      * 
      * @author Ramon Servadei
      */
     private static final class RxFrameHandler implements ISequentialRunnable
     {
+        final RxAtomicChangeHandler atomicChangeHandler;
         byte[] data;
         ITransportChannel source;
+        ProxyContext proxyContext;
         ProxyContextReceiver receiver;
 
         RxFrameHandler()
         {
+            this.atomicChangeHandler = new RxAtomicChangeHandler(this);
+        }
+
+        void clear()
+        {
+            initialise(null, null, null);
+            this.atomicChangeHandler.initialise(null, null, null);
         }
 
         RxFrameHandler initialise(byte[] data, ITransportChannel source, ProxyContextReceiver receiver)
@@ -513,53 +522,56 @@ public final class ProxyContext implements IObserverContext
             this.data = data;
             this.source = source;
             this.receiver = receiver;
+            if(this.receiver != null)
+            {
+                this.proxyContext = receiver.proxyContext;
+            }
             return this;
         }
 
         @Override
         public void run()
         {
+            boolean onDataReceivedCalled = false;
             try
             {
                 if (this.receiver.codecSyncExpected)
                 {
                     final SyncResponse response =
-                        this.receiver.proxyContext.codec.getSessionProtocol().handleSessionSyncData(this.data);
+                        this.proxyContext.codec.getSessionProtocol().handleSessionSyncData(this.data);
                     if (!response.syncFailed)
                     {
-                        Log.log(this.receiver.proxyContext, "(<-) SYNC RESP ", ObjectUtils.safeToString(this.source));
+                        Log.log(this.proxyContext, "(<-) SYNC RESP ", ObjectUtils.safeToString(this.source));
                         if (response.syncDataResponse != null)
                         {
                             this.receiver.localChannelRef.send(response.syncDataResponse);
-                            Log.log(this.receiver.proxyContext, "(->) SYNC RESP ",
-                                ObjectUtils.safeToString(this.source));
+                            Log.log(this.proxyContext, "(->) SYNC RESP ", ObjectUtils.safeToString(this.source));
                         }
                         if (response.syncComplete)
                         {
                             this.receiver.codecSyncExpected = false;
-                            Log.log(this.receiver.proxyContext, "SESSION SYNCED ",
-                                ObjectUtils.safeToString(this.source));
-                            this.receiver.proxyContext.onChannelConnected();
+                            Log.log(this.proxyContext, "SESSION SYNCED ", ObjectUtils.safeToString(this.source));
+                            this.proxyContext.onChannelConnected();
                         }
                     }
                     else
                     {
                         final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(this.source);
-                        Log.log(this.receiver.proxyContext, reason, new IllegalStateException(reason));
-                        this.receiver.proxyContext.destroy();
+                        Log.log(this.proxyContext, reason, new IllegalStateException(reason));
+                        this.proxyContext.destroy();
                     }
                     return;
                 }
 
                 try
                 {
-                    this.receiver.proxyContext.onDataReceived(this);
+                    onDataReceivedCalled = this.proxyContext.onDataReceived(this);
                 }
                 catch (IncorrectSequenceException e)
                 {
                     final String recordName = ProxyContext.substituteLocalNameWithRemoteName(
                         AtomicChangeTeleporter.getRecordName(e.recordName));
-                    if (this.receiver.proxyContext.resync(recordName))
+                    if (this.proxyContext.resync(recordName))
                     {
                         Log.log(this.receiver,
                             "Resync of " + recordName + " started due to error processing received change", e);
@@ -574,30 +586,36 @@ public final class ProxyContext implements IObserverContext
             }
             finally
             {
-                RX_FRAME_HANDLER_POOL.offer(this);
+                if (!onDataReceivedCalled)
+                {
+                    RX_FRAME_HANDLER_POOL.offer(this);
+                }
             }
         }
 
         @Override
         public Object context()
         {
-            return this.receiver.proxyContext.getName();
+            return this.proxyContext.getName();
         }
     }
 
     /**
-     * Handles a single {@link IRecordChange}
+     * Handles a single {@link IRecordChange} created from a recieved frame decoded from a
+     * {@link RxFrameHandler}
      * 
      * @author Ramon Servadei
      */
     private final static class RxAtomicChangeHandler implements ISequentialRunnable
     {
+        final RxFrameHandler frameHandler;
         String changeName;
         ProxyContext proxyContext;
         IRecordChange changeToApply;
 
-        RxAtomicChangeHandler()
+        RxAtomicChangeHandler(RxFrameHandler rxFrameHandler)
         {
+            this.frameHandler = rxFrameHandler;
         }
 
         RxAtomicChangeHandler initialise(String changeName, IRecordChange changeToApply, ProxyContext proxyContext)
@@ -696,7 +714,7 @@ public final class ProxyContext implements IObserverContext
             }
             finally
             {
-                RX_ATOMIC_CHANGE_HANDLER_POOL.offer(this);
+                RX_FRAME_HANDLER_POOL.offer(this.frameHandler);
             }
         }
 
@@ -709,24 +727,6 @@ public final class ProxyContext implements IObserverContext
 
     // todo property control the size
     private static final int POOL_SIZE = DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE;
-
-    static final ReusableObjectPool<RxAtomicChangeHandler> RX_ATOMIC_CHANGE_HANDLER_POOL =
-        new ReusableObjectPool<RxAtomicChangeHandler>("ProxyContext-RxAtomicChangeHandlerPool",
-            new IReusableObjectBuilder<RxAtomicChangeHandler>()
-            {
-                @Override
-                public RxAtomicChangeHandler newInstance()
-                {
-                    return new RxAtomicChangeHandler();
-                }
-            }, new IReusableObjectFinalizer<RxAtomicChangeHandler>()
-            {
-                @Override
-                public void reset(RxAtomicChangeHandler instance)
-                {
-                    instance.initialise(null, null, null);
-                }
-            }, POOL_SIZE);
 
     static final ReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL = new ReusableObjectPool<RxFrameHandler>(
         "ProxyContext-RxFrameHandlerPool", new IReusableObjectBuilder<RxFrameHandler>()
@@ -741,11 +741,10 @@ public final class ProxyContext implements IObserverContext
             @Override
             public void reset(RxFrameHandler instance)
             {
-                instance.initialise(null, null, null);
+                instance.clear();
             }
-        }, POOL_SIZE);
-    
-    
+        }, POOL_SIZE, ReusableObjectPool.MULTI_THREADED);
+
     final Object lock;
     volatile boolean active;
     volatile boolean connected;
@@ -861,7 +860,7 @@ public final class ProxyContext implements IObserverContext
         this.codec = codec;
         this.sessionContextName = sessionContextName;
         this.rpcTemplates = new ConcurrentHashMap<String, RpcInstance>();
-     
+
         this.sessionListener = new ISessionListener()
         {
             @Override
@@ -1347,7 +1346,7 @@ public final class ProxyContext implements IObserverContext
         }
     }
 
-    void onDataReceived(RxFrameHandler frameHandler) throws IncorrectSequenceException
+    boolean onDataReceived(RxFrameHandler frameHandler) throws IncorrectSequenceException
     {
         final IRecordChange changeToApply =
             this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(frameHandler.data));
@@ -1359,7 +1358,7 @@ public final class ProxyContext implements IObserverContext
 
         if (changeToApply == null)
         {
-            return;
+            return false;
         }
 
         // peek at the size before attempting the synchronize block
@@ -1388,7 +1387,7 @@ public final class ProxyContext implements IObserverContext
                 handleSubscribeResult(changeToApply, changeName, subscribeResult);
 
                 // EARLY RETURN
-                return;
+                return false;
             }
             else if (changeName.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0))
             {
@@ -1396,12 +1395,13 @@ public final class ProxyContext implements IObserverContext
                 this.context.executeRpcTask(new RpcResultHandler(changeToApply, changeName));
 
                 // EARLY RETURN
-                return;
+                return false;
             }
         }
 
-        executeSequentialCoreTask(RX_ATOMIC_CHANGE_HANDLER_POOL.get().initialise(changeName, changeToApply, this));
+        executeSequentialCoreTask(frameHandler.atomicChangeHandler.initialise(changeName, changeToApply, this));
 
+        return true;
     }
 
     private void handleSubscribeResult(final IRecordChange changeToApply, final String changeName,

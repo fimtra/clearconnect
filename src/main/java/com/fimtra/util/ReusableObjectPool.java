@@ -19,12 +19,17 @@ import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A pool of re-usable objects.
  * <p>
- * Thread-safe and equal by object reference.
+ * The pool is constructed with an {@link IThreadLogic} instance which determines whether it is
+ * thread-safe.
  * 
+ * @see #SINGLE_THREADED
+ * @see #MULTI_THREADED
  * @author Ramon Servadei
  */
 public final class ReusableObjectPool<T>
@@ -50,6 +55,82 @@ public final class ReusableObjectPool<T>
     {
         void reset(T instance);
     }
+
+    /**
+     * Encapsulates threading logic for accessing a pool.
+     * 
+     * @author Ramon Servadei
+     */
+    private static interface IThreadLogic
+    {
+        <T> T get(ReusableObjectPool<T> target);
+
+        <T> void offer(ReusableObjectPool<T> target, T instance);
+    }
+
+    /**
+     * No thread-safety, used for pools that are only accessed by a single thread.
+     */
+    public static final IThreadLogic SINGLE_THREADED = new IThreadLogic()
+    {
+        @Override
+        public <T> T get(ReusableObjectPool<T> target)
+        {
+            final T instance = target.doGet();
+            if (instance != null)
+            {
+                return instance;
+            }
+            return target.builder.newInstance();
+        }
+
+        @Override
+        public <T> void offer(ReusableObjectPool<T> target, T instance)
+        {
+            target.finalizer.reset(instance);
+            target.doOffer(instance);
+        }
+    };
+
+    /**
+     * Provides thread-safe multi-thread access to a pool.
+     */
+    public static final IThreadLogic MULTI_THREADED = new IThreadLogic()
+    {
+        @Override
+        public <T> T get(ReusableObjectPool<T> target)
+        {
+            target.lock.lock();
+            try
+            {
+                final T instance = target.doGet();
+                if (instance != null)
+                {
+                    return instance;
+                }
+            }
+            finally
+            {
+                target.lock.unlock();
+            }
+            return target.builder.newInstance();
+        }
+
+        @Override
+        public <T> void offer(ReusableObjectPool<T> target, T instance)
+        {
+            target.finalizer.reset(instance);
+            target.lock.lock();
+            try
+            {
+                target.doOffer(instance);
+            }
+            finally
+            {
+                target.lock.unlock();
+            }
+        }
+    };
 
     final static List<WeakReference<ReusableObjectPool<?>>> pools =
         new LowGcLinkedList<WeakReference<ReusableObjectPool<?>>>();
@@ -82,41 +163,46 @@ public final class ReusableObjectPool<T>
         }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
     }
 
+    final Lock lock;
+    final IReusableObjectBuilder<T> builder;
+    final IReusableObjectFinalizer<T> finalizer;
     private final String name;
-    private final LowGcLinkedList<T> pool;
-    private final int maxSize;
-    private final IReusableObjectBuilder<T> builder;
-    private final IReusableObjectFinalizer<T> finalizer;
+    private final IThreadLogic threadLogic;
     private final WeakReference<ReusableObjectPool<?>> weakRef;
+    private final Object[] pool;
 
-    /**
-     * Construct with unlimited size
-     */
-    public ReusableObjectPool(String name, IReusableObjectBuilder<T> builder, IReusableObjectFinalizer<T> finalizer)
-    {
-        this(name, builder, finalizer, 0);
-    }
+    private int highest;
+    private int poolPtr;
 
     public ReusableObjectPool(String name, IReusableObjectBuilder<T> builder, IReusableObjectFinalizer<T> finalizer,
-        int maxSize)
+        int maxSize, IThreadLogic threadLogic)
     {
         this.name = name;
-        this.maxSize = maxSize;
-        this.pool = new LowGcLinkedList<T>(maxSize);
+        this.pool = new Object[maxSize];
         this.builder = builder;
         this.finalizer = finalizer;
+        this.lock = new ReentrantLock();
         this.weakRef = new WeakReference<ReusableObjectPool<?>>(this);
         synchronized (pools)
         {
             pools.add(this.weakRef);
         }
+        this.threadLogic = threadLogic;
     }
 
     public final void destroy()
     {
-        synchronized (this)
+        this.lock.lock();
+        try
         {
-            this.pool.clear();
+            for (int i = 0; i < this.pool.length; i++)
+            {
+                this.pool[i] = null;
+            }
+        }
+        finally
+        {
+            this.lock.unlock();
         }
 
         synchronized (pools)
@@ -130,16 +216,7 @@ public final class ReusableObjectPool<T>
      */
     public T get()
     {
-        final T instance;
-        synchronized (this)
-        {
-            instance = this.pool.poll();
-        }
-        if (instance != null)
-        {
-            return instance;
-        }
-        return this.builder.newInstance();
+        return this.threadLogic.get(this);
     }
 
     /**
@@ -151,20 +228,53 @@ public final class ReusableObjectPool<T>
      */
     public void offer(T instance)
     {
-        this.finalizer.reset(instance);
-        synchronized (this)
-        {
-            if (this.maxSize == 0 || this.pool.size < this.maxSize)
-            {
-                this.pool.addLast(instance);
-            }
-        }
+        this.threadLogic.offer(this, instance);
+    }
+
+    public int getSize()
+    {
+        return this.pool.length;
     }
 
     @Override
     public String toString()
     {
-        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.pool.size() + "/"
-            + (this.maxSize == 0 ? "inf" : Integer.toString(this.maxSize)) + "]";
+        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.poolPtr + "/" + this.highest + "/"
+            + (this.pool.length) + "]";
+    }
+
+    void doOffer(T instance)
+    {
+        if (this.pool[this.poolPtr] == null)
+        {
+            this.pool[this.poolPtr] = instance;
+        }
+        else
+        {
+            if (this.poolPtr < this.pool.length - 2)
+            {
+                this.pool[++this.poolPtr] = (instance);
+            }
+            if (this.poolPtr > this.highest)
+            {
+                this.highest = this.poolPtr;
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    T doGet()
+    {
+        final T instance = (T) this.pool[this.poolPtr];
+        if (instance != null)
+        {
+            this.pool[this.poolPtr] = null;
+            if (this.poolPtr != 0)
+            {
+                this.poolPtr--;
+            }
+            return instance;
+        }
+        return null;
     }
 }

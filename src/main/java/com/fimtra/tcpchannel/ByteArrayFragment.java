@@ -38,22 +38,23 @@ class ByteArrayFragment
 {
     static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static ReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL = new ReusableObjectPool<ByteArrayFragment>(
-        "ByteArrayFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
-        {
-            @Override
-            public ByteArrayFragment newInstance()
+    static final ReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
+        new ReusableObjectPool<ByteArrayFragment>("ByteArrayFragmentPool",
+            new IReusableObjectBuilder<ByteArrayFragment>()
             {
-                return new ByteArrayFragment();
-            }
-        }, new IReusableObjectFinalizer<ByteArrayFragment>()
-        {
-            @Override
-            public void reset(ByteArrayFragment instance)
+                @Override
+                public ByteArrayFragment newInstance()
+                {
+                    return new ByteArrayFragment();
+                }
+            }, new IReusableObjectFinalizer<ByteArrayFragment>()
             {
-                instance.initialise(-1, -1, (byte) -1, null, -1, -1);
-            }
-        });
+                @Override
+                public void reset(ByteArrayFragment instance)
+                {
+                    instance.initialise(-1, -1, (byte) -1, null, -1, -1);
+                }
+            }, 32, ReusableObjectPool.SINGLE_THREADED);
 
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
@@ -295,6 +296,6 @@ class ByteArrayFragment
 
     void free()
     {
-        ByteArrayFragment.BYTE_ARRAY_FRAGMENT_POOL.offer(this);        
+        ByteArrayFragment.BYTE_ARRAY_FRAGMENT_POOL.offer(this);
     }
 }
