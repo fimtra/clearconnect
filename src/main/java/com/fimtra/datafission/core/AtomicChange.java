@@ -260,9 +260,9 @@ public final class AtomicChange implements IRecordChange
     @Override
     public void coalesce(List<IRecordChange> subsequentChanges)
     {
-        final Map<String, IValue> putEntries = new HashMap<String, IValue>();
-        final Map<String, IValue> overwrittenEntries = new HashMap<String, IValue>();
-        final Map<String, IValue> removedEntries = new HashMap<String, IValue>();
+        final Map<String, IValue> putEntries = CollectionUtils.newMap();
+        final Map<String, IValue> overwrittenEntries = CollectionUtils.newMap();
+        final Map<String, IValue> removedEntries = CollectionUtils.newMap();
         final Set<String> ultimatelyRemovedKeys = new HashSet<String>();
         final Set<String> ultimatelyAddedKeys = new HashSet<String>();
         Map<String, IValue> newPutEntries;
@@ -483,7 +483,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.putEntries == null)
             {
-                this.putEntries = new HashMap<String, IValue>();
+                this.putEntries = CollectionUtils.newMap();
             }
             return this.putEntries;
         }
@@ -499,7 +499,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.removedEntries == null)
             {
-                this.removedEntries = new HashMap<String, IValue>();
+                this.removedEntries = CollectionUtils.newMap();
             }
             return this.removedEntries;
         }
@@ -515,7 +515,7 @@ public final class AtomicChange implements IRecordChange
         {
             if (this.overwrittenEntries == null)
             {
-                this.overwrittenEntries = new HashMap<String, IValue>();
+                this.overwrittenEntries = CollectionUtils.newMap();
             }
             return this.overwrittenEntries;
         }

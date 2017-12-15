@@ -200,7 +200,7 @@ public final class ContextUtils
     final static RollingFileAppender statisticsLog =
         RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
 
-    static Map<Object, TaskStatistics> coreStats;
+    static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
     static
     {
         try
