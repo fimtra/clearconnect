@@ -200,6 +200,7 @@ public final class ContextUtils
     final static RollingFileAppender statisticsLog =
         RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
 
+    static Map<Object, TaskStatistics> coreStats;
     static
     {
         try
@@ -218,7 +219,6 @@ public final class ContextUtils
             @Override
             public void run()
             {
-
                 final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
@@ -227,8 +227,14 @@ public final class ContextUtils
                     sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
                         " coalescing queue, ").append(getStats(thimbleExecutor.getCoalescingTaskStatistics())).append(
                             SystemUtils.lineSeparator());
+                    final Map<Object, TaskStatistics> sequentialTaskStatistics =
+                        thimbleExecutor.getSequentialTaskStatistics();
+                    if (thimbleExecutor == CORE_EXECUTOR)
+                    {
+                        coreStats = sequentialTaskStatistics;
+                    }
                     sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
-                        " sequential queue, ").append(getStats(thimbleExecutor.getSequentialTaskStatistics())).append(
+                        " sequential queue, ").append(getStats(sequentialTaskStatistics)).append(
                             SystemUtils.lineSeparator());
                 }
                 try
@@ -272,7 +278,7 @@ public final class ContextUtils
      */
     public static long[] getCoreStats()
     {
-        final TaskStatistics stats = CORE_EXECUTOR.getSequentialTaskStatistics().get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+        final TaskStatistics stats = coreStats.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
         final long totalSubmitted = stats.getTotalSubmitted();
         final long totalExecuted = stats.getTotalExecuted();
         return new long[] { (totalSubmitted - totalExecuted), totalSubmitted, totalExecuted };
