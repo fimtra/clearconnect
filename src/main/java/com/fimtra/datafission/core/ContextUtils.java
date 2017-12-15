@@ -197,7 +197,6 @@ public final class ContextUtils
     final static ScheduledExecutorService UTILITY_SCHEDULER =
         ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    final static Map<Object, TaskStatistics> coreSequentialStats = CORE_EXECUTOR.getSequentialTaskStatistics();
     final static RollingFileAppender statisticsLog =
         RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
 
@@ -273,7 +272,7 @@ public final class ContextUtils
      */
     public static long[] getCoreStats()
     {
-        final TaskStatistics stats = coreSequentialStats.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+        final TaskStatistics stats = CORE_EXECUTOR.getSequentialTaskStatistics().get(ThimbleExecutor.QUEUE_LEVEL_STATS);
         final long totalSubmitted = stats.getTotalSubmitted();
         final long totalExecuted = stats.getTotalExecuted();
         return new long[] { (totalSubmitted - totalExecuted), totalSubmitted, totalExecuted };
