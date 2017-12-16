@@ -27,6 +27,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,6 +49,7 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
+import com.fimtra.util.ByteBufferUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
@@ -72,9 +74,9 @@ public class TestTcpServer
         }
 
         @Override
-        public void onDataReceived(byte[] data, ITransportChannel source)
+        public void onDataReceived(ByteBuffer data, ITransportChannel source)
         {
-            source.send(data);
+            source.send(ByteBufferUtils.asBytes(data));
         }
 
         @Override
@@ -96,7 +98,7 @@ public class TestTcpServer
         }
 
         @Override
-        public void onDataReceived(byte[] data, ITransportChannel source)
+        public void onDataReceived(ByteBuffer data, ITransportChannel source)
         {
         }
 
@@ -281,9 +283,9 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received1.add(new String(data));
+                received1.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -291,9 +293,9 @@ public class TestTcpServer
         final TcpChannel client2 = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received2.add(new String(data));
+                received2.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -349,7 +351,7 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
             }
         }, this.frameEncodingFormat);
@@ -378,7 +380,7 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
             }
         }, this.frameEncodingFormat);
@@ -401,7 +403,7 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
             }
         }, this.frameEncodingFormat);
@@ -422,9 +424,9 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received1.add(new String(data));
+                received1.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -453,9 +455,9 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received1.add(new String(data));
+                received1.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -463,9 +465,9 @@ public class TestTcpServer
         final TcpChannel client2 = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received2.add(new String(data));
+                received2.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -503,9 +505,9 @@ public class TestTcpServer
         final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received1.add(new String(data));
+                received1.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -513,9 +515,9 @@ public class TestTcpServer
         final TcpChannel client2 = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                received2.add(new String(data));
+                received2.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 latch.countDown();
             }
         }, this.frameEncodingFormat);
@@ -539,9 +541,9 @@ public class TestTcpServer
         this.server = new TcpServer(LOCALHOST, PORT, new NoopReceiver()
         {
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                int now = Integer.valueOf(new String(data)).intValue();
+                int now = Integer.valueOf(new String(data.array(), data.position(), data.limit() - data.position())).intValue();
                 if (last[0] + 1 != now)
                 {
                     throw new RuntimeException("Invalid sequence: last=" + last[0] + ", now=" + now);
@@ -635,9 +637,9 @@ public class TestTcpServer
             Map<ITransportChannel, Integer> lastValue = new HashMap<ITransportChannel, Integer>();
 
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                Integer now = Integer.valueOf(new String(data));
+                Integer now = Integer.valueOf(new String(data.array(), data.position(), data.limit() - data.position()));
 //                Integer then = this.lastValue.get(source);
 //                if (then == null)
 //                {
@@ -828,9 +830,9 @@ public class TestTcpServer
             }
 
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                dataRef.set(data);
+                dataRef.set(data.array());
                 dataLatch.countDown();
             }
 

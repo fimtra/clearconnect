@@ -18,6 +18,7 @@ package com.fimtra.datafission.core;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -166,7 +167,7 @@ public abstract class CodecBaseTest
 
         byte[] data = candidate.finalEncode(candidate.getTxMessageForAtomicChange(
             new AtomicChange("null overwritten entries", addedEntries, null, removedEntries)));
-        final IRecordChange changeFromRxData = candidate.getAtomicChangeFromRxMessage(data);
+        final IRecordChange changeFromRxData = candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(data));
         checkResults("null overwritten entries", addedEntries, removedEntries, changeFromRxData);
     }
 
@@ -261,7 +262,7 @@ public abstract class CodecBaseTest
         byte[] txMessageForRpc = constructCandidate.finalEncode(
             constructCandidate.getTxMessageForRpc("testRpc", args, "The result record name"));
 
-        IRecordChange rpcDetails = constructCandidate.getRpcFromRxMessage(constructCandidate.decode(txMessageForRpc));
+        IRecordChange rpcDetails = constructCandidate.getRpcFromRxMessage(constructCandidate.decode(ByteBuffer.wrap(txMessageForRpc)));
 
         Map<String, IValue> expected = new HashMap<String, IValue>();
         expected.put(RpcInstance.Remote.ARG_ + "0", TextValue.valueOf("lasers"));
@@ -281,7 +282,7 @@ public abstract class CodecBaseTest
         byte[] txMessageForRpc = constructCandidate.finalEncode(constructCandidate.getTxMessageForRpc(
             "testRpcDetailsEncodeDecodeWithSpecialCharacters", args, "The result record name\\||="));
 
-        IRecordChange rpcDetails = constructCandidate.getRpcFromRxMessage(constructCandidate.decode(txMessageForRpc));
+        IRecordChange rpcDetails = constructCandidate.getRpcFromRxMessage(constructCandidate.decode(ByteBuffer.wrap(txMessageForRpc)));
 
         Map<String, IValue> expected = new HashMap<String, IValue>();
         expected.put(RpcInstance.Remote.ARG_ + "0", TextValue.valueOf("lasers |\\="));
@@ -305,13 +306,13 @@ public abstract class CodecBaseTest
         Map<String, IValue> removedEntries)
     {
         IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(
-            this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(
-                new AtomicChange(name, putEntries, new HashMap<String, IValue>(), removedEntries))));
+            ByteBuffer.wrap(this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(
+                new AtomicChange(name, putEntries, new HashMap<String, IValue>(), removedEntries)))));
 
         // do it again to test codecs that send images
         changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(
-            this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(
-                new AtomicChange(name, putEntries, new HashMap<String, IValue>(), removedEntries))));
+            ByteBuffer.wrap(this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(
+                new AtomicChange(name, putEntries, new HashMap<String, IValue>(), removedEntries)))));
         return changeFromRxData;
     }
 
@@ -339,7 +340,7 @@ public abstract class CodecBaseTest
         }
         final byte[] txStringForChange =
             this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(atomicChange));
-        final IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(txStringForChange);
+        final IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txStringForChange));
 
         checkChanges(this.name, atomicChange, changeFromRxData);
     }
@@ -367,7 +368,7 @@ public abstract class CodecBaseTest
         }
         final byte[] txStringForChange =
             this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(atomicChange));
-        final IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(txStringForChange);
+        final IRecordChange changeFromRxData = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txStringForChange));
 
         checkChanges(this.name, atomicChange, changeFromRxData);
     }

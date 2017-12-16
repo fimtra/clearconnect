@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core.session;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.security.Key;
 
 import com.fimtra.util.AsymmetricCipher;
@@ -88,7 +89,7 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
     }
 
     @Override
-    public final SyncResponse handleSessionSyncData(byte[] data)
+    public final SyncResponse handleSessionSyncData(ByteBuffer data)
     {
         try
         {

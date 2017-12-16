@@ -33,11 +33,6 @@ public abstract class ChannelUtils
 
     public static final byte[] HEARTBEAT_SIGNAL = { 0x3 };
 
-    public static boolean isHeartbeatSignal(byte[] data)
-    {
-        return ChannelUtils.HEARTBEAT_SIGNAL.length == data.length && ChannelUtils.HEARTBEAT_SIGNAL[0] == data[0];
-    }
-
     /**
      * @see TransportTechnologyEnum#getNextAvailableServicePort()
      */

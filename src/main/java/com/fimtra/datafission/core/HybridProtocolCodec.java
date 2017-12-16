@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission.core;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
 import com.fimtra.datafission.ICodec;
@@ -49,7 +50,7 @@ public final class HybridProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    public IRecordChange getAtomicChangeFromRxMessage(byte[] data)
+    public IRecordChange getAtomicChangeFromRxMessage(ByteBuffer data)
     {
         throw new UnsupportedOperationException("Not supported anymore");
     }

@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission;
 
+import java.nio.ByteBuffer;
+
 import com.fimtra.datafission.core.session.ISessionListener;
 
 /**
@@ -99,7 +101,7 @@ public interface ISessionProtocol
      *            the data from the other end
      * @return a response
      */
-    SyncResponse handleSessionSyncData(byte[] data);
+    SyncResponse handleSessionSyncData(ByteBuffer data);
 
     /**
      * Destroy this instance
@@ -122,7 +124,7 @@ public interface ISessionProtocol
      *            the data to decode
      * @return the decoded data for the session
      */
-    byte[] decode(byte[] received);
+    ByteBuffer decode(ByteBuffer received);
 
     /**
      * Set the listener to receive callbacks about the session status

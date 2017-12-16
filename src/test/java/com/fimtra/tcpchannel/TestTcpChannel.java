@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -91,9 +92,9 @@ public class TestTcpChannel
         {
 
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                rxData.add(new String(data));
+                rxData.add(new String(data.array(), data.position(), data.limit() - data.position()));
                 if (rxData.size() == max)
                 {
                     latch.countDown();

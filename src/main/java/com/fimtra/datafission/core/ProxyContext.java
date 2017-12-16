@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +66,7 @@ import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
@@ -455,7 +457,7 @@ public final class ProxyContext implements IObserverContext
         }
 
         @Override
-        public void onDataReceived(final byte[] data, final ITransportChannel source)
+        public void onDataReceived(final ByteBuffer data, final ITransportChannel source)
         {
             // NOTE: channelToken is volatile so will slow message handling speed...but
             // there is no alternative - a local flag is not an option - setting it
@@ -501,7 +503,7 @@ public final class ProxyContext implements IObserverContext
     private static final class RxFrameHandler implements ISequentialRunnable
     {
         final RxAtomicChangeHandler atomicChangeHandler;
-        byte[] data;
+        ByteBuffer data;
         ITransportChannel source;
         ProxyContext proxyContext;
         ProxyContextReceiver receiver;
@@ -511,13 +513,7 @@ public final class ProxyContext implements IObserverContext
             this.atomicChangeHandler = new RxAtomicChangeHandler(this);
         }
 
-        void clear()
-        {
-            initialise(null, null, null);
-            this.atomicChangeHandler.initialise(null, null, null);
-        }
-
-        RxFrameHandler initialise(byte[] data, ITransportChannel source, ProxyContextReceiver receiver)
+        RxFrameHandler initialise(ByteBuffer data, ITransportChannel source, ProxyContextReceiver receiver)
         {
             this.data = data;
             this.source = source;
@@ -529,6 +525,15 @@ public final class ProxyContext implements IObserverContext
             return this;
         }
 
+        void clear()
+        {
+            this.data = null;
+            this.source = null;
+            this.receiver = null;
+            this.proxyContext = null;
+            this.atomicChangeHandler.initialise(null, null, null);
+        }
+        
         @Override
         public void run()
         {
@@ -588,9 +593,15 @@ public final class ProxyContext implements IObserverContext
             {
                 if (!onDataReceivedCalled)
                 {
-                    RX_FRAME_HANDLER_POOL.offer(this);
+                    free();
                 }
             }
+        }
+
+        void free()
+        {
+            ByteArrayPool.offer(this.data.array());
+            RX_FRAME_HANDLER_POOL.offer(this);
         }
 
         @Override
@@ -714,7 +725,7 @@ public final class ProxyContext implements IObserverContext
             }
             finally
             {
-                RX_FRAME_HANDLER_POOL.offer(this.frameHandler);
+                this.frameHandler.free();
             }
         }
 

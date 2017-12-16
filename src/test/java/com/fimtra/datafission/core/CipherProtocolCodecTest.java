@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
+import java.nio.ByteBuffer;
+
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 
@@ -37,9 +39,9 @@ public class CipherProtocolCodecTest extends StringProtocolCodecTest
             // todo bit of a cheat here - we use the codec to synchronise with itself
             final byte[] txMessageForCodecSync =
                 codec.getSessionProtocol().getSessionSyncStartMessage("CipherProtocolCodecTest");
-            SyncResponse response = codec.getSessionProtocol().handleSessionSyncData(txMessageForCodecSync);
-            response = codec.getSessionProtocol().handleSessionSyncData(response.syncDataResponse);
-            response = codec.getSessionProtocol().handleSessionSyncData(response.syncDataResponse);
+            SyncResponse response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(txMessageForCodecSync));
+            response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
+            response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         }
         catch (Exception e)
         {

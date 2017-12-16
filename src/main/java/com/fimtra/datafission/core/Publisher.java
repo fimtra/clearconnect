@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission.core;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -928,7 +929,7 @@ public class Publisher
                 }
 
                 @Override
-                public void onDataReceived(final byte[] data, final ITransportChannel source)
+                public void onDataReceived(final ByteBuffer data, final ITransportChannel source)
                 {
                     Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
                     {

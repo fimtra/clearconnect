@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -251,7 +252,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         byte[] txMessageForRpc =
                 this.candidate.finalEncode(this.candidate.getTxMessageForRpc("rpcException", new IValue[0],
                 "_RPC_rpcException:304189752:1405541086282:1"));
-        IRecordChange atomicChangeFromRxMessage = this.candidate.getAtomicChangeFromRxMessage(txMessageForRpc);
+        IRecordChange atomicChangeFromRxMessage = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForRpc));
         System.err.println(atomicChangeFromRxMessage);
         assertEquals("_RPC_rpcException:304189752:1405541086282:1",
             atomicChangeFromRxMessage.getPutEntries().get(RpcInstance.Remote.RESULT_RECORD_NAME).textValue());

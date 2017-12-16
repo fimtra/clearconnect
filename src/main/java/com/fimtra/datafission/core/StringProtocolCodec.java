@@ -213,13 +213,13 @@ public class StringProtocolCodec implements ICodec<char[]>
      * instance.
      * 
      * @param data
-     *            the received byte[] data
+     *            the received ByteBuffer
      * @return the converted change from the data
      * @throws RuntimeException
      *             if there is a problem converting
      */
     @Override
-    public IRecordChange getAtomicChangeFromRxMessage(byte[] data)
+    public IRecordChange getAtomicChangeFromRxMessage(ByteBuffer data)
     {
         return decodeAtomicChange(decode(data));
     }
@@ -888,9 +888,9 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public char[] decode(byte[] data)
+    public char[] decode(ByteBuffer data)
     {
-        return UTF8.decode(ByteBuffer.wrap(this.sessionSyncProtocol.decode(data))).array();
+        return UTF8.decode(this.sessionSyncProtocol.decode(data)).array();
     }
 
     @Override

@@ -16,6 +16,9 @@
 package com.fimtra.datafission.core.session;
 
 import static org.mockito.Mockito.*;
+
+import java.nio.ByteBuffer;
+
 import static org.junit.Assert.*;
 
 import org.junit.Before;
@@ -69,22 +72,22 @@ public class EncryptedSessionSyncProtocolTest
         final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(name.getMethodName());
 
         // NOTE: 4-way session sync for encrypted
-        SyncResponse response = this.publisherEnd.handleSessionSyncData(syncInit);
+        SyncResponse response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(syncInit));
         assertFalse(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNotNull(response.syncDataResponse);
 
-        response = this.proxyEnd.handleSessionSyncData(response.syncDataResponse);
+        response = this.proxyEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         assertFalse(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNotNull(response.syncDataResponse);
 
-        response = this.publisherEnd.handleSessionSyncData(response.syncDataResponse);
+        response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         assertTrue(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNotNull(response.syncDataResponse);
 
-        response = this.proxyEnd.handleSessionSyncData(response.syncDataResponse);
+        response = this.proxyEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         assertTrue(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNull(response.syncDataResponse);
@@ -103,17 +106,17 @@ public class EncryptedSessionSyncProtocolTest
 
         final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(name.getMethodName());
 
-        SyncResponse response = this.publisherEnd.handleSessionSyncData(syncInit);
+        SyncResponse response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(syncInit));
         assertFalse(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNotNull(response.syncDataResponse);
 
-        response = this.proxyEnd.handleSessionSyncData(response.syncDataResponse);
+        response = this.proxyEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         assertFalse(response.syncComplete);
         assertFalse(response.syncFailed);
         assertNotNull(response.syncDataResponse);
 
-        response = this.publisherEnd.handleSessionSyncData(response.syncDataResponse);
+        response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
         assertFalse(response.syncComplete);
         assertTrue(response.syncFailed);
         assertNotNull(response.syncDataResponse);

@@ -90,7 +90,7 @@ public abstract class GZipUtils
             final byte[] uncompressedData = new byte[uncompressedSize];
             final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
             final ByteArrayInputStream inStream =
-                new ByteArrayInputStream(compressedData, 4, compressedData.length - 4);
+                    new ByteArrayInputStream(compressedData, 4, compressedData.length - 4);
             final byte[] tempBuf = new byte[uncompressedSize > 1024 ? 1024 : uncompressedSize];
             GZIPInputStream gZipIn = new GZIPInputStream(inStream);
             try
@@ -102,6 +102,46 @@ public abstract class GZipUtils
                     buffer.position(buffer.position() + count);
                 }
                 return uncompressedData;
+            }
+            finally
+            {
+                gZipIn.close();
+            }
+        }
+        catch (IOException e)
+        {
+            Log.log(GZipUtils.class, "Could not uncompress data", e);
+            return null;
+        }
+    }
+    /**
+     * Unzip the data in the {@link ByteBuffer} that was compressed using {@link #compress(byte[])}
+     * 
+     * @see GZIPInputStream
+     * @return the uncompressed data, <code>null</code> if there was a problem
+     */
+    public static final ByteBuffer uncompress(ByteBuffer compressedData)
+    {
+        try
+        {
+            final int uncompressedSize = compressedData.getInt();
+            final byte[] uncompressedData = new byte[uncompressedSize];
+            final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
+            final ByteArrayInputStream inStream =
+                new ByteArrayInputStream(compressedData.array(), compressedData.position(),
+                    compressedData.limit() - compressedData.position());
+            final byte[] tempBuf = new byte[uncompressedSize > 1024 ? 1024 : uncompressedSize];
+            GZIPInputStream gZipIn = new GZIPInputStream(inStream);
+            try
+            {
+                int count = 0;
+                while ((count = gZipIn.read(tempBuf, 0, tempBuf.length)) != -1)
+                {
+                    System.arraycopy(tempBuf, 0, buffer.array(), buffer.position(), count);
+                    buffer.position(buffer.position() + count);
+                }
+                buffer.flip();
+                return buffer;
             }
             finally
             {

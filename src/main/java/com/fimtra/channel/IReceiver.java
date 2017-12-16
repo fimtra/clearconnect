@@ -15,6 +15,7 @@
  */
 package com.fimtra.channel;
 
+import java.nio.ByteBuffer;
 
 /**
  * The object that receives communication data from the remote end of a channel
@@ -39,7 +40,7 @@ public interface IReceiver
      * @param source
      *            the channel that sent the data. This can be used to send response data.
      */
-    void onDataReceived(byte[] data, ITransportChannel source);
+    void onDataReceived(ByteBuffer data, ITransportChannel source);
 
     /**
      * Called when a channel is closed

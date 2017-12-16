@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core.session;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.security.Key;
 
 import com.fimtra.datafission.ISessionProtocol;
@@ -80,7 +81,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
     }
 
     @Override
-    public SyncResponse handleSessionSyncData(byte[] data)
+    public SyncResponse handleSessionSyncData(ByteBuffer data)
     {
         try
         {
@@ -193,7 +194,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
     }
 
     @Override
-    public byte[] decode(byte[] received)
+    public ByteBuffer decode(ByteBuffer received)
     {
         return received;
     }

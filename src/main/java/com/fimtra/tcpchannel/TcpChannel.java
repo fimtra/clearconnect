@@ -211,7 +211,7 @@ public class TcpChannel implements ITransportChannel
     final ByteBuffer rxByteBuffer;
     final byte[] rxBytes;
     ByteBuffer[] readFrames = new ByteBuffer[10];
-    byte[][] resolvedFrames = new byte[10][];
+    ByteBuffer[] resolvedFrames = new ByteBuffer[10];
     final int[] readFramesSize = new int[1];
     final Queue<TxByteArrayFragment> txFrames = CollectionUtils.newDeque();
     final TxByteArrayFragment[][][] txFragmentsArrayPool = new TxByteArrayFragment[1][2][];
@@ -568,7 +568,7 @@ public class TcpChannel implements ITransportChannel
             this.readFrames = this.readerWriter.readFrames(this.rxByteBuffer, this.rxBytes, this.readFrames, this.readFramesSize);
             decodeFrames = System.nanoTime();
 
-            byte[] data;
+            ByteBuffer data;
             size = this.readFramesSize[0];
             int i = 0;
             int resolvedFramesSize = 0;
@@ -588,10 +588,13 @@ public class TcpChannel implements ITransportChannel
 
             for (i = 0; i < resolvedFramesSize; i++)
             {
-                switch(this.resolvedFrames[i].length)
+                // NOTE: we know that all ByteBuffers coming in here have position=0 
+                // (because they come from ByteArrayFragment.getData()
+                // so limit() is the length 
+                switch(this.resolvedFrames[i].limit())
                 {
                     case 1:
-                        if (ChannelUtils.isHeartbeatSignal(this.resolvedFrames[i]))
+                        if (ChannelUtils.HEARTBEAT_SIGNAL[0] == this.resolvedFrames[i].get(0))
                         {
                             ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
                             break;

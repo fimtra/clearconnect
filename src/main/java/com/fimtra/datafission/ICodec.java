@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.rmi.Remote;
 import java.util.List;
@@ -96,10 +97,10 @@ public interface ICodec<T>
 
     /**
      * @param data
-     *            the byte[] of the data holding an atomic change
+     *            the {@link ByteBuffer} holding an atomic change
      * @return the atomic change read from the decoded message
      */
-    IRecordChange getAtomicChangeFromRxMessage(byte[] data);
+    IRecordChange getAtomicChangeFromRxMessage(ByteBuffer data);
 
     /**
      * @return the message byte[] to send that represents an identity call (this identifies the
@@ -154,9 +155,9 @@ public interface ICodec<T>
     IRecordChange getRpcFromRxMessage(T decodedMessage);
 
     /**
-     * Decode the byte[] into the data object type
+     * Decode the ByteBuffer into the data object type
      */
-    T decode(byte[] rxMessage);
+    T decode(ByteBuffer rxMessage);
 
     /**
      * @return the frame encoding format for the wire protocol for this codec

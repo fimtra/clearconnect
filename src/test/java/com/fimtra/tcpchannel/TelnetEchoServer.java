@@ -15,6 +15,8 @@
  */
 package com.fimtra.tcpchannel;
 
+import java.nio.ByteBuffer;
+
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpServer;
@@ -33,9 +35,9 @@ public class TelnetEchoServer
         {
 
             @Override
-            public void onDataReceived(byte[] data, ITransportChannel source)
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
             {
-                source.send(("\r\n(" + new String(data) + ")").getBytes());
+                source.send(("\r\n(" + new String(data.array(), data.position(), data.limit() - data.position()) + ")").getBytes());
             }
 
             @Override

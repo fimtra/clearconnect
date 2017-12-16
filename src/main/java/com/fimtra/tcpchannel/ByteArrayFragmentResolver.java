@@ -60,7 +60,7 @@ abstract class ByteArrayFragmentResolver
     static final class RawByteHeaderByteArrayFragmentResolver extends ByteArrayFragmentResolver
     {
         @Override
-        byte[] resolve(ByteBuffer byteFragmentTxData)
+        ByteBuffer resolve(ByteBuffer byteFragmentTxData)
         {
             return resolveInternal(
                 ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
@@ -77,7 +77,7 @@ abstract class ByteArrayFragmentResolver
     static final class UTF8HeaderByteArrayFragmentResolver extends ByteArrayFragmentResolver
     {
         @Override
-        byte[] resolve(ByteBuffer byteFragmentTxData)
+        ByteBuffer resolve(ByteBuffer byteFragmentTxData)
         {
             return resolveInternal(
                 ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
@@ -97,9 +97,9 @@ abstract class ByteArrayFragmentResolver
      * 
      * @param byteFragmentTxData
      *            a {@link ByteArrayFragment} in {@link ByteBuffer} form
-     * @return the fully resolved data byte[] or <code>null</code> if fragments are still missing
+     * @return the fully resolved data in a ByteBuffer or <code>null</code> if fragments are still missing
      */
-    abstract byte[] resolve(ByteBuffer byteFragmentTxData);
+    abstract ByteBuffer resolve(ByteBuffer byteFragmentTxData);
 
     /**
      * Get the header and data {@link ByteBuffer} to send from the fragment
@@ -109,9 +109,9 @@ abstract class ByteArrayFragmentResolver
      */
     abstract ByteBuffer[] prepareBuffersToSend(TxByteArrayFragment byteArrayFragment);
 
-    byte[] resolveInternal(final ByteArrayFragment fragment)
+    ByteBuffer resolveInternal(final ByteArrayFragment fragment)
     {
-        byte[] resolvedData = null;
+        ByteBuffer resolvedData = null;
         try
         {
             if (fragment.isLastElement())

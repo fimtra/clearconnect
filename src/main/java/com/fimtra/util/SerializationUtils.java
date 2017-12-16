@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Utility methods for serialization of objects
@@ -116,7 +117,7 @@ public abstract class SerializationUtils
             oos.close();
         }
     }
-
+    
     /**
      * Resolve an object from a byte[]
      */
@@ -124,6 +125,24 @@ public abstract class SerializationUtils
     public static final <T extends Serializable> T fromByteArray(byte[] byteArr) throws IOException, ClassNotFoundException
     {
         final ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(byteArr));
+        try
+        {
+            return (T) ois.readObject();
+        }
+        finally
+        {
+            ois.close();
+        }
+    }
+
+    /**
+     * Resolve an object from a ByteBuffer
+     */
+    @SuppressWarnings("unchecked")
+    public static final <T extends Serializable> T fromByteArray(ByteBuffer byteBuffer) throws IOException, ClassNotFoundException
+    {
+        final ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(byteBuffer.array(),
+            byteBuffer.position(), byteBuffer.limit() - byteBuffer.position()));
         try
         {
             return (T) ois.readObject();

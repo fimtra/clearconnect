@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
@@ -207,7 +208,7 @@ public class TcpServer implements IEndPointService
                         TcpServer.this.clients.put(new TcpChannel(socketChannel, new IReceiver()
                         {
                             @Override
-                            public void onDataReceived(byte[] data, ITransportChannel source)
+                            public void onDataReceived(ByteBuffer data, ITransportChannel source)
                             {
                                 clientSocketReceiver.onDataReceived(data, source);
                             }

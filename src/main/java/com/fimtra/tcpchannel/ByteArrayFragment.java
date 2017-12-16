@@ -18,6 +18,7 @@ package com.fimtra.tcpchannel;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
+import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.ReusableObjectPool;
 import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
 import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
@@ -54,7 +55,7 @@ class ByteArrayFragment
                 {
                     instance.initialise(-1, -1, (byte) -1, null, -1, -1);
                 }
-            }, 32, ReusableObjectPool.SINGLE_THREADED);
+            }, 32, ReusableObjectPool.MULTI_THREADED);
 
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
@@ -238,29 +239,34 @@ class ByteArrayFragment
         {
             throw new IncorrectSequenceException("Expected " + (this.sequenceId) + " but got " + other.sequenceId);
         }
-        byte[] d = new byte[this.length + other.length];
+        byte[] d = ByteArrayPool.get(this.length + other.length);
         System.arraycopy(this.data, this.offset, d, 0, this.length);
         System.arraycopy(other.data, other.offset, d, this.length, other.length);
         this.data = d;
         this.offset = 0;
-        this.length = this.data.length;
+        this.length += other.length;
         return this;
     }
 
     /**
      * @return the data resolved from all the fragments
      */
-    final byte[] getData()
+    final ByteBuffer getData()
     {
+        if (this.data == null)
+        {
+            return null;
+        }
+
         if (this.offset != 0 || this.length != this.data.length)
         {
-            final byte[] d = new byte[this.length];
+            final byte[] d = ByteArrayPool.get(this.length);
             System.arraycopy(this.data, this.offset, d, 0, this.length);
+            // don't free the old data byte[] - could be the rxData permanent byte[]
             this.data = d;
             this.offset = 0;
-            this.length = this.data.length;
         }
-        return this.data;
+        return ByteBuffer.wrap(this.data, this.offset, this.length);
     }
 
     @Override

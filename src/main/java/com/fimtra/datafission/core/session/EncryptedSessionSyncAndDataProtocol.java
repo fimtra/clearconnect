@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission.core.session;
 
+import java.nio.ByteBuffer;
+
 import javax.crypto.SecretKey;
 
 import com.fimtra.util.SerializationUtils;
@@ -99,8 +101,15 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
     }
 
     @Override
-    public byte[] decode(byte[] received)
+    public ByteBuffer decode(ByteBuffer received)
     {
-        return this.rxCipher.decrypt(received);
+        byte[] array = received.array();
+        // we need an exact sized array for decrypting
+        if (!(received.position() == 0 && received.limit() == array.length))
+        {
+            array = new byte[received.limit() - received.position()];
+            System.arraycopy(received.array(), received.position(), array, 0, array.length);
+        }
+        return ByteBuffer.wrap(this.rxCipher.decrypt(array));
     }
 }
