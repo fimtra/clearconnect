@@ -80,8 +80,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${plugins.compiler.version}</version>
 				<configuration>
-					<source>1.6</source>
-					<target>1.7</target>
+					<source>1.8</source>
+					<target>1.8</target>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -239,115 +239,6 @@
 								</goals>
 							</execution>
 						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>central-java6</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-gpg-plugin</artifactId>
-						<version>${plugins.gpg.version}</version>
-						<executions>
-							<execution>
-								<id>sign-artifacts</id>
-								<phase>verify</phase>
-								<goals>
-									<goal>sign</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-					<plugin>
-						<artifactId>maven-jar-plugin</artifactId>
-						<version>${plugins.jar.version}</version>
-						<executions>
-							<!-- don't build a java6 default jar, we only want the classifier 
-								jar -->
-							<execution>
-								<id>default-jar</id>
-								<phase>none</phase>
-							</execution>
-							<execution>
-								<phase>package</phase>
-								<goals>
-									<goal>jar</goal>
-								</goals>
-								<configuration>
-									<classifier>java6</classifier>
-								</configuration>
-							</execution>
-						</executions>
-					</plugin>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-source-plugin</artifactId>
-						<configuration>
-							<classifier>java6-sources</classifier>
-						</configuration>
-					</plugin>						
-					<plugin>
-						<artifactId>maven-compiler-plugin</artifactId>
-						<version>${plugins.compiler.version}</version>
-						<configuration>
-							<source>1.6</source>
-							<target>1.6</target>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-		<profile>
-			<id>notjava6</id>
-			<activation>
-				<jdk>[1.7,)</jdk>
-			</activation>
-		</profile>
-		<profile>
-			<id>java6</id>
-			<activation>
-				<jdk>1.6</jdk>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<artifactId>maven-jar-plugin</artifactId>
-						<version>${plugins.jar.version}</version>
-						<executions>
-							<!-- don't build a java6 default jar, we only want the classifier 
-								jar -->
-							<execution>
-								<id>default-jar</id>
-								<phase>none</phase>
-							</execution>
-							<execution>
-								<phase>package</phase>
-								<goals>
-									<goal>jar</goal>
-								</goals>
-								<configuration>
-									<classifier>java6</classifier>
-								</configuration>
-							</execution>
-						</executions>						
-					</plugin>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-source-plugin</artifactId>
-						<configuration>
-							<classifier>java6-sources</classifier>
-						</configuration>
-					</plugin>						
-					<plugin>
-						<artifactId>maven-compiler-plugin</artifactId>
-						<version>${plugins.compiler.version}</version>
-						<configuration>
-							<source>1.6</source>
-							<target>1.6</target>
-						</configuration>
 					</plugin>
 				</plugins>
 			</build>
