@@ -46,6 +46,10 @@ public class ByteArrayPool
      */
     public static byte[] get(final int size)
     {
+        if (size > POOLS.length)
+        {
+            return new byte[size];
+        }
         final int index = getIndex(size);
         if (index < POOLS.length)
         {
@@ -90,13 +94,18 @@ public class ByteArrayPool
 
     static int getIndex(int size)
     {
-        // find a power of 2 that is greater than size
+        // find a power of 2 that is >= size
+        int _size = size;
         int index = 1;
         do
         {
             index <<= 1;
+            if (index == size)
+            {
+                return size;
+            }
         }
-        while ((size >>= 1) > 0);
+        while ((_size >>= 1) > 0);
 
         return index;
     }

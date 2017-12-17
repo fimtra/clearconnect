@@ -50,8 +50,10 @@ public class ByteArrayPoolTest
         for(int i = 0; i < ByteArrayPool.POOLS.length * 2; i++)
         {
             int index = ByteArrayPool.getIndex(i);
-            assertTrue("index=" + index + " for size=" + i, index > i);
+            assertTrue("index=" + index + " for size=" + i, index >= i);
         }
+        
+        assertEquals(1024, ByteArrayPool.getIndex(1024));
     }
 
 }
