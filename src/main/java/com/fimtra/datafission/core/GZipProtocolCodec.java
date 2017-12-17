@@ -23,6 +23,7 @@ import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.IValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
+import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.GZipUtils;
 
 /**
@@ -78,8 +79,19 @@ public class GZipProtocolCodec extends StringProtocolCodec
     @Override
     public char[] decode(ByteBuffer data)
     {
-        return ISO_8859_1.decode(GZipUtils.uncompress(this.sessionSyncProtocol.decode(data))).array();
-    }
+        final ByteBuffer uncompressed = GZipUtils.uncompress(this.sessionSyncProtocol.decode(data));
+        final int position = uncompressed.position();
+        final int limit = uncompressed.limit();
+        final char[] decoded = new char[limit - position];
+        final byte[] uncompressedArray = uncompressed.array();
+        int j = 0;
+        for (int i = position; i < limit; i++)
+        {
+            decoded[j++] = (char) uncompressedArray[i];
+        }
+        ByteArrayPool.offer(uncompressedArray);
+        return decoded;
+    }    
 
     @Override
     public FrameEncodingFormatEnum getFrameEncodingFormat()
