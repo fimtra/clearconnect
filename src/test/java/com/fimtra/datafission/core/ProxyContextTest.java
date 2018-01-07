@@ -309,6 +309,8 @@ public class ProxyContextTest
 
         this.publisher.destroy();
 
+        Thread.sleep(250);
+        
         addObserverLatch = this.candidate.addObserver(observer, "lasers, record!");
 
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
