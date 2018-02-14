@@ -1845,7 +1845,7 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) subscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")", (logVerboseSubscribes ? Arrays.toString(recordsToSubscribeFor) : ""));
+            Integer.toString(total), ")", (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToSubscribeFor) : ""));
 
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
@@ -1897,7 +1897,7 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) unsubscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")", (logVerboseSubscribes ? Arrays.toString(recordsToUnsubscribe) : ""));
+            Integer.toString(total), ")", (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToUnsubscribe) : ""));
 
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 

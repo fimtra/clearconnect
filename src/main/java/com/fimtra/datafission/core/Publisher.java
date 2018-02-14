@@ -1160,7 +1160,7 @@ public class Publisher
     void unsubscribe(List<String> recordNames, ITransportChannel client)
     {
         Log.log(this, "(<-) unsubscribe from [", client.getEndPointDescription(), "] for ",
-            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
+            (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         proxyContextPublisher.unsubscribe(recordNames);
         sendAck(recordNames, client, proxyContextPublisher, ProxyContext.UNSUBSCRIBE);
@@ -1169,7 +1169,7 @@ public class Publisher
     void resync(List<String> recordNames, ITransportChannel client)
     {
         Log.log(this, "(<-) re-sync from [", client.getEndPointDescription(), "] for ",
-            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
+            (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
         synchronized (this.subscribeTasks)
@@ -1222,7 +1222,7 @@ public class Publisher
         final String subscribeKey = Long.toString(this.subscribeCounter.incrementAndGet());
         Log.log(this, "(<-) subscribe #", subscribeKey, " (", Integer.toString(current), "/", Integer.toString(total),
             ") from [", client.getEndPointDescription(), "]",
-            (logVerboseSubscribes ? ObjectUtils.safeToString(recordNames) : ""));
+            (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : ""));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new LinkedList<String>();
