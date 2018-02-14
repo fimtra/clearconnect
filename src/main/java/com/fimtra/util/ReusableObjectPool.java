@@ -87,7 +87,6 @@ public final class ReusableObjectPool<T>
         @Override
         public <T> void offer(ReusableObjectPool<T> target, T instance)
         {
-            target.finalizer.reset(instance);
             target.doOffer(instance);
         }
     };
@@ -170,6 +169,7 @@ public final class ReusableObjectPool<T>
     private final IThreadLogic threadLogic;
     private final WeakReference<ReusableObjectPool<?>> weakRef;
     private final Object[] pool;
+    private final int poolLimit;
 
     private int highest;
     private int poolPtr;
@@ -179,6 +179,7 @@ public final class ReusableObjectPool<T>
     {
         this.name = name;
         this.pool = new Object[maxSize];
+        this.poolLimit = this.pool.length - 2;
         this.builder = builder;
         this.finalizer = finalizer;
         this.lock = new ReentrantLock();
@@ -247,13 +248,15 @@ public final class ReusableObjectPool<T>
     {
         if (this.pool[this.poolPtr] == null)
         {
+            this.finalizer.reset(instance);
             this.pool[this.poolPtr] = instance;
         }
         else
         {
-            if (this.poolPtr < this.pool.length - 2)
+            if (this.poolPtr <= this.poolLimit)
             {
-                this.pool[++this.poolPtr] = (instance);
+                this.finalizer.reset(instance);
+                this.pool[++this.poolPtr] = instance;
             }
             if (this.poolPtr > this.highest)
             {
