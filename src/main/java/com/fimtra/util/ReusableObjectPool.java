@@ -118,7 +118,6 @@ public final class ReusableObjectPool<T>
         @Override
         public <T> void offer(ReusableObjectPool<T> target, T instance)
         {
-            target.finalizer.reset(instance);
             target.lock.lock();
             try
             {
