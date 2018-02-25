@@ -58,11 +58,11 @@ import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.ReusableObjectPool;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
@@ -224,8 +224,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    static final ReusableObjectPool<SequentialPublishTask> PUBLISH_TASK_POOL =
-        new ReusableObjectPool<Context.SequentialPublishTask>("Context-publishTaskPool",
+    static final MultiThreadReusableObjectPool<SequentialPublishTask> PUBLISH_TASK_POOL =
+        new MultiThreadReusableObjectPool<Context.SequentialPublishTask>("Context-publishTaskPool",
             new IReusableObjectBuilder<Context.SequentialPublishTask>()
             {
                 @Override
@@ -240,7 +240,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     instance.initialise(null, null, null, -1, null, null);
                 }
-            }, DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE, ReusableObjectPool.MULTI_THREADED);
+            }, DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE);
 
     /**
      * Noop implementation

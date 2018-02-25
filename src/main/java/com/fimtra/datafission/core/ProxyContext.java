@@ -67,13 +67,13 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.ByteArrayPool;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
-import com.fimtra.util.ReusableObjectPool;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.ThreadUtils;
 
@@ -739,22 +739,23 @@ public final class ProxyContext implements IObserverContext
     // todo property control the size
     private static final int POOL_SIZE = DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE;
 
-    static final ReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL = new ReusableObjectPool<RxFrameHandler>(
-        "ProxyContext-RxFrameHandlerPool", new IReusableObjectBuilder<RxFrameHandler>()
-        {
-            @Override
-            public RxFrameHandler newInstance()
+    static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
+        new MultiThreadReusableObjectPool<RxFrameHandler>("ProxyContext-RxFrameHandlerPool",
+            new IReusableObjectBuilder<RxFrameHandler>()
             {
-                return new RxFrameHandler();
-            }
-        }, new IReusableObjectFinalizer<RxFrameHandler>()
-        {
-            @Override
-            public void reset(RxFrameHandler instance)
+                @Override
+                public RxFrameHandler newInstance()
+                {
+                    return new RxFrameHandler();
+                }
+            }, new IReusableObjectFinalizer<RxFrameHandler>()
             {
-                instance.clear();
-            }
-        }, POOL_SIZE, ReusableObjectPool.MULTI_THREADED);
+                @Override
+                public void reset(RxFrameHandler instance)
+                {
+                    instance.clear();
+                }
+            }, POOL_SIZE);
 
     final Object lock;
     volatile boolean active;

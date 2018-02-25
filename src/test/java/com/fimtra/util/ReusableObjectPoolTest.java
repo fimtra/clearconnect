@@ -27,9 +27,6 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
-
 /**
  * Tests for the {@link ReusableObjectPool}
  * 
@@ -37,12 +34,12 @@ import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
  */
 public class ReusableObjectPoolTest
 {
-    ReusableObjectPool<Map> candidate;
+    AbstractReusableObjectPool<Map> candidate;
 
     @Before
     public void setUp() throws Exception
     {
-        candidate = new ReusableObjectPool<Map>("test", new IReusableObjectBuilder<Map>()
+        candidate = new SingleThreadReusableObjectPool<Map>("test", new IReusableObjectBuilder<Map>()
         {
             @Override
             public Map newInstance()
@@ -56,7 +53,7 @@ public class ReusableObjectPoolTest
             {
                 instance.clear();
             }
-        }, 10, ReusableObjectPool.SINGLE_THREADED);
+        }, 10);
     }
     
     @Test

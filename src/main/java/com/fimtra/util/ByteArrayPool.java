@@ -15,8 +15,6 @@
  */
 package com.fimtra.util;
 
-import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
 import com.fimtra.util.UtilProperties.Names;
 
 /**
@@ -31,7 +29,7 @@ import com.fimtra.util.UtilProperties.Names;
 public class ByteArrayPool
 {
     @SuppressWarnings("unchecked")
-    static final ReusableObjectPool<byte[]>[] POOLS = new ReusableObjectPool[2048 + 1];
+    static final MultiThreadReusableObjectPool<byte[]>[] POOLS = new MultiThreadReusableObjectPool[2048 + 1];
 
     /**
      * Get a byte[] that can hold at least the specified size.
@@ -53,10 +51,10 @@ public class ByteArrayPool
         final int index = getIndex(size);
         if (index < POOLS.length)
         {
-            ReusableObjectPool<byte[]> pool = POOLS[index];
+            MultiThreadReusableObjectPool<byte[]> pool = POOLS[index];
             if (pool == null)
             {
-                pool = new ReusableObjectPool<byte[]>("byte[" + index + "]", new IReusableObjectBuilder<byte[]>()
+                pool = new MultiThreadReusableObjectPool<byte[]>("byte[" + index + "]", new IReusableObjectBuilder<byte[]>()
                 {
                     @Override
                     public byte[] newInstance()
@@ -69,7 +67,7 @@ public class ByteArrayPool
                     public void reset(byte[] instance)
                     {
                     }
-                }, UtilProperties.Values.BYTE_ARRAY_POOL_SIZE, ReusableObjectPool.MULTI_THREADED);
+                }, UtilProperties.Values.BYTE_ARRAY_POOL_SIZE);
                 POOLS[index] = pool;
             }
             return pool.get();
@@ -84,7 +82,7 @@ public class ByteArrayPool
     {
         if (array.length < POOLS.length)
         {
-            final ReusableObjectPool<byte[]> pool = POOLS[array.length];
+            final MultiThreadReusableObjectPool<byte[]> pool = POOLS[array.length];
             if (pool != null)
             {
                 pool.offer(array);

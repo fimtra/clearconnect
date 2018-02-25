@@ -19,9 +19,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
 import com.fimtra.util.ByteArrayPool;
-import com.fimtra.util.ReusableObjectPool;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectBuilder;
-import com.fimtra.util.ReusableObjectPool.IReusableObjectFinalizer;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
 
 /**
@@ -39,8 +39,8 @@ class ByteArrayFragment
 {
     static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static final ReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
-        new ReusableObjectPool<ByteArrayFragment>("ByteArrayFragmentPool",
+    static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
+        new MultiThreadReusableObjectPool<ByteArrayFragment>("ByteArrayFragmentPool",
             new IReusableObjectBuilder<ByteArrayFragment>()
             {
                 @Override
@@ -55,7 +55,7 @@ class ByteArrayFragment
                 {
                     instance.initialise(-1, -1, (byte) -1, null, -1, -1);
                 }
-            }, 32, ReusableObjectPool.MULTI_THREADED);
+            }, 32);
 
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
