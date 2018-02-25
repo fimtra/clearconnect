@@ -23,7 +23,7 @@ import com.fimtra.util.UtilProperties.Names;
  * of the same size and all sizes in the {@link ByteArrayPool} are powers of 2. Each pool of byte[]
  * is limited to a fixed maximum size.
  * 
- * @see Names#BYTE_ARRAY_POOL_MAX_SIZE
+ * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
  * @author Ramon Servadei
  */
 public class ByteArrayPool
@@ -67,7 +67,7 @@ public class ByteArrayPool
                     public void reset(byte[] instance)
                     {
                     }
-                }, UtilProperties.Values.BYTE_ARRAY_POOL_MAX_SIZE);
+                }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
                 POOLS[index] = pool;
             }
             return pool.get();
