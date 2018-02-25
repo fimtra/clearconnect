@@ -109,10 +109,10 @@ public abstract class UtilProperties
         String COMPRESS_ROLLED_LOGS = BASE + "compressRolledLogs";
 
         /**
-         * The system property name to define the size of each internal pool of the {@link ByteArrayPool}.<br>
+         * The system property name to define the maximum size of each internal pool of the {@link ByteArrayPool}.<br>
          * E.g. <code>-Dutil.byteArrayPoolSize=1024</code>
          */
-        String BYTE_ARRAY_POOL_SIZE = BASE + "byteArrayPoolSize";
+        String BYTE_ARRAY_POOL_MAX_SIZE = BASE + "byteArrayPoolSize";
     }
 
     /**
@@ -196,12 +196,12 @@ public abstract class UtilProperties
         boolean COMPRESS_ROLLED_LOGS = Boolean.parseBoolean(System.getProperty(Names.COMPRESS_ROLLED_LOGS, "true"));
 
         /**
-         * The size of each internal pool of the {@link ByteArrayPool}. Default is 1024<br>
+         * The maximum size of each internal pool of the {@link ByteArrayPool}. Default is 1000<br>
          * 
-         * @see Names#BYTE_ARRAY_POOL_SIZE
+         * @see Names#BYTE_ARRAY_POOL_MAX_SIZE
          */
-        int BYTE_ARRAY_POOL_SIZE = Integer.parseInt(System.getProperty(
-            Names.BYTE_ARRAY_POOL_SIZE, "1024"));
+        int BYTE_ARRAY_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(
+            Names.BYTE_ARRAY_POOL_MAX_SIZE, "1000"));
     }
 
 }

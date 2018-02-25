@@ -21,9 +21,9 @@ import com.fimtra.util.UtilProperties.Names;
  * A pool of re-usable byte[] instances. The instances are held in pools in an internal array. Each
  * pool is at the index of the size of arrays it manages. An internal pool manages byte[] instances
  * of the same size and all sizes in the {@link ByteArrayPool} are powers of 2. Each pool of byte[]
- * is limited to a fixed size.
+ * is limited to a fixed maximum size.
  * 
- * @see Names#BYTE_ARRAY_POOL_SIZE
+ * @see Names#BYTE_ARRAY_POOL_MAX_SIZE
  * @author Ramon Servadei
  */
 public class ByteArrayPool
@@ -67,7 +67,7 @@ public class ByteArrayPool
                     public void reset(byte[] instance)
                     {
                     }
-                }, UtilProperties.Values.BYTE_ARRAY_POOL_SIZE);
+                }, UtilProperties.Values.BYTE_ARRAY_POOL_MAX_SIZE);
                 POOLS[index] = pool;
             }
             return pool.get();
