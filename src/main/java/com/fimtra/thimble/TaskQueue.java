@@ -24,8 +24,10 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.fimtra.util.CollectionUtils;
-import com.fimtra.util.Log;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.LowGcLinkedList;
+import com.fimtra.util.SingleThreadReusableObjectPool;
 
 /**
  * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted
@@ -48,9 +50,9 @@ final class TaskQueue
     private final static boolean GENERATE_STATISTICS_PER_CONTEXT =
         Boolean.getBoolean("thimble.generateStatisticsPerContext");
 
-    final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
+    private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
         Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
-    final static int COALESCING_TASKS_MAX_POOL_SIZE =
+    private final static int COALESCING_TASKS_MAX_POOL_SIZE =
         Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
     
     private interface InternalTaskQueue<T> extends Runnable
@@ -66,11 +68,11 @@ final class TaskQueue
      */
     final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
     {
-        private final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<ISequentialRunnable>(2);
-        private int size;
-        private Object context;
-        private TaskStatistics stats;
-        private boolean active;
+        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<ISequentialRunnable>(2);
+        int size;
+        Object context;
+        TaskStatistics stats;
+        boolean active;
 
         SequentialTasks()
         {
@@ -90,12 +92,6 @@ final class TaskQueue
             return false;
         }
         
-        void initialise(Object context, TaskStatistics stats)
-        {
-            this.context = context;
-            this.stats = stats;
-        }
-
         @Override
         public void run()
         {
@@ -134,14 +130,7 @@ final class TaskQueue
                     else
                     {
                         TaskQueue.this.sequentialTasksPerContext.remove(this.context);
-
-                        if (TaskQueue.this.sequentialTasksPool.size() < SEQUENTIAL_TASKS_MAX_POOL_SIZE)
-                        {
-                            this.context = null;
-                            this.stats = null;
-                            this.active = false;
-                            TaskQueue.this.sequentialTasksPool.add(this);
-                        }
+                        TaskQueue.this.sequentialTasksPool.offer(this);
                     }
                 }
             }
@@ -177,10 +166,10 @@ final class TaskQueue
      */
     final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
     {
-        private ICoalescingRunnable latestTask;
-        private Object context;
-        private TaskStatistics stats;
-        private boolean active;
+        ICoalescingRunnable latestTask;
+        Object context;
+        TaskStatistics stats;
+        boolean active;
         
         CoalescingTasks()
         {
@@ -199,13 +188,7 @@ final class TaskQueue
             }
             return false;
         }
-        
-        void initialise(Object context, TaskStatistics stats)
-        {
-            this.context = context;
-            this.stats = stats;
-        }
-
+ 
         @Override
         public void run()
         {
@@ -231,14 +214,7 @@ final class TaskQueue
                     else
                     {
                         TaskQueue.this.coalescingTasksPerContext.remove(this.context);
-                        
-                        if (TaskQueue.this.coalescingTasksPool.size() < COALESCING_TASKS_MAX_POOL_SIZE)
-                        {
-                            this.context = null;
-                            this.stats = null;
-                            this.active = false;
-                            TaskQueue.this.coalescingTasksPool.add(this);
-                        }
+                        TaskQueue.this.coalescingTasksPool.offer(this);
                     }
                 }
             }
@@ -271,10 +247,8 @@ final class TaskQueue
     final TaskStatistics allSequentialStats;
     final Object lock = new Object();
 
-    final Deque<SequentialTasks> sequentialTasksPool =
-        new LowGcLinkedList<SequentialTasks>(SEQUENTIAL_TASKS_MAX_POOL_SIZE);
-    final Deque<CoalescingTasks> coalescingTasksPool =
-        new LowGcLinkedList<CoalescingTasks>(COALESCING_TASKS_MAX_POOL_SIZE);
+    final SingleThreadReusableObjectPool<SequentialTasks> sequentialTasksPool;
+    final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;
     long sequentialTaskCreateCount;
     long coalescingTaskCreateCount;
     final String name;
@@ -282,42 +256,46 @@ final class TaskQueue
     TaskQueue(String name)
     {
         this.name = name;
+        this.sequentialTasksPool =
+            new SingleThreadReusableObjectPool<SequentialTasks>("sequential-" + name, new IReusableObjectBuilder<SequentialTasks>()
+            {
+                @Override
+                public SequentialTasks newInstance()
+                {
+                    return new SequentialTasks();
+                }
+            }, new IReusableObjectFinalizer<SequentialTasks>()
+            {
+                @Override
+                public void reset(SequentialTasks instance)
+                {
+                    instance.context = null;
+                    instance.stats = null;
+                    instance.active = false;
+                }
+            }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
+        this.coalescingTasksPool =
+            new SingleThreadReusableObjectPool<CoalescingTasks>("coalescing-" + name, new IReusableObjectBuilder<CoalescingTasks>()
+            {
+                @Override
+                public CoalescingTasks newInstance()
+                {
+                    return new CoalescingTasks();
+                }
+            }, new IReusableObjectFinalizer<CoalescingTasks>()
+            {
+                @Override
+                public void reset(CoalescingTasks instance)
+                {
+                    instance.context = null;
+                    instance.stats = null;
+                    instance.active = false;
+                }
+            }, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + ThimbleExecutor.QUEUE_LEVEL_STATS);
         this.coalescingTaskStatsPerContext.put(ThimbleExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
         this.allSequentialStats = new TaskStatistics("Sequential" + ThimbleExecutor.QUEUE_LEVEL_STATS);
         this.sequentialTaskStatsPerContext.put(ThimbleExecutor.QUEUE_LEVEL_STATS, this.allSequentialStats);
-    }
-
-    SequentialTasks prepareSequentialTasks(Object context, TaskStatistics stats)
-    {
-        SequentialTasks task = this.sequentialTasksPool.poll();
-        if (task == null)
-        {
-            if (++this.sequentialTaskCreateCount % 1000 == 0)
-            {
-                Log.log(this, this.name, " sequential task pool size too small, task create count: "
-                    + Long.valueOf(this.sequentialTaskCreateCount));
-            }
-            task = new SequentialTasks();
-        }
-        task.initialise(context, stats);
-        return task;
-    }
-
-    CoalescingTasks prepareCoalescingTasks(Object context, TaskStatistics stats)
-    {
-        CoalescingTasks task = this.coalescingTasksPool.poll();
-        if (task == null)
-        {
-            if (++this.coalescingTaskCreateCount % 1000 == 0)
-            {
-                Log.log(this, this.name, " coalescing task pool size too small, task create count: "
-                    + Long.valueOf(this.coalescingTaskCreateCount));
-            }
-            task = new CoalescingTasks();
-        }
-        task.initialise(context, stats);
-        return task;
     }
 
     /**
@@ -347,7 +325,9 @@ final class TaskQueue
                 {
                     stats = this.allSequentialStats;
                 }
-                sequentialTasks = prepareSequentialTasks(context, stats);
+                sequentialTasks = this.sequentialTasksPool.get();
+                sequentialTasks.context = context;
+                sequentialTasks.stats = stats;
                 this.sequentialTasksPerContext.put(context, sequentialTasks);
             }
 
@@ -380,7 +360,9 @@ final class TaskQueue
                     {
                         stats = this.allCoalescingStats;
                     }
-                    coalescingTasks = prepareCoalescingTasks(context, stats);
+                    coalescingTasks = this.coalescingTasksPool.get();
+                    coalescingTasks.context = context;
+                    coalescingTasks.stats = stats;
                     this.coalescingTasksPerContext.put(context, coalescingTasks);
                 }
 
