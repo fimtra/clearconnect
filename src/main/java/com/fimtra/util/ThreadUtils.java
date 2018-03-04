@@ -15,6 +15,7 @@
  */
 package com.fimtra.util;
 
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -93,6 +94,18 @@ public abstract class ThreadUtils
             }
         }
         MAIN_METHOD_CLASSNAME = name;
+        
+        if (Thread.getDefaultUncaughtExceptionHandler() == null)
+        {
+            Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler()
+            {
+                @Override
+                public void uncaughtException(Thread t, Throwable e)
+                {
+                    Log.log(ThreadUtils.class, "Uncaught throwable: ", e);
+                }
+            });
+        }
     }
 
     private ThreadUtils()
