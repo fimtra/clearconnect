@@ -23,11 +23,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
+import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.is;
 
@@ -36,7 +39,7 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei
  */
-public final class AtomicChange implements IRecordChange
+public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
     static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(ContextUtils.EMPTY_MAP);
 
@@ -137,6 +140,11 @@ public final class AtomicChange implements IRecordChange
     Map<String, IValue> removedEntries;
     Map<String, AtomicChange> subMapAtomicChanges;
 
+    // members needed for the ISequentialRunnable use
+    Context context;
+    CountDownLatch latch;
+    IRecordListener[] subscribersForRecord;
+    
     /**
      * Construct the atomic change to represent the record.
      * <p>
@@ -169,6 +177,41 @@ public final class AtomicChange implements IRecordChange
         this(name, null, null, null);
     }
 
+    // ==== methods used to support use as the ISequentialRunnable
+
+    void preparePublish(CountDownLatch latch, IRecordListener[] subscribersForRecord, Context context)
+    {
+        this.latch = latch;
+        this.context = context;
+        this.subscribersForRecord = subscribersForRecord;
+    }
+    
+    @Override
+    public void run()
+    {
+        try
+        {
+            if (this.subscribersForRecord == null)
+            {
+                this.subscribersForRecord = this.context.recordObservers.getSubscribersFor(this.name);
+            }
+            this.context.doPublishChange(this.name, this, this.sequence.get().longValue(), this.subscribersForRecord);
+        }
+        finally
+        {
+            this.context.throttle.eventFinish();
+            this.latch.countDown();
+        }
+    }
+    
+    @Override
+    public Object context()
+    {
+        return this.name;
+    }
+    
+    // ==== END methods used to support use as the ISequentialRunnable
+    
     @Override
     public String getName()
     {

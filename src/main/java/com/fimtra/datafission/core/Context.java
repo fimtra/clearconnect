@@ -58,10 +58,7 @@ import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
-import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
-import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
@@ -167,80 +164,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         return ((Context) context).records.get(name);
     }
-
-    /**
-     * Encapsulates a re-usable task to handle publishing of a record.
-     * 
-     * @author Ramon Servadei
-     */
-    private static final class SequentialPublishTask implements ISequentialRunnable
-    {
-        String name;
-        long sequence;
-        Context context;
-        CountDownLatch latch;
-        AtomicChange atomicChange;
-        IRecordListener[] subscribersForRecord;
-
-        SequentialPublishTask()
-        {
-        }
-
-        SequentialPublishTask initialise(CountDownLatch latch, String name, AtomicChange atomicChange, long sequence,
-            IRecordListener[] subscribersForRecord, Context context)
-        {
-            this.latch = latch;
-            this.name = name;
-            this.atomicChange = atomicChange;
-            this.context = context;
-            this.sequence = sequence;
-            this.subscribersForRecord = subscribersForRecord;
-            return this;
-        }
-
-        @Override
-        public void run()
-        {
-            try
-            {
-                if (this.subscribersForRecord == null)
-                {
-                    this.subscribersForRecord = this.context.recordObservers.getSubscribersFor(this.name);
-                }
-                this.context.doPublishChange(this.name, this.atomicChange, this.sequence, this.subscribersForRecord);
-            }
-            finally
-            {
-                this.context.throttle.eventFinish();
-                this.latch.countDown();
-                PUBLISH_TASK_POOL.offer(this);
-            }
-        }
-
-        @Override
-        public Object context()
-        {
-            return this.name;
-        }
-    }
-
-    static final MultiThreadReusableObjectPool<SequentialPublishTask> PUBLISH_TASK_POOL =
-        new MultiThreadReusableObjectPool<Context.SequentialPublishTask>("Context-publishTaskPool",
-            new IReusableObjectBuilder<Context.SequentialPublishTask>()
-            {
-                @Override
-                public SequentialPublishTask newInstance()
-                {
-                    return new SequentialPublishTask();
-                }
-            }, new IReusableObjectFinalizer<Context.SequentialPublishTask>()
-            {
-                @Override
-                public void reset(SequentialPublishTask instance)
-                {
-                    instance.initialise(null, null, null, -1, null, null);
-                }
-            }, DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE);
 
     /**
      * Noop implementation
@@ -790,8 +713,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 final long sequence = atomicChange.getSequence();
                 ((Record) record).setSequence(sequence);
 
-                executeSequentialCoreTask(
-                    prepareSequentialPublishTask(name, latch, atomicChange, sequence, subscribersForRecord));
+                atomicChange.preparePublish(latch, subscribersForRecord, this);
+                
+                executeSequentialCoreTask(atomicChange);
+                
                 return latch;
             }
         }
@@ -800,12 +725,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             this.throttle.eventFinish();
             throw e;
         }
-    }
-
-    SequentialPublishTask prepareSequentialPublishTask(final String name, final CountDownLatch latch,
-        final AtomicChange atomicChange, final long sequence, final IRecordListener[] subscribersForRecord)
-    {
-        return PUBLISH_TASK_POOL.get().initialise(latch, name, atomicChange, sequence, subscribersForRecord, this);
     }
 
     @Override
