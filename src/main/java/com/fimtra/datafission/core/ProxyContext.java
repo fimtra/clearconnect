@@ -612,7 +612,7 @@ public final class ProxyContext implements IObserverContext
     }
 
     /**
-     * Handles a single {@link IRecordChange} created from a recieved frame decoded from a
+     * Handles a single {@link IRecordChange} created from a received frame decoded from a
      * {@link RxFrameHandler}
      * 
      * @author Ramon Servadei
@@ -736,7 +736,6 @@ public final class ProxyContext implements IObserverContext
         }
     }
 
-    // todo property control the size
     private static final int POOL_SIZE = DataFissionProperties.Values.PUBLISH_TASKS_MAX_POOL_SIZE;
 
     static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
