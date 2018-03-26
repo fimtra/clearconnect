@@ -36,8 +36,6 @@ import com.fimtra.util.UtilProperties.Values;
  */
 public abstract class CollectionUtils
 {
-    private static final float LOAD_FACTOR = 1 / .75f;
-
     /**
      * An unmodifiable set of Map.Entry objects that are themselves unmodifiable (
      * {@link Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
@@ -180,9 +178,7 @@ public abstract class CollectionUtils
      */
     public static <T> Set<T> newHashSet(Collection<T> c)
     {
-        final Set<T> s = new HashSet<T>(Math.max((int) (c.size() * LOAD_FACTOR) + 1, 2));
-        s.addAll(c);
-        return s;
+        return new HashSet<T>(c);
     }
     
     /**
