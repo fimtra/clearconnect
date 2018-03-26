@@ -18,7 +18,6 @@ package com.fimtra.datafission.core;
 import java.nio.charset.Charset;
 
 import com.fimtra.datafission.ICodec;
-import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.AsymmetricCipher;
@@ -32,25 +31,11 @@ import com.fimtra.util.SymmetricCipher;
  */
 public final class CipherProtocolCodec extends GZipProtocolCodec
 {
-    interface ISessionProtocolFactory
-    {
-        ISessionProtocol newSessionProtocol();
-    }
-
-    static ISessionProtocolFactory factory = new ISessionProtocolFactory()
-    {
-        @Override
-        public ISessionProtocol newSessionProtocol()
-        {
-            return new EncryptedSessionSyncAndDataProtocol();
-        }
-    };
-
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
     public CipherProtocolCodec()
     {
-        super(factory.newSessionProtocol());
+        super(new EncryptedSessionSyncAndDataProtocol());
     }
 
     @Override

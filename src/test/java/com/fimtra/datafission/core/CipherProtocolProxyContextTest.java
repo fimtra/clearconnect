@@ -15,9 +15,6 @@
  */
 package com.fimtra.datafission.core;
 
-import com.fimtra.datafission.ISessionProtocol;
-import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
-
 /**
  * Tests using the {@link CipherProtocolCodec}
  * 
@@ -25,21 +22,6 @@ import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
  */
 public class CipherProtocolProxyContextTest extends ProxyContextTest
 {
-    static
-    {
-        // add a re-usable cipher protocol object to speed up tests
-        CipherProtocolCodec.factory = new CipherProtocolCodec.ISessionProtocolFactory()
-        {
-            final EncryptedSessionSyncAndDataProtocol cipher = new EncryptedSessionSyncAndDataProtocol();
-        
-            @Override
-            public ISessionProtocol newSessionProtocol()
-            {
-                return this.cipher;
-            }
-        };
-    }
-
     // to speed up tests, re-use the same instance
     private static final CipherProtocolCodec CIPHER_PROTOCOL_CODEC = new CipherProtocolCodec();
     // these port ranges should not clash with any other ProxyContextTests
