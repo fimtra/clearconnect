@@ -589,7 +589,19 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         if (this.subMapAtomicChanges != null)
         {
-            return Collections.unmodifiableSet(CollectionUtils.newHashSet(this.subMapAtomicChanges.keySet()));
+            return Collections.unmodifiableSet(CollectionUtils.newHashSet(internalGetSubMapKeys()));
+        }
+        else
+        {
+            return ContextUtils.EMPTY_STRING_SET;
+        }
+    }
+
+    Set<String> internalGetSubMapKeys()
+    {
+        if (this.subMapAtomicChanges != null)
+        {
+            return this.subMapAtomicChanges.keySet();
         }
         else
         {

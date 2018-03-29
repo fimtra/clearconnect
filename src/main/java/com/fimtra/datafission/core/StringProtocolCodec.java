@@ -401,9 +401,21 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
     {
-        final Map<String, IValue> putEntries = atomicChange.getPutEntries();
-        final Map<String, IValue> removedEntries = atomicChange.getRemovedEntries();
-        final Set<String> subMapKeys = atomicChange.getSubMapKeys();
+        final Map<String, IValue> putEntries;
+        final Map<String, IValue> removedEntries;
+        final Set<String> subMapKeys;
+        if (atomicChange instanceof AtomicChange)
+        {
+            putEntries = ((AtomicChange) atomicChange).internalGetPutEntries();
+            removedEntries = ((AtomicChange) atomicChange).internalGetRemovedEntries();
+            subMapKeys = ((AtomicChange) atomicChange).internalGetSubMapKeys();
+        }
+        else
+        {
+            putEntries = atomicChange.getPutEntries();
+            removedEntries = atomicChange.getRemovedEntries();
+            subMapKeys = atomicChange.getSubMapKeys();
+        }
 
         final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
         encodingBuffers.sb.setLength(0);
