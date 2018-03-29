@@ -48,7 +48,7 @@ public abstract class GZipUtils
      */
     private static final class UnsynchronizedByteArrayInputStream extends InputStream
     {
-        final byte buf[];
+        byte buf[];
         int pos;
         int count;
 
@@ -136,20 +136,24 @@ public abstract class GZipUtils
         final CRC32 crc = new CRC32();
         final byte[] tmpbuf = new byte[128];
         boolean eos;
+        final CheckedInputStream checked_inStream;
 
-        public ReusableGZIPInputStream(InputStream in)
+        public ReusableGZIPInputStream(UnsynchronizedByteArrayInputStream in)
         {
             super(in, new Inflater(true), 512);
+            this.checked_inStream = new CheckedInputStream(this.in, this.crc);
         }
 
-        void reset(InputStream in) throws IOException
+        void reset(byte buf[], int offset, int length) throws IOException
         {
+            ((UnsynchronizedByteArrayInputStream) this.in).buf = buf;
+            ((UnsynchronizedByteArrayInputStream) this.in).pos = offset;
+            ((UnsynchronizedByteArrayInputStream) this.in).count = Math.min(offset + length, buf.length);
+
             this.inf.reset();
-            this.crc.reset();
             this.eos = false;
 
-            this.in = in;
-            readHeader(in);
+            readHeader(this.checked_inStream);
         }
 
         @Override
@@ -194,7 +198,7 @@ public abstract class GZipUtils
 
         private int readHeader(InputStream this_in) throws IOException
         {
-            CheckedInputStream in = new CheckedInputStream(this_in, this.crc);
+            CheckedInputStream in = (CheckedInputStream) (this_in instanceof CheckedInputStream ? this_in : new CheckedInputStream(this_in, this.crc));
 
             this.crc.reset();
             // Check header magic
@@ -485,7 +489,7 @@ public abstract class GZipUtils
         @Override
         protected ReusableGZIPInputStream initialValue()
         {
-            return new ReusableGZIPInputStream(new ByteArrayInputStream(new byte[1]));
+            return new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1));
         }
     };
 
@@ -536,7 +540,7 @@ public abstract class GZipUtils
             final byte[] uncompressedData = new byte[uncompressedSize];
             final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
             final ReusableGZIPInputStream gZipIn = INFLATER.get();
-            gZipIn.reset(new UnsynchronizedByteArrayInputStream(compressedData, 4, compressedData.length - 4));
+            gZipIn.reset(compressedData, 4, compressedData.length - 4);
             int len = 0;
             while ((len = uncompressedData.length - buffer.position()) > 0)
             {
@@ -565,8 +569,8 @@ public abstract class GZipUtils
             final byte[] uncompressedData = ByteArrayPool.get(uncompressedSize);
             final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
             final ReusableGZIPInputStream gZipIn = INFLATER.get();
-            gZipIn.reset(new UnsynchronizedByteArrayInputStream(compressedData.array(), compressedData.position(),
-                compressedData.limit() - compressedData.position()));
+            gZipIn.reset(compressedData.array(), compressedData.position(),
+                compressedData.limit() - compressedData.position());
             int len = 0;
             while ((len = uncompressedSize - buffer.position()) > 0)
             {
