@@ -384,14 +384,17 @@ final class Record implements IRecord, Cloneable
             }
             else
             {
+                final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(t.size());
                 IValue previous;
+                int putPtr = 0;
+                int removePtr = 0;
                 for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
                 {
                     entry = (Map.Entry<String, IValue>) it.next();
                     key = entry.getKey();
                     value = entry.getValue();
                     internKey = keysPool.intern(key);
-                    
+
                     if (value != null)
                     {
                         previous = this.data.put(internKey, value);
@@ -400,7 +403,9 @@ final class Record implements IRecord, Cloneable
                         {
                             if (previous == null || !previous.equals(value))
                             {
-                                this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
+                                changes.putKeys[putPtr] = internKey;
+                                changes.putValues[putPtr] = new IValue[] { value, previous };
+                                putPtr++;
                             }
                         }
                     }
@@ -412,11 +417,16 @@ final class Record implements IRecord, Cloneable
                         {
                             if (previous != null)
                             {
-                                this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
+                                changes.removedKeys[removePtr] = internKey;
+                                changes.removedValues[removePtr] = previous;
+                                removePtr++;
                             }
                         }
                     }
                 }
+                changes.putSize = putPtr;
+                changes.removedSize = removePtr;
+                this.context.addBulkChangesToAtomicChange(this, changes);
             }
         }
     }
@@ -924,28 +934,39 @@ final class SubMap implements Map<String, IValue>
             }
             else
             {
+                final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(m.size());
                 IValue previous;
+                int putPtr = 0;
+                int removePtr = 0;
                 for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
                 {
                     entry = (Map.Entry<?, ?>) it.next();
                     key = (String) entry.getKey();
                     value = (IValue) entry.getValue();
                     internKey = Record.keysPool.intern(key);
-                    
+
                     if (value != null)
                     {
                         previous = this.subMap.put(internKey, value);
                         if (previous == null || !previous.equals(value))
                         {
-                            this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
+                            changes.putKeys[putPtr] = internKey;
+                            changes.putValues[putPtr] = new IValue[] { value, previous };
+                            putPtr++;
                         }
                     }
                     else
                     {
                         previous = this.subMap.remove(internKey);
-                        this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
+                        changes.removedKeys[removePtr] = internKey;
+                        changes.removedValues[removePtr] = previous;
+                        removePtr++;
+
                     }
                 }
+                changes.putSize = putPtr;
+                changes.removedSize = removePtr;
+                this.record.context.addBulkSubMapChangesToAtomicChange(this.record, this.subMapKey, changes);
             }
         }
     }
