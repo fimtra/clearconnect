@@ -135,7 +135,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     AtomicReference<Character> scope = new AtomicReference<Character>(DELTA_SCOPE);
     AtomicReference<Long> sequence = new AtomicReference<Long>(Long.valueOf(-1));
 
-    // todo maybe putEntries becomes Map<String, IValue[]> and we get rid of overwrittenEntries
     Map<String, IValue> putEntries;
     Map<String, IValue> overwrittenEntries;
     Map<String, IValue> removedEntries;
@@ -343,9 +342,18 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 isImage = subsequentChange.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
             }
 
-            newPutEntries = subsequentChange.getPutEntries();
-            newOverwrittenEntries = subsequentChange.getOverwrittenEntries();
-            newRemovedEntries = subsequentChange.getRemovedEntries();
+            if (subsequentChange instanceof AtomicChange)
+            {
+                newPutEntries = ((AtomicChange)subsequentChange).internalGetPutEntries();
+                newOverwrittenEntries = ((AtomicChange)subsequentChange).internalGetOverwrittenEntries();
+                newRemovedEntries = ((AtomicChange)subsequentChange).internalGetRemovedEntries();
+            }
+            else
+            {
+                newPutEntries = subsequentChange.getPutEntries();
+                newOverwrittenEntries = subsequentChange.getOverwrittenEntries();
+                newRemovedEntries = subsequentChange.getRemovedEntries();
+            }
 
             newPutEntriesSizeGreaterThan0 = newPutEntries.size() > 0;
             newRemovedEntriesSizeGreaterThan0 = newRemovedEntries.size() > 0;
