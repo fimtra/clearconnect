@@ -290,6 +290,38 @@ public class AtomicChangeTest
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
         final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
+        
+        target.put(K2, V2);
+        assertNotNull(target.get(K2));
+        
+        this.candidate.applyCompleteAtomicChangeToRecord(target);
+        assertEquals(1, target.size());
+        assertEquals(1, target.getSubMapKeys().size());
+        assertTrue(target.containsKey(K1));
+        assertEquals(V1, target.get(K1));
+        assertEquals(V1, target.getOrCreateSubMap(SUBMAP_KEY1).get(K1));
+        assertNull(target.get(K2));
+        assertNull(target.getOrCreateSubMap(SUBMAP_KEY1).get(K2));
+    }
+    
+    @Test
+    public void testApplyCompleteAtomicChangeToRecord_bulk()
+    {
+        Map<String, IValue[]> added = new HashMap<String, IValue[]>();
+        added.put(K1, new IValue[] { V1, V1p });
+        added.put(K2, new IValue[] { V1, null });
+        this.candidate.mergeBulkEntryUpdatedChange(added);
+        
+        Map<String, IValue> removed = new HashMap<String, IValue>();
+        removed.put(K2, V1);
+        this.candidate.mergeBulkEntryRemovedChange(removed);
+        
+        added = new HashMap<String, IValue[]>();
+        added.put(K1, new IValue[] { V1, V1p });
+        this.candidate.mergeBulkSubMapEntryUpdatedChange(SUBMAP_KEY1, added);
+        
+        final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
+        Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
 
         target.put(K2, V2);
         assertNotNull(target.get(K2));
