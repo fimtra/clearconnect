@@ -145,7 +145,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     Context context;
     CountDownLatch latch;
     IRecordListener[] subscribersForRecord;
-    
+
     /**
      * Construct the atomic change to represent the record.
      * <p>
@@ -186,7 +186,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         this.context = context;
         this.subscribersForRecord = subscribersForRecord;
     }
-    
+
     @Override
     public void run()
     {
@@ -204,15 +204,15 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             this.latch.countDown();
         }
     }
-    
+
     @Override
     public Object context()
     {
         return this.name;
     }
-    
+
     // ==== END methods used to support use as the ISequentialRunnable
-    
+
     @Override
     public String getName()
     {
@@ -256,7 +256,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         if (dataEmpty && this.subMapAtomicChanges != null)
         {
             for (Iterator<Map.Entry<String, AtomicChange>> it = this.subMapAtomicChanges.entrySet().iterator(); it.hasNext()
-                && dataEmpty;)
+                    && dataEmpty;)
             {
                 dataEmpty &= it.next().getValue().isEmpty();
             }
@@ -300,7 +300,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             + (noRemovedEntries() ? "" : ", removedEntries=" + ContextUtils.mapToString(this.removedEntries))
             + (this.subMapAtomicChanges == null ? "" : " subMapAtomicChanges=" + this.subMapAtomicChanges) + "]";
     }
-
+    
     @Override
     public void coalesce(List<IRecordChange> subsequentChanges)
     {
@@ -474,56 +474,39 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         return this.sequence.get().longValue();
     }
-    
-    void mergeBulkChanges(Map<String, IValue[]> added, Map<String, IValue> removed)
+
+    void mergeBulkChanges(ThreadLocalBulkChanges changes)
     {
         final Map<String, IValue> internalPutEntries = internalGetPutEntries();
         final Map<String, IValue> internalOverwrittenEntries = internalGetOverwrittenEntries();
         final Map<String, IValue> internalRemovedEntries = internalGetRemovedEntries();
 
-        String key = null;
-        if (added != null)
+        for (int i = 0; i < changes.putSize; i++)
         {
-            Map.Entry<String, IValue[]> entry = null;
-            IValue[] value = null;
-            for (Iterator<Map.Entry<String, IValue[]>> it = added.entrySet().iterator(); it.hasNext();)
+            internalPutEntries.put(changes.putKeys[i], changes.putValues[i][0]);
+            if (changes.putValues[i][1] != null)
             {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                internalPutEntries.put(key, value[0]);
-                if (value[1] != null)
-                {
-                    internalOverwrittenEntries.put(key, value[1]);
-                }
-                // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
-                // a put MUST overrule any previous remove, otherwise the atomic change has a put +
-                // remove which can cause problems if the put vs removes are applied in different
-                // orders
-                internalRemovedEntries.remove(key);
+                internalOverwrittenEntries.put(changes.putKeys[i], changes.putValues[i][1]);
             }
+            // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
+            // a put MUST overrule any previous remove, otherwise the atomic change has a put +
+            // remove which can cause problems if the put vs removes are applied in different
+            // orders
+            internalRemovedEntries.remove(changes.putKeys[i]);
         }
 
         // now do removes
-        if (removed != null)
+        for (int i = 0; i < changes.removedSize; i++)
         {
-            Map.Entry<String, IValue> entry = null;
-            IValue value = null;
-            for (Iterator<Map.Entry<String, IValue>> it = removed.entrySet().iterator(); it.hasNext();)
-            {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                internalPutEntries.remove(key);
-                internalOverwrittenEntries.remove(key);
-                internalRemovedEntries.put(key, value);
-            }
+            internalPutEntries.remove(changes.removedKeys[i]);
+            internalOverwrittenEntries.remove(changes.removedKeys[i]);
+            internalRemovedEntries.put(changes.removedKeys[i], changes.removedValues[i]);
         }
     }
 
-    void mergeBulkSubMapChanges(String subMapKey, Map<String, IValue[]> added, Map<String, IValue> removed)
+    void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
     {
-        internalGetSubMapAtomicChange(subMapKey).mergeBulkChanges(added, removed);
+        internalGetSubMapAtomicChange(subMapKey).mergeBulkChanges(changes);
     }
 
     void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
@@ -699,9 +682,9 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             ((Record) record).setSequence(this.sequence.get().longValue());
         }
-        
+
         applyTo(record);
-        
+
         if (this.subMapAtomicChanges != null)
         {
             Map<String, IValue> subMap;
@@ -759,5 +742,60 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             && is.eq(this.sequence.get(), other.sequence.get()) && is.eq(this.putEntries, other.putEntries)
             && is.eq(this.removedEntries, other.removedEntries)
             && is.eq(this.subMapAtomicChanges, other.subMapAtomicChanges);
+    }
+}
+
+/**
+ * Utility to hold put and remove changes in bijectional arrays
+ * 
+ * @author Ramon Servadei
+ */
+final class ThreadLocalBulkChanges
+{
+    static final ThreadLocal<ThreadLocalBulkChanges> THREAD_LOCAL = new ThreadLocal<ThreadLocalBulkChanges>()
+    {
+        @SuppressWarnings("synthetic-access")
+        @Override
+        protected ThreadLocalBulkChanges initialValue()
+        {
+            return new ThreadLocalBulkChanges();
+        }
+    };
+
+    static ThreadLocalBulkChanges get()
+    {
+        return THREAD_LOCAL.get();
+    }
+    
+    String[] putKeys;
+    IValue[][] putValues;
+    String[] removedKeys;
+    IValue[] removedValues;
+    int putSize;
+    int removedSize;
+
+    private ThreadLocalBulkChanges()
+    {
+        this.putKeys = new String[4];
+        this.putValues = new IValue[4][];
+        this.removedKeys = new String[4];
+        this.removedValues = new IValue[4];
+    }
+
+    ThreadLocalBulkChanges initialise(int size)
+    {
+        if (this.putKeys.length < size)
+        {
+            this.putKeys = new String[size];
+            this.putValues = new IValue[size][];
+            this.removedKeys = new String[size];
+            this.removedValues = new IValue[size];
+        }
+
+        // marked to zero
+        this.putSize = 0;
+        this.removedSize = 0;
+        
+        return this;
     }
 }

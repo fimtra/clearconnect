@@ -307,16 +307,21 @@ public class AtomicChangeTest
     @Test
     public void testApplyCompleteAtomicChangeToRecord_bulk()
     {
-        Map<String, IValue[]> added = new HashMap<String, IValue[]>();
-        added.put(K1, new IValue[] { V1, V1p });
-        added.put(K2, new IValue[] { V1, null });
-        Map<String, IValue> removed = new HashMap<String, IValue>();
-        removed.put(K2, V1);
-        this.candidate.mergeBulkChanges(added, removed);
-        
-        added = new HashMap<String, IValue[]>();
-        added.put(K1, new IValue[] { V1, V1p });
-        this.candidate.mergeBulkSubMapChanges(SUBMAP_KEY1, added, null);
+        ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(2);
+        changes.putKeys[0] = K1;
+        changes.putValues[0] = new IValue[] { V1, V1p };
+        changes.putKeys[1] = K2;
+        changes.putValues[1] = new IValue[] { V1, null };
+        changes.removedKeys[0] = K2;
+        changes.removedValues[0] = V1;
+        changes.putSize = 2;
+        changes.removedSize = 1;
+        this.candidate.mergeBulkChanges(changes);
+
+        // reuse the changes for K1 (index=0) 
+        changes.putSize = 1;
+        changes.removedSize = 0;
+        this.candidate.mergeBulkSubMapChanges(SUBMAP_KEY1, changes);
         
         final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
