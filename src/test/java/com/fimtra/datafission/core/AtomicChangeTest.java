@@ -310,15 +310,13 @@ public class AtomicChangeTest
         Map<String, IValue[]> added = new HashMap<String, IValue[]>();
         added.put(K1, new IValue[] { V1, V1p });
         added.put(K2, new IValue[] { V1, null });
-        this.candidate.mergeBulkEntryUpdatedChange(added);
-        
         Map<String, IValue> removed = new HashMap<String, IValue>();
         removed.put(K2, V1);
-        this.candidate.mergeBulkEntryRemovedChange(removed);
+        this.candidate.mergeBulkChanges(added, removed);
         
         added = new HashMap<String, IValue[]>();
         added.put(K1, new IValue[] { V1, V1p });
-        this.candidate.mergeBulkSubMapEntryUpdatedChange(SUBMAP_KEY1, added);
+        this.candidate.mergeBulkSubMapChanges(SUBMAP_KEY1, added, null);
         
         final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);

@@ -475,60 +475,55 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         return this.sequence.get().longValue();
     }
     
-    void mergeBulkEntryUpdatedChange(Map<String, IValue[]> added)
+    void mergeBulkChanges(Map<String, IValue[]> added, Map<String, IValue> removed)
     {
         final Map<String, IValue> internalPutEntries = internalGetPutEntries();
         final Map<String, IValue> internalOverwrittenEntries = internalGetOverwrittenEntries();
         final Map<String, IValue> internalRemovedEntries = internalGetRemovedEntries();
-        
-        Map.Entry<String, IValue[]> entry = null;
+
         String key = null;
-        IValue[] value = null;
-        for (Iterator<Map.Entry<String, IValue[]>> it = added.entrySet().iterator(); it.hasNext();)
+        if (added != null)
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            internalPutEntries.put(key, value[0]);
-            if (value[1] != null)
+            Map.Entry<String, IValue[]> entry = null;
+            IValue[] value = null;
+            for (Iterator<Map.Entry<String, IValue[]>> it = added.entrySet().iterator(); it.hasNext();)
             {
-                internalOverwrittenEntries.put(key, value[1]);
+                entry = it.next();
+                key = entry.getKey();
+                value = entry.getValue();
+                internalPutEntries.put(key, value[0]);
+                if (value[1] != null)
+                {
+                    internalOverwrittenEntries.put(key, value[1]);
+                }
+                // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
+                // a put MUST overrule any previous remove, otherwise the atomic change has a put +
+                // remove which can cause problems if the put vs removes are applied in different
+                // orders
+                internalRemovedEntries.remove(key);
             }
-            // VERY IMPORTANT: when adding a field, if the atomic change has not been completed, a put
-            // MUST overrule any previous remove, otherwise the atomic change has a put + remove which
-            // can cause problems if the put vs removes are applied in different orders
-            internalRemovedEntries.remove(key);
         }
-    }
 
-    void mergeBulkEntryRemovedChange(Map<String, IValue> removed)
-    {
-        final Map<String, IValue> internalPutEntries = internalGetPutEntries();
-        final Map<String, IValue> internalOverwrittenEntries = internalGetOverwrittenEntries();
-        final Map<String, IValue> internalRemovedEntries = internalGetRemovedEntries();
-        
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
-        for (Iterator<Map.Entry<String, IValue>> it = removed.entrySet().iterator(); it.hasNext();)
+        // now do removes
+        if (removed != null)
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            internalPutEntries.remove(key);
-            internalOverwrittenEntries.remove(key);
-            internalRemovedEntries.put(key, value);
+            Map.Entry<String, IValue> entry = null;
+            IValue value = null;
+            for (Iterator<Map.Entry<String, IValue>> it = removed.entrySet().iterator(); it.hasNext();)
+            {
+                entry = it.next();
+                key = entry.getKey();
+                value = entry.getValue();
+                internalPutEntries.remove(key);
+                internalOverwrittenEntries.remove(key);
+                internalRemovedEntries.put(key, value);
+            }
         }
     }
 
-    void mergeBulkSubMapEntryUpdatedChange(String subMapKey, Map<String, IValue[]> added)
+    void mergeBulkSubMapChanges(String subMapKey, Map<String, IValue[]> added, Map<String, IValue> removed)
     {
-        internalGetSubMapAtomicChange(subMapKey).mergeBulkEntryUpdatedChange(added);
-    }
-
-    void mergeBulkSubMapEntryRemovedChange(String subMapKey, Map<String, IValue> removed)
-    {
-        internalGetSubMapAtomicChange(subMapKey).mergeBulkEntryRemovedChange(removed);
+        internalGetSubMapAtomicChange(subMapKey).mergeBulkChanges(added, removed);
     }
 
     void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
