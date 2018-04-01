@@ -246,6 +246,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     };
 
+    @SuppressWarnings("null")
     static IRecordChange decodeAtomicChange(char[] decodedMessage)
     {
         final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
@@ -261,109 +262,114 @@ public class StringProtocolCodec implements ICodec<char[]>
             findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
             final String name = stringFromCharBuffer(decodedMessage, bijTokenOffset[0][1], bijTokenLimit[0][1]);
             final AtomicChange atomicChange = new AtomicChange(name);
-            // prepare the put and remove maps
-            atomicChange.internalGetPutEntries();
-            atomicChange.internalGetRemovedEntries();
-
-            // set the scope and sequence
-            atomicChange.setScope(decodedMessage[bijTokenOffset[0][2]]);
-            atomicChange.setSequence(LongValue.valueOf(decodedMessage, bijTokenOffset[0][2] + 1,
-                bijTokenLimit[0][2] - bijTokenOffset[0][2] - 1).longValue());
-
-            boolean put = true;
-            boolean processSubmaps = false;
-            String subMapName = null;
-            int position;
-            int len;
-            if (bijTokenLen[0] > 2)
+            
+            // optimise the locking for the internal getXXX methods
+            synchronized (atomicChange)
             {
-                char previous;
-                int j;
-                for (int i = 3; i < bijTokenLen[0]; i++)
+                // set the scope and sequence
+                atomicChange.setScope(decodedMessage[bijTokenOffset[0][2]]);
+                atomicChange.setSequence(LongValue.valueOf(decodedMessage, bijTokenOffset[0][2] + 1,
+                    bijTokenLimit[0][2] - bijTokenOffset[0][2] - 1).longValue());
+
+                boolean put = true;
+                String subMapName = null;
+                AtomicChange target = null;
+                int position;
+                int len;
+                if (bijTokenLen[0] > 2)
                 {
-                    position = bijTokenOffset[0][i];
-                    len = bijTokenLimit[0][i] - position;
-                    if (len == 1)
+                    char previous;
+                    int j;
+                    for (int i = 3; i < bijTokenLen[0]; i++)
                     {
-                        switch(decodedMessage[bijTokenOffset[0][i]])
+                        position = bijTokenOffset[0][i];
+                        len = bijTokenLimit[0][i] - position;
+                        if (len == 1)
                         {
-                            case PUT_CODE:
-                                put = true;
-                                break;
-                            case REMOVE_CODE:
-                                put = false;
-                                break;
-                            case SUBMAP_CODE:
-                                processSubmaps = true;
-                                ++i;
-                                subMapName =
-                                    stringFromCharBuffer(decodedMessage, bijTokenOffset[0][i], bijTokenLimit[0][i]);
-                                break;
-                            default :
-                                break;
+                            switch(decodedMessage[bijTokenOffset[0][i]])
+                            {
+                                case PUT_CODE:
+                                    put = true;
+                                    if (subMapName == null)
+                                    {
+                                        target = atomicChange;
+                                    }
+                                    else
+                                    {
+                                        target = atomicChange.internalGetSubMapAtomicChange(subMapName);
+                                    }
+                                    target.internalGetPutEntries();
+                                    break;
+                                case REMOVE_CODE:
+                                    put = false;
+                                    if (subMapName == null)
+                                    {
+                                        target = atomicChange;
+                                    }
+                                    else
+                                    {
+                                        target = atomicChange.internalGetSubMapAtomicChange(subMapName);
+                                    }
+                                    target.internalGetRemovedEntries();
+                                    break;
+                                case SUBMAP_CODE:
+                                    ++i;
+                                    subMapName =
+                                        stringFromCharBuffer(decodedMessage, bijTokenOffset[0][i], bijTokenLimit[0][i]);
+                                    break;
+                                default :
+                                    break;
+                            }
                         }
-                    }
-                    else
-                    {
-                        previous = 0;
-                        // length must be relative to the position
-                        len += position;
-                        for (j = position; j < len; j++)
+                        else
                         {
+                            previous = 0;
+                            // length must be relative to the position
+                            len += position;
                             if (decodingBuffers.tempArr.length < len)
                             {
                                 decodingBuffers.tempArr = new char[len];
                             }
-                            switch(decodedMessage[j])
+                            for (j = position; j < len; j++)
                             {
-                                case CHAR_KEY_VALUE_SEPARATOR:
-                                    // find where the first non-escaped "=" is
-                                    if (previous != CHAR_ESCAPE)
-                                    {
-                                        if (processSubmaps)
+                                switch(decodedMessage[j])
+                                {
+                                    case CHAR_KEY_VALUE_SEPARATOR:
+                                        // find where the first non-escaped "=" is
+                                        if (previous != CHAR_ESCAPE)
                                         {
                                             if (put)
                                             {
-                                                atomicChange.mergeSubMapEntryUpdatedChange(subMapName,
-                                                    decodeKey(decodedMessage, position, j, true,
-                                                        decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr),
-                                                    null);
-                                            }
-                                            else
-                                            {
-                                                atomicChange.mergeSubMapEntryRemovedChange(subMapName,
-                                                    decodeKey(decodedMessage, position, j, true,
-                                                        decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
-                                            }
-                                        }
-                                        else
-                                        {
-                                            if (put)
-                                            {
-                                                atomicChange.addEntry_onlyCallFromCodec(
+                                                target.addEntry_onlyCallFromCodec(
                                                     decodeKey(decodedMessage, position, j, true,
                                                         decodingBuffers.tempArr),
                                                     decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
                                             }
                                             else
                                             {
-                                                atomicChange.removeEntry_onlyCallFromCodec(decodeKey(decodedMessage,
-                                                    position, j, true, decodingBuffers.tempArr), null);
+                                                target.removeEntry_onlyCallFromCodec(
+                                                    decodeKey(decodedMessage, position, j, true,
+                                                        decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
                                             }
+                                            j = decodedMessage.length;
                                         }
-                                        j = decodedMessage.length;
-                                    }
-                                    break;
-                                default :
-                                    previous = decodedMessage[j];
+                                        break;
+                                    default :
+                                        previous = decodedMessage[j];
+                                }
+                            }
+                            // remove any keys that are in put and removed - leave in removed
+                            if (target.putEntries != null && target.removedEntries != null
+                                && target.removedEntries.size() > 0)
+                            {
+                                target.putEntries.keySet().removeAll(target.removedEntries.keySet());
                             }
                         }
                     }
                 }
+                return atomicChange;
             }
-            return atomicChange;
         }
         catch (Exception e)
         {
@@ -404,17 +410,21 @@ public class StringProtocolCodec implements ICodec<char[]>
         final Map<String, IValue> putEntries;
         final Map<String, IValue> removedEntries;
         final Set<String> subMapKeys;
+        // optimise the locking for the internal getXXX methods
+        synchronized (atomicChange)
+        {
         if (atomicChange instanceof AtomicChange)
         {
-            putEntries = ((AtomicChange) atomicChange).internalGetPutEntries();
-            removedEntries = ((AtomicChange) atomicChange).internalGetRemovedEntries();
-            subMapKeys = ((AtomicChange) atomicChange).internalGetSubMapKeys();
+                putEntries = ((AtomicChange) atomicChange).internalGetPutEntries();
+                removedEntries = ((AtomicChange) atomicChange).internalGetRemovedEntries();
+                subMapKeys = ((AtomicChange) atomicChange).internalGetSubMapKeys();
         }
         else
         {
             putEntries = atomicChange.getPutEntries();
             removedEntries = atomicChange.getRemovedEntries();
             subMapKeys = atomicChange.getSubMapKeys();
+        }
         }
 
         final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
@@ -437,12 +447,21 @@ public class StringProtocolCodec implements ICodec<char[]>
             for (String subMapKey : subMapKeys)
             {
                 subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
-                sb.append(DELIMITER_SUBMAP_CODE);
-                escape(subMapKey, sb, charArrayRef, escapedChars);
-                addEntriesToTxString(DELIMITER_PUT_CODE, subMapAtomicChange.getPutEntries(), sb, charArrayRef,
-                    escapedChars, keyCharArrayRef);
-                addEntriesToTxString(DELIMITER_REMOVE_CODE, subMapAtomicChange.getRemovedEntries(), sb,
-                    charArrayRef, escapedChars, keyCharArrayRef);
+                synchronized (subMapAtomicChange)
+                {
+                    sb.append(DELIMITER_SUBMAP_CODE);
+                    escape(subMapKey, sb, charArrayRef, escapedChars);
+                    addEntriesToTxString(DELIMITER_PUT_CODE,
+                        subMapAtomicChange instanceof AtomicChange
+                            ? ((AtomicChange) subMapAtomicChange).internalGetPutEntries()
+                            : subMapAtomicChange.getPutEntries(),
+                        sb, charArrayRef, escapedChars, keyCharArrayRef);
+                    addEntriesToTxString(DELIMITER_REMOVE_CODE,
+                        subMapAtomicChange instanceof AtomicChange
+                            ? ((AtomicChange) subMapAtomicChange).internalGetRemovedEntries()
+                            : subMapAtomicChange.getRemovedEntries(),
+                        sb, charArrayRef, escapedChars, keyCharArrayRef);
+                }
             }
         }
 

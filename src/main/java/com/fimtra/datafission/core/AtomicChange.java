@@ -533,7 +533,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     void addEntry_onlyCallFromCodec(String key, IValue current)
     {
         this.putEntries.put(key, current);
-        this.removedEntries.remove(key);
     }
 
     void mergeEntryRemovedChange(String key, IValue value)
@@ -546,7 +545,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     void removeEntry_onlyCallFromCodec(String key, IValue value)
     {
         this.removedEntries.put(key, value);
-        this.putEntries.remove(key);
     }
 
     void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
@@ -632,6 +630,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         if (this.subMapAtomicChanges != null)
         {
+            // todo not very inefficient
             return Collections.unmodifiableSet(CollectionUtils.newHashSet(internalGetSubMapKeys()));
         }
         else
