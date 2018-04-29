@@ -76,7 +76,7 @@ public abstract class DataFissionProperties
          * The system property name to define the period in milliseconds to wait before a
          * {@link ProxyContext} will attempt re-connecting to a {@link Context} after losing the
          * connection.<br>
-         * E.g. <code>-DdataFission.proxyReconnectPeriodMillis=5000</code>
+         * E.g. <code>-DdataFission.proxyReconnectPeriodMillis=1000</code>
          */
         String PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS = BASE + "proxyReconnectPeriodMillis";
 
@@ -273,12 +273,12 @@ public abstract class DataFissionProperties
          * The default period in milliseconds that a {@link ProxyContext} waits before reconnecting
          * to a {@link Context} after losing the connection.
          * <p>
-         * Default is: 5000
+         * Default is: 1000
          * 
          * @see Names#PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS
          */
         int PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS =
-            Integer.parseInt(System.getProperty(Names.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, "5000"));
+            Integer.parseInt(System.getProperty(Names.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, "1000"));
 
         /**
          * The default maximum number of changes per message a {@link Publisher} can send.
