@@ -404,7 +404,8 @@ final class Record implements IRecord, Cloneable
                             if (previous == null || !previous.equals(value))
                             {
                                 changes.putKeys[putPtr] = internKey;
-                                changes.putValues[putPtr] = new IValue[] { value, previous };
+                                changes.putValues[putPtr][0] = value;
+                                changes.putValues[putPtr][1] = previous;
                                 putPtr++;
                             }
                         }
@@ -951,7 +952,8 @@ final class SubMap implements Map<String, IValue>
                         if (previous == null || !previous.equals(value))
                         {
                             changes.putKeys[putPtr] = internKey;
-                            changes.putValues[putPtr] = new IValue[] { value, previous };
+                            changes.putValues[putPtr][0] = value;
+                            changes.putValues[putPtr][1] = previous;
                             putPtr++;
                         }
                     }

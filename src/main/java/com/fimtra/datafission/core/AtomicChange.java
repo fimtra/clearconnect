@@ -784,7 +784,7 @@ final class ThreadLocalBulkChanges
     private ThreadLocalBulkChanges()
     {
         this.putKeys = new String[4];
-        this.putValues = new IValue[4][];
+        this.putValues = new IValue[4][2];
         this.removedKeys = new String[4];
         this.removedValues = new IValue[4];
     }
@@ -794,9 +794,24 @@ final class ThreadLocalBulkChanges
         if (this.putKeys.length < size)
         {
             this.putKeys = new String[size];
-            this.putValues = new IValue[size][];
+            this.putValues = new IValue[size][2];
             this.removedKeys = new String[size];
             this.removedValues = new IValue[size];
+        }
+        else
+        {
+            int i;
+            for (i = 0; i < this.putSize; i++)
+            {
+                this.putKeys[i] = null;
+                this.putValues[i][0] = null;
+                this.putValues[i][1] = null;
+            }
+            for (i = 0; i < this.removedSize; i++)
+            {
+                this.removedKeys[i] = null;
+                this.removedValues[i] = null;
+            }
         }
 
         // marked to zero
