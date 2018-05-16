@@ -52,7 +52,7 @@ public class RollingFileAppenderTest
     {
         this.file = new File(this.name.getMethodName() + ".log");
         deleteLogged();
-        this.candidate = new RollingFileAppender(this.file, 10, 5l, this.name.getMethodName());
+        this.candidate = new RollingFileAppender(this.file, 10);
     }
 
     @After
