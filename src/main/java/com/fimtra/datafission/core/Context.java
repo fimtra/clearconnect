@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -122,9 +121,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 Log.log(Context.class, "JVM shutting down...");
                 final DeadlockDetector deadlockDetector = new DeadlockDetector();
                 final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
-                // delete old files
-                FileUtils.deleteFiles(new File(UtilProperties.Values.LOG_DIR),
-                    TimeUnit.MINUTES.convert(1, TimeUnit.DAYS), filePrefix);
                 final File threadDumpOnShutdownFile =
                     FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
                 final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();

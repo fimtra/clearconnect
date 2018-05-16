@@ -48,7 +48,14 @@ import com.fimtra.util.ObjectUtils;
  */
 public final class ChannelWatchdog implements Runnable
 {
-    
+    /**
+     * Controls logging of:
+     * <ul>
+     * <li>received heartbeats
+     * </ul>
+     */
+    static final boolean log = Boolean.getBoolean("log.ChannelWatchdog");
+
     int heartbeatPeriodMillis;
     int missedHeartbeatCount;
     volatile Set<ITransportChannel> channels;
@@ -253,11 +260,19 @@ public final class ChannelWatchdog implements Runnable
 
     public void onHeartbeat(final ITransportChannel channel)
     {
+        final long timeIn = System.nanoTime();
+        
         this.executor.execute(new Runnable()
         {
             @Override
             public void run()
             {
+                if (log)
+                {
+                    Log.log(this, "HB (rx=T-", Long.toString((System.nanoTime() - timeIn) / 1000), "us) ",
+                        ObjectUtils.safeToString(channel));
+                }
+                
                 if (ChannelWatchdog.this.channels.contains(channel))
                 {
                     ChannelWatchdog.this.channelsReceivingHeartbeat.add(channel);

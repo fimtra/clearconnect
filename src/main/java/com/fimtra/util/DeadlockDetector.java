@@ -88,9 +88,6 @@ public final class DeadlockDetector
         if (appender == null)
         {
             final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDump";
-            // delete old files
-            FileUtils.deleteFiles(new File(UtilProperties.Values.LOG_DIR),
-                TimeUnit.MINUTES.convert(1, TimeUnit.DAYS), filePrefix);
             staticFile = FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
             try
             {
