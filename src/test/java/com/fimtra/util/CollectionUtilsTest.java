@@ -62,18 +62,18 @@ public class CollectionUtilsTest
     public void testNewSetFromString()
     {
         HashSet<String> expected = new HashSet<String>();
-        assertEquals(expected, CollectionUtils.newSetFromString(null));
+        assertEquals(expected, CollectionUtils.newSetFromString(null, ","));
         
         expected = new HashSet<String>();
         expected.add("");
-        assertEquals(expected, CollectionUtils.newSetFromString(""));
-        assertEquals(expected, CollectionUtils.newSetFromString(" "));
+        assertEquals(expected, CollectionUtils.newSetFromString("", ","));
+        assertEquals(expected, CollectionUtils.newSetFromString(" ", ","));
         
         expected = new HashSet<String>();
         expected.add("1");
         expected.add("2");
         expected.add("3");
-        assertEquals(expected, CollectionUtils.newSetFromString("1  , 2,3"));
+        assertEquals(expected, CollectionUtils.newSetFromString("1  , 2,3", ","));
     }
 
 }

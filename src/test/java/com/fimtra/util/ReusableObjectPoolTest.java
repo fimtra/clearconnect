@@ -32,6 +32,7 @@ import org.junit.Test;
  * 
  * @author Ramon Servadei
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class ReusableObjectPoolTest
 {
     AbstractReusableObjectPool<Map> candidate;
