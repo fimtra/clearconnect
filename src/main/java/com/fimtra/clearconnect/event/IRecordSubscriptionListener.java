@@ -31,7 +31,7 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei
  */
-public interface IRecordSubscriptionListener
+public interface IRecordSubscriptionListener extends IEventListener
 {
     public class SubscriptionInfo
     {

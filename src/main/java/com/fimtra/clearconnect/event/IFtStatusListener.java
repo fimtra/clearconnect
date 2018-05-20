@@ -32,7 +32,7 @@ import com.fimtra.clearconnect.RedundancyModeEnum;
  * 
  * @author Ramon Servadei
  */
-public interface IFtStatusListener
+public interface IFtStatusListener extends IEventListener
 {
     /**
      * Called when the platform service instance is active (the master) in an FT platform service

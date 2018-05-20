@@ -34,7 +34,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
  * @see IPlatformServiceInstance
  * @author Ramon Servadei
  */
-public interface IServiceAvailableListener
+public interface IServiceAvailableListener extends IEventListener
 {
     /**
      * Triggered when a platform service becomes available. This occurs when there is at least one

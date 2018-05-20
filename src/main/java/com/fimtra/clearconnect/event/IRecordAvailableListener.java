@@ -31,7 +31,7 @@ import com.fimtra.clearconnect.IPlatformServiceComponent;
  * 
  * @author Ramon Servadei
  */
-public interface IRecordAvailableListener
+public interface IRecordAvailableListener extends IEventListener
 {
     /**
      * Called when a record is added to a platform service component.

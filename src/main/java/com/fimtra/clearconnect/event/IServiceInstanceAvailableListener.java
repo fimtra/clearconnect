@@ -36,7 +36,7 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
  * @see
  * @author Ramon Servadei
  */
-public interface IServiceInstanceAvailableListener
+public interface IServiceInstanceAvailableListener extends IEventListener
 {
     /**
      * Triggered when a platform service instance becomes available.

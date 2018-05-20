@@ -44,7 +44,7 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * @see IPlatformServiceProxy#addServiceConnectionStatusListener(IServiceConnectionStatusListener)
  * @author Ramon Servadei
  */
-public interface IServiceConnectionStatusListener
+public interface IServiceConnectionStatusListener extends IEventListener
 {
     /**
      * Called when a platform service proxy is connected to its service.

@@ -27,7 +27,7 @@ package com.fimtra.clearconnect.event;
  * 
  * @author Ramon Servadei
  */
-public interface IRegistryAvailableListener
+public interface IRegistryAvailableListener extends IEventListener
 {
     /**
      * Called when the agent is connected to the registry

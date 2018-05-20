@@ -31,7 +31,7 @@ import com.fimtra.datafission.IRpcInstance;
  * 
  * @author Ramon Servadei
  */
-public interface IRpcAvailableListener
+public interface IRpcAvailableListener extends IEventListener
 {
     /**
      * Called when a new RPC is available in the platform service component.

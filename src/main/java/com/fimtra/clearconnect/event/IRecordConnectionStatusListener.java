@@ -38,7 +38,7 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * 
  * @author Ramon Servadei
  */
-public interface IRecordConnectionStatusListener
+public interface IRecordConnectionStatusListener extends IEventListener
 {
     /**
      * Called when the record is connected and its data can be considered valid

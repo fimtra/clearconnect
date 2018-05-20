@@ -26,6 +26,7 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * a new proxy connection.
  * <p>
  * <h2>Threading</h2>
+ * TODO - needs to be thread-safe - initial image notification occurs on a separate thread - applies to ALL event listener types
  * <ul>
  * <li>When a listener instance is registered with only one service, the callback methods are
  * guaranteed to not execute concurrently. However, they may be executed by different threads.
@@ -35,7 +36,7 @@ import com.fimtra.clearconnect.IPlatformServiceProxy;
  * 
  * @author Ramon Servadei
  */
-public interface IProxyConnectionListener
+public interface IProxyConnectionListener extends IEventListener
 {
     /**
      * Called when a platform service proxy connects to the service.
