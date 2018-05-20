@@ -39,23 +39,32 @@ class ByteArrayFragment
 {
     static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
-        new MultiThreadReusableObjectPool<ByteArrayFragment>("ByteArrayFragmentPool",
-            new IReusableObjectBuilder<ByteArrayFragment>()
+    static final ThreadLocal<MultiThreadReusableObjectPool<ByteArrayFragment>> BYTE_ARRAY_FRAGMENT_POOL =
+        new ThreadLocal<MultiThreadReusableObjectPool<ByteArrayFragment>>()
+        {
+            @Override
+            protected MultiThreadReusableObjectPool<ByteArrayFragment> initialValue()
             {
-                @Override
-                public ByteArrayFragment newInstance()
-                {
-                    return new ByteArrayFragment();
-                }
-            }, new IReusableObjectFinalizer<ByteArrayFragment>()
-            {
-                @Override
-                public void reset(ByteArrayFragment instance)
-                {
-                    instance.initialise(-1, -1, (byte) -1, null, -1, -1);
-                }
-            }, 32);
+                return new MultiThreadReusableObjectPool<ByteArrayFragment>(Thread.currentThread() + "-RxFramePool",
+                    new IReusableObjectBuilder<ByteArrayFragment>()
+                    {
+                        @Override
+                        public ByteArrayFragment newInstance()
+                        {
+                            final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
+                            byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL.get();
+                            return byteArrayFragment;
+                        }
+                    }, new IReusableObjectFinalizer<ByteArrayFragment>()
+                    {
+                        @Override
+                        public void reset(ByteArrayFragment instance)
+                        {
+                            instance.initialise(-1, -1, (byte) -1, null, -1, -1);
+                        }
+                    }, 32);
+            }
+        };
 
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
@@ -160,8 +169,8 @@ class ByteArrayFragment
         final int sequenceId = rxData.getInt();
         final byte lastElement = rxData.get();
 
-        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(), rxData.position(),
-            rxData.limit() - rxData.position());
+        return BYTE_ARRAY_FRAGMENT_POOL.get().get().initialise(id, sequenceId, lastElement, rxData.array(),
+            rxData.position(), rxData.limit() - rxData.position());
     }
 
     /**
@@ -191,8 +200,8 @@ class ByteArrayFragment
         final int sequenceId = parts[1];
         final byte lastElement = (byte) parts[2];
 
-        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(), rxData.position(),
-            rxData.limit() - rxData.position());
+        return BYTE_ARRAY_FRAGMENT_POOL.get().get().initialise(id, sequenceId, lastElement, rxData.array(),
+            rxData.position(), rxData.limit() - rxData.position());
     }
 
     int id;
@@ -201,6 +210,8 @@ class ByteArrayFragment
     int length;
     int sequenceId;
     byte[] data;
+    @SuppressWarnings("rawtypes")
+    MultiThreadReusableObjectPool poolRef;
 
     ByteArrayFragment()
     {
@@ -300,8 +311,9 @@ class ByteArrayFragment
             + this.lastElement + ", data=" + this.length + "]";
     }
 
+    @SuppressWarnings("unchecked")
     void free()
     {
-        ByteArrayFragment.BYTE_ARRAY_FRAGMENT_POOL.offer(this);
+        this.poolRef.offer(this);
     }
 }
