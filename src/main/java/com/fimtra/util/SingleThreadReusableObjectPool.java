@@ -18,6 +18,8 @@ package com.fimtra.util;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -73,6 +75,8 @@ abstract class AbstractReusableObjectPool<T>
             @Override
             public void run()
             {
+                final TreeMap<String, AbstractReusableObjectPool<?>> ordered =
+                    new TreeMap<String, AbstractReusableObjectPool<?>>();
                 synchronized (pools)
                 {
                     for (Iterator<WeakReference<AbstractReusableObjectPool<?>>> iterator =
@@ -87,8 +91,14 @@ abstract class AbstractReusableObjectPool<T>
                         }
                         else
                         {
-                            Log.log(AbstractReusableObjectPool.class, object.toString());
+                            ordered.put(object.name, object);
                         }
+                    }
+
+                    for (Iterator<Map.Entry<String, AbstractReusableObjectPool<?>>> it =
+                        ordered.entrySet().iterator(); it.hasNext();)
+                    {
+                        Log.log(AbstractReusableObjectPool.class, it.next().getValue().toString());
                     }
                 }
             }
@@ -98,7 +108,7 @@ abstract class AbstractReusableObjectPool<T>
     final Lock lock;
     final IReusableObjectBuilder<T> builder;
     final IReusableObjectFinalizer<T> finalizer;
-    private final String name;
+    final String name;
     private final WeakReference<AbstractReusableObjectPool<?>> weakRef;
     private final Object[] pool;
     private final int poolLimit;
@@ -165,8 +175,10 @@ abstract class AbstractReusableObjectPool<T>
     @Override
     public final String toString()
     {
-        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.poolPtr + "/" + this.highest + "/"
-            + (this.pool.length) + "]";
+        // note: we add 1 to the poolPtr and highest to represent these as 1-based (not as 0-based
+        // for the array that they operate on).
+        return this.getClass().getSimpleName() + "[" + this.name + ", " + (this.poolPtr + 1) + "/" + (this.highest + 1)
+            + "/" + (this.pool.length) + "]";
     }
 
     final void doOffer(T instance)
