@@ -20,7 +20,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
+import java.util.Vector;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -105,11 +105,11 @@ public class NotifyingCacheTest
     {
         final CyclicBarrier barrier = new CyclicBarrier(2);
         final CountDownLatch latch = new CountDownLatch(2);
-        final List<List<String>> listeners = new ArrayList<List<String>>();
+        final List<List<String>> listeners = new Vector<List<String>>();
         final int COUNT = 100;
         for (int i = 0; i < COUNT; i++)
         {
-            listeners.add(new ArrayList<String>(COUNT)
+            listeners.add(new Vector<String>(COUNT)
             {
 
                 @Override
@@ -162,7 +162,7 @@ public class NotifyingCacheTest
                 }
 
                 final CountDownLatch finished = new CountDownLatch(COUNT);
-                final ArrayList<String> listener = new ArrayList<String>(COUNT)
+                final Vector<String> listener = new Vector<String>(COUNT)
                 {
                     @Override
                     public boolean equals(Object o)
@@ -293,7 +293,7 @@ public class NotifyingCacheTest
     public void testNotifiedOnDestroy() throws EventFailedException, InterruptedException
     {
         this.candidate.notifyListenersDataAdded("key1", "data1");
-        final List<String> listener = new ArrayList<String>();
+        final List<String> listener = new Vector<String>();
         this.candidate.addListener(listener);
         TestUtils.waitForEvent(new EventChecker()
         {
@@ -341,7 +341,7 @@ public class NotifyingCacheTest
     {
         final AtomicReference<CountDownLatch> removed1 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> added1 = new AtomicReference<CountDownLatch>(new CountDownLatch(2));
-        List<String> listener1 = new ArrayList<String>()
+        List<String> listener1 = new Vector<String>()
         {
             @Override
             public boolean equals(Object o)
@@ -376,7 +376,7 @@ public class NotifyingCacheTest
         assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
         final AtomicReference<CountDownLatch> removed2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> added2 = new AtomicReference<CountDownLatch>(new CountDownLatch(2));
-        List<String> listener2 = new ArrayList<String>()
+        List<String> listener2 = new Vector<String>()
         {
 
             @Override
@@ -408,7 +408,7 @@ public class NotifyingCacheTest
             }
 
         };
-        ArrayList<String> currentData = new ArrayList<String>();
+        Vector<String> currentData = new Vector<String>();
         currentData.add("1");
         currentData.add("2");
         assertTrue(this.candidate.addListener(listener2));
@@ -541,8 +541,8 @@ public class NotifyingCacheTest
     @Test
     public void testListenerNotificationOrder() throws InterruptedException
     {
-        final List<Object> notifiedAdded = new ArrayList<Object>();
-        final List<Object> notifiedRemoved = new ArrayList<Object>();
+        final List<Object> notifiedAdded = new Vector<Object>();
+        final List<Object> notifiedRemoved = new Vector<Object>();
         Object o1 = new Object();
         Object o2 = new Object();
         NotifyingCache<Object, String> candidate = new NotifyingCache<Object, String>()
@@ -559,8 +559,8 @@ public class NotifyingCacheTest
                 notifiedAdded.add(listener);
             }
         };
-        final List<Object> expectedNotifiedAdded = new ArrayList<Object>();
-        final List<Object> expectedNotifiedRemoved = new ArrayList<Object>();
+        final List<Object> expectedNotifiedAdded = new Vector<Object>();
+        final List<Object> expectedNotifiedRemoved = new Vector<Object>();
         expectedNotifiedAdded.add(o1);
         expectedNotifiedAdded.add(o2);
         expectedNotifiedRemoved.add(o1);
