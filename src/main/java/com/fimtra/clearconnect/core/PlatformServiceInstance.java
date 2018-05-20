@@ -183,7 +183,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         IServiceStatsRecordFields.KB_PER_SEC,
                         DoubleValue.valueOf((((long) (((bytesPublished - this.lastBytesPublished) * inverse_1K * perSec) * 10)) / 10d)));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
-                        LongValue.valueOf(messagesPublished == 0 ? 0 : bytesPublished / messagesPublished));
+                        // use the period stats for calculating the average message size
+                        LongValue.valueOf(messagesPublished == 0 ? 0 : ((bytesPublished - this.lastBytesPublished)
+                            / (messagesPublished - this.lastMessagesPublished))));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(subscriptionCount));
                     PlatformServiceInstance.this.stats.put(
