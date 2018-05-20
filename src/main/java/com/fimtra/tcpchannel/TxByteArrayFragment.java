@@ -16,10 +16,11 @@
 package com.fimtra.tcpchannel;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.fimtra.util.LowGcLinkedList;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 
 /**
  * For efficiency reasons, there is a TX version of the ByteArrayFragment.
@@ -30,6 +31,34 @@ final class TxByteArrayFragment extends ByteArrayFragment
 {
     final static AtomicInteger ID_COUNTER = new AtomicInteger();
 
+    final static ThreadLocal<MultiThreadReusableObjectPool<TxByteArrayFragment>> TX_FRAGMENTS_POOL = 
+            new ThreadLocal<MultiThreadReusableObjectPool<TxByteArrayFragment>>()
+    {
+        @Override
+        protected MultiThreadReusableObjectPool<TxByteArrayFragment> initialValue()
+        {
+            return new MultiThreadReusableObjectPool<TxByteArrayFragment>(Thread.currentThread() + "-TxFramePool", 
+                    new IReusableObjectBuilder<TxByteArrayFragment>()
+            {
+                @Override
+                public TxByteArrayFragment newInstance()
+                {
+                    final TxByteArrayFragment txByteArrayFragment = new TxByteArrayFragment(0, 0, (byte) 0, null, 0, 0);
+                    txByteArrayFragment.poolRef = TX_FRAGMENTS_POOL.get();
+                    return txByteArrayFragment;
+                }
+            }, new IReusableObjectFinalizer<TxByteArrayFragment>()
+            {
+                @Override
+                public void reset(TxByteArrayFragment instance)
+                {
+                    instance.reset();
+                }
+            },
+            TcpChannelProperties.Values.TX_FRAME_POOL_MAX_SIZE);
+        }
+     };
+            
     /**
      * Break the byte[] into fragments.
      * 
@@ -39,51 +68,29 @@ final class TxByteArrayFragment extends ByteArrayFragment
      *            the maximum size of each {@link ByteArrayFragment} instance's internal byte[]
      * @return the list of ByteArrayFragment instances that collectively represent the data
      */
-    static TxByteArrayFragment[] getFragmentsForTxData(byte[] data, int maxFragmentInternalByteSize,
-        TxByteArrayFragment[][][] fragmentsArrayPool, LowGcLinkedList<TxByteArrayFragment> fragmentsPool)
+    static TxByteArrayFragment[] getFragmentsForTxData(byte[] data, int maxFragmentInternalByteSize)
     {
         final int id = ID_COUNTER.incrementAndGet();
         final int fragmentCount = data.length < maxFragmentInternalByteSize ? 1
             : ((int) Math.ceil((data.length * (1 / (double) maxFragmentInternalByteSize))));
-
-        // resize fragment array pool
-        if (fragmentCount >= fragmentsArrayPool[0].length)
-        {
-            fragmentsArrayPool[0] = Arrays.copyOf(fragmentsArrayPool[0], fragmentCount + 1);
-        }
-
-        // get the re-usable fragment array from the pool for the required size (fragment count)
-        TxByteArrayFragment[] fragments = fragmentsArrayPool[0][fragmentCount];
-        if (fragments == null)
-        {
-            fragments = new TxByteArrayFragment[fragmentCount];
-            fragmentsArrayPool[0][fragmentCount] = fragments;
-        }
-
+        
+        final TxByteArrayFragment[] fragments = new TxByteArrayFragment[fragmentCount];
+        
         int pointer = 0;
         int remainder = data.length;
         int length;
-        TxByteArrayFragment fragment;
+        final MultiThreadReusableObjectPool<TxByteArrayFragment> pool = TX_FRAGMENTS_POOL.get();
         for (int i = 0; i < fragmentCount; i++)
         {
             length = remainder > maxFragmentInternalByteSize ? maxFragmentInternalByteSize : remainder;
-            fragment = fragmentsPool.poll();
-            if (fragment == null)
-            {
-                fragment =
-                    new TxByteArrayFragment(id, i, (byte) (i == (fragmentCount - 1) ? 1 : 0), data, pointer, length);
-            }
-            else
-            {
-                fragment.initialise(id, i, (byte) (i == (fragmentCount - 1) ? 1 : 0), data, pointer, length);
-            }
-            fragments[i] = fragment;
+            fragments[i] = (TxByteArrayFragment) pool.get().initialise(id, i, (byte) (i == (fragmentCount - 1) ? 1 : 0),
+                data, pointer, length);
             pointer += length;
             remainder -= length;
         }
         return fragments;
     }
-
+    
     final ByteBuffer[] txDataWithHeader;
     byte[] header;
 
@@ -95,7 +102,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
         this.txDataWithHeader = new ByteBuffer[2];
         this.txDataWithHeader[0] = ByteBuffer.wrap(this.header, 0, this.header.length);
     }
-
+    
     void reset()
     {
         this.id = this.sequenceId = this.offset = this.length = this.lastElement = -1;

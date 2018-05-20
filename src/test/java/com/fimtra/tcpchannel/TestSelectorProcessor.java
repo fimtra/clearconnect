@@ -41,7 +41,7 @@ public class TestSelectorProcessor
     private static final int OPERATION = SelectionKey.OP_WRITE;
 
     SelectorProcessor candidate;
-
+    SelectionKey key;
     SocketChannel channel;
 
     @Before
@@ -49,10 +49,11 @@ public class TestSelectorProcessor
     {
         this.candidate = new SelectorProcessor("test", OPERATION);
         this.channel = SocketChannel.open();
-        this.channel.configureBlocking(false);
+        this.channel.configureBlocking(false);        
         assertTrue(this.candidate.selector.isOpen());
         assertTrue(this.candidate.register(this.channel, null));
-        assertTrue(this.channel.keyFor(this.candidate.selector).isValid());
+        key = this.channel.keyFor(this.candidate.selector);
+        assertTrue(key.isValid());
     }
 
     @After
@@ -64,22 +65,22 @@ public class TestSelectorProcessor
     @Test
     public void testSetInterest()
     {
-        this.candidate.setInterest(this.channel);
+        this.candidate.setInterest(this.key);
         assertEquals(OPERATION, this.channel.keyFor(this.candidate.selector).interestOps());
 
-        this.candidate.setInterest(this.channel);
+        this.candidate.setInterest(this.key);
         assertEquals(OPERATION, this.channel.keyFor(this.candidate.selector).interestOps());
     }
 
     @Test
     public void testResetInterest()
     {
-        this.candidate.setInterest(this.channel);
+        this.candidate.setInterest(this.key);
 
-        this.candidate.resetInterest(this.channel);
+        this.candidate.resetInterest(this.key);
         assertEquals(0, this.channel.keyFor(this.candidate.selector).interestOps());
 
-        this.candidate.resetInterest(this.channel);
+        this.candidate.resetInterest(this.key);
         assertEquals(0, this.channel.keyFor(this.candidate.selector).interestOps());
     }
 
@@ -116,7 +117,7 @@ public class TestSelectorProcessor
         }
         try
         {
-            this.candidate.setInterest(this.channel);
+            this.candidate.setInterest(this.key);
             fail("should throw CancelledKeyException");
         }
         catch (CancelledKeyException e)
@@ -124,7 +125,7 @@ public class TestSelectorProcessor
         }
         try
         {
-            this.candidate.resetInterest(this.channel);
+            this.candidate.resetInterest(this.key);
             fail("should throw CancelledKeyException");
         }
         catch (CancelledKeyException e)

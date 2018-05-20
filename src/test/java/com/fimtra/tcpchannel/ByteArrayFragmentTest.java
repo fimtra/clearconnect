@@ -32,7 +32,6 @@ import com.fimtra.tcpchannel.ByteArrayFragment.IncorrectSequenceException;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.RawByteHeaderByteArrayFragmentResolver;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.UTF8HeaderByteArrayFragmentResolver;
 import com.fimtra.util.ByteBufferUtils;
-import com.fimtra.util.LowGcLinkedList;
 
 /**
  * Tests for the {@link ByteArrayFragment}
@@ -41,15 +40,6 @@ import com.fimtra.util.LowGcLinkedList;
  */
 public class ByteArrayFragmentTest
 {
-
-    final static TxByteArrayFragment[][][] fragmentsArrayPool;
-    final static LowGcLinkedList<TxByteArrayFragment> fragmentsPool;
-    static
-    {
-        fragmentsArrayPool = new TxByteArrayFragment[1][2][];
-        fragmentsPool = new LowGcLinkedList<TxByteArrayFragment>();
-    }
-
     /**
      * Test method for
      * {@link com.fimtra.tcpchannel.ByteArrayFragment#getFragmentsForTxData(byte[], int)}.
@@ -69,7 +59,7 @@ public class ByteArrayFragmentTest
     private static void doTestGetFragmentsForTxData(byte[] data, int max, int expectedNumber)
     {
         final ByteArrayFragment[] fragments =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         assertEquals(expectedNumber, fragments.length);
         for (int i = 0; i < fragments.length; i++)
         {
@@ -83,7 +73,7 @@ public class ByteArrayFragmentTest
     {
         byte[] data = "hellohellohellohello".getBytes();
         ByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, 5, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, 5);
         assertEquals(4, fragmentsForTxData.length);
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
@@ -119,7 +109,7 @@ public class ByteArrayFragmentTest
     private static void doToTxAndFromRxBytesRawByteHeaderTest(byte[] data, final int max)
     {
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         ByteArrayFragment resolved;
         for (TxByteArrayFragment fragment : fragmentsForTxData)
         {
@@ -161,7 +151,7 @@ public class ByteArrayFragmentTest
     {
         byte[] data = "hello".getBytes();
         ByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, 1, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, 1);
         // force incorrect sequence here
         fragmentsForTxData[0].merge(fragmentsForTxData[2]);
     }
@@ -170,7 +160,7 @@ public class ByteArrayFragmentTest
     private static void doMergeTest(byte[] data, final int max) throws IncorrectSequenceException
     {
         ByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         ByteArrayFragment resolved = null;
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
@@ -214,7 +204,7 @@ public class ByteArrayFragmentTest
     private static void doTestResolverRawBytes(byte[] data, final int max, ByteArrayFragmentResolver resolver)
     {
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         ByteBuffer resolved = null;
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
@@ -242,7 +232,7 @@ public class ByteArrayFragmentTest
     private static void doTestResolverUTF8(byte[] data, final int max, ByteArrayFragmentResolver resolver)
     {
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         ByteBuffer resolved = null;
         for (int i = 0; i < fragmentsForTxData.length; i++)
         {
@@ -257,7 +247,7 @@ public class ByteArrayFragmentTest
     {
         byte[] data = "hello".getBytes();
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, 1, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, 1);
         ByteArrayFragmentResolver resolver = new UTF8HeaderByteArrayFragmentResolver();
         assertNull(resolver.resolve(joinBuffers(fragmentsForTxData[0].toTxBytesUTF8Header())));
         assertEquals(1, resolver.fragments.size());
@@ -271,7 +261,7 @@ public class ByteArrayFragmentTest
     {
         byte[] data = "hello".getBytes();
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, 1, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, 1);
         ByteArrayFragmentResolver resolver = new RawByteHeaderByteArrayFragmentResolver();
         assertNull(resolver.resolve(joinBuffers(fragmentsForTxData[0].toTxBytesRawByteHeader())));
         assertEquals(1, resolver.fragments.size());
@@ -291,14 +281,13 @@ public class ByteArrayFragmentTest
         while (i < messageCount)
         {
             TxByteArrayFragment[] fragmentsForTxData = TxByteArrayFragment.getFragmentsForTxData(("" + ++i).getBytes(),
-                65535, fragmentsArrayPool, fragmentsPool);
+                65535);
             for (TxByteArrayFragment byteArrayFragment : fragmentsForTxData)
             {
                 fragments.add(byteArrayFragment);
 
                 // add interleaved data that is not part of our check
-                final TxByteArrayFragment[] hbs = TxByteArrayFragment.getFragmentsForTxData(new byte[] { 0x3 }, 65535,
-                    fragmentsArrayPool, fragmentsPool);
+                final TxByteArrayFragment[] hbs = TxByteArrayFragment.getFragmentsForTxData(new byte[] { 0x3 }, 65535);
                 for (TxByteArrayFragment byteArrayFragment2 : hbs)
                 {
                     fragments.add(byteArrayFragment2);
@@ -343,7 +332,7 @@ public class ByteArrayFragmentTest
     private static void doToTxAndFromRxBytesUTF8HeaderTest(byte[] data, final int max)
     {
         TxByteArrayFragment[] fragmentsForTxData =
-            TxByteArrayFragment.getFragmentsForTxData(data, max, fragmentsArrayPool, fragmentsPool);
+            TxByteArrayFragment.getFragmentsForTxData(data, max);
         ByteArrayFragment resolved;
         for (TxByteArrayFragment fragment : fragmentsForTxData)
         {

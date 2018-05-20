@@ -16,13 +16,11 @@
 package com.fimtra.tcpchannel;
 
 import java.io.IOException;
-import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -40,9 +38,7 @@ import com.fimtra.util.ThreadUtils;
  * {@link Runnable} that will be invoked whenever the operation this SelectorProcessor handles
  * becomes available for the channel.
  * <p>
- * This provides scaling for multiple sockets. Typically there will only be 2 SelectorProcessor
- * objects handling read and write operations across any number of sockets encapsulated by
- * {@link SocketChannel} objects.
+ * This provides scaling for multiple sockets.
  * 
  * @see TcpChannelUtils#READER
  * @see TcpChannelUtils#WRITER
@@ -51,6 +47,16 @@ import com.fimtra.util.ThreadUtils;
  */
 final class SelectorProcessor implements Runnable
 {
+    /**
+     * Opposite of {@link #setInterest(SelectableChannel)}. After setting interest we need to reset
+     * the interest. So, for example, when a channel has completed writing all its data, this method
+     * is called to reset the channel's interest in writing.
+     */
+    static void resetInterest(SelectionKey keyFor)
+    {
+        keyFor.interestOps(0);
+    }
+    
     final Selector selector;
 
     private final int selectorProcessorOperation;
@@ -233,39 +239,15 @@ final class SelectorProcessor implements Runnable
      * <p>
      * Effectively, if this SelectorProcessor handles write operations, calling this method tells
      * the SelectorProcessor that this channel wants to write data.
-     * 
-     * @throws CancelledKeyException
-     *             if the channel has no registration with this SelectorProcessor. This can also
-     *             indicate that the channel is closed.
      */
-    void setInterest(SelectableChannel channel) throws CancelledKeyException
+    void setInterest(SelectionKey keyFor)
     {
-        final SelectionKey keyFor = channel.keyFor(this.selector);
-        if (keyFor == null)
-        {
-            throw new CancelledKeyException();
-        }
         keyFor.interestOps(this.selectorProcessorOperation);
         this.selector.wakeup();
     }
 
-    /**
-     * Opposite of {@link #setInterest(SelectableChannel)}. After setting interest we need to reset
-     * the interest. So, for example, when a channel has completed writing all its data, this method
-     * is called to reset the channel's interest in writing.
-     * 
-     * @throws CancelledKeyException
-     *             if the channel has no registration with this SelectorProcessor. This can also
-     *             indicate that the channel is closed.
-     */
-    void resetInterest(SelectableChannel channel) throws CancelledKeyException
+    SelectionKey getKeyFor(SelectableChannel channel)
     {
-        final SelectionKey keyFor = channel.keyFor(this.selector);
-        if (keyFor == null)
-        {
-            throw new CancelledKeyException();
-        }
-        keyFor.interestOps(0);
+        return channel.keyFor(this.selector);
     }
-
 }

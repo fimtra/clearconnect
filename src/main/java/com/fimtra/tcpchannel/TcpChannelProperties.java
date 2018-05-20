@@ -69,9 +69,15 @@ public abstract class TcpChannelProperties
         /**
          * The system property name to define the threshold, in nanos, for defining slow RX frame
          * handling (and thus logging a message indicating the RX frame handling was slow).<br>
-         * E.g. <code>-DtcpChannel.slowTaskThresholdNanos=50000000</code>
+         * E.g. <code>-DtcpChannel.slowRxFrameThresholdNanos=50000000</code>
          */
         String SLOW_RX_FRAME_THRESHOLD_NANOS = BASE + "slowRxFrameThresholdNanos";
+        /**
+         * The system property name to define the threshold, in nanos, for defining slow TX frame
+         * handling (and thus logging a message indicating the TX frame handling was slow).<br>
+         * E.g. <code>-DtcpChannel.slowTxFrameThresholdNanos=50000000</code>
+         */
+        String SLOW_TX_FRAME_THRESHOLD_NANOS = BASE + "slowTxFrameThresholdNanos";
         /**
          * The system property name to define the minimum alive time, in milliseconds, for a socket
          * before it is classified as a "short-lived" socket and increases the short-lived socket
@@ -166,7 +172,7 @@ public abstract class TcpChannelProperties
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
             Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
-
+        
         /**
          * The threshold value for logging when RX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP RX handling.
@@ -176,7 +182,18 @@ public abstract class TcpChannelProperties
          * @see Names#SLOW_RX_FRAME_THRESHOLD_NANOS
          */
         long SLOW_RX_FRAME_THRESHOLD_NANOS =
-            Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
+                Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
+
+        /**
+         * The threshold value for logging when TX frame handling is slow, in nanos. This is
+         * important to identify potential performance problems for TCP TX handling.
+         * <p>
+         * Default is: 50000000 (50ms)
+         * 
+         * @see Names#SLOW_TX_FRAME_THRESHOLD_NANOS
+         */
+        long SLOW_TX_FRAME_THRESHOLD_NANOS =
+            Long.parseLong(System.getProperty(Names.SLOW_TX_FRAME_THRESHOLD_NANOS, "50000000"));
 
         /**
          * The value for the minimum alive time, in milliseconds, for a socket before it is
@@ -216,10 +233,10 @@ public abstract class TcpChannelProperties
          * Defines whether writing to the socket in the {@link TcpChannel#send(byte[])} is performed
          * using the application thread or the TCP writer thread.
          * <p>
-         * Default is: false (use the TCP writer thread)
+         * Default is: true (use the application thread)
          */
         boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD =
-            Boolean.getBoolean(Names.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
+            Boolean.valueOf(System.getProperty(Names.WRITE_TO_SOCKET_USING_APPLICATION_THREAD, "true")).booleanValue();
 
         /**
          * The number of threads to use for TCP socket reading.
@@ -231,9 +248,9 @@ public abstract class TcpChannelProperties
         /**
          * The number of threads to use for TCP socket writing.
          * <p>
-         * Default is: 1
+         * Default is: 4
          */
-        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "1"));
+        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "4"));
         
         /**
          * The maximum size of the pool to hold re-usable tx frame objects.
