@@ -199,7 +199,7 @@ public final class ChannelWatchdog implements Runnable
                     {
                         // now check for missed heartbeat
                         Integer missedCount = this.channelsMissingHeartbeat.get(channel);
-                        if (missedCount != null && missedCount.intValue() > this.missedHeartbeatCount)
+                        if (missedCount != null && missedCount.intValue() >= this.missedHeartbeatCount)
                         {
                             channel.destroy(
                                 "Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount + " heartbeats");
