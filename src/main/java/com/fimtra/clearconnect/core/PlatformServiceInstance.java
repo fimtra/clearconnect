@@ -176,16 +176,17 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         : PlatformServiceInstance.this.publisher.getBytesPublished();
                     final double perSec = 1d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
 
-                    PlatformServiceInstance.this.stats.put(
-                        IServiceStatsRecordFields.MSGS_PER_SEC,
-                        DoubleValue.valueOf(((long) (((messagesPublished - this.lastMessagesPublished) * perSec) * 10)) / 10d));
-                    PlatformServiceInstance.this.stats.put(
-                        IServiceStatsRecordFields.KB_PER_SEC,
-                        DoubleValue.valueOf((((long) (((bytesPublished - this.lastBytesPublished) * inverse_1K * perSec) * 10)) / 10d)));
+                    final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
+                    final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
+
+                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
+                        DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
+                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_PER_SEC,
+                        DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
                         // use the period stats for calculating the average message size
-                        LongValue.valueOf(messagesPublished == 0 ? 0 : ((bytesPublished - this.lastBytesPublished)
-                            / (messagesPublished - this.lastMessagesPublished))));
+                        LongValue.valueOf(
+                            msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
                         LongValue.valueOf(subscriptionCount));
                     PlatformServiceInstance.this.stats.put(
