@@ -28,6 +28,7 @@ import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -273,7 +274,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
                 final NotifyingCache<IRpcAvailableListener, IRpcInstance> notifyingCache =
                     this.rpcAvailableNotifyingCache.get();
                 final ConcurrentHashMap<String, IRpcInstance> innerMap = new ConcurrentHashMap<String, IRpcInstance>();
-                notifyingCache.addListener(new IRpcAvailableListener()
+                notifyingCache.addListener(EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
                 {
                     @Override
                     public void onRpcUnavailable(IRpcInstance rpc)
@@ -286,7 +287,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
                     {
                         innerMap.put(rpc.getName(), rpc);
                     }
-                });
+                }));
                 innerMap.putAll(notifyingCache.getCacheSnapshot());
                 this.allRpcs = Collections.unmodifiableMap(innerMap);
             }

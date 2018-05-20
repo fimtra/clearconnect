@@ -23,6 +23,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IRecord;
@@ -82,7 +83,7 @@ public class EchoService
                 }
             }
         };
-        this.recordAvailableListener = new IRecordAvailableListener()
+        this.recordAvailableListener = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
             public void onRecordUnavailable(String recordName)
@@ -97,9 +98,9 @@ public class EchoService
                 EchoService.this.echoService.getOrCreateRecord(recordName);
                 EchoService.this.benchmarkServiceProxy.addRecordListener(EchoService.this.echoBackListener, recordName);
             }
-        };
+        });
 
-        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
             public void onServiceUnavailable(String serviceFamily)
@@ -122,6 +123,6 @@ public class EchoService
                     EchoService.this.benchmarkServiceProxy.addRecordAvailableListener(EchoService.this.recordAvailableListener);
                 }
             }
-        });
+        }));
     }
 }

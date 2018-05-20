@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
@@ -52,7 +53,7 @@ class PlatformServiceConnectionMonitor
         this.proxyContext = context;
         this.serviceConnectionStatusNotifyingCache =
             PlatformUtils.createServiceConnectionStatusNotifyingCache(this.proxyContext, this);
-        this.serviceConnectionStatusNotifyingCache.addListener(new IServiceConnectionStatusListener()
+        this.serviceConnectionStatusNotifyingCache.addListener(EventListenerUtils.synchronizedListener(new IServiceConnectionStatusListener()
         {
 
             @Override
@@ -75,7 +76,7 @@ class PlatformServiceConnectionMonitor
                 doDisconnected();
                 store(Connection.DISCONNECTED);
             }
-        });
+        }));
     }
 
     public final void destroy()

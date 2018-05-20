@@ -40,6 +40,7 @@ import com.fimtra.clearconnect.config.IConfig;
 import com.fimtra.clearconnect.config.impl.ConfigServiceProxy;
 import com.fimtra.clearconnect.config.impl.ConfigUtils;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
@@ -977,7 +978,7 @@ public class PlatformUtils
 
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
         final CountDownLatch latch = new CountDownLatch(1);
-        final IRpcAvailableListener rpcListener = new IRpcAvailableListener()
+        final IRpcAvailableListener rpcListener = EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
         {
             @Override
             public void onRpcUnavailable(IRpcInstance rpc)
@@ -999,7 +1000,7 @@ public class PlatformUtils
                     }
                 }
             }
-        };
+        });
         try
         {
             component.addRpcAvailableListener(rpcListener);

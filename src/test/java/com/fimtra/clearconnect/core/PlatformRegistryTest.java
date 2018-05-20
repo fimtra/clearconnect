@@ -33,6 +33,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
@@ -84,7 +85,7 @@ public class PlatformRegistryTest
             final String suffix = i + "-" + System.nanoTime();
             agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
             agents[i].setRegistryReconnectPeriodMillis(500);
-            agents[i].addRegistryAvailableListener(new IRegistryAvailableListener()
+            agents[i].addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
             {
                 @Override
                 public void onRegistryDisconnected()
@@ -97,7 +98,7 @@ public class PlatformRegistryTest
                 {
                     connectedLatch.get().countDown();
                 }
-            });
+            }));
         }
         assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
         this.candidate.destroy();

@@ -39,6 +39,7 @@ import com.fimtra.clearconnect.config.IConfigServiceProxy;
 import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformUtils;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IValue;
@@ -183,7 +184,7 @@ public class ConfigServiceTest
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> unavailableLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
             public void onServiceUnavailable(String serviceFamily)
@@ -202,7 +203,7 @@ public class ConfigServiceTest
                     availableLatch.get().countDown();
                 }
             }
-        });
+        }));
         assertTrue(availableLatch.get().await(10, TimeUnit.SECONDS));
 
         availableLatch.set(new CountDownLatch(1));
@@ -242,7 +243,7 @@ public class ConfigServiceTest
         // wait for the proxy to reconnect
         final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         this.agent.getPlatformServiceProxy(IConfigServiceProxy.CONFIG_SERVICE).addRecordConnectionStatusListener(
-            new IRecordConnectionStatusListener()
+            EventListenerUtils.synchronizedListener(new IRecordConnectionStatusListener()
             {
                 @Override
                 public void onRecordDisconnected(String recordName)
@@ -259,7 +260,7 @@ public class ConfigServiceTest
                 public void onRecordConnecting(String recordName)
                 {
                 }
-            });
+            }));
         assertTrue(connected.get().await(10, TimeUnit.SECONDS));
 
         assertEquals(v1, config.getProperty(k1));

@@ -42,6 +42,7 @@ import org.junit.rules.TestName;
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -196,7 +197,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> noMoreListenersLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener listener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -217,7 +218,7 @@ public class PlatformServiceProxyTest
                     }
                 }
             }
-        };
+        });
         expect.set(record1);
 
         assertTrue(this.candidate.addRecordSubscriptionListener(listener));
@@ -227,7 +228,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> noMoreListenersLatch2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener2 = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener listener2 = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -248,7 +249,7 @@ public class PlatformServiceProxyTest
                     }
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordSubscriptionListener(listener2));
 
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
@@ -283,7 +284,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> unavailableLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordAvailableListener recordListener1 = new IRecordAvailableListener()
+        IRecordAvailableListener recordListener1 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
             public void onRecordUnavailable(String recordName)
@@ -302,7 +303,7 @@ public class PlatformServiceProxyTest
                     latch.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordAvailableListener(recordListener1));
         assertFalse(this.candidate.addRecordAvailableListener(recordListener1));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
@@ -314,7 +315,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(5));
         final AtomicReference<CountDownLatch> unavailableLatch2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordAvailableListener recordListener2 = new IRecordAvailableListener()
+        IRecordAvailableListener recordListener2 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
             public void onRecordUnavailable(String recordName)
@@ -333,7 +334,7 @@ public class PlatformServiceProxyTest
                     latch2.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordAvailableListener(recordListener2));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
 
@@ -366,7 +367,7 @@ public class PlatformServiceProxyTest
             Log.log(this, ">>>>>> START testGetAllRecordNames");
             final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(4));
             final List<String> records = new CopyOnWriteArrayList<String>();
-            this.candidate.addRecordAvailableListener(new IRecordAvailableListener()
+            this.candidate.addRecordAvailableListener(EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
             {
 
                 @Override
@@ -380,7 +381,7 @@ public class PlatformServiceProxyTest
                     records.add(recordName);
                     latch.get().countDown();
                 }
-            });
+            }));
             assertTrue("GOT: " + records, latch.get().await(5, TimeUnit.SECONDS));
             waitForContextSubscriptionsToUpdate();
             assertEquals("GOT: " + records + ", candidate.getAllRecordNames()=" + this.candidate.getAllRecordNames(), 6,
@@ -450,7 +451,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> unavailableLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRpcAvailableListener rpcListener1 = new IRpcAvailableListener()
+        IRpcAvailableListener rpcListener1 = EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
         {
             @Override
             public void onRpcUnavailable(IRpcInstance rpc)
@@ -469,7 +470,7 @@ public class PlatformServiceProxyTest
                     latch.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRpcAvailableListener(rpcListener1));
         assertFalse(this.candidate.addRpcAvailableListener(rpcListener1));
         assertTrue(latch.get().await(timeout, TimeUnit.SECONDS));
@@ -488,7 +489,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> unavailableLatch2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRpcAvailableListener rpcListener2 = new IRpcAvailableListener()
+        IRpcAvailableListener rpcListener2 = EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
         {
             @Override
             public void onRpcUnavailable(IRpcInstance rpc)
@@ -507,7 +508,7 @@ public class PlatformServiceProxyTest
                     latch2.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRpcAvailableListener(rpcListener2));
         assertTrue(latch2.get().await(timeout, TimeUnit.SECONDS));
 
@@ -590,7 +591,7 @@ public class PlatformServiceProxyTest
         this.candidate.addRecordListener(listener, record1);
 
         final CountDownLatch latch2 = new CountDownLatch(1);
-        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
             public void onServiceUnavailable(String serviceFamily)
@@ -606,7 +607,7 @@ public class PlatformServiceProxyTest
             {
 
             }
-        });
+        }));
 
         // destroy and re-create
         this.agent.destroyPlatformServiceInstance(this.TEST_PLATFORM_SERVICE, "PRIMARY");
@@ -637,7 +638,7 @@ public class PlatformServiceProxyTest
         final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> reconnecting = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> disconnected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordConnectionStatusListener connectionStatusListener = new IRecordConnectionStatusListener()
+        IRecordConnectionStatusListener connectionStatusListener = EventListenerUtils.synchronizedListener(new IRecordConnectionStatusListener()
         {
             @Override
             public void onRecordDisconnected(String recordName)
@@ -665,7 +666,7 @@ public class PlatformServiceProxyTest
                     reconnecting.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordConnectionStatusListener(connectionStatusListener));
         assertFalse(this.candidate.addRecordConnectionStatusListener(connectionStatusListener));
 
@@ -678,7 +679,7 @@ public class PlatformServiceProxyTest
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> disconnected2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordConnectionStatusListener connectionStatusListener2 = new IRecordConnectionStatusListener()
+        IRecordConnectionStatusListener connectionStatusListener2 = EventListenerUtils.synchronizedListener(new IRecordConnectionStatusListener()
         {
             @Override
             public void onRecordDisconnected(String recordName)
@@ -706,7 +707,7 @@ public class PlatformServiceProxyTest
                     reconnecting2.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordConnectionStatusListener(connectionStatusListener2));
         assertTrue(connected2.get().await(1, TimeUnit.SECONDS));
 

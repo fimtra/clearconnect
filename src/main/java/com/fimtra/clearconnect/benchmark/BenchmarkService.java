@@ -32,6 +32,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -83,7 +84,7 @@ public class BenchmarkService
         this.benchmarkService = this.agent.getPlatformServiceInstance(BENCHMARK_SERVICE, "primary");
 
         final Set<String> echoServiceNames = new HashSet<String>();
-        this.agent.addServiceAvailableListener(new IServiceAvailableListener()
+        this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
             public void onServiceUnavailable(String serviceFamily)
@@ -102,7 +103,7 @@ public class BenchmarkService
                     echoServiceNames.add(serviceFamily);
                 }
             }
-        });
+        }));
 
         Log.log(this, "Waiting 5 seconds for echo services discovery...");
         Thread.sleep(5000);
@@ -279,7 +280,7 @@ public class BenchmarkService
                 // ensure the echo services have subscribed...
                 final CountDownLatch subscribers = new CountDownLatch(1);
 
-                final IRecordSubscriptionListener listener = new IRecordSubscriptionListener()
+                final IRecordSubscriptionListener listener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
                 {
                     @Override
                     public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -290,7 +291,7 @@ public class BenchmarkService
                             subscribers.countDown();
                         }
                     }
-                };
+                });
 
                 this.benchmarkService.addRecordSubscriptionListener(listener);
                 try

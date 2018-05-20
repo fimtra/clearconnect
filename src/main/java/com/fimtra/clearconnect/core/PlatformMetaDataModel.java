@@ -61,6 +61,7 @@ import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformRegistry.IServiceRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
@@ -532,7 +533,7 @@ public final class PlatformMetaDataModel
         this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
         this.serviceInstanceRecordsContext = new ConcurrentHashMap<String, Context>();
 
-        this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
+        this.agent.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
         {
             @Override
             public void onRegistryDisconnected()
@@ -544,7 +545,7 @@ public final class PlatformMetaDataModel
             public void onRegistryConnected()
             {
             }
-        });
+        }));
 
         // the bare minimum
         registerListener_PLATFORM_CONNECTIONS();

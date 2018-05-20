@@ -78,6 +78,7 @@ import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceProxyMetaDataRe
 import com.fimtra.clearconnect.core.PlatformMetaDataModel.ServiceRpcMetaDataRecordDefinition;
 import com.fimtra.clearconnect.core.PlatformRegistry.IPlatformSummaryRecordFields;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -1495,7 +1496,7 @@ class PlatformDesktop
                 PlatformDesktop.this.desktopWindow.add(
                     new DesktopSummaryPanel(platformMetaDataModel.agent.registryProxy), BorderLayout.SOUTH);
 
-                platformMetaDataModel.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
+                platformMetaDataModel.agent.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
                 {
                     String platformName;
 
@@ -1519,7 +1520,7 @@ class PlatformDesktop
                         PlatformDesktop.this.desktopWindow.setTitle("ClearConnect | " + title + " "
                             + PlatformDesktop.this.getMetaDataModel().agent.registryProxy.getShortSocketDescription());
                     }
-                });
+                }));
 
                 PlatformDesktop.this.getDesktopWindow().addWindowListener(new WindowAdapter()
                 {

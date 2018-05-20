@@ -21,6 +21,7 @@ import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
 import com.fimtra.clearconnect.PlatformCoreProperties;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.util.Log;
 import com.fimtra.util.SystemUtils;
@@ -114,7 +115,7 @@ public final class ShadowRegistry
         startShadowRegistry();
 
         this.primaryRegistryAgent = new PlatformRegistryAgent("ShadowRegistryMonitor", primaryRegistryEndPoint);
-        this.primaryRegistryAgent.addRegistryAvailableListener(new IRegistryAvailableListener()
+        this.primaryRegistryAgent.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
         {
             @Override
             public void onRegistryDisconnected()
@@ -133,7 +134,7 @@ public final class ShadowRegistry
                     stopShadowRegistry();
                 }
             }
-        });
+        }));
     }
 
     void startShadowRegistry()

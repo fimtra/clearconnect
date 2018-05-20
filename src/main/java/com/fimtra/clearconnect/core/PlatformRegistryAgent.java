@@ -51,6 +51,7 @@ import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.core.PlatformRegistry.ServiceInfoRecordFields;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
@@ -237,7 +238,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         // "split-plane" protection
         // setup listening for services lost from the registry - we use this to detect if the
         // registry loses a service but we still have the service...
-        this.serviceInstanceAvailableListeners.addListener(new IServiceInstanceAvailableListener()
+        this.serviceInstanceAvailableListeners.addListener(EventListenerUtils.synchronizedListener(new IServiceInstanceAvailableListener()
         {
             @Override
             public void onServiceInstanceUnavailable(final String serviceInstanceId)
@@ -268,7 +269,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 // noop
             }
-        });
+        }));
         
         this.registryProxy.addObserver(new IRecordListener()
         {
@@ -509,7 +510,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     public void waitForPlatformService(final String serviceFamily)
     {
         final CountDownLatch servicesAvailable = new CountDownLatch(1);
-        final IServiceAvailableListener listener = new IServiceAvailableListener()
+        final IServiceAvailableListener listener = EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
             public void onServiceUnavailable(String serviceFamily)
@@ -524,7 +525,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     servicesAvailable.countDown();
                 }
             }
-        };
+        });
         addServiceAvailableListener(listener);
         Log.log(this, "Waiting for availability of service '", serviceFamily, "' ...");
         try
@@ -663,7 +664,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         serviceInstance.setFtState(Boolean.FALSE);
         
         final CountDownLatch latch = new CountDownLatch(1);
-        final IServiceInstanceAvailableListener listener = new IServiceInstanceAvailableListener()
+        final IServiceInstanceAvailableListener listener = EventListenerUtils.synchronizedListener(new IServiceInstanceAvailableListener()
         {
             @Override
             public void onServiceInstanceAvailable(String serviceInstanceId)
@@ -681,7 +682,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
             }
            
-        };
+        });
         addServiceInstanceAvailableListener(listener);
         
         try

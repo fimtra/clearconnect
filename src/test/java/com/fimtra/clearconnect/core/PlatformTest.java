@@ -55,6 +55,7 @@ import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IFtStatusListener;
 import com.fimtra.clearconnect.event.IProxyConnectionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
@@ -492,7 +493,7 @@ public class PlatformTest
         final SubscriptionInfo expectedSubscriptionInfo = new SubscriptionInfo("record1", 1, 0);
 
         final CountDownLatch s1latch = new CountDownLatch(1);
-        IRecordSubscriptionListener s1recordListener = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener s1recordListener = EventListenerUtils.synchronizedListener((new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -502,9 +503,9 @@ public class PlatformTest
                     s1latch.countDown();
                 }
             }
-        };
+        }));
         final CountDownLatch s2latch = new CountDownLatch(1);
-        IRecordSubscriptionListener s2recordListener = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener s2recordListener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -514,7 +515,7 @@ public class PlatformTest
                     s2latch.countDown();
                 }
             }
-        };
+        });
 
         s1.addRecordSubscriptionListener(s1recordListener);
         s2.addRecordSubscriptionListener(s2recordListener);

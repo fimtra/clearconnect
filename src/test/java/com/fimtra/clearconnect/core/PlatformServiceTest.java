@@ -40,6 +40,7 @@ import org.junit.Test;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
@@ -131,7 +132,7 @@ public class PlatformServiceTest
         final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> unavailableLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordAvailableListener recordListener1 = new IRecordAvailableListener()
+        IRecordAvailableListener recordListener1 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
             public void onRecordUnavailable(String recordName)
@@ -150,7 +151,7 @@ public class PlatformServiceTest
                     latch.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordAvailableListener(recordListener1));
         assertFalse(this.candidate.addRecordAvailableListener(recordListener1));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
@@ -162,7 +163,7 @@ public class PlatformServiceTest
         final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(5));
         final AtomicReference<CountDownLatch> unavailableLatch2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordAvailableListener recordListener2 = new IRecordAvailableListener()
+        IRecordAvailableListener recordListener2 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
             public void onRecordUnavailable(String recordName)
@@ -181,7 +182,7 @@ public class PlatformServiceTest
                     latch2.get().countDown();
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordAvailableListener(recordListener2));
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));
 
@@ -348,7 +349,7 @@ public class PlatformServiceTest
         final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> noMoreListenersLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener listener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -369,7 +370,7 @@ public class PlatformServiceTest
                     }
                 }
             }
-        };
+        });
         expect.set(record1);
 
         assertTrue(this.candidate.addRecordSubscriptionListener(listener));
@@ -379,7 +380,7 @@ public class PlatformServiceTest
         final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         final AtomicReference<CountDownLatch> noMoreListenersLatch2 =
             new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener2 = new IRecordSubscriptionListener()
+        IRecordSubscriptionListener listener2 = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
         {
             @Override
             public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
@@ -400,7 +401,7 @@ public class PlatformServiceTest
                     }
                 }
             }
-        };
+        });
         assertTrue(this.candidate.addRecordSubscriptionListener(listener2));
 
         assertTrue(latch.get().await(1, TimeUnit.SECONDS));

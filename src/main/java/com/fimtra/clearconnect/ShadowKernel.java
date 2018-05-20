@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.IPlatformRegistryAgent.RegistryNotAvailableException;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.util.Log;
 import com.fimtra.util.SystemUtils;
@@ -110,7 +111,7 @@ public class ShadowKernel
         startShadowRegistry();
 
         this.primaryRegistryAgent = new PlatformRegistryAgent("shadowKernelMonitor", primaryRegistryEndPoint);
-        this.primaryRegistryAgent.addRegistryAvailableListener(new IRegistryAvailableListener()
+        this.primaryRegistryAgent.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
         {
             @Override
             public void onRegistryDisconnected()
@@ -129,7 +130,7 @@ public class ShadowKernel
                     stopShadowKernel();
                 }
             }
-        });
+        }));
     }
 
     void startShadowRegistry()

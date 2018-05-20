@@ -32,6 +32,7 @@ import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
+import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 
@@ -86,7 +87,7 @@ public class PlatformRegistryAgentTest
         this.registry = new PlatformRegistry("PRA-Test", "localhost", 54322);
 
         final CountDownLatch connected = new CountDownLatch(1);
-        this.candidate.addRegistryAvailableListener(new IRegistryAvailableListener()
+        this.candidate.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
         {
             @Override
             public void onRegistryDisconnected()
@@ -99,7 +100,7 @@ public class PlatformRegistryAgentTest
             {
                 connected.countDown();
             }
-        });
+        }));
 
         assertTrue("Not re-connected", connected.await(10, TimeUnit.SECONDS));
 

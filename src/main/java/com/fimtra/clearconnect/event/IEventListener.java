@@ -16,6 +16,8 @@
 package com.fimtra.clearconnect.event;
 
 /**
+ * A tagging interface for all event listeners
+ * 
  * @author Ramon Servadei
  */
 public interface IEventListener
