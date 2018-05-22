@@ -206,10 +206,22 @@ public abstract class FileUtils {
 	public static void archiveLogs(long olderThanMinutes) {
 		if (logDirCanonical != null && logDirCanonical.exists() && logDirCanonical.isDirectory()) {
 			for (File file : FileUtils.findFiles(logDirCanonical, olderThanMinutes)) {
-				boolean isGzipped = FileUtils.gzip(file, archiveDirCanonical);
-				if (isGzipped) {
-					file.delete();
-				}
+                if (!file.getName().endsWith(".gz"))
+                {
+                    boolean isGzipped = FileUtils.gzip(file, archiveDirCanonical);
+                    if (isGzipped)
+                    {
+                        file.delete();
+                    }
+                    else
+                    {
+                        Log.log(FileUtils.class, "Could not gzip ", file.getAbsolutePath());
+                    }
+                }
+                else
+                {
+                    Log.log(FileUtils.class, "Ignoring gzipping ", file.getAbsolutePath());
+                }
 			}
 		}
 	}
