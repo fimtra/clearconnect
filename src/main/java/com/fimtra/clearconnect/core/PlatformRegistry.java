@@ -19,6 +19,7 @@ import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -85,8 +86,10 @@ import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.RollingFileAppender;
 import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
+import com.fimtra.util.UtilProperties;
 import com.fimtra.util.is;
 
 /**
@@ -773,6 +776,23 @@ final class EventHandler
     private static final ThreadFactory IO_EXECUTOR_THREAD_FACTORY = ThreadUtils.newDaemonThreadFactory("io-executor");
     private static final ThreadFactory PUBLISH_EXECUTOR_THREAD_FACTORY =
         ThreadUtils.newDaemonThreadFactory("publish-executor");
+
+    private static final RollingFileAppender SERVICE_LOG =
+        RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
+
+    private static void banner(EventHandler eventHandler, String message)
+    {
+        Log.banner(eventHandler, message);
+        try
+        {
+            SERVICE_LOG.append(message).append(SystemUtils.lineSeparator());
+            SERVICE_LOG.flush();
+        }
+        catch (IOException e)
+        {
+            Log.log(EventHandler.class, "Could not log service message", e);
+        }
+    }
     
     private final static IRecordListener NOOP_OBSERVER = new IRecordListener()
     {
@@ -866,22 +886,23 @@ final class EventHandler
             public void run()
             {
                 EventHandler.this.eventCount.decrementAndGet();
-                long time = System.currentTimeMillis();
+                long time = System.nanoTime();
                 try
                 {
                     runnable.run();
                 }
                 catch (Exception e)
                 {
-                    Log.log(runnable, "Could not execute " + runnable.getDescription(), e);
+                    Log.log(runnable,
+                        "Could not execute " + runnable.getDescription() + " {" + runnable.context() + "}", e);
                 }
                 finally
                 {
-                    time = System.currentTimeMillis() - time;
+                    time = (long) ((System.nanoTime() - time) * 0.000001d);
                     if (time > SLOW_EVENT_MILLIS)
                     {
-                        Log.log(EventHandler.this, SLOW, ObjectUtils.safeToString(runnable.context()), " took ",
-                            Long.toString(time), "ms");
+                        Log.log(EventHandler.this, SLOW, runnable.getDescription(), " {",
+                            ObjectUtils.safeToString(runnable.context()), "} took ", Long.toString(time), "ms");
                     }
                 }
             }
@@ -1377,7 +1398,7 @@ final class EventHandler
         final String serviceFamily = serviceParts[0];
         final String serviceMember = serviceParts[1];
 
-        Log.banner(this,
+        banner(this,
             "Deregistering " + registrationToken + " (was monitored with " + proxy.getChannelString() + ")");
 
         proxy.destroy();
@@ -1709,7 +1730,7 @@ final class EventHandler
                                                             selectNextInstance_callInFamilyScope(serviceFamily,
                                                                 "register " + registrationToken);
 
-                                                            Log.banner(EventHandler.this,
+                                                            banner(EventHandler.this,
                                                                 "Registered " + registrationToken + " "
                                                                     + redundancyModeEnum + " (monitoring with "
                                                                     + serviceProxy.getChannelString() + ")");
@@ -1758,7 +1779,7 @@ final class EventHandler
                         registerStep5_registerListenersForServiceInstance(serviceFamily, serviceMember,
                             serviceInstanceId, serviceProxy);
 
-                        Log.banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyModeEnum
+                        banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyModeEnum
                             + " (monitoring with " + serviceProxy.getChannelString() + ")");
                     }
                     catch (Exception e)
