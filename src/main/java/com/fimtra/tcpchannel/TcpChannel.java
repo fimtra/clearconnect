@@ -515,9 +515,11 @@ public class TcpChannel implements ITransportChannel
     @Override
     public String toString()
     {
-        return (this.onChannelConnectedCalled
-            ? (this.onChannelClosedCalled.get() ? TCP_CHANNEL_CLOSED : TCP_CHANNEL_CONNECTED) : TCP_CHANNEL_PENDING)
-            + getDescription() + "]";
+        final StringBuilder sb = new StringBuilder(80);
+        sb.append(this.onChannelConnectedCalled
+            ? (this.onChannelClosedCalled.get() ? TCP_CHANNEL_CLOSED : TCP_CHANNEL_CONNECTED)
+            : TCP_CHANNEL_PENDING).append(getDescription()).append("]");
+        return sb.toString();
     }
 
     @Override
