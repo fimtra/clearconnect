@@ -42,7 +42,7 @@ public final class TcpChannelBuilder implements ITransportChannelBuilder
     public TcpChannel buildChannel(IReceiver receiver) throws IOException
     {
         return new TcpChannel(this.endPointAddress.getNode(), this.endPointAddress.getPort(), receiver,
-            this.frameEncodingFormat, TcpChannelUtils.isWriteToSocketUsingApplicationThread());
+            this.frameEncodingFormat);
     }
 
     @Override

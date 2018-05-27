@@ -29,14 +29,12 @@ public class TestTcpServerWithLengthBasedFrameEncodingFormat_sendUsingApplicatio
     @Override
     public void setUp() throws Exception
     {
-        TcpChannelUtils.setWriteToSocketUsingApplicationThread(true);
         super.setUp();
     }
 
     @Override
     public void tearDown() throws Exception
     {
-        TcpChannelUtils.setWriteToSocketUsingApplicationThread(TcpChannelProperties.Values.WRITE_TO_SOCKET_USING_APPLICATION_THREAD);
         super.tearDown();
     }
 }

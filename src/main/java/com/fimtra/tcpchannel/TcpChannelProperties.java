@@ -98,21 +98,28 @@ public abstract class TcpChannelProperties
          */
         String SLS_MAX_SHORT_LIVED_SOCKET_TRIES = BASE + "slsMaxShortLivedSocketTries";
         /**
-         * The system property name to define the TX queue threshold that causes an application
-         * thread to block in {@link TcpChannel#send(byte[])} until the queue clears.
+         * The system property name to define the size of the TX queue that causes the socket to be
+         * destroyed from the sender side due to slow consumption on the receiver side.
          * <p>
-         * Use a value of 0 for no blocking during send (i.e. send asynchronously).
+         * Use a value of 0 to mean no send queue threshold is in use.
          * <p>
-         * E.g. <code>-DtcpChannel.txSendQueueThreshold=40</code>
+         * E.g. <code>-DtcpChannel.sendQueueThreshold=10000</code>
+         * 
+         * @see #SEND_QUEUE_THRESHOLD_BREACH_MILLIS
          */
-        String TX_SEND_QUEUE_THRESHOLD = BASE + "txSendQueueThreshold";
+        String SEND_QUEUE_THRESHOLD = BASE + "sendQueueThreshold";
+
         /**
-         * The system property name to define writing to the TCP socket using the application
-         * thread.
+         * The system property name to define the time allowed (in millis) for the send queue
+         * threshold to be breached before destroying the socket.
          * <p>
-         * E.g. <code>-DtcpChannel.writeToSocketUsingApplicationThread=true</code>
+         * E.g. <code>-DtcpChannel.sendQueueThresholdBreachMillis=30000</code>
+         * 
+         * @see #SEND_QUEUE_THRESHOLD
          */
-        String WRITE_TO_SOCKET_USING_APPLICATION_THREAD = BASE + "writeToSocketUsingApplicationThread";
+        String SEND_QUEUE_THRESHOLD_BREACH_MILLIS =
+            BASE + "sendQueueThresholdBreachMillis";
+        
         /**
          * The system property name to define the number of threads to use for TCP socket reading.
          * <p>
@@ -222,22 +229,23 @@ public abstract class TcpChannelProperties
             Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
 
         /**
-         * The size of the TX queue that causes an application thread to block in
-         * {@link TcpChannel#send(byte[])}. A value of 0 means no waiting, just send asynchronously.
+         * The size of the TX queue that causes the socket to be destroyed from the sender side
+         * due to slow consumption on the receiver side. A value of 0 means no send queue threshold
+         * is in use.
          * <p>
-         * Default is: 40
+         * Default is: 10000
          */
-        int TX_SEND_QUEUE_THRESHOLD = Integer.parseInt(System.getProperty(Names.TX_SEND_QUEUE_THRESHOLD, "40"));
+        int SEND_QUEUE_THRESHOLD = Integer.parseInt(System.getProperty(Names.SEND_QUEUE_THRESHOLD, "10000"));
 
         /**
-         * Defines whether writing to the socket in the {@link TcpChannel#send(byte[])} is performed
-         * using the application thread or the TCP writer thread.
+         * The time allowed (in millis) for the send queue threshold to be breached before
+         * destroying the socket.
          * <p>
-         * Default is: true (use the application thread)
+         * Default is 30000 (30 secs)
          */
-        boolean WRITE_TO_SOCKET_USING_APPLICATION_THREAD =
-            Boolean.valueOf(System.getProperty(Names.WRITE_TO_SOCKET_USING_APPLICATION_THREAD, "true")).booleanValue();
-
+        long SEND_QUEUE_THRESHOLD_BREACH_MILLIS =
+            Long.parseLong(System.getProperty(Names.SEND_QUEUE_THRESHOLD_BREACH_MILLIS, "30000"));
+ 
         /**
          * The number of threads to use for TCP socket reading.
          * <p>

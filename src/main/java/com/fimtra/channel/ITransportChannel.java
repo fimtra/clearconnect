@@ -37,13 +37,13 @@ public interface ITransportChannel
     boolean sendAsync(byte[] toSend);
 
     /**
-     * Sends the byte[] to the receiver end of this channel. This blocks until the data is sent. May
-     * throw a {@link RuntimeException} if some IO problem occurs.
+     * Sends the byte[] to the receiver end of this channel. The data is added to the transmission
+     * queue to be processed asynchronously. This method does little to no blocking.
      * 
      * @param toSend
      *            the byte[] to send
-     * @return <code>true</code> if the data sent, <code>false</code> if the data cannot be sent
-     *         because the channel is closed
+     * @return <code>true</code> if the data was added to the transmission queue and will be sent,
+     *         <code>false</code> if the data cannot be sent because the channel is closed
      */
     boolean send(byte[] toSend);
 

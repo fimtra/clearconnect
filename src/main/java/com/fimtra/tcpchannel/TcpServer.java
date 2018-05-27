@@ -235,8 +235,7 @@ public class TcpServer implements IEndPointService
                                     }
                                 }
                             }
-                        }, clientSocketRxBufferSize, frameEncodingFormat,
-                            TcpChannelUtils.isWriteToSocketUsingApplicationThread()),
+                        }, clientSocketRxBufferSize, frameEncodingFormat),
                             new Pair<String, Long>(hostAddress, Long.valueOf(System.currentTimeMillis())));
                     }
                     catch (Exception e)
