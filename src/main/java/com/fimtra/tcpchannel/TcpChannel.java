@@ -45,8 +45,13 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.IReusableObjectBuilder;
+import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
 
 /**
@@ -123,6 +128,70 @@ public class TcpChannel implements ITransportChannel
 
     /** Represents the ASCII code for CRLF */
     static final byte[] TERMINATOR = { 0xd, 0xa };
+
+    /**
+     * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
+     * from the socket and logic to resolve a frame from the fragments received from the socket
+     * buffer.
+     * 
+     * @author Ramon Servadei
+     */
+    private static final class RxFrameResolver implements ISequentialRunnable
+    {
+        /** direct byte buffer to optimise reading */
+        final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
+        long socketRead;
+        TcpChannel channel;
+
+        RxFrameResolver()
+        {
+        }
+
+        @Override
+        public void run()
+        {
+            try
+            {
+                this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
+            }
+            finally
+            {
+                RX_FRAME_RESOLVER_POOL.offer(this);
+            }
+        }
+
+        @Override
+        public Object context()
+        {
+            return this.channel;
+        }
+    }
+
+    /**
+     * Exclusively used to handle frames dispatched from the TCP socket reads. Has the same number
+     * of threads as the TCP reader count.
+     */
+    private static final ThimbleExecutor RX_FRAME_PROCESSOR =
+        new ThimbleExecutor("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
+
+    static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
+        new MultiThreadReusableObjectPool<RxFrameResolver>("RxFrameResolverPool",
+            new IReusableObjectBuilder<RxFrameResolver>()
+            {
+                @Override
+                public RxFrameResolver newInstance()
+                {
+                    return new RxFrameResolver();
+                }
+            }, new IReusableObjectFinalizer<RxFrameResolver>()
+            {
+                @Override
+                public void reset(RxFrameResolver instance)
+                {
+                    instance.buffer.clear();
+                    instance.channel = null;
+                }
+            }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
 
     /**
      * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
@@ -221,9 +290,9 @@ public class TcpChannel implements ITransportChannel
     final IReceiver receiver;
     final ByteBuffer rxByteBuffer;
     final byte[] rxBytes;
-    ByteBuffer[] readFrames = new ByteBuffer[10];
+    ByteBuffer[] fragments = new ByteBuffer[10];
     ByteBuffer[] resolvedFrames = new ByteBuffer[10];
-    final int[] readFramesSize = new int[1];
+    final int[] fragmentsSize = new int[1];
     @SuppressWarnings("unchecked")
     final Deque<TxByteArrayFragment> txFrames[] =
         new Deque[] { CollectionUtils.newDeque(), CollectionUtils.newDeque() };
@@ -454,10 +523,9 @@ public class TcpChannel implements ITransportChannel
             final TxByteArrayFragment[] byteFragmentsToSend =
                 TxByteArrayFragment.getFragmentsForTxData(toSend, TX_SEND_SIZE);
 
-            final ByteBuffer[][] buffers = new ByteBuffer[byteFragmentsToSend.length][];
             for (int i = 0; i < byteFragmentsToSend.length; i++)
             {
-                buffers[i] = this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
+                this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
             }
 
             final Deque<TxByteArrayFragment> pendingTxFrames;
@@ -531,19 +599,14 @@ public class TcpChannel implements ITransportChannel
 
     void readFrames()
     {
-        long start = System.nanoTime();
-        long socketRead = 0;
-        long connected = 0;
-        long decodeFrames = 0;
-        long resolveFrames = 0;
-        long processFrames = 0;
-        int size = 0;
         try
         {
-            this.rxByteBuffer.compact();
+            final long start = System.nanoTime();
 
-            final int readCount = this.socketChannel.read(this.rxByteBuffer);
-
+            final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
+            frameResolver.channel = this;
+            
+            final int readCount = this.socketChannel.read(frameResolver.buffer);
             switch(readCount)
             {
                 case -1:
@@ -554,8 +617,40 @@ public class TcpChannel implements ITransportChannel
                 default :
                     this.rxData++;
             }
-            socketRead = System.nanoTime();
 
+            frameResolver.socketRead = System.nanoTime() - start;
+
+            RX_FRAME_PROCESSOR.execute(frameResolver);
+        }
+        catch (IOException e)
+        {
+            destroy("Could not read from socket (" + e.toString() + ")");
+        }
+    }
+
+    void resolveFrameFromBuffer(long socketRead, ByteBuffer buffer)
+    {
+        long connected = 0;
+        long decodeFrames = 0;
+        long resolveFrames = 0;
+        long processFrames = 0;
+        int size = 0;
+
+        final long start = System.nanoTime();
+
+        // prepare the main buffer
+        this.rxByteBuffer.compact();
+        if (this.rxByteBuffer.position() == this.rxByteBuffer.limit())
+        {
+            this.rxByteBuffer.clear();
+        }
+        
+        // read the input buffer into the main buffer
+        buffer.flip();
+        this.rxByteBuffer.put(buffer);
+
+        try
+        {
             // mark connected when we receive the first message (all channels send a heartbeat or
             // data as the first action they perform)
             if (!this.onChannelConnectedCalled)
@@ -574,18 +669,17 @@ public class TcpChannel implements ITransportChannel
                 connected = System.nanoTime();
             }
 
-            this.readFrames =
-                this.readerWriter.readFrames(this.rxByteBuffer, this.rxBytes, this.readFrames, this.readFramesSize);
+            this.fragments =
+                this.readerWriter.readFrames(this.rxByteBuffer, this.rxBytes, this.fragments, this.fragmentsSize);
             decodeFrames = System.nanoTime();
 
-            // todo do the rest in a task?
             ByteBuffer data;
-            size = this.readFramesSize[0];
+            size = this.fragmentsSize[0];
             int i = 0;
             int resolvedFramesSize = 0;
             for (i = 0; i < size; i++)
             {
-                if ((data = this.byteArrayFragmentResolver.resolve(this.readFrames[i])) != null)
+                if ((data = this.byteArrayFragmentResolver.resolve(this.fragments[i])) != null)
                 {
                     if (resolvedFramesSize == this.resolvedFrames.length)
                     {
@@ -593,7 +687,7 @@ public class TcpChannel implements ITransportChannel
                     }
                     this.resolvedFrames[resolvedFramesSize++] = data;
                 }
-                this.readFrames[i] = null;
+                this.fragments[i] = null;
             }
             resolveFrames = System.nanoTime();
 
@@ -627,37 +721,35 @@ public class TcpChannel implements ITransportChannel
             }
             processFrames = System.nanoTime();
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             destroy("Could not read from socket (" + e.toString() + ")");
         }
         finally
         {
-            final long elapsedTimeNanos = System.nanoTime() - start;
+            final long elapsedTimeNanos = System.nanoTime() - start + socketRead;
             if (elapsedTimeNanos > SLOW_RX_FRAME_THRESHOLD_NANOS)
             {
                 if (connected == 0)
                 {
-                    Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
-                        Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [socketRead=",
-                        Long.toString(((long) ((socketRead - start) * _INVERSE_1000000))), "ms, decodeFrames(",
+                    Log.log(this, "SLOW FRAME: ", Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))),
+                        "ms [socketRead=", Long.toString(((long) ((socketRead) * _INVERSE_1000000))), "ms, decode(",
                         Integer.toString(size), ")=",
-                        Long.toString(((long) ((decodeFrames - socketRead) * _INVERSE_1000000))), "ms, resolveFrames=",
-                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))),
-                        "ms, processFrames=",
-                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
+                        Long.toString(((long) ((decodeFrames - start) * _INVERSE_1000000))), "ms, resolve=",
+                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), "ms, process=",
+                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms] for ",
+                        ObjectUtils.safeToString(this));
                 }
                 else
                 {
-                    Log.log(this, "*** SLOW RX FRAME HANDLING *** ", ObjectUtils.safeToString(this), " took ",
-                        Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))), "ms [socketRead=",
-                        Long.toString(((long) ((socketRead - start) * _INVERSE_1000000))), "ms, onChannelConnected=",
-                        Long.toString(((long) ((connected - socketRead) * _INVERSE_1000000))), "ms, decodeFrames(",
-                        Integer.toString(size), ")=",
-                        Long.toString(((long) ((decodeFrames - connected) * _INVERSE_1000000))), "ms, resolveFrames=",
-                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))),
-                        "ms, processFrames=",
-                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms]");
+                    Log.log(this, "SLOW FRAME: ", Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))),
+                        "ms [socketRead=", Long.toString(((long) ((socketRead) * _INVERSE_1000000))),
+                        "ms, onChannelConnected=", Long.toString(((long) ((connected - start) * _INVERSE_1000000))),
+                        "ms, decode(", Integer.toString(size), ")=",
+                        Long.toString(((long) ((decodeFrames - connected) * _INVERSE_1000000))), "ms, resolve=",
+                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), "ms, process=",
+                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), "ms] for ",
+                        ObjectUtils.safeToString(this));
                 }
             }
         }
@@ -909,14 +1001,16 @@ interface IFrameReaderWriter
  */
 abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 {
+
     static final long SLOW_FRAME_WRITE_TIME_NANOS = 10000000;
 
     // note: the header will never by this large, but we just use it to ensure we have enough so the
     // txBuffer never resizes
-    private static final int HEADER_SPACE = 1024;
+    static final int HEADER_SPACE = 1024;
+    static final int BUFFER_SIZE = TX_SEND_SIZE + HEADER_SPACE;
 
     final TcpChannel tcpChannel;
-    final ByteBuffer txBuffer = ByteBuffer.allocateDirect(TX_SEND_SIZE + HEADER_SPACE);
+    final ByteBuffer txBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
     boolean writeInProgress = false;
     long zeroByteWriteTimeNanos;
 
@@ -940,7 +1034,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     final void writeBufferToSocket() throws IOException
     {
         long time = System.nanoTime();
-        
+
         if (!this.writeInProgress)
         {
             // only flip if there is not a previous write in progress - we are still reading from
@@ -982,13 +1076,12 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         }
 
         this.zeroByteWriteTimeNanos = 0;
-        
+
         time = System.nanoTime() - time;
         if (time > SLOW_TX_FRAME_THRESHOLD_NANOS)
         {
-            Log.log(this.tcpChannel, "SLOW FRAME WRITE: took ",
-                Long.toString((long) (time * TcpChannel._INVERSE_1000000)), "ms to write ", Integer.toString(byteCount),
-                " bytes to ", this.tcpChannel.toString());
+            Log.log(this.tcpChannel, "SLOW FRAME WRITE: ", Long.toString((long) (time * TcpChannel._INVERSE_1000000)),
+                "ms to write ", Integer.toString(byteCount), " bytes to ", this.tcpChannel.toString());
         }
     }
 

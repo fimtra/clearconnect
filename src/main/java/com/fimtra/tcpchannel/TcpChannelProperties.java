@@ -135,11 +135,27 @@ public abstract class TcpChannelProperties
         
         /**
          * The system property name to define the maximum size of the pool to hold re-usable tx
-         * frame objects.
+         * fragment objects.
          * <p>
-         * E.g. <code>-DtcpChannel.txFramePoolMaxSize=50</code>
+         * E.g. <code>-DtcpChannel.txFragmentPoolMaxSize=1000</code>
          */
-        String TX_FRAME_POOL_MAX_SIZE = BASE + "txFramePoolMaxSize";
+        String TX_FRAGMENT_POOL_MAX_SIZE = BASE + "txFragmentPoolMaxSize";
+        
+        /**
+         * The system property name to define the maximum size of the pool to hold re-usable rx
+         * fragment objects.
+         * <p>
+         * E.g. <code>-DtcpChannel.rxFragmentPoolMaxSize=32</code>
+         */
+        String RX_FRAGMENT_POOL_MAX_SIZE = BASE + "rxFragmentPoolMaxSize";
+        
+        /**
+         * The system property name to define the maximum size of the pool to hold re-usable frame
+         * resolver objects.
+         * <p>
+         * E.g. <code>-DtcpChannel.rxFrameResolverPoolMaxSize=1000</code>
+         */
+        String RX_FRAME_RESOLVER_POOL_MAX_SIZE = BASE + "rxFrameResolverPoolMaxSize";
     }
 
     /**
@@ -261,11 +277,25 @@ public abstract class TcpChannelProperties
         int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "4"));
         
         /**
-         * The maximum size of the pool to hold re-usable tx frame objects.
+         * The maximum size of the pool to hold re-usable tx fragment objects.
          * <p>
-         * Default is: 50
+         * Default is: 1000
          */
-        int TX_FRAME_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.TX_FRAME_POOL_MAX_SIZE, "50"));
+        int TX_FRAGMENT_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.TX_FRAGMENT_POOL_MAX_SIZE, "1000"));
+        
+        /**
+         * The maximum size of the pool to hold re-usable rx fragment objects.
+         * <p>
+         * Default is: 1000
+         */
+        int RX_FRAGMENT_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAGMENT_POOL_MAX_SIZE, "1000"));
+        
+        /**
+         * The maximum size of the pool to hold re-usable rx frame resolver objects.
+         * <p>
+         * Default is: 1000
+         */
+        int RX_FRAME_RESOLVER_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
     }
 
     private TcpChannelProperties()

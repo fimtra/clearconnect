@@ -39,33 +39,26 @@ class ByteArrayFragment
 {
     static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static final ThreadLocal<MultiThreadReusableObjectPool<ByteArrayFragment>> BYTE_ARRAY_FRAGMENT_POOL =
-        new ThreadLocal<MultiThreadReusableObjectPool<ByteArrayFragment>>()
-        {
-            @Override
-            protected MultiThreadReusableObjectPool<ByteArrayFragment> initialValue()
+    static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
+        new MultiThreadReusableObjectPool<ByteArrayFragment>("RxFragmentPool",
+            new IReusableObjectBuilder<ByteArrayFragment>()
             {
-                return new MultiThreadReusableObjectPool<ByteArrayFragment>(Thread.currentThread() + "-RxFramePool",
-                    new IReusableObjectBuilder<ByteArrayFragment>()
-                    {
-                        @Override
-                        public ByteArrayFragment newInstance()
-                        {
-                            final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
-                            byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL.get();
-                            return byteArrayFragment;
-                        }
-                    }, new IReusableObjectFinalizer<ByteArrayFragment>()
-                    {
-                        @Override
-                        public void reset(ByteArrayFragment instance)
-                        {
-                            instance.initialise(-1, -1, (byte) -1, null, -1, -1);
-                        }
-                    }, 32);
-            }
-        };
-
+                @Override
+                public ByteArrayFragment newInstance()
+                {
+                    final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
+                    byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL;
+                    return byteArrayFragment;
+                }
+            }, new IReusableObjectFinalizer<ByteArrayFragment>()
+            {
+                @Override
+                public void reset(ByteArrayFragment instance)
+                {
+                    instance.initialise(-1, -1, (byte) -1, null, -1, -1);
+                }
+            }, TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
+    
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
      * 
@@ -169,7 +162,7 @@ class ByteArrayFragment
         final int sequenceId = rxData.getInt();
         final byte lastElement = rxData.get();
 
-        return BYTE_ARRAY_FRAGMENT_POOL.get().get().initialise(id, sequenceId, lastElement, rxData.array(),
+        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(),
             rxData.position(), rxData.limit() - rxData.position());
     }
 
@@ -200,7 +193,7 @@ class ByteArrayFragment
         final int sequenceId = parts[1];
         final byte lastElement = (byte) parts[2];
 
-        return BYTE_ARRAY_FRAGMENT_POOL.get().get().initialise(id, sequenceId, lastElement, rxData.array(),
+        return BYTE_ARRAY_FRAGMENT_POOL.get().initialise(id, sequenceId, lastElement, rxData.array(),
             rxData.position(), rxData.limit() - rxData.position());
     }
 
