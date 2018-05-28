@@ -68,6 +68,7 @@ public final class ChannelWatchdog implements Runnable
     final Set<ITransportChannel> channelsReceivingHeartbeat;
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
     final Map<ITransportChannel, Long> channelsHeartbeatArrivalTime;
+    final Set<ITransportChannel> channelFirstHeartbeatWarning;
     final Object lock;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory()
@@ -93,6 +94,7 @@ public final class ChannelWatchdog implements Runnable
         this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
         this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
         this.channelsHeartbeatArrivalTime = new ConcurrentHashMap<ITransportChannel, Long>();
+        this.channelFirstHeartbeatWarning = new HashSet<ITransportChannel>();
         configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "30000")),
             Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
     }
@@ -263,6 +265,7 @@ public final class ChannelWatchdog implements Runnable
             this.channelsReceivingHeartbeat.remove(channel);
             this.channelsMissingHeartbeat.remove(channel);
             this.channelsHeartbeatArrivalTime.remove(channel);
+            this.channelFirstHeartbeatWarning.remove(channel);
         }
     }
 
@@ -298,13 +301,19 @@ public final class ChannelWatchdog implements Runnable
                         - ChannelWatchdog.this.heartbeatPeriodMillis;
                     if (hbDelta > HB_TOLERANCE_MILLIS)
                     {
-                        Log.log(this, "*** WARNING *** heartbeat received ", Long.toString(hbDelta),
-                            "ms too LATE from ", ObjectUtils.safeToString(channel));
+                        if (!ChannelWatchdog.this.channelFirstHeartbeatWarning.add(channel))
+                        {
+                            Log.log(this, "Heartbeat received ", Long.toString(hbDelta), "ms too LATE from ",
+                                ObjectUtils.safeToString(channel));
+                        }
                     }
                     else if (hbDelta < -HB_TOLERANCE_MILLIS)
                     {
-                        Log.log(this, "*** WARNING *** heartbeat received ", Long.toString(-hbDelta),
-                            "ms too EARLY from ", ObjectUtils.safeToString(channel));
+                        if (!ChannelWatchdog.this.channelFirstHeartbeatWarning.add(channel))
+                        {
+                            Log.log(this, "Heartbeat received ", Long.toString(-hbDelta), "ms too EARLY from ",
+                                ObjectUtils.safeToString(channel));
+                        }
                     }
                 }
 
