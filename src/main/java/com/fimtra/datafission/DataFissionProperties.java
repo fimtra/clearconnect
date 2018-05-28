@@ -202,10 +202,10 @@ public abstract class DataFissionProperties
         String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = BASE + "connectionsRecordPublishPeriodMillis";
 
         /**
-         * The maximum size for the publish tasks pool in a {@link Context}.<br>
-         * E.g. <code>-DdataFission.publishTasksMaxPoolSize=1000</code>
+         * The maximum size for the rx frame handling tasks pool in a {@link ProxyContext}.<br>
+         * E.g. <code>-DdataFission.proxyRxFrameHandlerPoolMaxSize=1000</code>
          */
-        String PUBLISH_TASKS_MAX_POOL_SIZE = BASE + "publishTasksMaxPoolSize";
+        String PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE = BASE + "proxyRxFrameHandlerPoolMaxSize";
     }
 
     /**
@@ -436,14 +436,14 @@ public abstract class DataFissionProperties
             Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "10000"));
 
         /**
-         * The maximum size for the publish tasks pool in a {@link Context}.<br>
+         * The maximum size for the rx frame handling tasks pool in a {@link ProxyContext}.<br>
          * <p>
          * Default is 1000.
          * 
-         * @see Names#PUBLISH_TASKS_MAX_POOL_SIZE
+         * @see Names#PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE
          */
-        int PUBLISH_TASKS_MAX_POOL_SIZE =
-            Integer.parseInt(System.getProperty(Names.PUBLISH_TASKS_MAX_POOL_SIZE, "1000"));
+        int PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE =
+            Integer.parseInt(System.getProperty(Names.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE, "1000"));
     }
 
     private DataFissionProperties()
