@@ -203,15 +203,6 @@ public final class ContextUtils
     static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
     static
     {
-        try
-        {
-            statisticsLog.append("Time, Q, QOverflowInterval, QSubmittedInterval, QSubmittedTotal").append(
-                SystemUtils.lineSeparator());
-        }
-        catch (IOException e)
-        {
-            Log.log(ContextUtils.class, "Could not log to QStats file", e);
-        }
         UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
         {
             final FastDateFormat fdf = new FastDateFormat();
@@ -222,24 +213,24 @@ public final class ContextUtils
                 final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
+                sb.append(yyyyMMddHHmmssSSS);
                 for (ThimbleExecutor thimbleExecutor : executors)
                 {
-                    sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
-                        " coalescing queue, ").append(getStats(thimbleExecutor.getCoalescingTaskStatistics())).append(
-                            SystemUtils.lineSeparator());
+                    sb.append(", ").append(thimbleExecutor.getName()).append(
+                        " coalescing Q, ").append(getStats(thimbleExecutor.getCoalescingTaskStatistics()));
+                    
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                         thimbleExecutor.getSequentialTaskStatistics();
                     if (thimbleExecutor == CORE_EXECUTOR)
                     {
                         coreStats = sequentialTaskStatistics;
                     }
-                    sb.append(yyyyMMddHHmmssSSS).append(", ").append(thimbleExecutor.getName()).append(
-                        " sequential queue, ").append(getStats(sequentialTaskStatistics)).append(
-                            SystemUtils.lineSeparator());
+                    sb.append(", ").append(thimbleExecutor.getName()).append(
+                        " sequential Q, ").append(getStats(sequentialTaskStatistics));
                 }
                 try
                 {
-                    statisticsLog.append(sb.toString());
+                    statisticsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
                     statisticsLog.flush();
                 }
                 catch (IOException e)
