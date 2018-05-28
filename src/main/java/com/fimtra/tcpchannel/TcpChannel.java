@@ -966,7 +966,7 @@ public class TcpChannel implements ITransportChannel
     @Override
     public int getTxQueueSize()
     {
-        return this.txFrames[this.pendingQueue].size();
+        return this.txFrames[0].size() + this.txFrames[1].size();
     }
 }
 
