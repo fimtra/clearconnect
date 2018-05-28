@@ -18,7 +18,7 @@ package com.fimtra.thimble;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -76,7 +76,7 @@ public final class ThimbleExecutor implements Executor
         return Collections.unmodifiableSet(EXECUTORS);
     }
     
-    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new HashSet<ThimbleExecutor>());
+    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<ThimbleExecutor>());
     
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
