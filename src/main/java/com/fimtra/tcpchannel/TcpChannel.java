@@ -535,7 +535,7 @@ public class TcpChannel implements ITransportChannel
                 pendingTxFrames = this.txFrames[this.pendingQueue];
                 for (int i = 0; i < byteFragmentsToSend.length; i++)
                 {
-                    pendingTxFrames.add(byteFragmentsToSend[i]);
+                    pendingTxFrames.offer(byteFragmentsToSend[i]);
                 }
 
                 switch(this.state)
@@ -605,7 +605,7 @@ public class TcpChannel implements ITransportChannel
 
             final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
             frameResolver.channel = this;
-            
+
             final int readCount = this.socketChannel.read(frameResolver.buffer);
             switch(readCount)
             {
@@ -644,7 +644,7 @@ public class TcpChannel implements ITransportChannel
         {
             this.rxByteBuffer.clear();
         }
-        
+
         // read the input buffer into the main buffer
         buffer.flip();
         this.rxByteBuffer.put(buffer);
@@ -809,13 +809,14 @@ public class TcpChannel implements ITransportChannel
                         }
 
                         // swap txFrames over
-                        int temp = channel.sendingQueue;
+                        final int temp = channel.sendingQueue;
                         channel.sendingQueue = channel.pendingQueue;
                         channel.pendingQueue = temp;
 
                         if (channel.txFrames[channel.sendingQueue].size() == 0)
                         {
                             setChannelIdle(channel);
+                            continue;
                         }
                     }
                     finally
@@ -823,28 +824,22 @@ public class TcpChannel implements ITransportChannel
                         channel.lock.unlock();
                     }
                 }
-                if (channel.txFrames[channel.sendingQueue].size() > 0)
+
+                data = channel.txFrames[channel.sendingQueue].poll();
+                if (data != null)
                 {
                     try
                     {
-                        data = channel.txFrames[channel.sendingQueue].poll();
                         ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data.txDataWithHeader[0],
                             data.txDataWithHeader[1]);
                     }
-                    catch (IOException e)
-                    {
-                        channel.destroy("Could not write frames (" + e.toString() + ")");
-                    }
                     catch (Exception e)
                     {
-                        channel.destroy("Could not write frames", e);
+                        channel.destroy("Could not write frames to socket", e);
                     }
                     finally
                     {
-                        if (data != null)
-                        {
-                            data.free();
-                        }
+                        data.free();
                     }
                 }
             }
@@ -854,13 +849,9 @@ public class TcpChannel implements ITransportChannel
                 {
                     ((AbstractFrameReaderWriter) channel.readerWriter).writeBufferToSocket();
                 }
-                catch (IOException e)
-                {
-                    channel.destroy("Could not write frames (" + e.toString() + ")");
-                }
                 catch (Exception e)
                 {
-                    channel.destroy("Could not write frames", e);
+                    channel.destroy("Could not write buffer to socket", e);
                 }
             }
         }
@@ -1044,44 +1035,31 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         }
 
         final int byteCount = this.txBuffer.remaining();
-        try
+        final int bytesWritten;
+        if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)
         {
-            final int bytesWritten;
-            if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)
+            final long current = System.nanoTime();
+            if (current - this.zeroByteWriteTimeNanos > 5000000000l)
             {
-                long current = System.nanoTime();
-                final long diff = current - this.zeroByteWriteTimeNanos;
-                if (diff > 1000000000)
-                {
-                    Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",
-                        Integer.toString(byteCount), " bytes ",
-                        (this.zeroByteWriteTimeNanos == 0 ? ""
-                            : " in the last " + Integer.toString((int) (diff * 0.000001d)) + "ms "),
-                        "to ", this.tcpChannel.toString());
-                }
                 this.zeroByteWriteTimeNanos = current;
-
-                // return here and don't compact the buffer
-                // we need to continue reading it on the next run
-                return;
+                Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",
+                    Integer.toString(byteCount), " bytes in the last 5 secs to ", this.tcpChannel.toString());
             }
+
+            // don't reset the writeInProgress flag and don't compact the buffer
+            // as we need to continue reading it on the next run
         }
-        finally
+        else
         {
-            if (this.zeroByteWriteTimeNanos == 0)
-            {
-                this.txBuffer.compact();
-                this.writeInProgress = false;
-            }
+            this.writeInProgress = false;
+            this.txBuffer.compact();
         }
-
-        this.zeroByteWriteTimeNanos = 0;
 
         time = System.nanoTime() - time;
         if (time > SLOW_TX_FRAME_THRESHOLD_NANOS)
         {
             Log.log(this.tcpChannel, "SLOW FRAME WRITE: ", Long.toString((long) (time * TcpChannel._INVERSE_1000000)),
-                "ms to write ", Integer.toString(byteCount), " bytes to ", this.tcpChannel.toString());
+                "ms to write ", Integer.toString(bytesWritten), " bytes to ", this.tcpChannel.toString());
         }
     }
 
