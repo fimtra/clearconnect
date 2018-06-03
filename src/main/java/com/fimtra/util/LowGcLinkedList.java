@@ -46,7 +46,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
 {
     private static final long serialVersionUID = 1L;
 
-    private final static class Node<E>
+    final static class Node<E>
     {
         E item;
         Node<E> next;
@@ -138,7 +138,6 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         final E element = f.item;
         final Node<E> next = f.next;
         f.item = null;
-        release(f);
         f.next = null;
         this.first = next;
         if (next == null)
@@ -149,6 +148,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         {
             next.prev = null;
         }
+        release(f);
         this.size--;
         this.modCount++;
         return element;
@@ -159,7 +159,6 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         final E element = l.item;
         final Node<E> prev = l.prev;
         l.item = null;
-        release(l);
         l.prev = null;
         this.last = prev;
         if (prev == null)
@@ -170,6 +169,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         {
             prev.next = null;
         }
+        release(l);
         this.size--;
         this.modCount++;
         return element;
@@ -799,6 +799,9 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     
     private void release(Node<E> node)
     {
+        node.prev = null;
+        node.next = null;
+        node.item = null;
         if (this.spare == null)
         {
             this.spare = node;
