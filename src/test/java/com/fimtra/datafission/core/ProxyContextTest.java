@@ -313,9 +313,27 @@ public class ProxyContextTest
         
         addObserverLatch = this.candidate.addObserver(observer, "lasers, record!");
 
-        this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
+        revivePublisher();
 
         assertTrue(addObserverLatch.get(10, TimeUnit.SECONDS).size() == 1);
+    }
+
+    private void revivePublisher() throws InterruptedException
+    {
+        this.publisher = null;
+        int i = 0;
+        while (this.publisher == null && i++ < 60)
+        {
+            try
+            {
+                this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                Thread.sleep(1000);
+            }
+        }
     }
 
     @Test
@@ -2076,20 +2094,7 @@ public class ProxyContextTest
         statusObserver.latch = new CountDownLatch(1);
 
         // need to try until the server socket is dead
-        while (true)
-        {
-            Thread.sleep(10);
-            try
-            {
-                this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
-                break;
-            }
-            catch (Exception e)
-            {
-                Log.log(this, ">>>testPublisherBounced previous server socket still active: " + e);
-                continue;
-            }
-        }
+        revivePublisher();
 
         assertTrue(statusObserver.latch.await(timeout, TimeUnit.SECONDS));
         Log.log(this, ">>>>testPublisherBounced " + statusObserver.getLatestImage());
@@ -2132,7 +2137,7 @@ public class ProxyContextTest
         observer.latch = new CountDownLatch(UPDATE_COUNT);
         statusObserver.latch = new CountDownLatch(1);
 
-        this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
+        revivePublisher();
         this.candidate.reconnect(LOCALHOST, this.PORT);
 
         assertTrue(statusObserver.latch.await(timeout, TimeUnit.SECONDS));
@@ -2333,30 +2338,6 @@ public class ProxyContextTest
         this.context.destroy();
         this.executor.shutdownNow();
         
-
-        try
-        {
-            while (true)
-            {
-                Thread.sleep(100);
-                Socket s = null;
-                try
-                {
-                    s = new Socket(LOCALHOST, this.PORT);
-                }
-                finally
-                {                    
-                    if (s != null)
-                    {
-                        s.close();
-                    }
-                }
-            }
-        }
-        catch (Exception e)
-        {
-        }
-        
         // re-add the listener - ensures idempotency is tested
         this.candidate.addObserver(observer, simpleRecord);
         
@@ -2364,7 +2345,8 @@ public class ProxyContextTest
         this.contextName = getContextName();
         this.context = new Context(this.contextName);
         doSetup();
-        this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
+        
+        revivePublisher();
         
         // re-create the record
         record = this.context.createRecord(simpleRecord);

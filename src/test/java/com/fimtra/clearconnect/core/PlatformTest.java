@@ -277,10 +277,12 @@ public class PlatformTest
     String primary = "PRIMARY";
     String secondary = "SECONDARY";
 
+    // todo consider using full ephemeral ports
     static int servicePort3 = 34001;
     static int servicePort2 = 33001;
     static int servicePort = 32001;
     static int registryPort = 31001;
+    
     PlatformRegistry registry;
     PlatformRegistryAgent agent, agent008;
 
@@ -368,22 +370,22 @@ public class PlatformTest
         serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT,
             PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
-        // bit of a sleep for I/O to settle so we can re-create on the same port
+        // restart the registry, then check we get our services back
+        this.registry = null;
         int i = 0;
-        try
+        while (this.registry == null && i++ < 60)
         {
-            while (i++ < 10)
+            try
             {
-                new Socket(this.registryHost, registryPort).close();
-                Thread.sleep(200);
+                this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                Thread.sleep(1000);
             }
         }
-        catch (Exception er)
-        {
-        }
-
-        // restart the registry, then check we get our services back
-        this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
+        
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
 
@@ -906,23 +908,13 @@ public class PlatformTest
         // give time for IO to settle
         Thread.sleep(500);
 
-        // verify the socket is gone for us to proceed
-        try
-        {
-            Socket socket = null;
-            while (true)
-            {
-                socket = new Socket(this.agentHost, servicePort);
-                socket.close();
-            }
-        }
-        catch (IOException e)
-        {
-        }
-
         // re-create service instance 1 - SAME port
-        assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+        i = 0;
+        while (!this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT) && i++ < 60)
+        {
+            Thread.sleep(1000);
+        }
 
         listener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1);
         listener2.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1);
@@ -1237,14 +1229,7 @@ public class PlatformTest
             assertTrue(agent008RegistryConnectedLatch.get().getCount() > 0);
 
             this.registry.destroy();
-            try
-            {
-                while (true)
-                    new Socket(this.registryHost, oldPort).close();
-            }
-            catch (Exception e)
-            {
-            }
+
             Thread.sleep(500);
 
             assertTrue("Agent not disconnected from registry?",
@@ -1270,7 +1255,20 @@ public class PlatformTest
             assertNotNull(service1Proxy);
 
             // restart the old registry
-            this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
+            this.registry = null;
+            int i = 0;
+            while (this.registry == null && i++ < 60)
+            {
+                try
+                {
+                    this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                }
+            }
 
             IPlatformServiceProxy oldP1 = service1Proxy;
             IPlatformServiceProxy oldP2 = service2Proxy;
@@ -1377,14 +1375,7 @@ public class PlatformTest
             assertTrue(agentRegistryConnectedLatch.get().getCount() > 0);
 
             this.registry.destroy();
-            try
-            {
-                while (true)
-                    new Socket(this.registryHost, oldPort).close();
-            }
-            catch (Exception e)
-            {
-            }
+
             Thread.sleep(500);
 
             assertTrue("Agent not disconnected from registry?",
@@ -1401,7 +1392,20 @@ public class PlatformTest
             assertNotNull(service1Proxy);
 
             // restart the old registry
-            this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
+            this.registry = null;
+            int i = 0;
+            while (this.registry == null && i++ < 60)
+            {
+                try
+                {
+                    this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, oldPort);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                }
+            }
 
             IPlatformServiceProxy oldP2 = service1Proxy;
             this.agent.destroyPlatformServiceProxy(SERVICE1);

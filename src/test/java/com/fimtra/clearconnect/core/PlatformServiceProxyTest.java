@@ -146,7 +146,7 @@ public class PlatformServiceProxyTest
     public void testServiceConnectionStatusListener()
     {
         IServiceConnectionStatusListener listener = mock(IServiceConnectionStatusListener.class);
-        this.candidate.addServiceConnectionStatusListener(listener);
+        this.candidate.addServiceConnectionStatusListener(EventListenerUtils.synchronizedListener(EventListenerUtils.synchronizedListener(listener)));
         verify(listener, timeout(1000).atLeastOnce()).onConnected(eq(this.service.getPlatformServiceFamily()),
             anyInt());
         this.service.destroy();
@@ -425,7 +425,7 @@ public class PlatformServiceProxyTest
     {
         // compensate for lazy loading
         IRpcAvailableListener rpcListener = mock(IRpcAvailableListener.class);
-        this.candidate.addRpcAvailableListener(rpcListener);
+        this.candidate.addRpcAvailableListener(EventListenerUtils.synchronizedListener(rpcListener));
         verify(rpcListener, timeout(1000).times(1)).onRpcAvailable(any(IRpcInstance.class));
 
         assertEquals(1, this.candidate.getAllRpcs().size());
@@ -433,7 +433,7 @@ public class PlatformServiceProxyTest
         assertTrue(this.service.publishRPC(rpc1));
 
         rpcListener = mock(IRpcAvailableListener.class);
-        this.candidate.addRpcAvailableListener(rpcListener);
+        this.candidate.addRpcAvailableListener(EventListenerUtils.synchronizedListener(rpcListener));
         verify(rpcListener, timeout(1000).times(2)).onRpcAvailable(any(IRpcInstance.class));
 
         assertEquals(2, this.candidate.getAllRpcs().size());

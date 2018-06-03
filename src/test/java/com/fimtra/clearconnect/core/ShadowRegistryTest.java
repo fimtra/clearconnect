@@ -62,7 +62,7 @@ public class ShadowRegistryTest
     }
 
     @Test
-    public void test()
+    public void test() throws InterruptedException
     {
         IRegistryAvailableListener listener = mock(IRegistryAvailableListener.class);
         this.agent.addRegistryAvailableListener(listener);
@@ -74,7 +74,20 @@ public class ShadowRegistryTest
         verify(listener, timeout(millis)).onRegistryDisconnected();
         verify(listener, timeout(millis).times(2)).onRegistryConnected();
 
-        this.primary = new PlatformRegistry("Test", TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT);
+        this.primary = null;
+        int i = 0;
+        while (this.primary == null && i++ < 60)
+        {
+            try
+            {
+                this.primary = new PlatformRegistry("Test", TcpChannelUtils.LOCALHOST_IP, PRIMARY_PORT);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                Thread.sleep(1000);
+            }
+        }
 
         verify(listener, timeout(millis).times(2)).onRegistryDisconnected();
         verify(listener, timeout(millis).times(3)).onRegistryConnected();

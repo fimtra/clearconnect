@@ -104,31 +104,23 @@ public class PlatformRegistryTest
         this.candidate.destroy();
         assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
 
-        try
+        connectedLatch.set(new CountDownLatch(MAX));
+
+        this.candidate = null;
+        int i = 0;
+        while (this.candidate == null && i++ < 60)
         {
-            while (true)
+            try
             {
-                Socket s = null;
-                try
-                {
-                    s = new Socket(TcpChannelUtils.LOCALHOST_IP, regPort);
-                }
-                finally
-                {
-                    if (s != null)
-                    {
-                        s.close();
-                    }
-                    Thread.sleep(500);
-                }
+                this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                Thread.sleep(1000);
             }
         }
-        catch (Exception e)
-        {
-        }
-
-        connectedLatch.set(new CountDownLatch(MAX));
-        this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+        
         final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
         assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
     }
@@ -166,8 +158,8 @@ public class PlatformRegistryTest
             {
                 if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
                 {
-                    allConnections.countDown();
                     this.connected = true;
+                    allConnections.countDown();
                 }
 
                 // this is for when we destroy the agents
