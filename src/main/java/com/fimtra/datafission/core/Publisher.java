@@ -895,9 +895,6 @@ public class Publisher
             }
         };
 
-        // prepare to periodically publish status changes
-        this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
-
         this.mainCodec = codec;
         this.server = transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
             new EndPointAddress(node, port)).buildService(new IReceiver()
@@ -1050,6 +1047,9 @@ public class Publisher
             });
 
         this.multiplexer = new ProxyContextMultiplexer(this.server);
+        
+        // prepare to periodically publish status changes
+        this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
     }
 
     public long getContextConnectionsRecordPublishPeriodMillis()

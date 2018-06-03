@@ -146,6 +146,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.context =
             new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), coreExecutor,
                 rpcExecutor, utilityExecutor);
+        
+        this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
+        
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
         
@@ -207,8 +210,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
                 }
             }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
-
-        this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
+        
         this.recordAvailableNotifyingCache =
             PlatformUtils.createRecordAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RECORDS, this);
         this.rpcAvailableNotifyingCache =
