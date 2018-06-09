@@ -487,7 +487,7 @@ public final class ProxyContext implements IObserverContext
                     @Override
                     public Object context()
                     {
-                        return ProxyContextReceiver.this.proxyContext.getName();
+                        return ProxyContextReceiver.this.proxyContext;
                     }
                 });
             }
