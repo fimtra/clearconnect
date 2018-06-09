@@ -113,8 +113,8 @@ abstract class AbstractReusableObjectPool<T>
     private final Object[] pool;
     private final int poolLimit;
 
-    private int highest;
-    private int poolPtr;
+    int highest;
+    int poolPtr;
 
     AbstractReusableObjectPool(String name, IReusableObjectBuilder<T> builder, IReusableObjectFinalizer<T> finalizer,
         int maxSize)
@@ -194,10 +194,10 @@ abstract class AbstractReusableObjectPool<T>
             {
                 this.finalizer.reset(instance);
                 this.pool[++this.poolPtr] = instance;
-            }
-            if (this.poolPtr > this.highest)
-            {
-                this.highest = this.poolPtr;
+                if (this.poolPtr > this.highest)
+                {
+                    this.highest = this.poolPtr;
+                }
             }
         }
     }

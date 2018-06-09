@@ -56,7 +56,7 @@ public class ReusableObjectPoolTest
             }
         }, 10);
     }
-    
+
     @Test
     public void testSimpleGetOffer()
     {
@@ -65,15 +65,15 @@ public class ReusableObjectPoolTest
         assertNotSame(map1, map2);
         map1.put("1", "1");
         map2.put("2", "2");
-        
+
         candidate.offer(map1);
-        final Map map1_1 = candidate.get();        
+        final Map map1_1 = candidate.get();
         assertSame(map1, map1_1);
         assertEquals(0, map1_1.size());
-        
+
         candidate.offer(map1);
         candidate.offer(map2);
-        
+
         final Map map2_1 = candidate.get();
         assertSame(map2, map2_1);
         assertEquals(0, map2_1.size());
@@ -84,15 +84,31 @@ public class ReusableObjectPoolTest
     {
         int max = candidate.getSize();
         List<Map> maps = new ArrayList<Map>(max);
-        for(int i = 0; i < max; i++)
+        for (int i = 0; i < max + 2; i++)
         {
             maps.add(candidate.get());
         }
-        for(int i = 0; i < max; i++)
+        for (int i = 0; i < max + 2; i++)
         {
             candidate.offer(maps.get(i));
+            if (i < max)
+            {
+                assertEquals(i, candidate.poolPtr);
+                assertEquals(i, candidate.highest);
+            }
         }
-        System.out.println(candidate.getSize());
+        assertEquals(max - 1, candidate.poolPtr);
+        assertEquals(max - 1, candidate.highest);
+        for (int i = 0; i < max + 2; i++)
+        {
+            maps.add(candidate.get());
+            if (i < max - 2)
+            {
+                assertEquals("at " + i, max - 2 - i, candidate.poolPtr);
+                assertEquals(max - 1, candidate.highest);
+            }
+        }
+
     }
 
 }
