@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -779,19 +780,28 @@ final class EventHandler
 
     private static final RollingFileAppender SERVICE_LOG =
         RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
+    private static final Executor SERVICE_LOG_EXECUTOR = ThreadUtils.newSingleThreadExecutorService("service-log");
 
-    private static void banner(EventHandler eventHandler, String message)
+    private static void banner(EventHandler eventHandler, final String message)
     {
         Log.banner(eventHandler, message);
-        try
+
+        SERVICE_LOG_EXECUTOR.execute(new Runnable()
         {
-            SERVICE_LOG.append(message).append(SystemUtils.lineSeparator());
-            SERVICE_LOG.flush();
-        }
-        catch (IOException e)
-        {
-            Log.log(EventHandler.class, "Could not log service message", e);
-        }
+            @Override
+            public void run()
+            {
+                try
+                {
+                    SERVICE_LOG.append(message).append(SystemUtils.lineSeparator());
+                    SERVICE_LOG.flush();
+                }
+                catch (IOException e)
+                {
+                    Log.log(EventHandler.class, "Could not log service message", e);
+                }
+            }
+        });
     }
     
     private final static IRecordListener NOOP_OBSERVER = new IRecordListener()
