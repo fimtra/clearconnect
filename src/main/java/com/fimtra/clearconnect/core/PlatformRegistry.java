@@ -85,6 +85,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.RollingFileAppender;
@@ -778,30 +779,47 @@ final class EventHandler
     private static final ThreadFactory PUBLISH_EXECUTOR_THREAD_FACTORY =
         ThreadUtils.newDaemonThreadFactory("publish-executor");
 
-    private static final RollingFileAppender SERVICE_LOG =
-        RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
-    private static final Executor SERVICE_LOG_EXECUTOR = ThreadUtils.newSingleThreadExecutorService("service-log");
+    private static final boolean SERVICES_LOG_DISABLED = Boolean.getBoolean("platform.servicesLogDisabled");
+    private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null
+        : RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
+    private static final Executor SERVICES_LOG_EXECUTOR =
+        SERVICES_LOG_DISABLED ? null : ThreadUtils.newSingleThreadExecutorService("services-log");
+    private static final FastDateFormat fdf = new FastDateFormat();
 
     private static void banner(EventHandler eventHandler, final String message)
     {
-        Log.banner(eventHandler, message);
-
-        SERVICE_LOG_EXECUTOR.execute(new Runnable()
+        try
         {
-            @Override
-            public void run()
+            Log.banner(eventHandler, message);
+
+            if (SERVICES_LOG_DISABLED)
             {
-                try
-                {
-                    SERVICE_LOG.append(message).append(SystemUtils.lineSeparator());
-                    SERVICE_LOG.flush();
-                }
-                catch (IOException e)
-                {
-                    Log.log(EventHandler.class, "Could not log service message", e);
-                }
+                return;
             }
-        });
+
+            final long now = System.currentTimeMillis();
+            SERVICES_LOG_EXECUTOR.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(
+                            SystemUtils.lineSeparator());
+                        SERVICES_LOG.flush();
+                    }
+                    catch (IOException e)
+                    {
+                        Log.log(EventHandler.class, "Could not log service message", e);
+                    }
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Log.log(eventHandler, "Could not log banner message: " + message, e);
+        }
     }
     
     private final static IRecordListener NOOP_OBSERVER = new IRecordListener()
@@ -1842,7 +1860,7 @@ final class EventHandler
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.USER, args[3]);
         runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.CPU_COUNT, args[4]);
         publishTimed(this.registry.runtimeStatus);
-        Log.log(this, "Agent connected: ", agentName);
+        banner(this, "Agent connected: " + agentName);
     }
 
     private void handleRpcRuntimeDynamic(final IValue... args)
@@ -1917,7 +1935,7 @@ final class EventHandler
                         agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
                         // purge the runtimeStatus record
                         this.registry.runtimeStatus.removeSubMap(agent);
-                        Log.log(this, "Agent disconnected: ", proxyId.textValue());
+                        banner(this, "Agent disconnected: " + agent);
                     }
                 }
     
