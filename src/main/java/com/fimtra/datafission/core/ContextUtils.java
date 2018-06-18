@@ -23,6 +23,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.nio.CharBuffer;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,6 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.channel.ChannelUtils;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.IObserverContext;
@@ -61,6 +64,7 @@ import com.fimtra.util.FileUtils;
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 import com.fimtra.util.RollingFileAppender;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
@@ -197,15 +201,42 @@ public final class ContextUtils
     final static ScheduledExecutorService UTILITY_SCHEDULER =
         ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    final static RollingFileAppender statisticsLog =
-        RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
+    final static RollingFileAppender qStatsLog =
+            RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
+    
+    static final RollingFileAppender runtimeStatsLog =
+            RollingFileAppender.createStandardRollingFileAppender("runtimeStats", UtilProperties.Values.LOG_DIR);
 
+    static long gcDutyCycle;
+    
+    public static long getGcDutyCycle()
+    {
+        return gcDutyCycle;
+    }
+    
     static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
     static
     {
         UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
         {
             final FastDateFormat fdf = new FastDateFormat();
+            long gcTimeLastPeriod;
+
+            {
+                final StringBuilder sb = new StringBuilder(1024);
+                sb.append(
+                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted").append(
+                        SystemUtils.lineSeparator());
+                try
+                {
+                    runtimeStatsLog.append(sb);
+                    runtimeStatsLog.flush();
+                }
+                catch (Exception e)
+                {
+                    Log.log(ContextUtils.class, "Could not add header to runtime stats log", e);
+                }
+            }
 
             @Override
             public void run()
@@ -213,29 +244,109 @@ public final class ContextUtils
                 final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
+                
+                // QStats first
                 sb.append(yyyyMMddHHmmssSSS);
+                // thimble executor Qs
+                long qOverflow = 0, qSubmitted = 0;
+                TaskStatistics stats;
+                long overflow;
                 for (ThimbleExecutor thimbleExecutor : executors)
                 {
-                    sb.append(", ").append(thimbleExecutor.getName()).append(
-                        " coalescing Q, ").append(getStats(thimbleExecutor.getCoalescingTaskStatistics()));
-                    
+                    final Map<Object, TaskStatistics> coalescingTaskStatistics =
+                        thimbleExecutor.getCoalescingTaskStatistics();
+                    stats = coalescingTaskStatistics.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+                    overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
+                    qOverflow += (overflow < 0 ? 0 : overflow);
+                    qSubmitted += stats.getIntervalSubmitted();
+                    sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
+                        getStats(coalescingTaskStatistics));
+
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                         thimbleExecutor.getSequentialTaskStatistics();
+                    stats = sequentialTaskStatistics.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+                    overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
+                    qOverflow += (overflow < 0 ? 0 : overflow);
+                    qSubmitted += stats.getIntervalSubmitted();
                     if (thimbleExecutor == CORE_EXECUTOR)
                     {
                         coreStats = sequentialTaskStatistics;
                     }
-                    sb.append(", ").append(thimbleExecutor.getName()).append(
-                        " sequential Q, ").append(getStats(sequentialTaskStatistics));
+                    sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
+                        getStats(sequentialTaskStatistics));
                 }
+                
                 try
                 {
-                    statisticsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
-                    statisticsLog.flush();
+                    qStatsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
+                    qStatsLog.flush();
                 }
                 catch (IOException e)
                 {
                     Log.log(ContextUtils.class, "Could not log to QStats file", e);
+                }
+                
+                // now Summary stats
+                sb.setLength(0);
+                
+                // time
+                sb.append(yyyyMMddHHmmssSSS);
+                
+                // memory use
+                final Runtime runtime = Runtime.getRuntime();
+                final double MB = 1d / (1024 * 1024);
+                final long memUsed = (long) ((runtime.totalMemory() - runtime.freeMemory()) * MB);
+                sb.append(", ").append(memUsed);
+
+                // compute the GC duty
+                long gcMillisInPeriod = 0;
+                long time = 0;
+                for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
+                {
+                    time = gcMxBean.getCollectionTime();
+                    if (time > -1)
+                    {
+                        gcMillisInPeriod += time;
+                    }
+                }
+                // store and work out delta of gc times
+                time = this.gcTimeLastPeriod;
+                this.gcTimeLastPeriod = gcMillisInPeriod;
+                gcMillisInPeriod -= time;
+                final double inverseLoggingPeriodSecs = 1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
+                // this is now the "% GC duty cycle per minute"
+                gcDutyCycle = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
+                
+                sb.append(", ").append(getGcDutyCycle());
+                
+                // TX Q and max TX Q connection
+                final List<Pair<Integer, String>> channelStats = ChannelUtils.WATCHDOG.getChannelStats();
+                int txQsize = 0;
+                int maxTxQ = 0;
+                String maxTxQName = "";
+                int size;
+                for (Pair<Integer, String> stat : channelStats)
+                {
+                    size = stat.getFirst().intValue();
+                    txQsize += size;
+                    if(maxTxQ < size)
+                    {
+                        maxTxQName = stat.getSecond();
+                        maxTxQ = size;
+                    }
+                }
+                sb.append(", ").append(channelStats.size());
+                sb.append(", ").append(txQsize).append(", ").append(maxTxQ).append(", ").append(maxTxQName);
+                sb.append(", ").append(qOverflow).append(", ").append(qSubmitted);
+                
+                try
+                {
+                    runtimeStatsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
+                    runtimeStatsLog.flush();
+                }
+                catch (IOException e)
+                {
+                    Log.log(ContextUtils.class, "Could not log to runStats file", e);
                 }
             }
 
@@ -269,6 +380,7 @@ public final class ContextUtils
      */
     public static long[] getCoreStats()
     {
+        // todo should this be the summary across all thimble executors?
         final TaskStatistics stats = coreStats.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
         final long totalSubmitted = stats.getTotalSubmitted();
         final long totalExecuted = stats.getTotalExecuted();
