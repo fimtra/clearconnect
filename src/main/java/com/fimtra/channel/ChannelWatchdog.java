@@ -15,8 +15,10 @@
  */
 package com.fimtra.channel;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.Pair;
 
 /**
  * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
@@ -333,5 +336,21 @@ public final class ChannelWatchdog implements Runnable
                 Log.log(this, "Heartbeat recovered for ", ObjectUtils.safeToString(channel));
             }
         }
+    }
+
+    /**
+     * @return a {@link List} of {@link Pair} objects of
+     *         {@link Integer}={@link ITransportChannel#getTxQueueSize()} and
+     *         {@link String}={@link ITransportChannel#getDescription()}
+     */
+    public List<Pair<Integer, String>> getChannelStats()
+    {
+        final Set<ITransportChannel> localChannelsRef = this.channels;
+        final List<Pair<Integer, String>> stats = new ArrayList<Pair<Integer, String>>(localChannelsRef.size());
+        for (ITransportChannel channel : localChannelsRef)
+        {
+            stats.add(new Pair<Integer, String>(Integer.valueOf(channel.getTxQueueSize()), channel.getDescription()));
+        }
+        return stats;
     }
 }
