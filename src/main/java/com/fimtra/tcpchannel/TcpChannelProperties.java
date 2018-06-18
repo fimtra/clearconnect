@@ -249,18 +249,18 @@ public abstract class TcpChannelProperties
          * due to slow consumption on the receiver side. A value of 0 means no send queue threshold
          * is in use.
          * <p>
-         * Default is: 10000
+         * Default is: 1000
          */
-        int SEND_QUEUE_THRESHOLD = Integer.parseInt(System.getProperty(Names.SEND_QUEUE_THRESHOLD, "10000"));
+        int SEND_QUEUE_THRESHOLD = Integer.parseInt(System.getProperty(Names.SEND_QUEUE_THRESHOLD, "1000"));
 
         /**
          * The time allowed (in millis) for the send queue threshold to be breached before
          * destroying the socket.
          * <p>
-         * Default is 30000 (30 secs)
+         * Default is 10000 (10 secs)
          */
         long SEND_QUEUE_THRESHOLD_BREACH_MILLIS =
-            Long.parseLong(System.getProperty(Names.SEND_QUEUE_THRESHOLD_BREACH_MILLIS, "30000"));
+            Long.parseLong(System.getProperty(Names.SEND_QUEUE_THRESHOLD_BREACH_MILLIS, "10000"));
  
         /**
          * The number of threads to use for TCP socket reading.
