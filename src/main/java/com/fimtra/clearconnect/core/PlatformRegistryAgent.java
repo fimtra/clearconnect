@@ -16,7 +16,6 @@
 package com.fimtra.clearconnect.core;
 
 import java.io.IOException;
-import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.net.InetSocketAddress;
@@ -1160,7 +1159,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
             long executedFromLastPeriod;
-            long gcTimeLastPeriod;
             IRpcInstance rpc;
 
             @Override
@@ -1180,28 +1178,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     final long qTotalSubmitted = stats[1];
                     final Runtime runtime = Runtime.getRuntime();
                     final double MB = 1d / (1024 * 1024);
-                    final long memUsed = (long) ((runtime.totalMemory() - runtime.freeMemory()) * MB);
-                    final long memAvailable = (long) (runtime.freeMemory() * MB);
+                    final long freeMemory = runtime.freeMemory();
+                    final long memUsed = (long) ((runtime.totalMemory() - freeMemory) * MB);
+                    final long memAvailable = (long) (freeMemory * MB);
                     final long threadCount = this.threadMxBean.getThreadCount();
-
-                    long gcMillisInPeriod = 0;
-                    long time = 0;
-                    for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
-                    {
-                        time = gcMxBean.getCollectionTime();
-                        if (time > -1)
-                        {
-                            gcMillisInPeriod += time;
-                        }
-                    }
-                    // store and work out delta of gc times
-                    time = this.gcTimeLastPeriod;
-                    this.gcTimeLastPeriod = gcMillisInPeriod;
-                    gcMillisInPeriod -= time;
                     final double inverseLoggingPeriodSecs = 1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
-                    // this is now the "% GC duty cycle per minute"
-                    gcMillisInPeriod = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
-
                     final long qTotalExecuted = stats[2];
                     final long eventsPerSec =
                         (long) ((qTotalExecuted - this.executedFromLastPeriod) * inverseLoggingPeriodSecs);
@@ -1212,7 +1193,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
                             LongValue.valueOf(qOverflow), LongValue.valueOf(qTotalSubmitted),
                             LongValue.valueOf(memUsed), LongValue.valueOf(memAvailable), LongValue.valueOf(threadCount),
-                            LongValue.valueOf(gcMillisInPeriod), LongValue.valueOf(eventsPerSec),
+                            LongValue.valueOf(ContextUtils.getGcDutyCycle()), LongValue.valueOf(eventsPerSec),
                             LongValue.valueOf(uptime));
                     }
                     catch (Exception e)
