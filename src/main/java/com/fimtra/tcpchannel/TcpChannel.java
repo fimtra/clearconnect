@@ -269,13 +269,17 @@ public class TcpChannel implements ITransportChannel
         {
             channel.prev.next = channel.next;
         }
-        if (channel == chain.first)
+        // defensive check if chain is null
+        if (chain != null)
         {
-            chain.first = channel.next;
-        }
-        if (channel == chain.last)
-        {
-            chain.last = channel.prev;
+            if (channel == chain.first)
+            {
+                chain.first = channel.next;
+            }
+            if (channel == chain.last)
+            {
+                chain.last = channel.prev;
+            }
         }
         channel.next = null;
         channel.prev = null;
@@ -486,7 +490,6 @@ public class TcpChannel implements ITransportChannel
         {
             this.reader.register(this.socketChannel, new Runnable()
             {
-
                 @Override
                 public void run()
                 {
@@ -1043,7 +1046,8 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
             {
                 this.zeroByteWriteTimeNanos = current;
                 Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",
-                    Integer.toString(byteCount), " bytes in the last 5 secs to ", this.tcpChannel.toString());
+                    Integer.toString(byteCount), " bytes at least once in the last 5 secs to ",
+                    this.tcpChannel.toString());
             }
 
             // don't reset the writeInProgress flag and don't compact the buffer
