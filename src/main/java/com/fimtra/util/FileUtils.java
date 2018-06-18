@@ -220,7 +220,15 @@ public abstract class FileUtils {
                 }
                 else
                 {
-                    Log.log(FileUtils.class, "Ignoring gzipping ", file.getAbsolutePath());
+                    // move it to the archive dir
+                    try
+                    {
+                        FileUtils.move(file, new File(archiveDirCanonical, file.getName()));
+                    }
+                    catch (IOException e)
+                    {
+                        Log.log(FileUtils.class, "Could not move to archive dir: " + file.getAbsolutePath(), e);
+                    }
                 }
 			}
 		}
