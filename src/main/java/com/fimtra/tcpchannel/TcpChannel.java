@@ -20,6 +20,7 @@ import static com.fimtra.tcpchannel.TcpChannelProperties.Values.RX_BUFFER_SIZE;
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD;
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD_BREACH_MILLIS;
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SLOW_RX_FRAME_THRESHOLD_NANOS;
+import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SLOW_SEND_METHOD_THRESHOLD_NANOS;
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SLOW_TX_FRAME_THRESHOLD_NANOS;
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.TX_SEND_SIZE;
 
@@ -523,6 +524,8 @@ public class TcpChannel implements ITransportChannel
     {
         try
         {
+            long start = System.nanoTime();
+            
             final TxByteArrayFragment[] byteFragmentsToSend =
                 TxByteArrayFragment.getFragmentsForTxData(toSend, TX_SEND_SIZE);
 
@@ -532,9 +535,13 @@ public class TcpChannel implements ITransportChannel
             }
 
             final Deque<TxByteArrayFragment> pendingTxFrames;
+            
+            long idleTrigger = 0;
+            long lockgrab = System.nanoTime();
             this.lock.lock();
             try
             {
+                lockgrab = System.nanoTime() - start;
                 pendingTxFrames = this.txFrames[this.pendingQueue];
                 for (int i = 0; i < byteFragmentsToSend.length; i++)
                 {
@@ -547,8 +554,10 @@ public class TcpChannel implements ITransportChannel
                         throw new ClosedChannelException();
                     case IDLE:
                         this.state = StateEnum.SENDING;
+                        idleTrigger = System.nanoTime();
                         linkChannel(this);
                         this.writer.setInterest(this.writerKey);
+                        idleTrigger = System.nanoTime() - idleTrigger;
                         break;
                     case SENDING:
                     default :
@@ -566,6 +575,12 @@ public class TcpChannel implements ITransportChannel
             finally
             {
                 this.lock.unlock();
+            }
+            start = System.nanoTime() - start;
+            if(start > SLOW_SEND_METHOD_THRESHOLD_NANOS)
+            {
+                Log.log(this, "SLOW SEND: " + start / 1000000 + "ms, lockgrab=" + lockgrab / 1000000 + "ms, idleTrigger="
+                    + idleTrigger / 1000000 + "ms");
             }
             return true;
         }

@@ -156,6 +156,13 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.rxFrameResolverPoolMaxSize=1000</code>
          */
         String RX_FRAME_RESOLVER_POOL_MAX_SIZE = BASE + "rxFrameResolverPoolMaxSize";
+
+        /**
+         * The system property name to define the threshold, in nanos, for defining a slow
+         * {@link TcpChannel#send(byte[])}<br>
+         * E.g. <code>-DtcpChannel.slowSendMethodThresholdNanos=20000000</code>
+         */
+        String SLOW_SEND_METHOD_THRESHOLD_NANOS = BASE + "slowSendMethodThresholdNanos";
     }
 
     /**
@@ -296,6 +303,14 @@ public abstract class TcpChannelProperties
          * Default is: 1000
          */
         int RX_FRAME_RESOLVER_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
+        
+        /**
+         * The threshold value for logging when a TCP send method is slow, in nanos
+         * <p>
+         * Default is: 20000000 (20ms)
+         */
+        long SLOW_SEND_METHOD_THRESHOLD_NANOS =
+            Long.parseLong(System.getProperty(Names.SLOW_SEND_METHOD_THRESHOLD_NANOS, "20000000"));
     }
 
     private TcpChannelProperties()
