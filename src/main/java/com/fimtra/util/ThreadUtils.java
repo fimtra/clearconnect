@@ -75,22 +75,36 @@ public abstract class ThreadUtils
     private static final String MAIN_METHOD_CLASSNAME;
     static
     {
-        String name = "unknown";
-        final Map<Thread, StackTraceElement[]> allStackTraces = Thread.getAllStackTraces();
-        Map.Entry<Thread, StackTraceElement[]> entry = null;
-        Thread key = null;
-        StackTraceElement[] value = null;
-        for (Iterator<Map.Entry<Thread, StackTraceElement[]>> it = allStackTraces.entrySet().iterator(); it.hasNext();)
+        String name = null;
+        final String command = System.getProperty("sun.java.command");
+        if (command != null)
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            if ("main".equals(key.getName()))
+            final String[] javaFqcn = command.split(" ")[0].split("\\.");
+            if (javaFqcn.length > 0)
             {
-                final StackTraceElement stackTraceElement = value[value.length - 1];
-                final String className = stackTraceElement.getClassName();
-                name = className.substring(className.lastIndexOf(".") + 1);
-                break;
+                name = javaFqcn[javaFqcn.length - 1];
+            }
+        }
+        if (name == null)
+        {
+            name = "Unknown";
+            final Map<Thread, StackTraceElement[]> allStackTraces = Thread.getAllStackTraces();
+            Map.Entry<Thread, StackTraceElement[]> entry = null;
+            Thread key = null;
+            StackTraceElement[] value = null;
+            for (Iterator<Map.Entry<Thread, StackTraceElement[]>> it =
+                allStackTraces.entrySet().iterator(); it.hasNext();)
+            {
+                entry = it.next();
+                key = entry.getKey();
+                value = entry.getValue();
+                if ("main".equals(key.getName()))
+                {
+                    final StackTraceElement stackTraceElement = value[value.length - 1];
+                    final String className = stackTraceElement.getClassName();
+                    name = className.substring(className.lastIndexOf(".") + 1);
+                    break;
+                }
             }
         }
         MAIN_METHOD_CLASSNAME = name;
