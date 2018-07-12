@@ -110,6 +110,9 @@ public class Publisher
      * {@link ISystemRecordNames#CONTEXT_STATUS}
      */
     public static final String ATTR_DELIM = ",";
+    
+    static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong(); 
+    static final AtomicLong BYTES_PUBLISHED = new AtomicLong(); 
 
     /**
      * @return the field name for the transmission statistics for a connection to a single
@@ -238,14 +241,14 @@ public class Publisher
             // note: for efficiency, we have almost duplicate code here for both parts rather than a
             // method
             //
+            int bytesPublished = 0;
             if (parts != null)
             {
-                int bytesPublished = 0;
                 int loopBroadcastCount = 0;
                 for (int i = 0; i < parts.length; i++)
                 {
                     txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
-
+                    
                     loopBroadcastCount += this.service.broadcast(name, txMessage, clients);
                     bytesPublished +=  loopBroadcastCount * txMessage.length;
                     broadcastCount += loopBroadcastCount;
@@ -258,16 +261,21 @@ public class Publisher
                 }
                 
                 Publisher.this.messagesPublished += broadcastCount;
+                MESSAGES_PUBLISHED.addAndGet(broadcastCount);
                 Publisher.this.bytesPublished += bytesPublished;
+                BYTES_PUBLISHED.addAndGet(bytesPublished);
             }
             else
             {
                 txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(atomicChange);
-
+                
                 broadcastCount = this.service.broadcast(name, txMessage, clients);
 
                 Publisher.this.messagesPublished += broadcastCount;
-                Publisher.this.bytesPublished += broadcastCount * txMessage.length;
+                MESSAGES_PUBLISHED.addAndGet(broadcastCount);
+                bytesPublished = broadcastCount * txMessage.length;
+                Publisher.this.bytesPublished += bytesPublished;
+                BYTES_PUBLISHED.addAndGet(bytesPublished);
 
                 // even if the service is broadcast capable, perform this loop to capture stats
                 for (j = 0; j < clients.length; j++)

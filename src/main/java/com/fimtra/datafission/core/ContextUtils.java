@@ -225,7 +225,7 @@ public final class ContextUtils
             {
                 final StringBuilder sb = new StringBuilder(1024);
                 sb.append(
-                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted").append(
+                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted, Msgs sent, Bytes sent").append(
                         SystemUtils.lineSeparator());
                 try
                 {
@@ -335,10 +335,11 @@ public final class ContextUtils
                         maxTxQ = size;
                     }
                 }
-                sb.append(", ").append(channelStats.size());
-                sb.append(", ").append(txQsize).append(", ").append(maxTxQ).append(", ").append(maxTxQName);
-                sb.append(", ").append(qOverflow).append(", ").append(qSubmitted);
-                
+                sb.append(", ").append(channelStats.size()).append(", ").append(txQsize).append(", ").append(
+                    maxTxQ).append(", ").append(maxTxQName).append(", ").append(qOverflow).append(", ").append(
+                        qSubmitted).append(", ").append(Publisher.MESSAGES_PUBLISHED.getAndSet(0)).append(", ").append(
+                            Publisher.BYTES_PUBLISHED.getAndSet(0));
+
                 try
                 {
                     runtimeStatsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
