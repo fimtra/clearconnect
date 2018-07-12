@@ -98,20 +98,24 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     static
     {
-        DeadlockDetector.newDeadlockDetectorTask(60000, new DeadlockObserver()
+        if (DataFissionProperties.Values.ENABLE_THREAD_DEADLOCK_CHECK)
         {
-            @Override
-            public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
+            DeadlockDetector.newDeadlockDetectorTask(DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS,
+                new DeadlockObserver()
             {
-                StringBuilder sb = new StringBuilder();
-                sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                for (int i = 0; i < deadlocks.length; i++)
+                @Override
+                public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
                 {
-                    sb.append(deadlocks[i].toString());
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
+                    for (int i = 0; i < deadlocks.length; i++)
+                    {
+                        sb.append(deadlocks[i].toString());
+                    }
+                    System.err.println(sb.toString());
                 }
-                System.err.println(sb.toString());
-            }
-        }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
+            }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
+        }
 
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
         {

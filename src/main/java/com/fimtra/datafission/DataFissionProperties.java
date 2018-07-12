@@ -206,6 +206,23 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.proxyRxFrameHandlerPoolMaxSize=1000</code>
          */
         String PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE = BASE + "proxyRxFrameHandlerPoolMaxSize";
+
+        /**
+         * Whether thread deadlock checking and thread dumps are enabled. <b>ENABLING THIS IS AN
+         * EXPENSIVE OPERATION.</b> <br>
+         * E.g. <code>-DdataFission.enableThreadDeadlockCheck=false</code>
+         */
+        String ENABLE_THREAD_DEADLOCK_CHECK = BASE + "enableThreadDeadlockCheck";
+
+        /**
+         * The name of the system property to define the period, in milliseconds, for thread
+         * deadlock checks and thread dumps. Only relevant if {@link #ENABLE_THREAD_DEADLOCK_CHECK}
+         * is true.<br>
+         * E.g. <code>-DdataFission.threadDeadlockCheckPeriodMillis=300000</code>
+         * 
+         * @see Values#ENABLE_THREAD_DEADLOCK_CHECK
+         */
+        String THREAD_DEADLOCK_CHECK_PERIOD_MILLIS = BASE + "threadDeadlockCheckPeriodMillis";
     }
 
     /**
@@ -444,6 +461,29 @@ public abstract class DataFissionProperties
          */
         int PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE =
             Integer.parseInt(System.getProperty(Names.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE, "1000"));
+
+        /**
+         * Whether thread deadlock checking and thread dumps are enabled. <b>ENABLING THIS IS AN
+         * EXPENSIVE OPERATION.</b>
+         * <p>
+         * Default is false.
+         * 
+         * @see Names#ENABLE_THREAD_DEADLOCK_CHECK
+         */
+        boolean ENABLE_THREAD_DEADLOCK_CHECK = Boolean.getBoolean(Names.ENABLE_THREAD_DEADLOCK_CHECK);
+
+        /**
+         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant
+         * if {@link #ENABLE_THREAD_DEADLOCK_CHECK} is true.
+         * <p>
+         * Default is 300000 (5 mins).
+         * 
+         * @see Values#ENABLE_THREAD_DEADLOCK_CHECK
+         * @see Names#THREAD_DEADLOCK_CHECK_PERIOD_MILLIS
+         */
+        int THREAD_DEADLOCK_CHECK_PERIOD_MILLIS =
+            Integer.parseInt(System.getProperty(Names.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS, "300000"));
+
     }
 
     private DataFissionProperties()
