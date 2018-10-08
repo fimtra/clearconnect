@@ -223,6 +223,12 @@ public abstract class DataFissionProperties
          * @see Values#ENABLE_THREAD_DEADLOCK_CHECK
          */
         String THREAD_DEADLOCK_CHECK_PERIOD_MILLIS = BASE + "threadDeadlockCheckPeriodMillis";
+
+        /**
+         * The name of the system property to define if queue statistics logging is enabled. <br>
+         * E.g. <code>-DdataFission.enableQStatsLogging=false</code>
+         */
+        String ENABLE_Q_STATS_LOGGING = BASE + "enableQStatsLogging";
     }
 
     /**
@@ -483,6 +489,13 @@ public abstract class DataFissionProperties
          */
         int THREAD_DEADLOCK_CHECK_PERIOD_MILLIS =
             Integer.parseInt(System.getProperty(Names.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS, "300000"));
+
+        /**
+         * Whether the queue statistics are logged.
+         * <p>
+         * Default is false
+         */
+        boolean ENABLE_Q_STATS_LOGGING = Boolean.getBoolean(Names.ENABLE_Q_STATS_LOGGING);
 
     }
 

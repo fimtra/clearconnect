@@ -201,9 +201,9 @@ public final class ContextUtils
     final static ScheduledExecutorService UTILITY_SCHEDULER =
         ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    final static RollingFileAppender qStatsLog =
-            RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR);
-    
+    final static RollingFileAppender qStatsLog = DataFissionProperties.Values.ENABLE_Q_STATS_LOGGING
+        ? RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) : null;
+
     static final RollingFileAppender runtimeStatsLog =
             RollingFileAppender.createStandardRollingFileAppender("runtimeStats", UtilProperties.Values.LOG_DIR);
 
@@ -246,7 +246,10 @@ public final class ContextUtils
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
                 
                 // QStats first
-                sb.append(yyyyMMddHHmmssSSS);
+                if (qStatsLog != null)
+                {
+                    sb.append(yyyyMMddHHmmssSSS);
+                }
                 // thimble executor Qs
                 long qOverflow = 0, qSubmitted = 0;
                 TaskStatistics stats;
@@ -259,8 +262,6 @@ public final class ContextUtils
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
-                    sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
-                        getStats(coalescingTaskStatistics));
 
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                         thimbleExecutor.getSequentialTaskStatistics();
@@ -272,18 +273,27 @@ public final class ContextUtils
                     {
                         coreStats = sequentialTaskStatistics;
                     }
-                    sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
-                        getStats(sequentialTaskStatistics));
+                    
+                    if (qStatsLog != null)
+                    {
+                        sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
+                            getStats(coalescingTaskStatistics));
+                        sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
+                            getStats(sequentialTaskStatistics));
+                    }
                 }
-                
-                try
+
+                if (qStatsLog != null)
                 {
-                    qStatsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
-                    qStatsLog.flush();
-                }
-                catch (IOException e)
-                {
-                    Log.log(ContextUtils.class, "Could not log to QStats file", e);
+                    try
+                    {
+                        qStatsLog.append(sb.toString()).append(SystemUtils.lineSeparator());
+                        qStatsLog.flush();
+                    }
+                    catch (IOException e)
+                    {
+                        Log.log(ContextUtils.class, "Could not log to QStats file", e);
+                    }
                 }
                 
                 // now Summary stats
