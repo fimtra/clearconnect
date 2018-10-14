@@ -242,7 +242,7 @@ public abstract class TcpChannelProperties
          * Default is: 3
          */
         int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
-            Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "3"));
+            Integer.parseInt(System.getProperty(Names.SLS_MAX_SHORT_LIVED_SOCKET_TRIES, "3"));
 
         /**
          * The size of the TX queue that causes the socket to be destroyed from the sender side
