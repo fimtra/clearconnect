@@ -60,6 +60,13 @@ public abstract class TcpChannelProperties
          */
         String PROPERTY_NAME_SERVER_ACL = BASE + "serverAcl";
         /**
+         * The system property name to define if connections to the {@link TcpServer} instances in
+         * the runtime are logged. The logging will track the number of connections attempted from
+         * each host and whether the host is blacklisted or blocked.<br>
+         * E.g. <code>-DtcpChannel.serverConnectionLogging=true</code>
+         */
+        String SERVER_CONNECTION_LOGGING = BASE + "serverConnectionLogging";
+        /**
          * The system property name to define whether TCP server sockets can re-use an address.<br>
          * E.g. <code>-DtcpChannel.serverSocketReuseAddr=true</code>
          * 
@@ -194,8 +201,16 @@ public abstract class TcpChannelProperties
          * @see Names#SERVER_SOCKET_REUSE_ADDR
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
-            Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
+                Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
         
+        /**
+         * The default for server connection logging, default is <code>true</code>.
+         * 
+         * @see Names#SERVER_CONNECTION_LOGGING
+         */
+        boolean SERVER_CONNECTION_LOGGING =
+            Boolean.valueOf(System.getProperty(Names.SERVER_CONNECTION_LOGGING, "true")).booleanValue();
+
         /**
          * The threshold value for logging when RX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP RX handling.

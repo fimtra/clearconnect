@@ -15,7 +15,10 @@
  */
 package com.fimtra.tcpchannel;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -25,9 +28,14 @@ import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
@@ -37,9 +45,12 @@ import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
+import com.fimtra.util.ThreadUtils;
+import com.fimtra.util.UtilProperties;
 
 /**
  * A TCP server socket component. A TcpServer is constructed with an {@link IReceiver} that will be
@@ -55,7 +66,57 @@ import com.fimtra.util.Pair;
  */
 public class TcpServer implements IEndPointService
 {
-
+    static final ConcurrentMap<String, Boolean> BLACKLISTED_HOSTS = new ConcurrentHashMap<String, Boolean>();
+    static final ConcurrentMap<String, Boolean> BLOCKED_HOSTS = new ConcurrentHashMap<String, Boolean>();
+    static final ConcurrentMap<String, AtomicInteger> CONNECTING_HOSTS = new ConcurrentHashMap<String, AtomicInteger>();
+    static
+    {
+        if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
+        {
+            final  Runnable connectionDumpTask = new Runnable()
+            {
+                final File serverConnectionsFile = FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR,
+                    ThreadUtils.getMainMethodClassSimpleName() + "-serverConnections");
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        this.serverConnectionsFile.createNewFile();
+                        PrintWriter pw = null;
+                        try
+                        {
+                            pw = new PrintWriter(new FileWriter(this.serverConnectionsFile));
+                            pw.println("HOST IP, CONNECTION COUNT, BLOCKED, BLACKLISTED");
+                            final List<String> sortedIps = new LinkedList<String>(CONNECTING_HOSTS.keySet());
+                            for (String IP : sortedIps)
+                            {
+                                pw.print(IP);
+                                pw.print(", ");
+                                pw.print(CONNECTING_HOSTS.get(IP));
+                                pw.print(", ");
+                                pw.print(Boolean.TRUE.equals(BLOCKED_HOSTS.get(IP)) ? "BLOCKED" : "");
+                                pw.print(", ");
+                                pw.println(Boolean.TRUE.equals(BLACKLISTED_HOSTS.get(IP)) ? "BLACKLISTED" : "");
+                            }
+                        }
+                        finally
+                        {
+                            FileUtils.safeClose(pw);
+                        }
+                    }
+                    catch (IOException e)
+                    {
+                        throw new RuntimeException(
+                            "Could not create " + ObjectUtils.safeToString(this.serverConnectionsFile), e);
+                    }
+                }
+            };
+            ThreadUtils.newScheduledExecutorService("server-connections", 1).scheduleAtFixedRate(connectionDumpTask, 1,
+                1, TimeUnit.MINUTES);
+        }
+    }
+    
     final static int DEFAULT_SERVER_RX_BUFFER_SIZE = 65535;
 
     final ServerSocketChannel serverSocketChannel;
@@ -171,10 +232,25 @@ public class TcpServer implements IEndPointService
                             if (remoteAddress instanceof InetSocketAddress)
                             {
                                 hostAddress = ((InetSocketAddress) remoteAddress).getAddress().getHostAddress();
+                                if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
+                                {
+                                    final AtomicInteger counter = new AtomicInteger(0);
+                                    final AtomicInteger connectionCount =
+                                        CONNECTING_HOSTS.putIfAbsent(hostAddress, counter);
+                                    if (connectionCount == null)
+                                    {
+                                        counter.incrementAndGet();
+                                    }
+                                    else
+                                    {
+                                        connectionCount.incrementAndGet();
+                                    }
+                                }
                                 boolean matched = false;
                                 if (isBlacklistedHost(hostAddress))
                                 {
                                     socketChannel.close();
+                                    BLACKLISTED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
                                     return;
                                 }
                                 for (Pattern pattern : TcpServer.this.aclPatterns)
@@ -191,6 +267,7 @@ public class TcpServer implements IEndPointService
                                     Log.log(TcpServer.this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
                                         " does not match any ACL pattern");
                                     socketChannel.close();
+                                    BLOCKED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
                                     return;
                                 }
                             }
