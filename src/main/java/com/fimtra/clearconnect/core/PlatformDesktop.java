@@ -297,6 +297,7 @@ class PlatformDesktop
         final String metaDataViewKey;
         final PlatformMetaDataViewEnum metaDataViewType;
         final IObserverContext context;
+        final String sessionId;
         final TableSummaryPanel tableSummaryPanel;
 
         public RecordSubscriptionPlatformDesktopView(PlatformDesktop desktop, String title,
@@ -313,9 +314,12 @@ class PlatformDesktop
                     case RECORDS_PER_INSTANCE:
                         this.context =
                             desktop.getMetaDataModel().getProxyContextForPlatformServiceInstance(metaDataViewKey);
+                        this.sessionId =
+                            desktop.getMetaDataModel().getSessionIdForPlatformServiceInstance(metaDataViewKey);
                         break;
                     case RECORDS_PER_SERVICE:
                         this.context = desktop.getMetaDataModel().getProxyContextForPlatformService(metaDataViewKey);
+                        this.sessionId = desktop.getMetaDataModel().getSessionIdForPlatformService(metaDataViewKey); 
                         break;
                     default :
                         throw new IllegalStateException("Unsupported: " + metaDataViewType);
@@ -337,7 +341,7 @@ class PlatformDesktop
             this.subscribedRecords = new CopyOnWriteArrayList<String>();
             this.model.addRecordRemovedListener(this.context);
 
-            this.context.addObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
+            this.context.addObserver(this.sessionId, this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
 
             prepareTablePopupMenu();
 
@@ -396,7 +400,7 @@ class PlatformDesktop
         {
             if (this.subscribedRecords.add(recordNameToSubscribe))
             {
-                this.context.addObserver(this.model, recordNameToSubscribe);
+                this.context.addObserver(this.sessionId, this.model, recordNameToSubscribe);
             }
         }
 
@@ -651,6 +655,7 @@ class PlatformDesktop
             this.metaDataViewType = metaDataViewType;
 
             this.model = new RowOrientedRecordTableModel();
+            // todo need a filter on the table
             this.table = new RowOrientedRecordTable(this.model);
             this.context = metaDataViewType.getContextForMetaDataViewType(platformDesktop.getMetaDataModel(),
                 this.metaDataViewKey);

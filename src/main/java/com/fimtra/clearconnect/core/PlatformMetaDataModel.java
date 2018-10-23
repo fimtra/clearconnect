@@ -43,7 +43,17 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TX_QUEUE_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Frame;
+import java.awt.Graphics;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -56,8 +66,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.swing.JDialog;
+
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
+import com.fimtra.clearconnect.core.PlatformDesktop.ParametersPanel;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformRegistry.IServiceRecordFields;
 import com.fimtra.clearconnect.core.PlatformServiceInstance.IServiceStatsRecordFields;
@@ -78,6 +91,9 @@ import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.ProxyContext;
+import com.fimtra.datafission.core.session.ISessionAttributesProvider;
+import com.fimtra.datafission.core.session.ISessionListener;
+import com.fimtra.datafission.core.session.SessionContexts;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -798,9 +814,17 @@ public final class PlatformMetaDataModel
         {
             return this.agent.registryProxy;
         }
-        return ((PlatformServiceProxy) getAgent().getPlatformServiceProxy(serviceFamily)).proxyContext;
+        registerSessionProvider(serviceFamily);
+        final ProxyContext proxyContext = ((PlatformServiceProxy) getAgent().getPlatformServiceProxy(serviceFamily)).proxyContext;
+        waitForSessionResponse(proxyContext, serviceFamily);
+        return proxyContext;
     }
 
+    public String getSessionIdForPlatformService(String serviceFamily)
+    {
+        return this.sessionIds.get(serviceFamily);
+    }
+    
     /**
      * Get a remote {@link IObserverContext} to a platform service instance. <b>THIS WILL CREATE A
      * NEW CONNECTION TO THE SERVICE INSTANCE. USE WITH CARE.</b>
@@ -820,8 +844,100 @@ public final class PlatformMetaDataModel
 
         // NOTE: this leaves a connection leak if the proxy is not destroyed when no more components
         // need it from the model
-        return ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0],
+        registerSessionProvider(family_member[0]);
+        final ProxyContext proxyContext = ((PlatformServiceProxy) this.agent.getPlatformServiceInstanceProxy(family_member[0],
             family_member[1])).proxyContext;
+        waitForSessionResponse(proxyContext, family_member[0]);
+        return proxyContext;
+    }
+
+    public String getSessionIdForPlatformServiceInstance(String platformServiceInstanceID)
+    {
+        final String[] family_member = PlatformUtils.decomposePlatformServiceInstanceID(platformServiceInstanceID);
+        return this.sessionIds.get(family_member[0]);
+    }
+    
+    private void waitForSessionResponse(final ProxyContext proxyContext, final String serviceFamily)
+    {
+        final CountDownLatch latch = new CountDownLatch(1); 
+        proxyContext.addSessionListener(new ISessionListener()
+        {
+            @Override
+            public void onSessionOpen(String sessionContext, String sessionId)
+            {
+                if (is.eq(serviceFamily, sessionContext))
+                {
+                    PlatformMetaDataModel.this.sessionIds.put(serviceFamily, sessionId);
+                    proxyContext.removeSessionListener(this);
+                    latch.countDown();
+                }
+            }
+
+            @Override
+            public void onSessionClosed(String sessionContext, String sessionId)
+            {
+                if (is.eq(serviceFamily, sessionContext))
+                {
+                    PlatformMetaDataModel.this.sessionAttributes.remove(serviceFamily);
+                    proxyContext.removeSessionListener(this);
+                    latch.countDown();
+                }
+            }
+        });
+        try
+        {
+            latch.await(5, TimeUnit.SECONDS);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    final Set<String> sessionAttributes = Collections.synchronizedSet(new HashSet<String>());
+    final Map<String, String> sessionIds = Collections.synchronizedMap(new HashMap<String, String>());
+
+    private void registerSessionProvider(String serviceFamily)
+    {
+        if (this.sessionAttributes.add(serviceFamily))
+        {
+            final ParametersPanel parameters = new ParametersPanel();
+            parameters.addParameter("attributes", null);
+
+            final String title = "Session attributes for " + serviceFamily;
+            final JDialog dialog = new JDialog((Frame)null, title, true);
+            final Point location = MouseInfo.getPointerInfo().getLocation(); 
+            dialog.setLocation((int) location.getX(), (int) location.getY());
+            dialog.setIconImage(PlatformDesktop.createIcon());
+            parameters.setOkButtonActionListener(new ActionListener()
+            {
+                @Override
+                public void actionPerformed(ActionEvent e)
+                {
+                    dialog.dispose();
+                }
+            });
+            dialog.getRootPane().setDefaultButton(parameters.ok);
+            final Font font = parameters.getFont();
+            final Graphics graphics = dialog.getGraphics();
+            final FontMetrics fontMetrics = dialog.getFontMetrics(font);
+            final double width = fontMetrics.getStringBounds(title, graphics).getWidth() + 64;
+            parameters.setPreferredSize(new Dimension((int) width, (int) parameters.getPreferredSize().getHeight()));
+            dialog.getContentPane().add(parameters);
+            dialog.pack();
+            dialog.setVisible(true);
+
+            final String[] sessionAttributes = parameters.get().get("attributes").split(",");
+            final ISessionAttributesProvider provider = new ISessionAttributesProvider()
+            {
+                @Override
+                public String[] getSessionAttributes()
+                {
+                    return sessionAttributes;
+                }
+            };
+            SessionContexts.registerSessionProvider(serviceFamily, provider);
+        }
     }
 
     /**
