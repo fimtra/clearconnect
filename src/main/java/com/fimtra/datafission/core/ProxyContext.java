@@ -38,6 +38,7 @@ import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.channel.EndPointAddress;
@@ -160,7 +161,10 @@ public final class ProxyContext implements IObserverContext
 
     static final String SUBSCRIBE = "subscribe";
     static final String UNSUBSCRIBE = "unsubscribe";
-
+    
+    static final AtomicLong MESSAGES_RECEIVED = new AtomicLong(); 
+    static final AtomicLong BYTES_RECEIVED = new AtomicLong();
+    
     private static final CountDownLatch DEFAULT_COUNT_DOWN_LATCH = new CountDownLatch(0);
 
     private static final int MINIMUM_RECONNECT_PERIOD_MILLIS = 50;
@@ -540,6 +544,7 @@ public final class ProxyContext implements IObserverContext
             boolean onDataReceivedCalled = false;
             try
             {
+                BYTES_RECEIVED.addAndGet(this.data.limit() - this.data.position());
                 if (this.receiver.codecSyncExpected)
                 {
                     final SyncResponse response =
@@ -642,6 +647,7 @@ public final class ProxyContext implements IObserverContext
         {
             try
             {
+                MESSAGES_RECEIVED.incrementAndGet();
                 final String name = substituteLocalNameWithRemoteName(this.changeName);
 
                 final boolean isImage = this.changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;

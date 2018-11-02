@@ -219,13 +219,14 @@ public final class ContextUtils
     {
         UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
         {
+            // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();
             long gcTimeLastPeriod;
 
             {
                 final StringBuilder sb = new StringBuilder(1024);
                 sb.append(
-                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted, Msgs sent, Bytes sent").append(
+                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted, Msgs sent, Bytes sent, Msgs rcvd, Bytes rcvd").append(
                         SystemUtils.lineSeparator());
                 try
                 {
@@ -348,7 +349,9 @@ public final class ContextUtils
                 sb.append(", ").append(channelStats.size()).append(", ").append(txQsize).append(", ").append(
                     maxTxQ).append(", ").append(maxTxQName).append(", ").append(qOverflow).append(", ").append(
                         qSubmitted).append(", ").append(Publisher.MESSAGES_PUBLISHED.getAndSet(0)).append(", ").append(
-                            Publisher.BYTES_PUBLISHED.getAndSet(0));
+                            Publisher.BYTES_PUBLISHED.getAndSet(0)).append(", ").append(
+                                ProxyContext.MESSAGES_RECEIVED.getAndSet(0)).append(", ").append(
+                                    ProxyContext.BYTES_RECEIVED.getAndSet(0));
 
                 try
                 {
