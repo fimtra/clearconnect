@@ -175,9 +175,8 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
-        IRecordChange result =
-            StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange("|".toCharArray(),
-                change, new StringProtocolCodec().getCharset())).toCharArray());
+        byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
+        IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
 
         Map<String, IValue> map1 = new HashMap<String, IValue>();
         map1.put(k1, v3);
