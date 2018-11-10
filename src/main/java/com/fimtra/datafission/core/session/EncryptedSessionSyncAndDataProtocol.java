@@ -30,11 +30,13 @@ import com.fimtra.util.SymmetricCipher;
  */
 public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionSyncProtocol
 {
+    @Deprecated
     private static final String SYMMETRIC_TRANSFORMATION = SymmetricCipher.ALGORITHM_AES;
+    static final String TRANSFORMATION = "AES/ECB/PKCS5Padding";
 
     final SecretKey txKey;
-    final SymmetricCipher txCipher;
 
+    SymmetricCipher txCipher;
     SymmetricCipher rxCipher;
 
     public EncryptedSessionSyncAndDataProtocol()
@@ -42,22 +44,32 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
         super();
         try
         {
-            this.txKey = SymmetricCipher.generate128BitKey(SYMMETRIC_TRANSFORMATION);
-            this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
+            this.txKey = SymmetricCipher.generate128BitKey(SymmetricCipher.ALGORITHM_AES);
         }
         catch (Exception e)
         {
             throw new RuntimeException(e);
         }
-    }
-
+    }  
+    
     @Override
     void handleExtra(FromPublisher fromPublisher)
     {
         try
         {
-            this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
-                SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
+            if (fromPublisher.dataTransformation != null)
+            {
+                this.txCipher = new SymmetricCipher(TRANSFORMATION, this.txKey);
+                this.rxCipher = new SymmetricCipher(fromPublisher.dataTransformation,
+                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
+            }
+            else
+            {
+                // pre 3.15.5 support
+                this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
+                this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
+                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
+            }
         }
         catch (Exception e)
         {
@@ -70,10 +82,22 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
     {
         try
         {
-            this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
-                SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
+            if (fromProxy.dataTransformation != null)
+            {
+                this.txCipher = new SymmetricCipher(TRANSFORMATION, this.txKey);
+                this.rxCipher = new SymmetricCipher(fromProxy.dataTransformation,
+                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
+            }
+            else
+            {
+                // pre 3.15.5 support
+                this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
+                this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
+                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
+            }
 
             response.extra = this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey));
+            response.dataTransformation = TRANSFORMATION;
         }
         catch (Exception e)
         {
@@ -87,6 +111,7 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
         try
         {
             response.extra = this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey));
+            response.dataTransformation = TRANSFORMATION;
         }
         catch (Exception e)
         {

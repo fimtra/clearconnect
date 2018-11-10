@@ -15,10 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
-import java.nio.ByteBuffer;
-
 import com.fimtra.datafission.ICodec;
-import com.fimtra.datafission.ISessionProtocol.SyncResponse;
+import com.fimtra.datafission.core.session.CipherProtocolCodecTestHelper;
 
 /**
  * Tests for the {@link CipherProtocolCodec}
@@ -27,31 +25,23 @@ import com.fimtra.datafission.ISessionProtocol.SyncResponse;
  */
 public class CipherProtocolCodecTest extends StringProtocolCodecTest
 {
+    final static CipherProtocolCodec CODEC;
+    static
+    {
+        CODEC = CipherProtocolCodecTestHelper.getCodec();
+    }
     final CipherProtocolCodec codec;
-    
+
     public CipherProtocolCodecTest()
     {
         super();
         // to speed up tests, re-use the same instance
-        codec = new CipherProtocolCodec();
-        try
-        {
-            // todo bit of a cheat here - we use the codec to synchronise with itself
-            final byte[] txMessageForCodecSync =
-                codec.getSessionProtocol().getSessionSyncStartMessage("CipherProtocolCodecTest");
-            SyncResponse response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(txMessageForCodecSync));
-            response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
-            response = codec.getSessionProtocol().handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
+        this.codec = CODEC;
     }
 
     @Override
     ICodec<?> constructCandidate()
     {
-        return codec;
+        return this.codec;
     }
 }

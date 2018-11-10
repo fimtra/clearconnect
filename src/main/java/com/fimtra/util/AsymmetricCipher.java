@@ -29,27 +29,36 @@ import javax.crypto.NoSuchPaddingException;
  * encryption. Each end point has an {@link AsymmetricCipher} instance. Each cipher decrypts using
  * its own private key and encrypts using the other instance's public key. In this way an encrypted
  * data exchange can be performed using the two instances as ends of a communication channel.
+ * <p>
+ * 
+ * @see https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Cipher
  * 
  * @author Ramon Servadei
  */
 public final class AsymmetricCipher
 {
     public static final String ALGORITHM_RSA = "RSA";
+    public static final String TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
     
-    final Cipher decryptCipher;
-    final Cipher encryptCipher;
-    final Key pubKey;
+    private final Key pubKey;
+    
+    final int keySize;
+    final KeyPair keyPair;
+    
+    Cipher decryptCipher;
+    Cipher encryptCipher;
+    
 
     /**
      * Construct with a random generated 2048-bit RSA key
      */
-    public AsymmetricCipher() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
+    public AsymmetricCipher() throws NoSuchAlgorithmException
     {
-        this("RSA", 2048);
+        this(ALGORITHM_RSA, 2048);
     }
 
     /**
-     * Construct the cipher with the given key algorithm and key size
+     * Construct the cipher with the given key algorithm, transformation and key size
      * 
      * @param keyAlgorithm
      *            the algorithm for the key, e.g. "RSA"
@@ -57,20 +66,25 @@ public final class AsymmetricCipher
      *            the bit size for the key
      */
     public AsymmetricCipher(String keyAlgorithm, int keySize)
-        throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
+        throws NoSuchAlgorithmException
     {
+        this.keySize = keySize;
+        
         final KeyPairGenerator generator = KeyPairGenerator.getInstance(keyAlgorithm);
         generator.initialize(keySize);
-        final KeyPair keyPair = generator.generateKeyPair();
-        Key privateKey = keyPair.getPrivate();
-        this.pubKey = keyPair.getPublic();
-
-        this.encryptCipher = Cipher.getInstance(keyAlgorithm);
-
-        this.decryptCipher = Cipher.getInstance(keyAlgorithm);
-        this.decryptCipher.init(Cipher.DECRYPT_MODE, privateKey);
+        this.keyPair = generator.generateKeyPair();
+        this.pubKey = this.keyPair.getPublic();
     }
 
+    public void setTransformation(String transformation) throws NoSuchPaddingException, InvalidKeyException, NoSuchAlgorithmException
+    {
+        this.encryptCipher = Cipher.getInstance(transformation);
+        
+        this.decryptCipher = Cipher.getInstance(transformation);
+        Key privateKey = this.keyPair.getPrivate();
+        this.decryptCipher.init(Cipher.DECRYPT_MODE, privateKey);
+    }
+    
     /**
      * Set the encryption key to use. This is the public key of another {@link AsymmetricCipher}
      * instance.
@@ -129,5 +143,13 @@ public final class AsymmetricCipher
         {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @return the key size
+     */
+    public int getKeySize()
+    {
+        return this.keySize;
     }
 }

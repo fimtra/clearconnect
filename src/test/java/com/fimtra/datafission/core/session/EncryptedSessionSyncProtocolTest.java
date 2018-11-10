@@ -15,11 +15,18 @@
  */
 package com.fimtra.datafission.core.session;
 
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
-
-import static org.junit.Assert.*;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -28,6 +35,9 @@ import org.junit.rules.TestName;
 
 import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
+import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromProxy;
+import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromPublisher;
+import com.fimtra.util.SerializationUtils;
 
 /**
  * Tests for the {@link EncryptedSessionSyncProtocol}
@@ -50,6 +60,72 @@ public class EncryptedSessionSyncProtocolTest
     }
 
     @Test
+    public void testSyncSessionPre3_15_5_client() throws IOException, ClassNotFoundException
+    {
+        // prepare mocks
+        ISessionAttributesProvider provider = mock(ISessionAttributesProvider.class);
+        final String[] attrs = new String[] { "a1", "a2", "a3" };
+        when(provider.getSessionAttributes()).thenReturn(attrs);
+
+        ISessionManager manager = mock(ISessionManager.class);
+        final String sessionId = "sesh-" + this.name.getMethodName();
+        when(manager.createSession(eq(attrs))).thenReturn(sessionId);
+
+        ISessionListener listener = mock(ISessionListener.class);
+
+        // register session collaborators
+        SessionContexts.registerSessionProvider(this.name.getMethodName(), provider);
+        SessionContexts.registerSessionManager(this.name.getMethodName(), manager);
+        this.proxyEnd.setSessionListener(listener);
+
+        // start the session sync
+        byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(this.name.getMethodName());
+        
+        // simulate that its a pre 3.15.5 client
+        FromProxy fromProxy = SerializationUtils.fromByteArray(syncInit);
+        fromProxy.version = null;
+        fromProxy.dataTransformation = null;
+        fromProxy.keySize = 0;
+        fromProxy.transformation = null;
+        syncInit = SerializationUtils.toByteArray(fromProxy);
+
+        // NOTE: 4-way session sync for encrypted
+        SyncResponse response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(syncInit));
+        assertFalse(response.syncComplete);
+        assertFalse(response.syncFailed);
+        assertNotNull(response.syncDataResponse);
+        
+        // we need to set the FromPublisher.version to null...
+        // in a pre 3.15.5 runtime, the version will be ignored from the serialised response
+        FromPublisher fromPublisher = SerializationUtils.fromByteArray(response.syncDataResponse);
+        fromPublisher.version = null;
+        
+        response = this.proxyEnd.handleSessionSyncData(ByteBuffer.wrap(SerializationUtils.toByteArray(fromPublisher)));
+        assertFalse(response.syncComplete);
+        assertFalse(response.syncFailed);
+        assertNotNull(response.syncDataResponse);
+        
+        // simulate that its a pre 3.15.5 client
+        fromProxy = SerializationUtils.fromByteArray(response.syncDataResponse);
+        fromProxy.version = null;
+        fromProxy.dataTransformation = null;
+        fromProxy.keySize = 0;
+        fromProxy.transformation = null;
+
+        response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(SerializationUtils.toByteArray(fromProxy)));
+        assertTrue(response.syncComplete);
+        assertFalse(response.syncFailed);
+        assertNotNull(response.syncDataResponse);
+        
+        response = this.proxyEnd.handleSessionSyncData(ByteBuffer.wrap(response.syncDataResponse));
+        assertTrue(response.syncComplete);
+        assertFalse(response.syncFailed);
+        assertNull(response.syncDataResponse);
+
+        verify(listener).onSessionOpen(eq(this.name.getMethodName()), eq(sessionId));
+    }
+
+    @Test
     public void testSyncSession()
     {
         // prepare mocks
@@ -58,18 +134,18 @@ public class EncryptedSessionSyncProtocolTest
         when(provider.getSessionAttributes()).thenReturn(attrs);
 
         ISessionManager manager = mock(ISessionManager.class);
-        final String sessionId = "sesh-" + name.getMethodName();
+        final String sessionId = "sesh-" + this.name.getMethodName();
         when(manager.createSession(eq(attrs))).thenReturn(sessionId);
 
         ISessionListener listener = mock(ISessionListener.class);
 
         // register session collaborators
-        SessionContexts.registerSessionProvider(name.getMethodName(), provider);
-        SessionContexts.registerSessionManager(name.getMethodName(), manager);
-        proxyEnd.setSessionListener(listener);
+        SessionContexts.registerSessionProvider(this.name.getMethodName(), provider);
+        SessionContexts.registerSessionManager(this.name.getMethodName(), manager);
+        this.proxyEnd.setSessionListener(listener);
 
         // start the session sync
-        final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(name.getMethodName());
+        final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(this.name.getMethodName());
 
         // NOTE: 4-way session sync for encrypted
         SyncResponse response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(syncInit));
@@ -92,7 +168,7 @@ public class EncryptedSessionSyncProtocolTest
         assertFalse(response.syncFailed);
         assertNull(response.syncDataResponse);
 
-        verify(listener).onSessionOpen(eq(name.getMethodName()), eq(sessionId));
+        verify(listener).onSessionOpen(eq(this.name.getMethodName()), eq(sessionId));
     }
 
     @Test
@@ -102,9 +178,9 @@ public class EncryptedSessionSyncProtocolTest
         ISessionManager manager = mock(ISessionManager.class);
         when(manager.createSession((String[]) any())).thenReturn(null);
 
-        SessionContexts.registerSessionManager(name.getMethodName(), manager);
+        SessionContexts.registerSessionManager(this.name.getMethodName(), manager);
 
-        final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(name.getMethodName());
+        final byte[] syncInit = this.proxyEnd.getSessionSyncStartMessage(this.name.getMethodName());
 
         SyncResponse response = this.publisherEnd.handleSessionSyncData(ByteBuffer.wrap(syncInit));
         assertFalse(response.syncComplete);

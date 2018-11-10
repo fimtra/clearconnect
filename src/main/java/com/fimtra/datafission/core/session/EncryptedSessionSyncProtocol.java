@@ -43,32 +43,28 @@ import com.fimtra.util.SerializationUtils;
  */
 public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
 {
-    static class FromProxy extends com.fimtra.datafission.core.session.SimpleSessionProtocol.FromProxy
+    static class FromProxy extends SimpleSessionProtocol.FromProxy
     {
         private static final long serialVersionUID = 1L;
         Key key;
         byte[] extra;
+        int keySize;
+        String transformation;
+        String dataTransformation;
     }
 
-    static class FromPublisher extends com.fimtra.datafission.core.session.SimpleSessionProtocol.FromPublisher
+    static class FromPublisher extends SimpleSessionProtocol.FromPublisher
     {
         private static final long serialVersionUID = 1L;
         Key key;
         byte[] extra;
+        String dataTransformation;
     }
 
-    final AsymmetricCipher handshakeCipher;
+    AsymmetricCipher handshakeCipher;
 
     public EncryptedSessionSyncProtocol()
     {
-        try
-        {
-            this.handshakeCipher = new AsymmetricCipher();
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override
@@ -76,10 +72,16 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
     {
         this.sessionContext = sessionContext;
 
+        // the proxy starts the session sync procedure and reacts to
+        // which ever key the publisher uses.
         try
         {
-            FromProxy initSync = new FromProxy();
+            this.handshakeCipher = new AsymmetricCipher(AsymmetricCipher.ALGORITHM_RSA, 2048);
+
+            final FromProxy initSync = new FromProxy();
             initSync.key = this.handshakeCipher.getPubKey();
+            initSync.transformation = AsymmetricCipher.TRANSFORMATION;
+            initSync.keySize = this.handshakeCipher.getKeySize();
             return SerializationUtils.toByteArray(initSync);
         }
         catch (Exception e)
@@ -103,10 +105,26 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
 
                 if (fromProxy.key != null)
                 {
-                    this.handshakeCipher.setEncryptionKey(fromProxy.key);
-
                     final FromPublisher response = new FromPublisher();
-                    response.key = this.handshakeCipher.getPubKey();
+                    // todo check version >= than 3.15.5?
+                    if (fromProxy.version != null)
+                    {
+                        this.handshakeCipher = new AsymmetricCipher(fromProxy.key.getAlgorithm(), fromProxy.keySize);
+                        this.handshakeCipher.setTransformation(fromProxy.transformation);
+                        this.handshakeCipher.setEncryptionKey(fromProxy.key);
+                        response.key = this.handshakeCipher.getPubKey();
+                    }
+                    else
+                    {
+                        // pre 3.15.5 code support
+                        Log.log(this, "pre 3.15.5 proxy connection");
+                        this.handshakeCipher = new AsymmetricCipher(AsymmetricCipher.ALGORITHM_RSA, 2048);
+                        // yes, this is wrong for the transformation but this is the pre 3.15.5 code
+                        this.handshakeCipher.setTransformation("RSA");
+                        this.handshakeCipher.setEncryptionKey(fromProxy.key);
+                        response.key = this.handshakeCipher.getPubKey();
+                    }
+
                     return new SyncResponse(SerializationUtils.toByteArray(response));
                 }
                 else
@@ -141,9 +159,21 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                     final FromPublisher fromPublisher = (FromPublisher) fromByteArray;
                     if (fromPublisher.key != null)
                     {
-                        this.handshakeCipher.setEncryptionKey(fromPublisher.key);
+                        if (fromPublisher.version != null)
+                        {
+                            this.handshakeCipher.setTransformation(AsymmetricCipher.TRANSFORMATION);
+                            this.handshakeCipher.setEncryptionKey(fromPublisher.key);
+                        }
+                        else
+                        {
+                            // pre 3.15.5 code support
+                            Log.log(this, "pre 3.15.5 publisher connection");
+                            // yes, this is wrong for the transformation but this is the pre 3.15.5 code
+                            this.handshakeCipher.setTransformation("RSA");
+                            this.handshakeCipher.setEncryptionKey(fromPublisher.key);
+                        }
 
-                        FromProxy response = new FromProxy();
+                        final FromProxy response = new FromProxy();
                         response.sessionContext = this.sessionContext;
                         response.sessionAttrs = this.handshakeCipher.encrypt(
                             SerializationUtils.toByteArray(SessionContexts.getSessionAttributes(this.sessionContext)));

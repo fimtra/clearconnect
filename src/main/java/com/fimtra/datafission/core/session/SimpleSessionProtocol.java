@@ -17,8 +17,8 @@ package com.fimtra.datafission.core.session;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.security.Key;
 
+import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -44,13 +44,14 @@ public class SimpleSessionProtocol implements ISessionProtocol
         private static final long serialVersionUID = 1L;
         String sessionContext;
         byte[] sessionAttrs;
+        String version = PlatformUtils.VERSION;
     }
 
     static class FromPublisher implements Serializable
     {
         private static final long serialVersionUID = 1L;
-        Key key;
         byte[] session;
+        String version = PlatformUtils.VERSION;
     }
 
     String sessionId;

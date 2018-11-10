@@ -46,6 +46,8 @@ public class AsymmetricCipherTest
     {
         final AsymmetricCipher c1 = new AsymmetricCipher();
         final AsymmetricCipher c2 = new AsymmetricCipher();
+        c1.setTransformation(AsymmetricCipher.TRANSFORMATION);
+        c2.setTransformation(AsymmetricCipher.TRANSFORMATION);
         c1.setEncryptionKey(c2.getPubKey());
         c2.setEncryptionKey(c1.getPubKey());
 
@@ -60,6 +62,8 @@ public class AsymmetricCipherTest
     {
         final AsymmetricCipher c1 = new AsymmetricCipher(AsymmetricCipher.ALGORITHM_RSA, 1024);
         final AsymmetricCipher c2 = new AsymmetricCipher(AsymmetricCipher.ALGORITHM_RSA, 2048);
+        c1.setTransformation(AsymmetricCipher.TRANSFORMATION);
+        c2.setTransformation(AsymmetricCipher.TRANSFORMATION);
         c1.setEncryptionKey(c2.getPubKey());
         c2.setEncryptionKey(c1.getPubKey());
 
