@@ -223,12 +223,18 @@ public abstract class DataFissionProperties
          * @see Values#ENABLE_THREAD_DEADLOCK_CHECK
          */
         String THREAD_DEADLOCK_CHECK_PERIOD_MILLIS = BASE + "threadDeadlockCheckPeriodMillis";
-
+        
         /**
          * The name of the system property to define if queue statistics logging is enabled. <br>
          * E.g. <code>-DdataFission.enableQStatsLogging=false</code>
          */
         String ENABLE_Q_STATS_LOGGING = BASE + "enableQStatsLogging";
+
+        /**
+         * The name of the system property to define the symmetric transformation. <br>
+         * E.g. <code>-DdataFission.encryptedSessionTransformation=AES/ECB/PKCS5Padding</code>
+         */
+        String ENCRYPTED_SESSION_TRANSFORMATION = BASE + "encryptedSessionTransformation";
     }
 
     /**
@@ -496,6 +502,14 @@ public abstract class DataFissionProperties
          * Default is false
          */
         boolean ENABLE_Q_STATS_LOGGING = Boolean.getBoolean(Names.ENABLE_Q_STATS_LOGGING);
+
+        /**
+         * Defines the transformation string for encrypted sessions.
+         * 
+         * @see Names#ENCRYPTED_SESSION_TRANSFORMATION
+         */
+        String ENCRYPTED_SESSION_TRANSFORMATION =
+            System.getProperty(Names.ENCRYPTED_SESSION_TRANSFORMATION, "AES/ECB/PKCS5Padding");
 
     }
 

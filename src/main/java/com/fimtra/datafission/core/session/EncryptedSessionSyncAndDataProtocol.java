@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 
 import javax.crypto.SecretKey;
 
+import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.util.SerializationUtils;
 import com.fimtra.util.SymmetricCipher;
 
@@ -32,7 +33,7 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
 {
     @Deprecated
     private static final String SYMMETRIC_TRANSFORMATION = SymmetricCipher.ALGORITHM_AES;
-    static final String TRANSFORMATION = "AES/ECB/PKCS5Padding";
+    static final String TRANSFORMATION = Values.ENCRYPTED_SESSION_TRANSFORMATION;
 
     final SecretKey txKey;
 
