@@ -878,8 +878,11 @@ public final class ContextUtils
                 continue;
             }
             record = context.getRecord(recordName);
-            record.clear();
-            context.publishAtomicChange(record);
+            if (record != null)
+            {
+                record.clear();
+                context.publishAtomicChange(record);
+            }
         }
     }
 

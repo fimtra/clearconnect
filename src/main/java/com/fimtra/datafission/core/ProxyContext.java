@@ -428,27 +428,34 @@ public final class ProxyContext implements IObserverContext
                     @Override
                     public void run()
                     {
-                        ProxyContextReceiver.this.localChannelRef = channel;
+                        try
+                        {
+                            ProxyContextReceiver.this.localChannelRef = channel;
 
-                        // clear records before dispatching further messages (this assumes
-                        // single-threaded dispatching)
-                        ContextUtils.clearNonSystemRecords(ProxyContextReceiver.this.proxyContext.context);
+                            // clear records before dispatching further messages (this assumes
+                            // single-threaded dispatching)
+                            ContextUtils.clearNonSystemRecords(ProxyContextReceiver.this.proxyContext.context);
 
-                        // when connecting, initialise a new codec instance to reset any state
-                        // held by the previous codec
-                        ProxyContextReceiver.this.proxyContext.codec =
-                            ProxyContextReceiver.this.proxyContext.codec.newInstance();
-                        ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().setSessionListener(
-                            ProxyContextReceiver.this.proxyContext.sessionListener);
+                            // when connecting, initialise a new codec instance to reset any state
+                            // held by the previous codec
+                            ProxyContextReceiver.this.proxyContext.codec =
+                                ProxyContextReceiver.this.proxyContext.codec.newInstance();
+                            ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().setSessionListener(
+                                ProxyContextReceiver.this.proxyContext.sessionListener);
 
-                        // proxy initiates the codec-sync operation
-                        // THIS MUST BE THE FIRST MESSAGE SENT
+                            // proxy initiates the codec-sync operation
+                            // THIS MUST BE THE FIRST MESSAGE SENT
 
-                        ProxyContextReceiver.this.localChannelRef.send(
-                            ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().getSessionSyncStartMessage(
-                                ProxyContextReceiver.this.proxyContext.sessionContextName));
-                        Log.log(ProxyContextReceiver.this.proxyContext, "(->) START SESSION SYNC ",
-                            ObjectUtils.safeToString(ProxyContextReceiver.this.localChannelRef));
+                            ProxyContextReceiver.this.localChannelRef.send(
+                                ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().getSessionSyncStartMessage(
+                                    ProxyContextReceiver.this.proxyContext.sessionContextName));
+                            Log.log(ProxyContextReceiver.this.proxyContext, "(->) START SESSION SYNC ",
+                                ObjectUtils.safeToString(ProxyContextReceiver.this.localChannelRef));
+                        }
+                        catch (Exception e)
+                        {
+                            channel.destroy("Could not intialise session", e);
+                        }
                     }
 
                     @Override
