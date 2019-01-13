@@ -182,12 +182,12 @@ public abstract class UtilProperties
             Names.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES, String.valueOf(TimeUnit.MINUTES.convert(14, TimeUnit.DAYS))));
 
         /**
-         * The period of object pool logging in minutes. Default is 10<br>
+         * The period of object pool logging in minutes. Default is 30<br>
          * 
          * @see Names#OBJECT_POOL_SIZE_LOG_PERIOD_MINS
          */
         int OBJECT_POOL_SIZE_LOG_PERIOD_MINS = Integer.parseInt(System.getProperty(
-            Names.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, "10"));
+            Names.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, "30"));
 
         /**
          * Defines if rolled logs files are compressed. <br>
