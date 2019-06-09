@@ -15,11 +15,6 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
@@ -34,12 +29,9 @@ import com.fimtra.util.NotifyingCache;
  */
 class PlatformServiceConnectionMonitor
 {
-    Future<?> reconnectTask;
     final String serviceInstanceId;
     final ProxyContext proxyContext;
-    final Lock callbackLock = new ReentrantLock();
-    Connection previous = Connection.DISCONNECTED;
-    NotifyingCache<IServiceConnectionStatusListener, Connection> serviceConnectionStatusNotifyingCache;
+    final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceConnectionStatusNotifyingCache;
 
     /**
      * @param context
@@ -53,30 +45,27 @@ class PlatformServiceConnectionMonitor
         this.proxyContext = context;
         this.serviceConnectionStatusNotifyingCache =
             PlatformUtils.createServiceConnectionStatusNotifyingCache(this.proxyContext, this);
-        this.serviceConnectionStatusNotifyingCache.addListener(EventListenerUtils.synchronizedListener(new IServiceConnectionStatusListener()
-        {
-
-            @Override
-            public void onConnected(String platformServiceName, int identityHash)
+        this.serviceConnectionStatusNotifyingCache.addListener(
+            EventListenerUtils.synchronizedListener(new IServiceConnectionStatusListener()
             {
-                doConnected();
-                store(Connection.CONNECTED);
-            }
+                @Override
+                public void onConnected(String platformServiceName, int identityHash)
+                {
+                    onPlatformServiceConnected();
+                }
 
-            @Override
-            public void onReconnecting(String platformServiceName, int identityHash)
-            {
-                doReconnected();
-                store(Connection.RECONNECTING);
-            }
+                @Override
+                public void onReconnecting(String platformServiceName, int identityHash)
+                {
+                    onPlatformServiceReconnecting();
+                }
 
-            @Override
-            public void onDisconnected(String platformServiceName, int identityHash)
-            {
-                doDisconnected();
-                store(Connection.DISCONNECTED);
-            }
-        }));
+                @Override
+                public void onDisconnected(String platformServiceName, int identityHash)
+                {
+                    onPlatformServiceDisconnected();
+                }
+            }));
     }
 
     public final void destroy()
@@ -88,105 +77,6 @@ class PlatformServiceConnectionMonitor
         catch (Exception e)
         {
             Log.log(this, "Could not destroy connection monitor for " + this.serviceInstanceId, e);
-        }
-    }
-
-    final void store(Connection status)
-    {
-        this.previous = status;
-    }
-
-    final void doConnected()
-    {
-        if (this.reconnectTask != null)
-        {
-            this.reconnectTask.cancel(true);
-            this.reconnectTask = null;
-        }
-        if (this.previous != Connection.CONNECTED)
-        {
-            this.callbackLock.lock();
-            try
-            {
-                onPlatformServiceConnected();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformServiceConnectionMonitor.this,
-                    "Exception logged during onPlatformServiceConnected for " + this.serviceInstanceId, e);
-            }
-            finally
-            {
-                this.callbackLock.unlock();
-            }
-        }
-    }
-
-    final void doReconnected()
-    {
-        if (this.previous != Connection.RECONNECTING)
-        {
-            this.reconnectTask = this.proxyContext.getUtilityExecutor().schedule(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    if (PlatformServiceConnectionMonitor.this.previous != Connection.CONNECTED)
-                    {
-                        PlatformServiceConnectionMonitor.this.callbackLock.lock();
-                        try
-                        {
-                            onPlatformServiceDisconnected();
-                        }
-                        finally
-                        {
-                            PlatformServiceConnectionMonitor.this.callbackLock.unlock();
-                        }
-                    }
-                    PlatformServiceConnectionMonitor.this.reconnectTask = null;
-                }
-            }, this.proxyContext.getReconnectPeriodMillis() * 2, TimeUnit.MILLISECONDS);
-
-            this.callbackLock.lock();
-            try
-            {
-                onPlatformServiceReconnecting();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformServiceConnectionMonitor.this,
-                    "Exception logged during onPlatformServiceReconnecting for " + this.serviceInstanceId, e);
-            }
-            finally
-            {
-                this.callbackLock.unlock();
-            }
-        }
-    }
-
-    final void doDisconnected()
-    {
-        if (this.previous != Connection.DISCONNECTED)
-        {
-            if (this.reconnectTask != null)
-            {
-                this.reconnectTask.cancel(true);
-                this.reconnectTask = null;
-            }
-            this.callbackLock.lock();
-            try
-            {
-                onPlatformServiceDisconnected();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformServiceConnectionMonitor.this,
-                    "Exception logged during onPlatformServiceDisconnected for " + this.serviceInstanceId, e);
-            }
-            finally
-            {
-                this.callbackLock.unlock();
-            }
         }
     }
 

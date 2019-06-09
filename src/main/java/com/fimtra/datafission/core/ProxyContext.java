@@ -1283,12 +1283,18 @@ public final class ProxyContext implements IObserverContext
                 Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
                 this.active = false;
                 cancelReconnectTask();
-                this.context.destroy();
                 // the channel can be null if destroying during a reconnection
                 if (this.channel != null)
                 {
                     this.channel.destroy(getShortName() + " destroyed");
                 }
+                else
+                {
+                    updateConnectionStatus(Connection.DISCONNECTED);
+                }
+
+                // destroy at the end so that connection notifications are received
+                this.context.destroy();
             }
         }
     }
@@ -1533,15 +1539,12 @@ public final class ProxyContext implements IObserverContext
     {
         this.channelToken = null;
         this.connected = false;
-
-        if (!this.active)
-        {
-            return;
-        }
-
         updateConnectionStatus(Connection.DISCONNECTED);
 
-        setupReconnectTask();
+        if (this.active)
+        {
+            setupReconnectTask();
+        }
     }
 
     @Override
@@ -1731,8 +1734,6 @@ public final class ProxyContext implements IObserverContext
     {
         synchronized (this.lock)
         {
-            updateConnectionStatus(Connection.RECONNECTING);
-
             this.connected = false;
             this.reconnectTask = null;
 
@@ -1741,6 +1742,8 @@ public final class ProxyContext implements IObserverContext
                 Log.log(this, "Not reconnecting proxy as it is not active: ", getShortName());
                 return;
             }
+            
+            updateConnectionStatus(Connection.RECONNECTING);
 
             String endPoint = ObjectUtils.safeToString(this.channel);
             try
