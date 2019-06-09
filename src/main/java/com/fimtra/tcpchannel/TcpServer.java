@@ -257,9 +257,8 @@ public class TcpServer implements IEndPointService
                                 {
                                     if (pattern.matcher(hostAddress).matches())
                                     {
-                                        Log.log(TcpServer.this, "IP address ", hostAddress, " matches ACL entry ",
-                                            pattern.toString());
                                         matched = true;
+                                        break;
                                     }
                                 }
                                 if (!matched)
