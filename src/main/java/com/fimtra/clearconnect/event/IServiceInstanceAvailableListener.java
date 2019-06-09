@@ -22,16 +22,8 @@ package com.fimtra.clearconnect.event;
  * <p>
  * This is a low-level service listener for applications that know what they are doing with service
  * instance connections!
- * <h2>Threading</h2> <b>Callbacks must be thread-safe.</b> They will be executed by at least 2
- * threads, possibly concurrently:
- * <ul>
- * <li>The image-on-subscribe is handled by a dedicated image notifier thread (image thread).
- * <li>Normal updates are handled by a different thread (update thread).
- * </ul>
- * The image and update threads will be different and there is no guarantee that images will be
- * notified before real-time updates.
  * 
- * @see
+ * @see IEventListener for threading
  * @author Ramon Servadei
  */
 public interface IServiceInstanceAvailableListener extends IEventListener
