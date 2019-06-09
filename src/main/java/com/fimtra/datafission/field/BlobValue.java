@@ -21,8 +21,8 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SerializationUtils;
+import com.fimtra.util.StringAppender;
 import com.fimtra.util.is;
-
 /**
  * The IValue for a binary large object
  * 
@@ -299,9 +299,9 @@ public final class BlobValue extends AbstractValue
     }
 
     @Override
-    public StringBuilder toStringBuilder()
+    public StringAppender toStringAppender()
     {
-        return appendTo(new StringBuilder((this.value.length * 2) + 1));
+        return appendTo(new StringAppender((this.value.length * 2) + 1));
     }
     
     void fromChars(char[] chars, int start, int len)
@@ -344,10 +344,10 @@ public final class BlobValue extends AbstractValue
     }
 
     @Override
-    public StringBuilder appendTo(StringBuilder stringBuilder)
+    public StringAppender appendTo(StringAppender stringAppender)
     {
         final String type = getType().toString();
         final char[] charArrValue = charArrValue();
-        return stringBuilder.append(type).append(charArrValue);
+        return stringAppender.append(type).append(charArrValue);
     }
 }

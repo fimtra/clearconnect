@@ -66,6 +66,7 @@ import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.RollingFileAppender;
+import com.fimtra.util.StringAppender;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
@@ -668,7 +669,7 @@ public final class ContextUtils
 
     public static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException
     {
-        final StringBuilder sb = new StringBuilder();
+        final StringAppender sb = new StringAppender();
         Map.Entry<String, IValue> entry = null;
         String key = null;
         IValue value = null;

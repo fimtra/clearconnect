@@ -19,6 +19,7 @@ import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.util.StringAppender;
 
 /**
  * An immutable value for a key-value pair held in a record.
@@ -110,16 +111,16 @@ public interface IValue extends Comparable<IValue>
     byte[] byteValue();
 
     /**
-     * @return a {@link StringBuilder} initialised with the {@link #toString()} contents of this
+     * @return a {@link StringAppender} initialised with the {@link #toString()} contents of this
      *         {@link IValue}
      */
-    StringBuilder toStringBuilder();
+    StringAppender toStringAppender();
     
     /**
-     * Append the {@link #toString()} of this {@link IValue} to the {@link StringBuilder}.
+     * Append the {@link #toString()} of this {@link IValue} to the {@link StringAppender}.
      * 
-     * @param stringBuilder
-     * @return the passed in string builder
+     * @param stringAppender
+     * @return the passed in string appender
      */
-    StringBuilder appendTo(StringBuilder stringBuilder);
+    StringAppender appendTo(StringAppender stringAppender);
 }

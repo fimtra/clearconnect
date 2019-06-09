@@ -38,6 +38,7 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.StringAppender;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -382,7 +383,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         CharArrayReference charArrayRef;
         CharArrayReference keyCharArrayRef;
         char[] escapedChars;
-        StringBuilder sb;
+        StringAppender sb;
     }
 
     final static ThreadLocal<EncodingBuffers> ENCODING_BUFFERS = new ThreadLocal<EncodingBuffers>()
@@ -391,7 +392,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         protected EncodingBuffers initialValue()
         {
             final EncodingBuffers instance = new EncodingBuffers();
-            instance.sb = new StringBuilder(1000);
+            instance.sb = new StringAppender(1000);
             instance.charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
 
             instance.keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
@@ -432,7 +433,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         final CharArrayReference charArrayRef = encodingBuffers.charArrayRef;
         final CharArrayReference keyCharArrayRef = encodingBuffers.keyCharArrayRef;
         final char[] escapedChars = encodingBuffers.escapedChars;
-        final StringBuilder sb = encodingBuffers.sb;
+        final StringAppender sb = encodingBuffers.sb;
 
         sb.append(preamble);
         escape(atomicChange.getName(), sb, charArrayRef, escapedChars);
@@ -465,32 +466,12 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
         }
 
-        if (charSet == GZipProtocolCodec.ISO_8859_1)
-        {
-            // NOTE: this is less expensive than String.getBytes(Charset) which creates 2x
-            // arrays during encoding
-            final int length = sb.length();
-            if (charArrayRef.ref.length < length)
-            {
-                charArrayRef.ref = new char[length];
-            }
-            sb.getChars(0, length, charArrayRef.ref, 0);
-            final byte[] bytes = new byte[length];
-            final char[] ref = charArrayRef.ref;
-            for (int i = 0; i < length; i++)
-            {
-                bytes[i] = (byte) ref[i];
-            }
-            return bytes;
-        }
-        else
-        {
-            return sb.toString().getBytes(charSet);
-        }
+        final ByteBuffer encoded = charSet.encode(sb.getCharBuffer());
+        return Arrays.copyOf(encoded.array(), encoded.limit());
     }
 
     private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
-        final StringBuilder txString, final CharArrayReference chars, final char[] escapedChars,
+        final StringAppender txString, final CharArrayReference chars, final char[] escapedChars,
         final CharArrayReference keyChars)
     {
         if (entries != null && entries.size() > 0)
@@ -612,9 +593,9 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     /**
      * Escape special chars in the value-to-send, ultimately adding the escaped value into the
-     * destination StringBuilder
+     * destination StringAppender
      */
-    static void escape(String valueToSend, StringBuilder dest, CharArrayReference charsRef, char[] escapedChars)
+    static void escape(String valueToSend, StringAppender dest, CharArrayReference charsRef, char[] escapedChars)
     {
         try
         {
@@ -799,7 +780,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
         else
         {
-            StringBuilder sb = new StringBuilder(recordNames.length * 20);
+            StringAppender sb = new StringAppender(recordNames.length * 20);
             sb.append(commandWithDelimiter);
             escape(recordNames[0], sb, chars, escapedChars);
             for (int i = 1; i < recordNames.length; i++)

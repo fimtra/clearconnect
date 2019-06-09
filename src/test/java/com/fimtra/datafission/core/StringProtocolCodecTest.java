@@ -35,6 +35,7 @@ import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.util.StringAppender;
 
 /**
  * Tests for the {@link StringProtocolCodec}
@@ -57,7 +58,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEscapeUnescape()
     {
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
@@ -74,7 +75,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEscapeUnescapeLength()
     {
         String value = "||||||||";
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
@@ -84,7 +85,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEscapeUnescapeEndingInSpecialChar()
     {
         String value = "special char ending \\";
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
         String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
         assertEquals(value, unescape);
@@ -94,7 +95,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testEscapeUnescapeCRLF()
     {
         String value = "some value \\|| with \r\n | delimiters \\/ |\\ |/";
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
@@ -107,7 +108,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     public void testStringWithEscapedCRLF()
     {
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
         String escaped = sb.toString();
         String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray(), 0, sb.toString().length());
@@ -260,7 +261,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
     @Test
     public void testPerformanceOfIndexAndBulkBuffer()
     {
-        StringBuilder sb = new StringBuilder();
+        StringAppender sb = new StringAppender();
         String valueToSend = "0123456789";
 
         int MAX = 10000;
@@ -301,7 +302,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         System.err.println("Scan=" + (scanAndSwitch += (System.nanoTime() - swStart)));
     }
 
-    void doswitch(StringBuilder sb, String valueToSend)
+    void doswitch(StringAppender sb, String valueToSend)
     {
         sb.setLength(0);
         final char[] chars = valueToSend.toCharArray();
@@ -339,7 +340,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         sb.append(chars, last, length - last);
     }
 
-    void dobulk(StringBuilder sb, String valueToSend)
+    void dobulk(StringAppender sb, String valueToSend)
     {
         sb.setLength(0);
         if ((valueToSend.indexOf('\r', 0) == -1) && (valueToSend.indexOf('\n', 0) == -1)

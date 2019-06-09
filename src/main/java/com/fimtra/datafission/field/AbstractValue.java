@@ -123,7 +123,7 @@ public abstract class AbstractValue implements IValue
     @Override
     public final String toString()
     {
-        return toStringBuilder().toString();
+        return toStringAppender().toString();
     }
 
     @Override

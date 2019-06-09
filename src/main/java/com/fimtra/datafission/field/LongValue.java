@@ -17,6 +17,7 @@ package com.fimtra.datafission.field;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IValue;
+import com.fimtra.util.StringAppender;
 import com.fimtra.util.is;
 
 /**
@@ -112,9 +113,9 @@ public final class LongValue extends AbstractValue
     }
     
     @Override
-    public final StringBuilder toStringBuilder()
+    public final StringAppender toStringAppender()
     {
-        return appendTo(new StringBuilder());
+        return appendTo(new StringAppender());
     }
     
     @Override
@@ -243,8 +244,8 @@ public final class LongValue extends AbstractValue
     }
 
     @Override
-    public StringBuilder appendTo(StringBuilder stringBuilder)
+    public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringBuilder.append(getType().toString()).append(this.value);
+        return stringAppender.append(getType().toString()).append(this.value);
     }
 }
