@@ -249,7 +249,7 @@ public class Publisher
                 {
                     txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
                     
-                    loopBroadcastCount += this.service.broadcast(name, txMessage, clients);
+                    loopBroadcastCount = this.service.broadcast(name, txMessage, clients);
                     bytesPublished +=  loopBroadcastCount * txMessage.length;
                     broadcastCount += loopBroadcastCount;
                    
@@ -545,7 +545,8 @@ public class Publisher
             {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
-
+                long lastTimeNanos;
+                
                 @Override
                 public void run()
                 {
@@ -568,15 +569,22 @@ public class Publisher
                     final Map<String, IValue> submapConnections = Publisher.this.connectionsRecord.getOrCreateSubMap(
                         transmissionStatisticsFieldName);
 
-                    final double perSec =
-                        1 / (Publisher.this.contextConnectionsRecordPublishPeriodMillis * 0.5 * 0.001d);
+                    final long nanoTime = System.nanoTime();
+                    final long l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
+                    final long l_bytesPublished = ProxyContextPublisher.this.bytesPublished;
+
+                    final long intervalMessagesPublished = l_messagesPublished - this.lastMessagesPublished;
+                    final long intervalBytesPublished = l_bytesPublished - this.lastBytesPublished;
+
+                    this.lastMessagesPublished = l_messagesPublished;
+                    this.lastBytesPublished = l_bytesPublished;
+
+                    final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
+                    this.lastTimeNanos = nanoTime;
                     final double inverse_1K = 1 / 1024d;
-                    final long intervalMessagesPublished =
-                        ProxyContextPublisher.this.messagesPublished - this.lastMessagesPublished;
+                 
                     submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC,
                         LongValue.valueOf((long) (intervalMessagesPublished * perSec)));
-                    final long intervalBytesPublished =
-                        ProxyContextPublisher.this.bytesPublished - this.lastBytesPublished;
                     submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC,
                         DoubleValue.valueOf((((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
                     submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
@@ -597,8 +605,6 @@ public class Publisher
                     submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
                         intervalMessagesPublished == 0 ? 0 : intervalBytesPublished / intervalMessagesPublished));
 
-                    this.lastMessagesPublished = ProxyContextPublisher.this.messagesPublished;
-                    this.lastBytesPublished = ProxyContextPublisher.this.bytesPublished;
 
                     if (ProxyContextPublisher.this.active)
                     {

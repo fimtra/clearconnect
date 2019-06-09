@@ -39,7 +39,6 @@ import com.fimtra.clearconnect.event.IRecordAvailableListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
-import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IPermissionFilter;
@@ -158,7 +157,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
-
+                long lastTimeNanos;
+                
                 @Override
                 public void run()
                 {
@@ -171,16 +171,22 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                         subscriptionCount += it.next().getValue().longValue();
                     }
 
-                    final double inverse_1K = 1 / 1024d;
+                    final long nanoTime = System.nanoTime();
                     // can be null on the first call
                     final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
                         : PlatformServiceInstance.this.publisher.getMessagesPublished();
                     final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
                         : PlatformServiceInstance.this.publisher.getBytesPublished();
-                    final double perSec = 1d / (DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS);
 
                     final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
                     final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
+
+                    this.lastMessagesPublished = messagesPublished;
+                    this.lastBytesPublished = bytesPublished;
+
+                    final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
+                    this.lastTimeNanos = nanoTime;
+                    final double inverse_1K = 1 / 1024d;
 
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
                         DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
@@ -204,8 +210,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
                         LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
 
-                    this.lastMessagesPublished = messagesPublished;
-                    this.lastBytesPublished = bytesPublished;
 
                     PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
                 }
