@@ -80,16 +80,8 @@ public class GZipProtocolCodec extends StringProtocolCodec
     public char[] decode(ByteBuffer data)
     {
         final ByteBuffer uncompressed = GZipUtils.uncompress(this.sessionSyncProtocol.decode(data));
-        final int position = uncompressed.position();
-        final int limit = uncompressed.limit();
-        final char[] decoded = new char[limit - position];
-        final byte[] uncompressedArray = uncompressed.array();
-        int j = 0;
-        for (int i = position; i < limit; i++)
-        {
-            decoded[j++] = (char) uncompressedArray[i];
-        }
-        ByteArrayPool.offer(uncompressedArray);
+        final char[] decoded = ISO_8859_1.decode(uncompressed).array();
+        ByteArrayPool.offer(uncompressed.array());
         return decoded;
     }    
 

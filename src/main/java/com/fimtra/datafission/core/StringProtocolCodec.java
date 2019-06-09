@@ -414,18 +414,18 @@ public class StringProtocolCodec implements ICodec<char[]>
         // optimise the locking for the internal getXXX methods
         synchronized (atomicChange)
         {
-        if (atomicChange instanceof AtomicChange)
-        {
+            if (atomicChange instanceof AtomicChange)
+            {
                 putEntries = ((AtomicChange) atomicChange).internalGetPutEntries();
                 removedEntries = ((AtomicChange) atomicChange).internalGetRemovedEntries();
                 subMapKeys = ((AtomicChange) atomicChange).internalGetSubMapKeys();
-        }
-        else
-        {
-            putEntries = atomicChange.getPutEntries();
-            removedEntries = atomicChange.getRemovedEntries();
-            subMapKeys = atomicChange.getSubMapKeys();
-        }
+            }
+            else
+            {
+                putEntries = atomicChange.getPutEntries();
+                removedEntries = atomicChange.getRemovedEntries();
+                subMapKeys = atomicChange.getSubMapKeys();
+            }
         }
 
         final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
@@ -465,7 +465,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
             }
         }
-
+        
         final ByteBuffer encoded = charSet.encode(sb.getCharBuffer());
         return Arrays.copyOf(encoded.array(), encoded.limit());
     }
@@ -804,6 +804,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         int cbufPtr = 0;
         char previous = 0;
         int slashCount = 0;
+        int len = chars.length;
         for (int i = 0; i < chars.length; i++)
         {
             switch(chars[i])
@@ -837,6 +838,13 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // an even number means they are escaped so a "|" is a token
                     slashCount++;
                     break;
+                case 0 :
+                    // when decoding a byte[] into a char[], the byte[] and char[] lengths are the
+                    // same BUT characters taking up 2 bytes for encoding only take up 1 char so we
+                    // end up with trailing 0 in the char[], e.g. '£' = [-62][-93] for bytes but is
+                    // 1 char in a char[]
+                    len--;
+                    break;
                 default :
                     slashCount = 0;
             }
@@ -850,7 +858,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             bijTokenLimit[0] = Arrays.copyOf(bijTokenLimit[0], bijTokenLimit[0].length + 10);
         }
         bijTokenOffset[0][bijTokenLen[0]] = cbufPtr + 1;
-        bijTokenLimit[0][bijTokenLen[0]] = chars.length;
+        bijTokenLimit[0][bijTokenLen[0]] = len;
         bijTokenLen[0]++;
     }
 

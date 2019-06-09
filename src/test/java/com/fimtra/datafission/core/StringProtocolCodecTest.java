@@ -157,24 +157,25 @@ public class StringProtocolCodecTest extends CodecBaseTest
     @Test
     public void testEncodeDecodeAtomicChange()
     {
-        final String k1 = "one";
-        final String k2 = "two";
-        final String k3 = "three";
-        final String k4 = "four";
+        final String k1 = "one$£";
+        final String k2 = "two$£";
+        final String k3 = "three$£";
+        final String k4 = "four$£";
         final LongValue v1 = LongValue.valueOf(1);
         final DoubleValue v2 = DoubleValue.valueOf(2);
-        final BlobValue v3 = BlobValue.valueOf("some value \\|| with \\r\\n | delimiters \\/ |\\ |/".getBytes());
-        final TextValue v4 = TextValue.valueOf("0123456789-10-0123456789-20-0123456789-30-0123456789-40-0123456789");
+        final BlobValue v3 = BlobValue.valueOf("$£some value \\|| with \\r\\n | delimiters \\/ |\\ |/".getBytes());
+        final TextValue v4 = TextValue.valueOf("$£23456789-10-0123456789-20-$£23456789-30-0123456789-40-0123456789");
 
-        AtomicChange change = new AtomicChange("change");
+        AtomicChange change = new AtomicChange("change-$£");
         change.mergeEntryUpdatedChange(k1, v1, null);
         change.mergeEntryUpdatedChange(k2, v2, null);
         change.mergeEntryRemovedChange(k3, v3);
         change.mergeEntryRemovedChange(k4, v4);
-        change.mergeSubMapEntryUpdatedChange("subMap1", k1, v1, null);
-        change.mergeSubMapEntryUpdatedChange("subMap1", k2, v2, null);
-        change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
-        change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
+        final String subMapKey = "subMap1-£$";
+        change.mergeSubMapEntryUpdatedChange(subMapKey, k1, v1, null);
+        change.mergeSubMapEntryUpdatedChange(subMapKey, k2, v2, null);
+        change.mergeSubMapEntryRemovedChange(subMapKey, k3, v3);
+        change.mergeSubMapEntryRemovedChange(subMapKey, k4, v4);
 
         byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
         IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
@@ -183,16 +184,16 @@ public class StringProtocolCodecTest extends CodecBaseTest
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
-        
+
         Context c = new Context("test");
         IRecord rec1 = c.getOrCreateRecord("rec1");
-        rec1.putAll(map1);     
-        rec1.getOrCreateSubMap("subMap1").putAll(map1);
-        
+        rec1.putAll(map1);
+        rec1.getOrCreateSubMap(subMapKey).putAll(map1);
+
         IRecord rec2 = c.getOrCreateRecord("rec2");
-        rec2.putAll(map1);     
-        rec2.getOrCreateSubMap("subMap1").putAll(map1);
-        
+        rec2.putAll(map1);
+        rec2.getOrCreateSubMap(subMapKey).putAll(map1);
+
         change.applyTo(rec1);
         result.applyTo(rec2);
         assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
@@ -230,16 +231,16 @@ public class StringProtocolCodecTest extends CodecBaseTest
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
-        
+
         Context c = new Context("test");
         IRecord rec1 = c.getOrCreateRecord("rec1");
-        rec1.putAll(map1);     
+        rec1.putAll(map1);
         rec1.getOrCreateSubMap("subMap1").putAll(map1);
-        
+
         IRecord rec2 = c.getOrCreateRecord("rec2");
-        rec2.putAll(map1);     
+        rec2.putAll(map1);
         rec2.getOrCreateSubMap("subMap1").putAll(map1);
-        
+
         change.applyTo(rec1);
         result.applyTo(rec2);
         assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
