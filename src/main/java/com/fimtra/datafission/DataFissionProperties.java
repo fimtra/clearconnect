@@ -235,6 +235,12 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.encryptedSessionTransformation=AES/ECB/PKCS5Padding</code>
          */
         String ENCRYPTED_SESSION_TRANSFORMATION = BASE + "encryptedSessionTransformation";
+
+        /**
+         * The name of the system property to define the rpc names (comma separated) to exclude from logging. <br>
+         * E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>
+         */
+        String EXCLUDE_RPC_LOGGING = BASE + "excludeRpcLogging";
     }
 
     /**
@@ -511,6 +517,13 @@ public abstract class DataFissionProperties
         String ENCRYPTED_SESSION_TRANSFORMATION =
             System.getProperty(Names.ENCRYPTED_SESSION_TRANSFORMATION, "AES/ECB/PKCS5Padding");
 
+        /**
+         * Defines the RPC names that are excluded from logging.
+         * 
+         * @see Names#EXCLUDE_RPC_LOGGING
+         */
+        String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,
+            "runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister");
     }
 
     private DataFissionProperties()

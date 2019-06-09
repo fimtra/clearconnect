@@ -18,7 +18,9 @@ package com.fimtra.datafission.core;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,6 +63,24 @@ public final class RpcInstance implements IRpcInstance, Cloneable
      * Controls verbose logging of RPC responses
      */
     public static boolean logVerbose = Boolean.getBoolean("logVerbose." + RpcInstance.class.getCanonicalName());
+
+    private static final Set<String> EXCLUDED_RPC_NAMES = new HashSet<String>();
+    static
+    {
+        if (DataFissionProperties.Values.EXCLUDE_RPC_LOGGING != null)
+        {
+            final String[] split = DataFissionProperties.Values.EXCLUDE_RPC_LOGGING.split(",");
+            for (int i = 0; i < split.length; i++)
+            {
+                EXCLUDED_RPC_NAMES.add(split[i].trim());
+            }
+        }
+        Log.log(RpcInstance.class, "RPCs excluded from logging: ", DataFissionProperties.Values.EXCLUDE_RPC_LOGGING);
+    }
+    static boolean logRpc(String rpcName)
+    {
+        return !EXCLUDED_RPC_NAMES.contains(rpcName);
+    }
     
     static final String RPC_RECORD_RESULT_PREFIX = ContextUtils.PROTOCOL_PREFIX + "RPC_";
     static final TextValue NO_ACK = TextValue.valueOf(RPC_RECORD_RESULT_PREFIX);
@@ -206,8 +226,11 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                     this.caller.send(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
-                    Log.log(CallReceiver.class, "(->) STARTED [", this.caller.getEndPointDescription(), "] ",
-                        resultRecordName);
+                    if (logRpc(rpcName))
+                    {
+                        Log.log(CallReceiver.class, "(->) STARTED [", this.caller.getEndPointDescription(), "] ",
+                            resultRecordName);
+                    }
 
                     try
                     {
@@ -236,15 +259,18 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                     this.caller.send(
                         this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
                             resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
-                    if (logVerbose)
+                    if (logRpc(rpcName))
                     {
-                        Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
-                            resultRecordName, " ", ContextUtils.mapToString(resultEntries));
-                    }
-                    else
-                    {
-                        Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
-                            resultRecordName);
+                        if (logVerbose)
+                        {
+                            Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
+                                resultRecordName, " ", ContextUtils.mapToString(resultEntries));
+                        }
+                        else
+                        {
+                            Log.log(CallReceiver.class, "(->) FINISHED [", this.caller.getEndPointDescription(), "] ",
+                                resultRecordName);
+                        }
                     }
                 }
             }
@@ -315,15 +341,18 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 {
                     IValue[] callArgs = new IValue[args.length - 1];
                     System.arraycopy(args, 0, callArgs, 0, args.length - 1);
-                    if (logVerbose)
+                    if (logRpc(this.rpcName))
                     {
-                        Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(), "] ",
-                            this.rpcName, " ", Arrays.toString(callArgs));
-                    }
-                    else
-                    {
-                        Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(), "] ",
-                            this.rpcName);
+                        if (logVerbose)
+                        {
+                            Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(),
+                                "] ", this.rpcName, " ", Arrays.toString(callArgs));
+                        }
+                        else
+                        {
+                            Log.log(Caller.class, "(->) RPC (no ack) [", this.callReceiver.getEndPointDescription(),
+                                "] ", this.rpcName);
+                        }
                     }
                     this.callReceiver.send(
                         this.codec.finalEncode(this.codec.getTxMessageForRpc(this.rpcName, callArgs, resultMapName)));
@@ -341,13 +370,18 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         {
                             throw new ExecutionException(e2);
                         }
-                        if (logVerbose)
+                        if (logRpc(this.rpcName))
                         {
-                            Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ", resultMapName, " ", Arrays.toString(args));
-                        }
-                        else
-                        {
-                            Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ", resultMapName);
+                            if (logVerbose)
+                            {
+                                Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ",
+                                    resultMapName, " ", Arrays.toString(args));
+                            }
+                            else
+                            {
+                                Log.log(Caller.class, "(->) [", this.callReceiver.getEndPointDescription(), "] ",
+                                    resultMapName);
+                            }
                         }
                         
                         if (ContextUtils.isFrameworkThread())
@@ -410,15 +444,18 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                                 throw new ExecutionException(exception.textValue());
                             }
                         }
-                        if (logVerbose)
+                        if (logRpc(this.rpcName))
                         {
-                            Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
-                                resultMapName, " ", ContextUtils.mapToString(resultMap));
-                        }
-                        else
-                        {
-                            Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
-                                resultMapName);
+                            if (logVerbose)
+                            {
+                                Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
+                                    resultMapName, " ", ContextUtils.mapToString(resultMap));
+                            }
+                            else
+                            {
+                                Log.log(Caller.class, "(<-) [", this.callReceiver.getEndPointDescription(), "] ",
+                                    resultMapName);
+                            }
                         }
                         return resultMap.get(RESULT);
                     }
