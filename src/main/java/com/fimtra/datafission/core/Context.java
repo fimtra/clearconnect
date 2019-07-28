@@ -49,6 +49,7 @@ import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
@@ -309,9 +310,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
-    final ThimbleExecutor rpcExecutor;
-    final ThimbleExecutor coreExecutor;
-    final ThimbleExecutor systemExecutor;
+    final IContextExecutor rpcExecutor;
+    final IContextExecutor coreExecutor;
+    @Deprecated
+    final IContextExecutor systemExecutor;
     final ScheduledExecutorService utilityExecutor;
     final Object recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
@@ -1229,6 +1231,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
+        // todo system-level differentiation not needed
         final Object context = sequentialRunnable.context();
         if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
         {

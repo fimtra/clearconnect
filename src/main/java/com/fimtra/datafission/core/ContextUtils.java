@@ -55,8 +55,10 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.BlobValue;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.TaskStatistics;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.ArrayUtils;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.FastDateFormat;
@@ -180,21 +182,21 @@ public final class ContextUtils
      * 
      * @see #SYSTEM_RECORDS
      */
-    final static ThimbleExecutor SYSTEM_RECORD_EXECUTOR = new ThimbleExecutor(FISSION_SYSTEM, SYSTEM_RECORDS.size());
+    final static IContextExecutor SYSTEM_RECORD_EXECUTOR = ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
 
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
      */
-    final static ThimbleExecutor CORE_EXECUTOR =
-        new ThimbleExecutor(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
+    final static IContextExecutor CORE_EXECUTOR =
+            ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
      * This is dedicated to handle RPC results. If RPC results are handled by the
      * {@link #CORE_EXECUTOR}, a timeout could occur if the result is placed onto the same queue of
      * the thread that is waiting for the result!
      */
-    final static ThimbleExecutor RPC_EXECUTOR =
-        new ThimbleExecutor(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
+    final static IContextExecutor RPC_EXECUTOR =
+            ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
 
     /**
      * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.

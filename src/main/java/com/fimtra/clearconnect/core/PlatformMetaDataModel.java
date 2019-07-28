@@ -97,7 +97,8 @@ import com.fimtra.datafission.core.session.SessionContexts;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.is;
@@ -406,7 +407,7 @@ public final class PlatformMetaDataModel
         return name.substring(PREFIX_RPCS_PER_INSTANCE.length());
     }
     
-    final ThimbleExecutor coalescingExecutor = new ThimbleExecutor("meta-data-model-coalescing-executor", 1);
+    final IContextExecutor coalescingExecutor = ContextExecutorFactory.create("meta-data-model-coalescing-executor", 1);
 
     final CoalescingRecordListener _servicesRecordListener =
             new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()

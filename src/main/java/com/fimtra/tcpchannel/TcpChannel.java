@@ -45,8 +45,9 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.IReusableObjectFinalizer;
@@ -171,8 +172,8 @@ public class TcpChannel implements ITransportChannel
      * Exclusively used to handle frames dispatched from the TCP socket reads. Has the same number
      * of threads as the TCP reader count.
      */
-    private static final ThimbleExecutor RX_FRAME_PROCESSOR =
-        new ThimbleExecutor("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
+    private static final IContextExecutor RX_FRAME_PROCESSOR =
+            ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
 
     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
         new MultiThreadReusableObjectPool<RxFrameResolver>("RxFrameResolverPool",

@@ -82,9 +82,10 @@ import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -356,7 +357,7 @@ public final class PlatformRegistry
     /** @see IRegistryRecordNames#PLATFORM_SUMMARY */
     final IRecord platformSummary;
 
-    final ThimbleExecutor coalescingExecutor;
+    final IContextExecutor coalescingExecutor;
     final EventHandler eventHandler;
     final AtomicLong serviceSequence;
     final AtomicLong registrationTokenCounter;
@@ -413,7 +414,7 @@ public final class PlatformRegistry
         this.context = new Context(PlatformUtils.composeHostQualifiedName(SERVICE_NAME + "[" + platformName + "]"));
         this.publisher = new Publisher(this.context, CODEC, host, port);
 
-        this.coalescingExecutor = new ThimbleExecutor("registry-status", 1);
+        this.coalescingExecutor = ContextExecutorFactory.create("registry-status", 1);
         this.eventHandler = new EventHandler(this);
 
         this.services = this.context.createRecord(IRegistryRecordNames.SERVICES);

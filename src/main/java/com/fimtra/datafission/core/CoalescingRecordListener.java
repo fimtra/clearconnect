@@ -32,6 +32,7 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 
@@ -153,9 +154,9 @@ public class CoalescingRecordListener implements IRecordListener
     public static class ContextCoalescingStrategy implements ICoalescingStrategy
     {
         final Object coalescingContext;
-        final ThimbleExecutor executor;
+        final IContextExecutor executor;
 
-        ContextCoalescingStrategy(ThimbleExecutor executor, Object coalescingContext)
+        ContextCoalescingStrategy(IContextExecutor executor, Object coalescingContext)
         {
             super();
             this.coalescingContext = coalescingContext;
@@ -291,7 +292,7 @@ public class CoalescingRecordListener implements IRecordListener
      *            the context to coalesce on - this can be the record name but for multi-source
      *            updates, the context should identify the source and record name
      */
-    public CoalescingRecordListener(ThimbleExecutor coalescingExecutor, IRecordListener delegate,
+    public CoalescingRecordListener(IContextExecutor coalescingExecutor, IRecordListener delegate,
         Object coalescingContext)
     {
         this(coalescingExecutor, delegate, coalescingContext, CachePolicyEnum.KEEP_IMAGE_ON_COALESCE);
@@ -312,7 +313,7 @@ public class CoalescingRecordListener implements IRecordListener
      *            {@link CachePolicyEnum#REMOVE_IMAGE_ON_COALESCE} and
      *            {@link CachePolicyEnum#NO_IMAGE_NEEDED}
      */
-    public CoalescingRecordListener(ThimbleExecutor coalescingExecutor, IRecordListener delegate,
+    public CoalescingRecordListener(IContextExecutor coalescingExecutor, IRecordListener delegate,
         Object coalescingContext, CachePolicyEnum cachePolicy)
     {
         this(delegate, new ContextCoalescingStrategy(coalescingExecutor, coalescingContext), cachePolicy);

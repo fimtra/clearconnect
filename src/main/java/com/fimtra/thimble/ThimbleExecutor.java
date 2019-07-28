@@ -57,7 +57,7 @@ import com.fimtra.util.ObjectUtils;
  * @see ICoalescingRunnable
  * @author Ramon Servadei
  */
-public final class ThimbleExecutor implements Executor
+public final class ThimbleExecutor extends IContextExecutor
 {
     final static Map<String, Long> threadIds = Collections.synchronizedMap(new HashMap<String, Long>());
 
@@ -192,7 +192,7 @@ public final class ThimbleExecutor implements Executor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    public ThimbleExecutor(int size)
+    ThimbleExecutor(int size)
     {
         this(ThimbleExecutor.class.getSimpleName(), size);
     }
@@ -206,7 +206,7 @@ public final class ThimbleExecutor implements Executor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    public ThimbleExecutor(String name, int size)
+    ThimbleExecutor(String name, int size)
     {
         this.name = name;
         this.size = size;
@@ -269,6 +269,7 @@ public final class ThimbleExecutor implements Executor
      * @return a Map holding all sequential task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
+    @Override
     public Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
         return this.taskQueue.getSequentialTaskStatistics();
@@ -282,6 +283,7 @@ public final class ThimbleExecutor implements Executor
      * @return a Map holding all coalescing task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
+    @Override
     public Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
         return this.taskQueue.getCoalescingTaskStatistics();
@@ -290,11 +292,13 @@ public final class ThimbleExecutor implements Executor
     /**
      * @return the statistics for all tasks submitted to this ThimbleExecutor
      */
+    @Override
     public TaskStatistics getExecutorStatistics()
     {
         return this.stats.intervalFinished();
     }
 
+    @Override
     public void destroy()
     {
         synchronized (this.taskQueue.lock)
@@ -316,6 +320,7 @@ public final class ThimbleExecutor implements Executor
      * @return the name of the {@link ThimbleExecutor} (this is also what each internal thread name
      *         begins with)
      */
+    @Override
     public String getName()
     {
         return this.name;

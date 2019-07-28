@@ -29,12 +29,10 @@ import org.junit.Test;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.CoalescingRecordListener;
-import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
-import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 
@@ -57,13 +55,13 @@ public class CoalescingRecordListenerTest
     private static final IValue V2p = new DoubleValue(2.1);
     private final static IValue V5 = new DoubleValue(5);
 
-    private ThimbleExecutor executor;
+    private IContextExecutor executor;
     Context candidate;
 
     @Before
     public void setUp() throws Exception
     {
-        this.executor = new ThimbleExecutor(1);
+        this.executor = ContextExecutorFactory.create("CoalescingRecordListenerTest", 1);
         this.candidate = new Context("testContext");
     }
 
