@@ -18,6 +18,8 @@ package com.fimtra.tcpchannel;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -173,5 +175,25 @@ public class TestTcpChannelUtils
         buffer.put(data);
         ByteBuffer[] decode = new ByteBuffer[2];
         decode = TcpChannelUtils.decodeUsingTerminator(decode, this.readFramesSize, buffer, data, terminator);
+    }
+    
+    @Test(expected = IOException.class)
+    public void testBindWithinRange() throws IOException
+    {
+        ServerSocket ssoc1 = new ServerSocket();
+        ssoc1.setReuseAddress(true);
+        TcpChannelUtils.bindWithinRange(ssoc1, null, 2000, 2001);
+        assertEquals(2000, ssoc1.getLocalPort());
+        
+        ServerSocket ssoc2 = new ServerSocket();
+        ssoc2.setReuseAddress(true);
+        TcpChannelUtils.bindWithinRange(ssoc2, null, 2000, 2001);
+        assertEquals(2001, ssoc2.getLocalPort());
+        
+        // exception now
+        ServerSocket ssoc3 = new ServerSocket();
+        ssoc3.setReuseAddress(true);
+        TcpChannelUtils.bindWithinRange(ssoc3, null, 2000, 2001);
+        assertEquals(2001, ssoc2.getLocalPort());
     }
 }

@@ -73,10 +73,11 @@ public class TcpServer implements IEndPointService
     {
         if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
         {
-            final  Runnable connectionDumpTask = new Runnable()
+            final Runnable connectionDumpTask = new Runnable()
             {
                 final File serverConnectionsFile = FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR,
                     ThreadUtils.getMainMethodClassSimpleName() + "-serverConnections");
+
                 @Override
                 public void run()
                 {
@@ -116,7 +117,7 @@ public class TcpServer implements IEndPointService
                 1, TimeUnit.MINUTES);
         }
     }
-    
+
     final static int DEFAULT_SERVER_RX_BUFFER_SIZE = 65535;
 
     final ServerSocketChannel serverSocketChannel;
@@ -202,8 +203,7 @@ public class TcpServer implements IEndPointService
             this.serverSocketChannel.socket().setReuseAddress(reuseAddress);
             this.serverSocketChannel.socket().setReceiveBufferSize(serverRxBufferSize);
 
-            this.serverSocketChannel.socket().bind(
-                new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address, port));
+            TcpChannelUtils.bind(this.serverSocketChannel.socket(), address, port);
 
             TcpChannelUtils.ACCEPT_PROCESSOR.register(this.serverSocketChannel, new Runnable()
             {
@@ -372,9 +372,9 @@ public class TcpServer implements IEndPointService
     public void destroy()
     {
         Log.log(TcpChannelUtils.class, "Closing ", ObjectUtils.safeToString(this.serverSocketChannel));
-        
+
         TcpChannelUtils.ACCEPT_PROCESSOR.cancel(this.serverSocketChannel);
-        
+
         try
         {
             this.serverSocketChannel.socket().close();
@@ -384,7 +384,6 @@ public class TcpServer implements IEndPointService
         {
             Log.log(TcpChannelUtils.class, "Could not close " + ObjectUtils.safeToString(this.serverSocketChannel), e);
         }
-
 
         final Set<ITransportChannel> connections;
         synchronized (this.clients)

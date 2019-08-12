@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -117,7 +118,10 @@ public abstract class TcpChannelUtils
         void onConnectionFailed(Exception e);
     }
 
-    /** Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin. */
+    /**
+     * Handles socket read operations for {@link TcpChannel} instances. Allocation based on
+     * round-robin.
+     */
     private final static SelectorProcessor[] READER;
     private static int currentReader = 0;
     static
@@ -138,7 +142,10 @@ public abstract class TcpChannelUtils
         return READER[currentReader++];
     }
 
-    /** Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin. */
+    /**
+     * Handles socket write operations for {@link TcpChannel} instances. Allocation based on
+     * round-robin.
+     */
     private final static SelectorProcessor[] WRITER;
     private static int currentWriter = 0;
     static
@@ -213,7 +220,8 @@ public abstract class TcpChannelUtils
      * @throws BufferOverflowException
      *             if the buffer size cannot hold a complete frame
      */
-    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] bufferArray) throws BufferOverflowException
+    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] bufferArray)
+        throws BufferOverflowException
     {
         ByteBuffer[] decoded = frames;
         framesSize[0] = 0;
@@ -489,6 +497,60 @@ public abstract class TcpChannelUtils
             {
                 Log.log(TcpChannelUtils.class, "Could not set socket option " + ObjectUtils.safeToString(key) + " on "
                     + ObjectUtils.safeToString(socketChannel), e);
+            }
+        }
+    }
+
+    private static int lastEphemeralPort = -1;
+
+    static void bind(ServerSocket socket, String address, int port) throws IOException
+    {
+        if (port == 0 && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START > -1
+            && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END > -1)
+        {
+            bindWithinRange(socket, address, TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START,
+                TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END);
+        }
+        else
+        {
+            socket.bind(new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address, port));
+        }
+    }
+
+    static synchronized void bindWithinRange(ServerSocket socket, String address, final int ephemeralRangeStart,
+        final int ephemeralRangeEnd) throws IOException
+    {
+        int loop = 0;
+
+        while (true)
+        {
+            if (lastEphemeralPort == -1 || lastEphemeralPort < ephemeralRangeStart)
+            {
+                lastEphemeralPort = ephemeralRangeStart;
+            }
+            else
+            {
+                lastEphemeralPort++;
+            }
+            if (lastEphemeralPort > ephemeralRangeEnd)
+            {
+                lastEphemeralPort = ephemeralRangeStart;
+                if (++loop > 1)
+                {
+                    throw new IOException(
+                        "No free port found between " + ephemeralRangeStart + "-" + ephemeralRangeEnd);
+                }
+            }
+            try
+            {
+                final InetSocketAddress endpoint =
+                    new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address, lastEphemeralPort);
+                socket.bind(endpoint);
+                break;
+            }
+            catch (IOException e)
+            {
+                Log.log(TcpChannelUtils.class, "Could not bind to socket: " + lastEphemeralPort);
             }
         }
     }

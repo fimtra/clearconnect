@@ -163,6 +163,20 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.rxFrameResolverPoolMaxSize=1000</code>
          */
         String RX_FRAME_RESOLVER_POOL_MAX_SIZE = BASE + "rxFrameResolverPoolMaxSize";
+        
+        /**
+         * The system property name to define the range start for ephemeral ports.
+         * <p>
+         * E.g. <code>-DtcpChannel.ephemeralPortRangeStart=22222</code>
+         */
+        String EPHEMERAL_PORT_RANGE_START = BASE + "ephemeralPortRangeStart";
+        
+        /**
+         * The system property name to define the range end for ephemeral ports.
+         * <p>
+         * E.g. <code>-DtcpChannel.ephemeralPortRangeEnd=33333</code>
+         */
+        String EPHEMERAL_PORT_RANGE_END = BASE + "ephemeralPortRangeEnd";
     }
 
     /**
@@ -311,6 +325,20 @@ public abstract class TcpChannelProperties
          * Default is: 1000
          */
         int RX_FRAME_RESOLVER_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
+
+        /**
+         * The system property name to define the range start for ephemeral ports.
+         * <p>
+         * Default is: -1 (no range)
+         */
+        int EPHEMERAL_PORT_RANGE_START = Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_START, "-1"));
+        
+        /**
+         * The system property name to define the range end for ephemeral ports.
+         * <p>
+         * Default is: -1 (no range)
+         */
+        int EPHEMERAL_PORT_RANGE_END = Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_END, "-1"));
     }
 
     private TcpChannelProperties()
