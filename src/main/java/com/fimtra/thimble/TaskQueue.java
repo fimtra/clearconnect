@@ -54,10 +54,12 @@ final class TaskQueue
         Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
         Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
-    
-    private interface InternalTaskQueue<T> extends Runnable
+
+    static interface InternalTaskQueue<T> extends Runnable
     {
         void offer(T t);
+
+        void onTaskFinished();
     }
 
     /**
@@ -91,48 +93,44 @@ final class TaskQueue
             }
             return false;
         }
-        
+
         @Override
         public void run()
         {
             ISequentialRunnable item = null;
             try
             {
-                try
+                synchronized (this.sequentialTasks)
                 {
-                    synchronized (this.sequentialTasks)
+                    item = this.sequentialTasks.removeFirst();
+                    if (item != null)
                     {
-                        item = this.sequentialTasks.removeFirst();
-                        if (item != null)
-                        {
-                            this.size--;
-                        }
+                        this.size--;
                     }
-                }
-                catch (NoSuchElementException e)
-                {
-                    // empty tasks
-                }
-                if (item != null)
-                {
-                    item.run();
                 }
             }
-            finally
+            catch (NoSuchElementException e)
             {
-                synchronized (TaskQueue.this.lock)
-                {
-                    this.stats.itemExecuted();            
-                    if (this.size > 0)
-                    {
-                        TaskQueue.this.queue.offer(this);
-                    }
-                    else
-                    {
-                        TaskQueue.this.sequentialTasksPerContext.remove(this.context);
-                        TaskQueue.this.sequentialTasksPool.offer(this);
-                    }
-                }
+                // empty tasks
+            }
+            if (item != null)
+            {
+                item.run();
+            }
+        }
+
+        @Override
+        public void onTaskFinished()
+        {
+            this.stats.itemExecuted();
+            if (this.size > 0)
+            {
+                TaskQueue.this.queue.offer(this);
+            }
+            else
+            {
+                TaskQueue.this.sequentialTasksPerContext.remove(this.context);
+                TaskQueue.this.sequentialTasksPool.offer(this);
             }
         }
 
@@ -170,7 +168,7 @@ final class TaskQueue
         Object context;
         TaskStatistics stats;
         boolean active;
-        
+
         CoalescingTasks()
         {
             super();
@@ -188,35 +186,31 @@ final class TaskQueue
             }
             return false;
         }
- 
+
         @Override
         public void run()
         {
-            try
+            ICoalescingRunnable task;
+            synchronized (this)
             {
-                ICoalescingRunnable task;
-                synchronized(this)
-                {
-                    task = this.latestTask;
-                    this.latestTask = null;
-                }
-                task.run();
+                task = this.latestTask;
+                this.latestTask = null;
             }
-            finally
+            task.run();
+        }
+
+        @Override
+        public void onTaskFinished()
+        {
+            this.stats.itemExecuted();
+            if (this.latestTask != null)
             {
-                synchronized (TaskQueue.this.lock)
-                {
-                    this.stats.itemExecuted();
-                    if (this.latestTask != null)
-                    {
-                        TaskQueue.this.queue.offer(this);
-                    }
-                    else
-                    {
-                        TaskQueue.this.coalescingTasksPerContext.remove(this.context);
-                        TaskQueue.this.coalescingTasksPool.offer(this);
-                    }
-                }
+                TaskQueue.this.queue.offer(this);
+            }
+            else
+            {
+                TaskQueue.this.coalescingTasksPerContext.remove(this.context);
+                TaskQueue.this.coalescingTasksPool.offer(this);
             }
         }
 
@@ -252,12 +246,12 @@ final class TaskQueue
     long sequentialTaskCreateCount;
     long coalescingTaskCreateCount;
     final String name;
-    
+
     TaskQueue(String name)
     {
         this.name = name;
-        this.sequentialTasksPool =
-            new SingleThreadReusableObjectPool<SequentialTasks>("sequential-" + name, new IReusableObjectBuilder<SequentialTasks>()
+        this.sequentialTasksPool = new SingleThreadReusableObjectPool<SequentialTasks>("sequential-" + name,
+            new IReusableObjectBuilder<SequentialTasks>()
             {
                 @Override
                 public SequentialTasks newInstance()
@@ -274,8 +268,8 @@ final class TaskQueue
                     instance.active = false;
                 }
             }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
-        this.coalescingTasksPool =
-            new SingleThreadReusableObjectPool<CoalescingTasks>("coalescing-" + name, new IReusableObjectBuilder<CoalescingTasks>()
+        this.coalescingTasksPool = new SingleThreadReusableObjectPool<CoalescingTasks>("coalescing-" + name,
+            new IReusableObjectBuilder<CoalescingTasks>()
             {
                 @Override
                 public CoalescingTasks newInstance()
@@ -292,10 +286,10 @@ final class TaskQueue
                     instance.active = false;
                 }
             }, COALESCING_TASKS_MAX_POOL_SIZE);
-        this.allCoalescingStats = new TaskStatistics("Coalescing" + ThimbleExecutor.QUEUE_LEVEL_STATS);
-        this.coalescingTaskStatsPerContext.put(ThimbleExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
-        this.allSequentialStats = new TaskStatistics("Sequential" + ThimbleExecutor.QUEUE_LEVEL_STATS);
-        this.sequentialTaskStatsPerContext.put(ThimbleExecutor.QUEUE_LEVEL_STATS, this.allSequentialStats);
+        this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
+        this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
+        this.allSequentialStats = new TaskStatistics("Sequential" + IContextExecutor.QUEUE_LEVEL_STATS);
+        this.sequentialTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allSequentialStats);
     }
 
     /**
@@ -398,7 +392,8 @@ final class TaskQueue
         Map.Entry<Object, TaskStatistics> entry = null;
         Object key = null;
         TaskStatistics value = null;
-        for (Iterator<Map.Entry<Object, TaskStatistics>> it = this.sequentialTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
+        for (Iterator<Map.Entry<Object, TaskStatistics>> it =
+            this.sequentialTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();
@@ -418,7 +413,8 @@ final class TaskQueue
         Map.Entry<Object, TaskStatistics> entry = null;
         Object key = null;
         TaskStatistics value = null;
-        for (Iterator<Map.Entry<Object, TaskStatistics>> it = this.coalescingTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
+        for (Iterator<Map.Entry<Object, TaskStatistics>> it =
+            this.coalescingTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
             key = entry.getKey();

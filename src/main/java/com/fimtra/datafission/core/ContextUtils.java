@@ -182,13 +182,14 @@ public final class ContextUtils
      * 
      * @see #SYSTEM_RECORDS
      */
-    final static IContextExecutor SYSTEM_RECORD_EXECUTOR = ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
+    final static IContextExecutor SYSTEM_RECORD_EXECUTOR =
+        ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
 
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
      */
     final static IContextExecutor CORE_EXECUTOR =
-            ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
+        ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
      * This is dedicated to handle RPC results. If RPC results are handled by the
@@ -196,7 +197,7 @@ public final class ContextUtils
      * the thread that is waiting for the result!
      */
     final static IContextExecutor RPC_EXECUTOR =
-            ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
+        ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
 
     /**
      * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.
@@ -208,15 +209,15 @@ public final class ContextUtils
         ? RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) : null;
 
     static final RollingFileAppender runtimeStatsLog =
-            RollingFileAppender.createStandardRollingFileAppender("runtimeStats", UtilProperties.Values.LOG_DIR);
+        RollingFileAppender.createStandardRollingFileAppender("runtimeStats", UtilProperties.Values.LOG_DIR);
 
     static long gcDutyCycle;
-    
+
     public static long getGcDutyCycle()
     {
         return gcDutyCycle;
     }
-    
+
     static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
     static
     {
@@ -248,7 +249,7 @@ public final class ContextUtils
                 final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
-                
+
                 // QStats first
                 if (qStatsLog != null)
                 {
@@ -277,7 +278,7 @@ public final class ContextUtils
                     {
                         coreStats = sequentialTaskStatistics;
                     }
-                    
+
                     if (qStatsLog != null)
                     {
                         sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
@@ -299,13 +300,13 @@ public final class ContextUtils
                         Log.log(ContextUtils.class, "Could not log to QStats file", e);
                     }
                 }
-                
+
                 // now Summary stats
                 sb.setLength(0);
-                
+
                 // time
                 sb.append(yyyyMMddHHmmssSSS);
-                
+
                 // memory use
                 final Runtime runtime = Runtime.getRuntime();
                 final double MB = 1d / (1024 * 1024);
@@ -330,9 +331,9 @@ public final class ContextUtils
                 final double inverseLoggingPeriodSecs = 1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                 // this is now the "% GC duty cycle per minute"
                 gcDutyCycle = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
-                
+
                 sb.append(", ").append(getGcDutyCycle());
-                
+
                 // TX Q and max TX Q connection
                 final List<Pair<Integer, String>> channelStats = ChannelUtils.WATCHDOG.getChannelStats();
                 int txQsize = 0;
@@ -343,7 +344,7 @@ public final class ContextUtils
                 {
                     size = stat.getFirst().intValue();
                     txQsize += size;
-                    if(maxTxQ < size)
+                    if (maxTxQ < size)
                     {
                         maxTxQName = stat.getSecond();
                         maxTxQ = size;
@@ -680,7 +681,7 @@ public final class ContextUtils
 
         final char[] escapedChars = new char[2];
         escapedChars[0] = StringProtocolCodec.CHAR_ESCAPE;
-        
+
         for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();
@@ -890,11 +891,11 @@ public final class ContextUtils
     }
 
     /**
-     * @return <code>true</code> if the thread is a core thread
+     * @return <code>true</code> if the thread is a system record context thread
      */
     public static boolean isSystemThread()
     {
-        return Arrays.binarySearch(SYSTEM_THREAD_IDS, Thread.currentThread().getId()) > -1;
+        return SYSTEM_RECORD_EXECUTOR.isExecutorThread(Thread.currentThread().getId());
     }
 
     /**
@@ -902,7 +903,7 @@ public final class ContextUtils
      */
     public static boolean isCoreThread()
     {
-        return Arrays.binarySearch(CORE_THREAD_IDS, Thread.currentThread().getId()) > -1;
+        return CORE_EXECUTOR.isExecutorThread(Thread.currentThread().getId());
     }
 
     /**
@@ -910,7 +911,7 @@ public final class ContextUtils
      */
     public static boolean isRpcThread()
     {
-        return Arrays.binarySearch(RPC_THREAD_IDS, Thread.currentThread().getId()) > -1;
+        return RPC_EXECUTOR.isExecutorThread(Thread.currentThread().getId());
     }
 
     /**
@@ -922,7 +923,9 @@ public final class ContextUtils
      */
     public static boolean isFrameworkThread()
     {
-        return Arrays.binarySearch(FRAMEWORK_THREAD_IDS, Thread.currentThread().getId()) > -1;
+        final long id = Thread.currentThread().getId();
+        return CORE_EXECUTOR.isExecutorThread(id) || RPC_EXECUTOR.isExecutorThread(id)
+            || SYSTEM_RECORD_EXECUTOR.isExecutorThread(id);
     }
 
     /**
@@ -1052,50 +1055,5 @@ public final class ContextUtils
                 || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
         }
         return false;
-    }
-
-    final static long[] FRAMEWORK_THREAD_IDS;
-    final static long[] CORE_THREAD_IDS;
-    final static long[] SYSTEM_THREAD_IDS;
-    final static long[] RPC_THREAD_IDS;
-    static
-    {
-        long[] coreThreadIds = new long[0];
-        long[] rpcThreadIds = new long[0];
-        long[] systemThreadIds = new long[0];
-        long[] frameworkThreadIds = new long[0];
-        Map.Entry<String, Long> entry = null;
-        String name = null;
-        long threadId;
-        for (Iterator<Map.Entry<String, Long>> it = ThimbleExecutor.getThreadIds().entrySet().iterator(); it.hasNext();)
-        {
-            entry = it.next();
-            name = entry.getKey();
-            threadId = entry.getValue().longValue();
-
-            if (name.startsWith(FISSION_CORE, 0))
-            {
-                coreThreadIds = ArrayUtils.add(threadId, coreThreadIds);
-                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
-            }
-            else if (name.startsWith(FISSION_RPC, 0))
-            {
-                rpcThreadIds = ArrayUtils.add(threadId, rpcThreadIds);
-                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
-            }
-            else if (name.startsWith(FISSION_SYSTEM, 0))
-            {
-                systemThreadIds = ArrayUtils.add(threadId, systemThreadIds);
-                frameworkThreadIds = ArrayUtils.add(threadId, frameworkThreadIds);
-            }
-        }
-        Arrays.sort(coreThreadIds);
-        Arrays.sort(rpcThreadIds);
-        Arrays.sort(systemThreadIds);
-        Arrays.sort(frameworkThreadIds);
-        CORE_THREAD_IDS = coreThreadIds;
-        RPC_THREAD_IDS = rpcThreadIds;
-        SYSTEM_THREAD_IDS = systemThreadIds;
-        FRAMEWORK_THREAD_IDS = frameworkThreadIds;
     }
 }

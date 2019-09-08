@@ -17,6 +17,7 @@ package com.fimtra.thimble;
 
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -280,4 +281,39 @@ public class ThimbleExecutorTest
             latch.await(2, TimeUnit.SECONDS));
     }
 
+    @Test
+    public void testAddRemoveThreadId()
+    {
+        System.err.println(Arrays.toString(this.candidate.tids));
+        
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
+        
+        this.candidate.addThreadId(2);
+        this.candidate.addThreadId(1);
+        this.candidate.addThreadId(100);
+        
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) > -1);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) > -1);
+        
+        this.candidate.removeThreadId(1);
+        
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) > -1);
+        
+        this.candidate.removeThreadId(2);
+        
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
+
+        this.candidate.removeThreadId(100);
+        
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
+        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
+    }
 }

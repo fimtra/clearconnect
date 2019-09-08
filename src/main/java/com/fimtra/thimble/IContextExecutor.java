@@ -47,14 +47,17 @@ import java.util.concurrent.Executor;
  * @see ISequentialRunnable
  * @see ICoalescingRunnable
  * @author Ramon Servadei
- * @author Ramon Servadei
  */
-public abstract class IContextExecutor implements Executor
+public interface IContextExecutor extends Executor
 {
+    String QUEUE_LEVEL_STATS = "QueueLevelStats";
+    
+    boolean isExecutorThread(long id);
+    
     /**
      * @return the name of the {@link IContextExecutor}
      */
-    public abstract String getName();
+    String getName();
 
     /**
      * Get the statistics for the sequential tasks submitted to this {@link IContextExecutor}. The
@@ -64,7 +67,7 @@ public abstract class IContextExecutor implements Executor
      * @return a Map holding all sequential task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
-    public abstract Map<Object, TaskStatistics> getSequentialTaskStatistics();
+    Map<Object, TaskStatistics> getSequentialTaskStatistics();
 
     /**
      * Get the statistics for the coalescing tasks submitted to this {@link IContextExecutor}. The
@@ -74,12 +77,12 @@ public abstract class IContextExecutor implements Executor
      * @return a Map holding all coalescing task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
-    public abstract Map<Object, TaskStatistics> getCoalescingTaskStatistics();
+    Map<Object, TaskStatistics> getCoalescingTaskStatistics();
 
     /**
      * @return the statistics for all tasks submitted to this {@link IContextExecutor}.
      */
-    public abstract TaskStatistics getExecutorStatistics();
+    TaskStatistics getExecutorStatistics();
 
-    public abstract void destroy();
+    void destroy();
 }

@@ -503,6 +503,12 @@ public abstract class TcpChannelUtils
 
     private static int lastEphemeralPort = -1;
 
+    /**
+     * Bind the server socket to the IP address and port. If the address is <code>null</code>, uses
+     * the localhost IP. If the port is 0 AND the system properties for the ephemeral port range
+     * start-end are set then an ephemeral port within the range is used. If the port is 0 and no
+     * system properties are set, an ephemeral port is allocated.
+     */
     static void bind(ServerSocket socket, String address, int port) throws IOException
     {
         if (port == 0 && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START > -1
@@ -517,6 +523,10 @@ public abstract class TcpChannelUtils
         }
     }
 
+    /**
+     * Bind the server socket to an ephemeral port within the range start and end, inclusive. If the
+     * address is <code>null</code>, uses the localhost IP.
+     */
     static synchronized void bindWithinRange(ServerSocket socket, String address, final int ephemeralRangeStart,
         final int ephemeralRangeEnd) throws IOException
     {
