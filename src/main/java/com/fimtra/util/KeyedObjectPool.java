@@ -64,8 +64,8 @@ public class KeyedObjectPool<K, T>
     }
 
     private final String name;
-    private final ConcurrentMap<K, T> pool;
-    private final LowGcLinkedList<T> order;
+    final ConcurrentMap<K, T> pool;
+    final LowGcLinkedList<K> order;
     private final int maxSize;
     private final WeakReference<KeyedObjectPool<?, ?>> weakRef;
 
@@ -129,7 +129,7 @@ public class KeyedObjectPool<K, T>
             {
                 synchronized (this.order)
                 {
-                    this.order.add(t);
+                    this.order.add(k);
                     if (this.order.size > this.maxSize)
                     {
                         this.pool.remove(this.order.removeFirst());
