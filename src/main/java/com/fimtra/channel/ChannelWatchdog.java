@@ -93,11 +93,11 @@ public final class ChannelWatchdog implements Runnable
     {
         super();
         this.lock = new Object();
-        this.channels = new HashSet<ITransportChannel>();
-        this.channelsReceivingHeartbeat = new HashSet<ITransportChannel>();
-        this.channelsMissingHeartbeat = new HashMap<ITransportChannel, Integer>();
-        this.channelsHeartbeatArrivalTime = new ConcurrentHashMap<ITransportChannel, Long>();
-        this.channelFirstHeartbeatWarning = new HashSet<ITransportChannel>();
+        this.channels = new HashSet<>();
+        this.channelsReceivingHeartbeat = new HashSet<>();
+        this.channelsMissingHeartbeat = new HashMap<>();
+        this.channelsHeartbeatArrivalTime = new ConcurrentHashMap<>();
+        this.channelFirstHeartbeatWarning = new HashSet<>();
         configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "30000")),
             Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
     }
@@ -162,7 +162,7 @@ public final class ChannelWatchdog implements Runnable
     {
         synchronized (this.lock)
         {
-            final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
+            final Set<ITransportChannel> copy = new HashSet<>(this.channels);
             copy.add(channel);
             this.channels = copy;
         }
@@ -259,7 +259,7 @@ public final class ChannelWatchdog implements Runnable
         final boolean remove;
         synchronized (this.lock)
         {
-            final Set<ITransportChannel> copy = new HashSet<ITransportChannel>(this.channels);
+            final Set<ITransportChannel> copy = new HashSet<>(this.channels);
             remove = copy.remove(channel);
             this.channels = copy;
         }
@@ -346,10 +346,10 @@ public final class ChannelWatchdog implements Runnable
     public List<Pair<Integer, String>> getChannelStats()
     {
         final Set<ITransportChannel> localChannelsRef = this.channels;
-        final List<Pair<Integer, String>> stats = new ArrayList<Pair<Integer, String>>(localChannelsRef.size());
+        final List<Pair<Integer, String>> stats = new ArrayList<>(localChannelsRef.size());
         for (ITransportChannel channel : localChannelsRef)
         {
-            stats.add(new Pair<Integer, String>(Integer.valueOf(channel.getTxQueueSize()), channel.getDescription()));
+            stats.add(new Pair<>(Integer.valueOf(channel.getTxQueueSize()), channel.getDescription()));
         }
         return stats;
     }

@@ -24,8 +24,6 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.fimtra.util.CollectionUtils;
-import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.SingleThreadReusableObjectPool;
 
@@ -70,7 +68,7 @@ final class TaskQueue
      */
     final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
     {
-        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<ISequentialRunnable>(2);
+        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);
         int size;
         Object context;
         TaskStatistics stats;
@@ -233,10 +231,10 @@ final class TaskQueue
     }
 
     final Queue<Runnable> queue = CollectionUtils.newDeque();
-    final Map<Object, SequentialTasks> sequentialTasksPerContext = new HashMap<Object, SequentialTasks>();
-    final Map<Object, CoalescingTasks> coalescingTasksPerContext = new HashMap<Object, CoalescingTasks>();
-    final Map<Object, TaskStatistics> sequentialTaskStatsPerContext = new ConcurrentHashMap<Object, TaskStatistics>();
-    final Map<Object, TaskStatistics> coalescingTaskStatsPerContext = new ConcurrentHashMap<Object, TaskStatistics>();
+    final Map<Object, SequentialTasks> sequentialTasksPerContext = new HashMap<>();
+    final Map<Object, CoalescingTasks> coalescingTasksPerContext = new HashMap<>();
+    final Map<Object, TaskStatistics> sequentialTaskStatsPerContext = new ConcurrentHashMap<>();
+    final Map<Object, TaskStatistics> coalescingTaskStatsPerContext = new ConcurrentHashMap<>();
     final TaskStatistics allCoalescingStats;
     final TaskStatistics allSequentialStats;
     final Object lock = new Object();
@@ -250,41 +248,17 @@ final class TaskQueue
     TaskQueue(String name)
     {
         this.name = name;
-        this.sequentialTasksPool = new SingleThreadReusableObjectPool<SequentialTasks>("sequential-" + name,
-            new IReusableObjectBuilder<SequentialTasks>()
-            {
-                @Override
-                public SequentialTasks newInstance()
-                {
-                    return new SequentialTasks();
-                }
-            }, new IReusableObjectFinalizer<SequentialTasks>()
-            {
-                @Override
-                public void reset(SequentialTasks instance)
-                {
-                    instance.context = null;
-                    instance.stats = null;
-                    instance.active = false;
-                }
+        this.sequentialTasksPool =
+            new SingleThreadReusableObjectPool<>("sequential-" + name, () -> new SequentialTasks(), (instance) -> {
+                instance.context = null;
+                instance.stats = null;
+                instance.active = false;
             }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
-        this.coalescingTasksPool = new SingleThreadReusableObjectPool<CoalescingTasks>("coalescing-" + name,
-            new IReusableObjectBuilder<CoalescingTasks>()
-            {
-                @Override
-                public CoalescingTasks newInstance()
-                {
-                    return new CoalescingTasks();
-                }
-            }, new IReusableObjectFinalizer<CoalescingTasks>()
-            {
-                @Override
-                public void reset(CoalescingTasks instance)
-                {
-                    instance.context = null;
-                    instance.stats = null;
-                    instance.active = false;
-                }
+        this.coalescingTasksPool =
+            new SingleThreadReusableObjectPool<>("coalescing-" + name, () -> new CoalescingTasks(), (instance) -> {
+                instance.context = null;
+                instance.stats = null;
+                instance.active = false;
             }, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
         this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
@@ -388,7 +362,7 @@ final class TaskQueue
     Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
         HashMap<Object, TaskStatistics> stats =
-            new HashMap<Object, TaskStatistics>(this.sequentialTaskStatsPerContext.size());
+            new HashMap<>(this.sequentialTaskStatsPerContext.size());
         Map.Entry<Object, TaskStatistics> entry = null;
         Object key = null;
         TaskStatistics value = null;
@@ -409,7 +383,7 @@ final class TaskQueue
     Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
         HashMap<Object, TaskStatistics> stats =
-            new HashMap<Object, TaskStatistics>(this.coalescingTaskStatsPerContext.size());
+            new HashMap<>(this.coalescingTaskStatsPerContext.size());
         Map.Entry<Object, TaskStatistics> entry = null;
         Object key = null;
         TaskStatistics value = null;

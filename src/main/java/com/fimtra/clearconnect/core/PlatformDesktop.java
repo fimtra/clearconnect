@@ -259,7 +259,7 @@ class PlatformDesktop
         private static List<String> getSubscriptionsFromStateString(String state)
         {
             final String[] tokens = state.split("\\|");
-            List<String> subscriptions = new ArrayList<String>(tokens.length);
+            List<String> subscriptions = new ArrayList<>(tokens.length);
             for (String string : tokens)
             {
                 subscriptions.add(string.replace("\\|", "|"));
@@ -338,7 +338,7 @@ class PlatformDesktop
             this.model = new ColumnOrientedRecordTableModel();
             this.table = new ColumnOrientedRecordTable(this.model);
 
-            this.subscribedRecords = new CopyOnWriteArrayList<String>();
+            this.subscribedRecords = new CopyOnWriteArrayList<>();
             this.model.addRecordRemovedListener(this.context);
 
             this.context.addObserver(this.sessionId, this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
@@ -922,7 +922,7 @@ class PlatformDesktop
                 @Override
                 public void onChange(IRecord image, IRecordChange atomicChange)
                 {
-                    final Map<String, IValue> copy = new HashMap<String, IValue>(image.asFlattenedMap());
+                    final Map<String, IValue> copy = new HashMap<>(image.asFlattenedMap());
                     SwingUtilities.invokeLater(new Runnable()
                     {
                         @Override
@@ -1059,16 +1059,16 @@ class PlatformDesktop
         ParametersPanel()
         {
             this.ok = new JButton("OK");
-            this.parameters = new LinkedHashMap<String, Parameter>();
+            this.parameters = new LinkedHashMap<>();
             this.parametersPanel = new JPanel(new GridLayout(0, 2));
-            this.result = new AtomicReference<LinkedHashMap<String, String>>();
+            this.result = new AtomicReference<>();
 
             this.ok.addActionListener(new ActionListener()
             {
                 @Override
                 public void actionPerformed(ActionEvent e)
                 {
-                    LinkedHashMap<String, String> values = new LinkedHashMap<String, String>();
+                    LinkedHashMap<String, String> values = new LinkedHashMap<>();
                     Map.Entry<String, Parameter> entry = null;
                     String key = null;
                     Parameter value = null;
@@ -1193,7 +1193,7 @@ class PlatformDesktop
         ;
 
         static final Map<String, RecordSubscriptionPlatformDesktopView> recordSubscriptionViews =
-            new HashMap<String, RecordSubscriptionPlatformDesktopView>();
+            new HashMap<>();
 
         static void deregister(IObserverContext context, IRecordListener observer)
         {
@@ -1486,7 +1486,7 @@ class PlatformDesktop
             }
         }
         this.platformMetaDataModel = platformMetaDataModel;
-        this.views = new HashSet<AbstractPlatformDesktopView>();
+        this.views = new HashSet<>();
         SwingUtilities.invokeLater(new Runnable()
         {
             @Override

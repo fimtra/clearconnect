@@ -402,7 +402,7 @@ public final class DeadlockDetector
     private ThreadInfoWrapper[] getThreadInfoWrappersFor(long[] deadlockedThreadIds)
     {
         ThreadInfo[] threadInfos = this.threadMxBean.getThreadInfo(deadlockedThreadIds, true, true);
-        List<ThreadInfoWrapper> wrappers = new LinkedList<ThreadInfoWrapper>();
+        List<ThreadInfoWrapper> wrappers = new LinkedList<>();
         for (int i = 0; i < threadInfos.length; i++)
         {
             if (threadInfos[i] != null)

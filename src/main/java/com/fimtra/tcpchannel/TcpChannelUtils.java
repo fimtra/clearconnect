@@ -50,7 +50,7 @@ import com.fimtra.util.ObjectUtils;
  */
 public abstract class TcpChannelUtils
 {
-    static final Map<String, String> SOCKET_OPTIONS = new HashMap<String, String>();
+    static final Map<String, String> SOCKET_OPTIONS = new HashMap<>();
     static
     {
         Map.Entry<Object, Object> entry = null;

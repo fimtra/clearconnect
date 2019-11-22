@@ -64,7 +64,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
      */
     public static boolean logVerbose = Boolean.getBoolean("logVerbose." + RpcInstance.class.getCanonicalName());
 
-    private static final Set<String> EXCLUDED_RPC_NAMES = new HashSet<String>();
+    private static final Set<String> EXCLUDED_RPC_NAMES = new HashSet<>();
     static
     {
         if (DataFissionProperties.Values.EXCLUDE_RPC_LOGGING != null)
@@ -220,7 +220,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 }
                 else
                 {
-                    final Map<String, IValue> resultEntries = new HashMap<String, IValue>(2);
+                    final Map<String, IValue> resultEntries = new HashMap<>(2);
 
                     // tell the remote caller we have started
                     this.caller.send(
@@ -312,7 +312,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             {
                 final CountDownLatch executionStartedLatch = new CountDownLatch(1);
                 final CountDownLatch executionCompleteLatch = new CountDownLatch(1);
-                final AtomicReference<Map<String, IValue>> result = new AtomicReference<Map<String, IValue>>();
+                final AtomicReference<Map<String, IValue>> result = new AtomicReference<>();
                 final boolean noAck = args.length == 0 ? false : args[args.length - 1] == NO_ACK;
                 final String resultMapName =
                     noAck ? NO_ACK.textValue() : RPC_RECORD_RESULT_PREFIX + this.rpcName + ":"
@@ -624,9 +624,9 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             }
         }
         this.remoteExecutionStartTimeoutMillis =
-            new AtomicReference<Long>(DataFissionProperties.Values.RPC_EXECUTION_START_TIMEOUT_MILLIS);
+            new AtomicReference<>(DataFissionProperties.Values.RPC_EXECUTION_START_TIMEOUT_MILLIS);
         this.remoteExecutionDurationTimeoutMillis =
-            new AtomicReference<Long>(DataFissionProperties.Values.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS);
+            new AtomicReference<>(DataFissionProperties.Values.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS);
         setHandler(handler);
     }
 

@@ -106,7 +106,7 @@ final class Record implements IRecord, Cloneable
      * times so this is a valuable memory optimisation.
      */
     static final ObjectPool<String> keysPool =
-        new ObjectPool<String>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
+        new ObjectPool<>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
     final AtomicLong sequence;
     final String name;
@@ -150,7 +150,7 @@ final class Record implements IRecord, Cloneable
         synchronized (this)
         {
             for (Iterator<Map.Entry<String, IValue>> it =
-                new HashMap<String, IValue>(this.data).entrySet().iterator(); it.hasNext();)
+                new HashMap<>(this.data).entrySet().iterator(); it.hasNext();)
             {
                 remove(it.next().getKey());
             }
@@ -542,7 +542,7 @@ final class Record implements IRecord, Cloneable
             {
                 return ContextUtils.EMPTY_MAP;
             }
-            final Map<String, IValue> previous = new HashMap<String, IValue>(subMap);
+            final Map<String, IValue> previous = new HashMap<>(subMap);
             // this call adds the remove to the atomic change
             subMap.clear();
             return previous;
@@ -572,7 +572,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public void resolveFromStream(Reader reader) throws IOException
     {
-        final HashMap<String, IValue> flattenedMap = new HashMap<String, IValue>();
+        final HashMap<String, IValue> flattenedMap = new HashMap<>();
         ContextUtils.resolveRecordMapFromStream(reader, flattenedMap);
         final Map<?, ?>[] demergeMaps = ContextUtils.demergeMaps(flattenedMap);
         synchronized (this)
@@ -992,7 +992,7 @@ final class SubMap implements Map<String, IValue>
     {
         return new AbstractSet<String>()
         {
-            final Set<java.util.Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
+            final Set<Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
 
             @Override
             public Iterator<String> iterator()
@@ -1048,9 +1048,9 @@ final class SubMap implements Map<String, IValue>
     @Override
     public Set<Map.Entry<String, IValue>> entrySet()
     {
-        return new AbstractSet<Entry<String, IValue>>()
+        return new AbstractSet<Map.Entry<String, IValue>>()
         {
-            final Set<java.util.Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
+            final Set<Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
 
             @Override
             public Iterator<Entry<String, IValue>> iterator()

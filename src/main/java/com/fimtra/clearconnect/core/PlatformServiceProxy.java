@@ -178,7 +178,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
             {
                 final NotifyingCache<IRpcAvailableListener, IRpcInstance> notifyingCache =
                     this.rpcAvailableNotifyingCache.get();
-                final ConcurrentHashMap<String, IRpcInstance> innerMap = new ConcurrentHashMap<String, IRpcInstance>();
+                final ConcurrentHashMap<String, IRpcInstance> innerMap = new ConcurrentHashMap<>();
                 notifyingCache.addListener(EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
                 {
                     @Override

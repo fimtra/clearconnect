@@ -189,7 +189,7 @@ abstract class RecordTableUtils
             }
             else
             {
-                List<IRecordChange> subsequentChanges = new ArrayList<IRecordChange>(1);
+                List<IRecordChange> subsequentChanges = new ArrayList<>(1);
                 subsequentChanges.add(atomicChange);
                 change.coalesce(subsequentChanges);
             }
@@ -202,9 +202,9 @@ abstract class RecordTableUtils
                     public void run()
                     {
                         final Map<Pair<String, String>, IRecord> recordImages =
-                            new HashMap<Pair<String, String>, IRecord>();
+                            new HashMap<>();
                         final Map<Pair<String, String>, IRecordChange> recordAtomicChanges =
-                            new HashMap<Pair<String, String>, IRecordChange>();
+                            new HashMap<>();
                         synchronized (pendingBatchUpdates)
                         {
                             recordImages.putAll(pendingBatchUpdates);
@@ -275,7 +275,7 @@ abstract class RecordTableUtils
         sorter.modelStructureChanged();
 
         // force sorting when opened
-        List<SortKey> sortKeys = new ArrayList<SortKey>(1);
+        List<SortKey> sortKeys = new ArrayList<>(1);
         sortKeys.add(new SortKey(0, SortOrder.ASCENDING));
         sorter.setSortKeys(sortKeys);
         sorter.sort();
@@ -313,7 +313,7 @@ abstract class RecordTableUtils
     static int deleteIndexedFields(Set<String> fieldsToDelete, List<String> fields,
         Map<String, AtomicInteger> fieldIndexLookupMap)
     {
-        List<String> copy = new ArrayList<String>(fields);
+        List<String> copy = new ArrayList<>(fields);
         fields.clear();
 
         int singleIndex = -1;

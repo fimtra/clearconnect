@@ -610,7 +610,7 @@ public final class PlatformRegistry
                 final String serviceInstanceId =
                     PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
                 final RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(redundancyMode);
-                final Map<String, IValue> serviceRecordStructure = new HashMap<String, IValue>();
+                final Map<String, IValue> serviceRecordStructure = new HashMap<>();
                 serviceRecordStructure.put(ServiceInfoRecordFields.WIRE_PROTOCOL_FIELD,
                     TextValue.valueOf(wireProtocol));
                 serviceRecordStructure.put(ServiceInfoRecordFields.HOST_NAME_FIELD, TextValue.valueOf(host));
@@ -839,7 +839,7 @@ final class EventHandler
 
     static FutureTask<String> createStubFuture(final String serviceInstanceId)
     {
-        final FutureTask<String> futureTask = new FutureTask<String>(new Runnable()
+        final FutureTask<String> futureTask = new FutureTask<>(new Runnable()
         {
             @Override
             public void run()
@@ -886,20 +886,20 @@ final class EventHandler
         this.startTimeMillis = System.currentTimeMillis();
 
         this.servicesRecordSize = new AtomicInteger(0);
-        this.monitoredServiceInstances = new ConcurrentHashMap<RegistrationToken, ProxyContext>();
-        this.connectionMonitors = new ConcurrentHashMap<RegistrationToken, PlatformServiceConnectionMonitor>();
-        this.pendingMasterInstancePerFtService = new ConcurrentHashMap<String, String>();
-        this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<String, FutureTask<String>>();
-        this.pendingPlatformServices = new ConcurrentHashMap<String, IValue>();
-        this.registrationTokenPerInstance = new ConcurrentHashMap<String, RegistrationToken>();
-        this.connectionsPerServiceFamily = new ConcurrentHashMap<String, Set<String>>();
+        this.monitoredServiceInstances = new ConcurrentHashMap<>();
+        this.connectionMonitors = new ConcurrentHashMap<>();
+        this.pendingMasterInstancePerFtService = new ConcurrentHashMap<>();
+        this.confirmedMasterInstancePerFtService = new ConcurrentHashMap<>();
+        this.pendingPlatformServices = new ConcurrentHashMap<>();
+        this.registrationTokenPerInstance = new ConcurrentHashMap<>();
+        this.connectionsPerServiceFamily = new ConcurrentHashMap<>();
 
-        this.pendingPublish = new HashSet<String>();
+        this.pendingPublish = new HashSet<>();
         this.eventCount = new AtomicInteger(0);
         this.publishExecutor =
             new ScheduledThreadPoolExecutor(1, PUBLISH_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
         this.ioExecutor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS,
-            new SynchronousQueue<Runnable>(), IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
+            new SynchronousQueue<>(), IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
     }
 
     void execute(final IDescriptiveRunnable runnable)
@@ -1153,7 +1153,7 @@ final class EventHandler
     Future<String> executeSelectNextInstance(final String serviceFamily)
     {
         final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<Future<String>> result = new AtomicReference<Future<String>>(null);
+        final AtomicReference<Future<String>> result = new AtomicReference<>(null);
         execute(new IDescriptiveRunnable()
         {
             @Override
@@ -1218,7 +1218,7 @@ final class EventHandler
 
     private void computePlatformSummary()
     {
-        final Set<String> hosts = new HashSet<String>();
+        final Set<String> hosts = new HashSet<>();
         final Set<String> agentNames = this.registry.runtimeStatus.getSubMapKeys();
         for (String agentName : agentNames)
         {
@@ -1440,7 +1440,7 @@ final class EventHandler
         // matching connections from the publisher that is now dead
         synchronized(this.connectionsLock)
         {
-            for (String connection : new HashSet<String>(this.registry.platformConnections.getSubMapKeys()))
+            for (String connection : new HashSet<>(this.registry.platformConnections.getSubMapKeys()))
             {
                 final Map<String, IValue> subMap = this.registry.platformConnections.getOrCreateSubMap(connection);
                 final IValue iValue = subMap.get(IContextConnectionsRecordFields.PUBLISHER_ID);
@@ -1478,7 +1478,7 @@ final class EventHandler
 
         // remove the service instance from the instances-per-agent
         Map<String, IValue> instancesPerAgent;
-        Set<String> agentsWithNoServiceInstance = new HashSet<String>();
+        Set<String> agentsWithNoServiceInstance = new HashSet<>();
         for (String agentName : this.registry.serviceInstancesPerAgent.getSubMapKeys())
         {
             // we don't know which agent has it so scan them all
@@ -1907,7 +1907,7 @@ final class EventHandler
         Set<String> connectionIds = this.connectionsPerServiceFamily.get(serviceFamily);
         if (connectionIds == null)
         {
-            connectionIds = new HashSet<String>();
+            connectionIds = new HashSet<>();
             this.connectionsPerServiceFamily.put(serviceFamily, connectionIds);
         }
         connectionIds.addAll(atomicChange.getSubMapKeys());
@@ -2007,8 +2007,8 @@ final class EventHandler
                 this.pendingMasterInstancePerFtService.put(serviceFamily, activeServiceInstanceId)),
             activeServiceInstanceId))
         {
-            final AtomicReference<FutureTask<String>> futureTaskRef = new AtomicReference<FutureTask<String>>();
-            final FutureTask<String> futureTask = new FutureTask<String>(new Runnable()
+            final AtomicReference<FutureTask<String>> futureTaskRef = new AtomicReference<>();
+            final FutureTask<String> futureTask = new FutureTask<>(new Runnable()
             {
                 @Override
                 public void run()
@@ -2178,9 +2178,9 @@ final class EventHandler
                  */
                 if (aggregateValuesAsLongs)
                 {
-                    final Set<String> keysChanged = new HashSet<String>(atomicChange.getPutEntries().keySet());
+                    final Set<String> keysChanged = new HashSet<>(atomicChange.getPutEntries().keySet());
                     keysChanged.addAll(atomicChange.getRemovedEntries().keySet());
-                    Map<String, IValue> additions = new HashMap<String, IValue>();
+                    Map<String, IValue> additions = new HashMap<>();
                     IValue value;
                     for (Iterator<String> iterator = keysChanged.iterator(); iterator.hasNext();)
                     {
@@ -2301,7 +2301,7 @@ final class EventHandler
         // remove the records for this service instance
         final IRecord recordsPerServiceInstance = getRecordsPerServiceInstance(serviceInstanceId);
         AtomicChange removeAllAtomicChange = new AtomicChange(serviceInstanceId, ContextUtils.EMPTY_MAP,
-            ContextUtils.EMPTY_MAP, new HashMap<String, IValue>(recordsPerServiceInstance));
+            ContextUtils.EMPTY_MAP, new HashMap<>(recordsPerServiceInstance));
 
         handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, removeAllAtomicChange,
             recordsPerServiceInstance, getRecordsPerServiceFamily(serviceFamily), true,
@@ -2312,7 +2312,7 @@ final class EventHandler
         // remove the rpcs for this service instance
         final IRecord rpcsPerServiceInstance = getRpcsPerServiceInstance(serviceInstanceId);
         removeAllAtomicChange = new AtomicChange(serviceInstanceId, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP,
-            new HashMap<String, IValue>(rpcsPerServiceInstance));
+            new HashMap<>(rpcsPerServiceInstance));
 
         handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, removeAllAtomicChange,
             rpcsPerServiceInstance, getRpcsPerServiceFamily(serviceFamily), false, IServiceRecordFields.RPC_COUNT);
@@ -2488,7 +2488,7 @@ final class EventHandler
                 serviceMembersForThisService.keySet().toArray(new String[serviceMembersForThisService.keySet().size()]);
 
             final List<Map<String, IValue>> objectsForAllServiceInstancesOfThisService =
-                new ArrayList<Map<String, IValue>>(serviceInstancesNamesForThisServiceArray.length);
+                new ArrayList<>(serviceInstancesNamesForThisServiceArray.length);
             String serviceInstanceId;
             for (int i = 0; i < serviceInstancesNamesForThisServiceArray.length; i++)
             {

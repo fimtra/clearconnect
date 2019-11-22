@@ -50,7 +50,7 @@ public class FileSystemConfigPersist implements IConfigPersist {
 	public Collection<String> getChangedRecordNames() {
 
 		List<File> changedFiles = this.configDirReader.updateRecordFileCache();
-		Collection<String> changedRecordNames = new ArrayList<String>(changedFiles.size());
+		Collection<String> changedRecordNames = new ArrayList<>(changedFiles.size());
 		for (File file : changedFiles) {
 			final String recordNameFromFile = ContextUtils.getRecordNameFromFile(file);
 			if(recordNameFromFile != null)

@@ -49,8 +49,8 @@ import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ICoalescingRunnable;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CollectionUtils;
@@ -245,8 +245,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         ImageCache(int size)
         {
-            this.images = new ConcurrentHashMap<String, Record>(size);
-            this.immutableImages = new ConcurrentHashMap<String, ImmutableRecord>(size);
+            this.images = new ConcurrentHashMap<>(size);
+            this.immutableImages = new ConcurrentHashMap<>(size);
         }
 
         void put(String recordName, Record record)
@@ -371,25 +371,25 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
         this.utilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
         this.recordCreateLock = new Object();
-        this.recordObservers = new SubscriptionManager<String, IRecordListener>(IRecordListener.class);
-        this.recordsToRemoveFromSystemRecords = new HashSet<String>();
+        this.recordObservers = new SubscriptionManager<>(IRecordListener.class);
+        this.recordsToRemoveFromSystemRecords = new HashSet<>();
         this.recordsToRemoveContext = "recordsToRemoveFromSystemRecords:" + name
         // this MUST be added to ensure complete uniqueness for coalescing in case more than one
         // Context share the same name!
             + "-" + UUID.randomUUID();
 
         final int initialSize = 1024;
-        this.sequences = new ConcurrentHashMap<String, AtomicLong>(initialSize);
+        this.sequences = new ConcurrentHashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
-        this.records = new ConcurrentHashMap<String, IRecord>(initialSize);
-        this.pendingAtomicChanges = new ConcurrentHashMap<String, AtomicChange>(initialSize);
-        this.tokenPerRecord = new ConcurrentHashMap<String, String>(initialSize);
-        this.coalescingChanges = new ConcurrentHashMap<String, List<IRecordChange>>(initialSize);
-        this.rpcInstances = new ConcurrentHashMap<String, IRpcInstance>();
-        this.validators = new CopyOnWriteArraySet<IValidator>();
+        this.records = new ConcurrentHashMap<>(initialSize);
+        this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
+        this.tokenPerRecord = new ConcurrentHashMap<>(initialSize);
+        this.coalescingChanges = new ConcurrentHashMap<>(initialSize);
+        this.rpcInstances = new ConcurrentHashMap<>();
+        this.validators = new CopyOnWriteArraySet<>();
         
         this.listenersToNotifyWithInitialImages =
-            Collections.synchronizedMap(new HashMap<IRecordListener, Set<String>>());
+            Collections.synchronizedMap(new HashMap<>());
 
         // create the special records by hand
         createSystemRecord(ISystemRecordNames.CONTEXT_RECORDS);
@@ -754,13 +754,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new IllegalArgumentException("Null or zero-length subscriptions " + Arrays.toString(recordNames));
         }
 
-        final Map<String, Boolean> resultMap = new HashMap<String, Boolean>(recordNames.length);
-        final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<Map<String, Boolean>>(new Runnable()
+        final Map<String, Boolean> resultMap = new HashMap<>(recordNames.length);
+        final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<>(new Runnable()
         {
             @Override
             public void run()
             {
-                final List<String> permissionedRecords = new LinkedList<String>();
+                final List<String> permissionedRecords = new LinkedList<>();
                 for (int i = 0; i < recordNames.length; i++)
                 {
                     if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
@@ -799,7 +799,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
                 else
                 {
-                    initialImagePending = Collections.synchronizedSet(new HashSet<String>());
+                    initialImagePending = Collections.synchronizedSet(new HashSet<>());
                     this.listenersToNotifyWithInitialImages.put(observer, initialImagePending);
                 }
                 this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
@@ -807,7 +807,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
             // first pass, whilst holding the initialImagePending lock, work out if the listener
             // needs to be added
-            final List<String> subscriberAdded = new LinkedList<String>();
+            final List<String> subscriberAdded = new LinkedList<>();
             synchronized (initialImagePending)
             {
                 for (String name : recordNames)
@@ -918,7 +918,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
             }
 
-            final List<String> toRemove = new LinkedList<String>();
+            final List<String> toRemove = new LinkedList<>();
             String name;
             for (int i = 0; i < names.length; i++)
             {
@@ -946,7 +946,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     void addDeltaToSubscriptionCount(final int delta, final Collection<String> recordNames)
     {
-        final Map<String, LongValue> countsPerRecord = new HashMap<String, LongValue>(recordNames.size());
+        final Map<String, LongValue> countsPerRecord = new HashMap<>(recordNames.size());
         final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         if (isSystemRecordReady(contextSubscriptions))
         {
@@ -1338,7 +1338,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             // work out who to notify, i.e. listeners NOT expecting an image
             Set<String> initialImagePending;
-            final List<IRecordListener> listenersNotExpectingImage = new LinkedList<IRecordListener>();
+            final List<IRecordListener> listenersNotExpectingImage = new LinkedList<>();
             for (int i = 0; i < listenersToNotify.length; i++)
             {
                 listener = listenersToNotify[i];

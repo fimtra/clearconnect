@@ -45,7 +45,7 @@ class ContextThrottle
     {
         this.threshold = threshold;
         this.eventCount = eventCount;
-        this.exemptThreads = Collections.synchronizedMap(new HashMap<Long, Long>());
+        this.exemptThreads = Collections.synchronizedMap(new HashMap<>());
     }
 
     /**

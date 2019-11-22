@@ -70,7 +70,7 @@ public abstract class BootstrapUtils {
 		if (registryConfigString == null) {
 			registryConfigString = initProperties.getProperty(initKeyRegstryEndPointAddresses);
 		}
-		List<EndPointAddress> registryEndPoints = new ArrayList<EndPointAddress>();
+		List<EndPointAddress> registryEndPoints = new ArrayList<>();
 		if (registryConfigString == null || registryConfigString.isEmpty()) {
 			registryEndPoints.add(new EndPointAddress(TcpChannelUtils.LOCALHOST_IP, PlatformCoreProperties.Values.REGISTRY_PORT));
 		} else {

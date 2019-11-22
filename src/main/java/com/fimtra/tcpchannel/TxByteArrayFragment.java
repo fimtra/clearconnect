@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 
 /**
@@ -32,24 +31,16 @@ final class TxByteArrayFragment extends ByteArrayFragment
     final static AtomicInteger ID_COUNTER = new AtomicInteger();
 
     final static MultiThreadReusableObjectPool<TxByteArrayFragment> TX_FRAGMENTS_POOL =
-        new MultiThreadReusableObjectPool<TxByteArrayFragment>("TxFragmentPool",
-            new IReusableObjectBuilder<TxByteArrayFragment>()
+        new MultiThreadReusableObjectPool<>("TxFragmentPool", new IReusableObjectBuilder<TxByteArrayFragment>()
+        {
+            @Override
+            public TxByteArrayFragment newInstance()
             {
-                @Override
-                public TxByteArrayFragment newInstance()
-                {
-                    final TxByteArrayFragment txByteArrayFragment = new TxByteArrayFragment(0, 0, (byte) 0, null, 0, 0);
-                    txByteArrayFragment.poolRef = TX_FRAGMENTS_POOL;
-                    return txByteArrayFragment;
-                }
-            }, new IReusableObjectFinalizer<TxByteArrayFragment>()
-            {
-                @Override
-                public void reset(TxByteArrayFragment instance)
-                {
-                    instance.reset();
-                }
-            }, TcpChannelProperties.Values.TX_FRAGMENT_POOL_MAX_SIZE);
+                final TxByteArrayFragment txByteArrayFragment = new TxByteArrayFragment(0, 0, (byte) 0, null, 0, 0);
+                txByteArrayFragment.poolRef = TX_FRAGMENTS_POOL;
+                return txByteArrayFragment;
+            }
+        }, (instance) -> instance.reset(), TcpChannelProperties.Values.TX_FRAGMENT_POOL_MAX_SIZE);
 
     /**
      * Break the byte[] into fragments.

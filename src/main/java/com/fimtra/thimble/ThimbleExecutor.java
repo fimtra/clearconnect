@@ -64,7 +64,7 @@ public final class ThimbleExecutor implements IContextExecutor
         return Collections.unmodifiableSet(EXECUTORS);
     }
 
-    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<ThimbleExecutor>());
+    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
 
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
@@ -248,7 +248,7 @@ public final class ThimbleExecutor implements IContextExecutor
             final String threadName = this.name + i;
             this.taskRunners.offer(new TaskRunner(threadName));
         }
-        this.taskRunnersRef = new ArrayList<TaskRunner>(this.taskRunners);
+        this.taskRunnersRef = new ArrayList<>(this.taskRunners);
         EXECUTORS.add(this);
     }
 

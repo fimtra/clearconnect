@@ -150,7 +150,7 @@ public final class ColumnOrientedRecordTable extends JTable implements ICellUpda
     {
         try
         {
-            final Map<String, Integer> widths = new HashMap<String, Integer>();
+            final Map<String, Integer> widths = new HashMap<>();
             getTableHeader().getColumnModel().addColumnModelListener(new TableColumnModelListener()
             {
 

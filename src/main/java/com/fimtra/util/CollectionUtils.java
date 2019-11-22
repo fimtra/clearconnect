@@ -81,7 +81,7 @@ public abstract class CollectionUtils
         }
 
         @Override
-        public Iterator<java.util.Map.Entry<K, V>> iterator()
+        public Iterator<Map.Entry<K, V>> iterator()
         {
             return new Iterator<Map.Entry<K, V>>()
             {
@@ -96,7 +96,7 @@ public abstract class CollectionUtils
                 @Override
                 public java.util.Map.Entry<K, V> next()
                 {
-                    return new UnmodifiableEntry<K, V>(this.backingIterator.next());
+                    return new UnmodifiableEntry<>(this.backingIterator.next());
                 }
 
                 @Override
@@ -124,7 +124,7 @@ public abstract class CollectionUtils
      */
     public static final <T> Deque<T> newDeque()
     {
-        return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcLinkedList<T>() : new LinkedList<T>();
+        return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcLinkedList<>() : new LinkedList<>();
     }
 
     /**
@@ -150,7 +150,7 @@ public abstract class CollectionUtils
             return Collections.emptySet();
         }
         final String[] split = tokenSeparatedList.split(tokenSeparator);
-        final Set<String> set = new HashSet<String>(split.length);
+        final Set<String> set = new HashSet<>(split.length);
         for (int i = 0; i < split.length; i++)
         {
             set.add(split[i].trim());
@@ -178,7 +178,7 @@ public abstract class CollectionUtils
      */
     public static <T> Set<T> newHashSet(Collection<T> c)
     {
-        return new HashSet<T>(c);
+        return new HashSet<>(c);
     }
     
     /**
@@ -202,7 +202,7 @@ public abstract class CollectionUtils
      */
     public static <K, V> Map<K, V> newMap(int size)
     {
-        return new HashMap<K, V>(size);
+        return new HashMap<>(size);
     }
 
     /**
@@ -214,6 +214,6 @@ public abstract class CollectionUtils
      */
     public static <K, V> Map<K, V> newMap(Map<K, V> data)
     {
-        return new HashMap<K, V>(data);
+        return new HashMap<>(data);
     }
 }

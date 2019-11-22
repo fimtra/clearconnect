@@ -86,17 +86,17 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
 
     public ColumnOrientedRecordTableModel()
     {
-        this.recordIndexByName = new HashMap<Pair<String, String>, Integer>();
-        this.records = new ArrayList<IRecord>();
-        this.fieldIndexes = new ArrayList<String>();
-        this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
-        this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
+        this.recordIndexByName = new HashMap<>();
+        this.records = new ArrayList<>();
+        this.fieldIndexes = new ArrayList<>();
+        this.fieldIndexLookupMap = new HashMap<>();
+        this.recordRemovedListeners = new ConcurrentHashMap<>();
 
         this.batchUpdateScheduled = new AtomicBoolean();
-        this.pendingBatchUpdates = new HashMap<Pair<String, String>, IRecord>();
-        this.pendingBatchAtomicChanges = new HashMap<Pair<String, String>, IRecordChange>();
+        this.pendingBatchUpdates = new HashMap<>();
+        this.pendingBatchAtomicChanges = new HashMap<>();
 
-        final ArrayList<Integer> inserts = new ArrayList<Integer>();
+        final ArrayList<Integer> inserts = new ArrayList<>();
         checkAddFieldRow(RecordTableUtils.CONTEXT, inserts);
         if (inserts.size() > 0)
         {
@@ -227,8 +227,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
     public void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
         Map<Pair<String, String>, IRecordChange> recordAtomicChanges)
     {
-        final Set<String> fieldsToDelete = new HashSet<String>();
-        final List<Integer> inserts = new ArrayList<Integer>();
+        final Set<String> fieldsToDelete = new HashSet<>();
+        final List<Integer> inserts = new ArrayList<>();
 
         Map.Entry<Pair<String, String>, IRecord> entry = null;
         Pair<String, String> nameAndContext = null;
@@ -369,7 +369,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 if (index != null)
                 {
                     final IRecord removed = ColumnOrientedRecordTableModel.this.records.remove(index.intValue());
-                    removeRows(new HashSet<String>(), removed.keySet());
+                    removeRows(new HashSet<>(), removed.keySet());
 
                     // rebuild indexes
                     ColumnOrientedRecordTableModel.this.recordIndexByName.clear();

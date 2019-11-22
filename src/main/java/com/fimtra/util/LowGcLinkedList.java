@@ -829,7 +829,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         }
         else
         {
-            node = new Node<E>();
+            node = new Node<>();
         }
         node.prev = prev;
         node.next = next;

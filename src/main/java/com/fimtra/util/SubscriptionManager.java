@@ -144,7 +144,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
             return false;
         }
         List<SUBSCRIBER> list = Arrays.asList(current);
-        List<SUBSCRIBER> copy = new ArrayList<SUBSCRIBER>(list);
+        List<SUBSCRIBER> copy = new ArrayList<>(list);
         final boolean removed = copy.remove(subscriber);
         if (copy.size() > 0)
         {

@@ -53,7 +53,7 @@ abstract class ByteArrayFragmentResolver
 
     private ByteArrayFragmentResolver()
     {
-        this.fragments = new HashMap<ByteArrayFragment, ByteArrayFragment>();
+        this.fragments = new HashMap<>();
     }
 
     @SuppressWarnings("synthetic-access")

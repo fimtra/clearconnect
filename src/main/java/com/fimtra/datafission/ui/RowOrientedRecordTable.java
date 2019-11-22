@@ -89,7 +89,7 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
         try
         {
             final AtomicBoolean stuctureChanged = new AtomicBoolean();
-            Map<String, Integer> widths = new HashMap<String, Integer>();
+            Map<String, Integer> widths = new HashMap<>();
             final String[] tokens = stateString.split(",");
             String columnName;
             for (int i = 0; i < tokens.length; i++)

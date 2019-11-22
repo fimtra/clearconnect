@@ -29,7 +29,7 @@ public abstract class CharSubArrayKeyedPool<T>
 
     public CharSubArrayKeyedPool(String name, int poolSize, KeyedObjectPool<String, T> objectPool)
     {
-        this.pool = new KeyedObjectPool<CharSubArray, T>(name, poolSize);
+        this.pool = new KeyedObjectPool<>(name, poolSize);
         this.objectPool = objectPool;
     }
 

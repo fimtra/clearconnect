@@ -68,8 +68,6 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.ByteArrayPool;
-import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.NotifyingCache;
@@ -269,14 +267,14 @@ public final class ProxyContext implements IObserverContext
     static
     {
         Map<String, String> mapping = null;
-        mapping = new HashMap<String, String>();
+        mapping = new HashMap<>();
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, ISystemRecordNames.CONTEXT_RPCS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, ISystemRecordNames.CONTEXT_RECORDS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS, ISystemRecordNames.CONTEXT_CONNECTIONS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         remoteToLocalSystemRecordNameConversions = Collections.unmodifiableMap(mapping);
 
-        mapping = new HashMap<String, String>();
+        mapping = new HashMap<>();
         mapping.put(ISystemRecordNames.CONTEXT_RPCS, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         mapping.put(ISystemRecordNames.CONTEXT_RECORDS, IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
         mapping.put(ISystemRecordNames.CONTEXT_CONNECTIONS, IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS);
@@ -311,7 +309,7 @@ public final class ProxyContext implements IObserverContext
     static String[] getEligibleRecords(SubscriptionManager<String, IRecordListener> subscriptionManager, int count,
         String... recordNames)
     {
-        final List<String> records = new ArrayList<String>(recordNames.length);
+        final List<String> records = new ArrayList<>(recordNames.length);
         for (int i = 0; i < recordNames.length; i++)
         {
             if (!ContextUtils.isSystemRecordName(recordNames[i])
@@ -750,22 +748,8 @@ public final class ProxyContext implements IObserverContext
     }
 
     static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
-        new MultiThreadReusableObjectPool<RxFrameHandler>("ProxyContext-RxFrameHandlerPool",
-            new IReusableObjectBuilder<RxFrameHandler>()
-            {
-                @Override
-                public RxFrameHandler newInstance()
-                {
-                    return new RxFrameHandler();
-                }
-            }, new IReusableObjectFinalizer<RxFrameHandler>()
-            {
-                @Override
-                public void reset(RxFrameHandler instance)
-                {
-                    instance.clear();
-                }
-            }, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
+        new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", () -> new RxFrameHandler(),
+            (instance) -> instance.clear(), DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
 
     final Object lock;
     volatile boolean active;
@@ -881,7 +865,7 @@ public final class ProxyContext implements IObserverContext
         super();
         this.codec = codec;
         this.sessionContextName = sessionContextName;
-        this.rpcTemplates = new ConcurrentHashMap<String, RpcInstance>();
+        this.rpcTemplates = new ConcurrentHashMap<>();
 
         this.sessionListener = new ISessionListener()
         {
@@ -889,7 +873,7 @@ public final class ProxyContext implements IObserverContext
             public void onSessionOpen(String sessionContext, String sessionId)
             {
                 ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext,
-                    new Pair<String, Boolean>(sessionId, Boolean.TRUE));
+                    new Pair<>(sessionId, Boolean.TRUE));
             }
 
             @Override
@@ -897,7 +881,7 @@ public final class ProxyContext implements IObserverContext
             {
                 // NOTE: we use the ADDED events to trigger notification of listeners
                 ProxyContext.this.sessionCache.notifyListenersDataAdded(sessionContext,
-                    new Pair<String, Boolean>(sessionId, Boolean.FALSE));
+                    new Pair<>(sessionId, Boolean.FALSE));
             }
         };
         this.sessionCache = new NotifyingCache<ISessionListener, Pair<String, Boolean>>()
@@ -924,14 +908,14 @@ public final class ProxyContext implements IObserverContext
         this.context = new Context(name);
         this.lock = new Object();
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
-        this.actionSubscribeResults = new ConcurrentHashMap<CountDownLatch, Map<String, Boolean>>();
-        this.actionResponseLatches = new ConcurrentHashMap<String, Queue<CountDownLatch>>();
+        this.actionSubscribeResults = new ConcurrentHashMap<>();
+        this.actionResponseLatches = new ConcurrentHashMap<>();
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
-        this.tokenPerRecord = new ConcurrentHashMap<String, String>();
-        this.resyncs = Collections.synchronizedSet(new HashSet<String>());
+        this.tokenPerRecord = new ConcurrentHashMap<>();
+        this.resyncs = Collections.synchronizedSet(new HashSet<>());
         // note: unsynchronized
-        this.firstUpdateExpected = new HashSet<String>();
+        this.firstUpdateExpected = new HashSet<>();
 
         // add default permissions for system records
         for (String recordName : ContextUtils.SYSTEM_RECORDS)
@@ -1063,7 +1047,7 @@ public final class ProxyContext implements IObserverContext
     public IRecord getRemoteRecordImage(final String recordName, long timeoutMillis)
     {
         final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<IRecord> image = new AtomicReference<IRecord>();
+        final AtomicReference<IRecord> image = new AtomicReference<>();
         final IRecordListener observer = new IRecordListener()
         {
             @Override
@@ -1144,9 +1128,9 @@ public final class ProxyContext implements IObserverContext
     public Future<Map<String, Boolean>> addObserver(final String permissionToken, IRecordListener observer,
         String... recordNames)
     {
-        final Map<String, Boolean> subscribeResults = new HashMap<String, Boolean>(recordNames.length);
+        final Map<String, Boolean> subscribeResults = new HashMap<>(recordNames.length);
 
-        final RunnableFuture<Map<String, Boolean>> futureResult = new FutureTask<Map<String, Boolean>>(new Runnable()
+        final RunnableFuture<Map<String, Boolean>> futureResult = new FutureTask<>(new Runnable()
         {
             @Override
             public void run()
@@ -1443,7 +1427,7 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        final List<String> recordNames = new ArrayList<String>(changeToApply.getPutEntries().keySet());
+        final List<String> recordNames = new ArrayList<>(changeToApply.getPutEntries().keySet());
         final String action = changeName.substring(ACK_LEN);
         // always ensure a NOK is logged
         if (!log && !logRx && !subscribeResult.booleanValue())
@@ -1767,7 +1751,7 @@ public final class ProxyContext implements IObserverContext
         Queue<CountDownLatch> pending;
         for (int i = 0; i < recordNames.length; i++)
         {
-            pending = new ConcurrentLinkedQueue<CountDownLatch>();
+            pending = new ConcurrentLinkedQueue<>();
             latches = this.actionResponseLatches.putIfAbsent(action + recordNames[i], pending);
             if (latches == null)
             {
@@ -1815,7 +1799,7 @@ public final class ProxyContext implements IObserverContext
     void subscribe(final String permissionToken, final String[] recordsToSubscribeFor)
     {
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
-        List<String> batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+        List<String> batchSubscribeRecordNames = new ArrayList<>(batchSize);
         final int size = recordsToSubscribeFor.length;
         int i;
         for (i = 0; i < size; i++)
@@ -1824,7 +1808,7 @@ public final class ProxyContext implements IObserverContext
             {
                 subscribeBatch(permissionToken,
                     batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
-                batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchSubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
         }
@@ -1868,7 +1852,7 @@ public final class ProxyContext implements IObserverContext
     void unsubscribe(final String[] recordsToUnsubscribe)
     {
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
-        List<String> batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
+        List<String> batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
         final int size = recordsToUnsubscribe.length;
         int i;
         for (i = 0; i < size; i++)
@@ -1877,7 +1861,7 @@ public final class ProxyContext implements IObserverContext
             {
                 unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
                     size);
-                batchUnsubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
         }
@@ -1923,7 +1907,7 @@ public final class ProxyContext implements IObserverContext
 
     void doResubscribe(final String[] recordNamesToSubscribeFor)
     {
-        final Map<String, List<String>> recordsPerToken = new HashMap<String, List<String>>();
+        final Map<String, List<String>> recordsPerToken = new HashMap<>();
         String token = null;
         List<String> records;
 
@@ -1936,7 +1920,7 @@ public final class ProxyContext implements IObserverContext
                 records = recordsPerToken.get(token);
                 if (records == null)
                 {
-                    records = new ArrayList<String>();
+                    records = new ArrayList<>();
                     recordsPerToken.put(token, records);
                 }
                 records.add(recordName);

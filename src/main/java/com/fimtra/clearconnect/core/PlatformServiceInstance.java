@@ -136,7 +136,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.ftStatusListeners = new CopyOnWriteArrayList<IFtStatusListener>();
+            this.ftStatusListeners = new CopyOnWriteArrayList<>();
         }
         else
         {

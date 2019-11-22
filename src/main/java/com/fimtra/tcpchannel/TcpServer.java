@@ -66,9 +66,9 @@ import com.fimtra.util.UtilProperties;
  */
 public class TcpServer implements IEndPointService
 {
-    static final ConcurrentMap<String, Boolean> BLACKLISTED_HOSTS = new ConcurrentHashMap<String, Boolean>();
-    static final ConcurrentMap<String, Boolean> BLOCKED_HOSTS = new ConcurrentHashMap<String, Boolean>();
-    static final ConcurrentMap<String, AtomicInteger> CONNECTING_HOSTS = new ConcurrentHashMap<String, AtomicInteger>();
+    static final ConcurrentMap<String, Boolean> BLACKLISTED_HOSTS = new ConcurrentHashMap<>();
+    static final ConcurrentMap<String, Boolean> BLOCKED_HOSTS = new ConcurrentHashMap<>();
+    static final ConcurrentMap<String, AtomicInteger> CONNECTING_HOSTS = new ConcurrentHashMap<>();
     static
     {
         if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
@@ -89,7 +89,7 @@ public class TcpServer implements IEndPointService
                         {
                             pw = new PrintWriter(new FileWriter(this.serverConnectionsFile));
                             pw.println("HOST IP, CONNECTION COUNT, BLOCKED, BLACKLISTED");
-                            final List<String> sortedIps = new LinkedList<String>(CONNECTING_HOSTS.keySet());
+                            final List<String> sortedIps = new LinkedList<>(CONNECTING_HOSTS.keySet());
                             for (String IP : sortedIps)
                             {
                                 pw.print(IP);
@@ -123,18 +123,18 @@ public class TcpServer implements IEndPointService
     final ServerSocketChannel serverSocketChannel;
 
     final Map<ITransportChannel, Pair<String, Long>> clients =
-        Collections.synchronizedMap(new HashMap<ITransportChannel, Pair<String, Long>>());
+        Collections.synchronizedMap(new HashMap<>());
 
     /**
      * Key=host IP, value=number of short-lived socket connections<br>
      * Synchronise access using {@link #blacklistHosts}.
      */
-    final Map<String, AtomicLong> shortLivedSocketCountPerHost = new HashMap<String, AtomicLong>();
+    final Map<String, AtomicLong> shortLivedSocketCountPerHost = new HashMap<>();
     /**
      * Key=host IP, value=system time IP was blacklisted<br>
      * Synchronise access using {@link #blacklistHosts}.
      */
-    final Map<String, Long> blacklistHosts = new HashMap<String, Long>();
+    final Map<String, Long> blacklistHosts = new HashMap<>();
 
     final InetSocketAddress localSocketAddress;
 
@@ -312,7 +312,7 @@ public class TcpServer implements IEndPointService
                                 }
                             }
                         }, clientSocketRxBufferSize, frameEncodingFormat),
-                            new Pair<String, Long>(hostAddress, Long.valueOf(System.currentTimeMillis())));
+                            new Pair<>(hostAddress, Long.valueOf(System.currentTimeMillis())));
                     }
                     catch (Exception e)
                     {
@@ -357,7 +357,7 @@ public class TcpServer implements IEndPointService
 
     private static Set<? extends Pattern> constructPatterns(Set<String> set)
     {
-        Set<Pattern> patterns = new HashSet<Pattern>(set.size());
+        Set<Pattern> patterns = new HashSet<>(set.size());
         for (String template : set)
         {
             patterns.add(Pattern.compile(template));
@@ -388,7 +388,7 @@ public class TcpServer implements IEndPointService
         final Set<ITransportChannel> connections;
         synchronized (this.clients)
         {
-            connections = new HashSet<ITransportChannel>(this.clients.keySet());
+            connections = new HashSet<>(this.clients.keySet());
         }
         for (ITransportChannel client : connections)
         {

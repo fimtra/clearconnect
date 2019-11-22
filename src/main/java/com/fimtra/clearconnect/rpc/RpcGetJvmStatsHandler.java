@@ -54,7 +54,7 @@ public class RpcGetJvmStatsHandler implements IRpcExecutionHandler {
 		statsBuilder.append(freeMemoryLabel).append(freeMemoryMegaBytes).append(SystemUtils.lineSeparator());
 		statsBuilder.append(noProcessorsLabel).append(processorCount).append(SystemUtils.lineSeparator());
 		statsBuilder.append(SystemUtils.lineSeparator()).append(sysPropertiesLabel).append(SystemUtils.lineSeparator());
-		for (String systemPropertyKey : new TreeSet<String>(systemProperties.stringPropertyNames())) {
+		for (String systemPropertyKey : new TreeSet<>(systemProperties.stringPropertyNames())) {
 			statsBuilder.append(systemPropertyKey).append(": ").append(systemProperties.getProperty(systemPropertyKey))
 					.append(SystemUtils.lineSeparator());
 		}

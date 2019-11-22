@@ -95,7 +95,7 @@ class ConfigDirReader {
 
 	ConfigDirReader(File configDir) {
 		this.configDir = configDir;
-		this.fileCache = new HashMap<File, FileMetaData>();
+		this.fileCache = new HashMap<>();
 	}
 
 	/**
@@ -124,7 +124,7 @@ class ConfigDirReader {
 
 	private Set<File> setWithCachedFiles() {
 		if (this.deletedFilesCollection == null) {
-			this.deletedFilesCollection = new HashSet<File>(this.fileCache.keySet());
+			this.deletedFilesCollection = new HashSet<>(this.fileCache.keySet());
 			return this.deletedFilesCollection;
 		}
 		this.deletedFilesCollection.clear();
@@ -134,7 +134,7 @@ class ConfigDirReader {
 
 	private List<File> emptyChangedFiles(final File[] propertyFiles) {
 		if (this.changedFilesCollection == null) {
-			this.changedFilesCollection = new ArrayList<File>(propertyFiles.length);
+			this.changedFilesCollection = new ArrayList<>(propertyFiles.length);
 			return this.changedFilesCollection;
 		}
 		this.changedFilesCollection.clear();
@@ -143,7 +143,7 @@ class ConfigDirReader {
 
 	private List<File> emptyAllFiles(final File[] propertyFiles) {
 		if (this.allFilesCollection == null) {
-			this.allFilesCollection = new ArrayList<File>(propertyFiles.length);
+			this.allFilesCollection = new ArrayList<>(propertyFiles.length);
 			return this.allFilesCollection;
 		}
 		this.allFilesCollection.clear();

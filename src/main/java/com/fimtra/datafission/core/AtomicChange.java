@@ -132,8 +132,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     };
 
     final String name;
-    AtomicReference<Character> scope = new AtomicReference<Character>(DELTA_SCOPE);
-    AtomicReference<Long> sequence = new AtomicReference<Long>(Long.valueOf(-1));
+    AtomicReference<Character> scope = new AtomicReference<>(DELTA_SCOPE);
+    AtomicReference<Long> sequence = new AtomicReference<>(Long.valueOf(-1));
 
     Map<String, IValue> putEntries;
     Map<String, IValue> overwrittenEntries;
@@ -306,8 +306,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         final Map<String, IValue> putEntries = CollectionUtils.newMap();
         final Map<String, IValue> overwrittenEntries = CollectionUtils.newMap();
         final Map<String, IValue> removedEntries = CollectionUtils.newMap();
-        final Set<String> ultimatelyRemovedKeys = new HashSet<String>();
-        final Set<String> ultimatelyAddedKeys = new HashSet<String>();
+        final Set<String> ultimatelyRemovedKeys = new HashSet<>();
+        final Set<String> ultimatelyAddedKeys = new HashSet<>();
         Map<String, IValue> newPutEntries;
         Map<String, IValue> newOverwrittenEntries;
         Map<String, IValue> newRemovedEntries;
@@ -399,7 +399,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             {
                 if (subMapChangesToMerge == null)
                 {
-                    subMapChangesToMerge = new HashMap<String, List<IRecordChange>>();
+                    subMapChangesToMerge = new HashMap<>();
                 }
                 for (subMapKeysToMergeIterator = subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext();)
                 {
@@ -407,7 +407,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                     subMapChangesList = subMapChangesToMerge.get(subMapKey);
                     if (subMapChangesList == null)
                     {
-                        subMapChangesList = new ArrayList<IRecordChange>(1);
+                        subMapChangesList = new ArrayList<>(1);
                         subMapChangesToMerge.put(subMapKey, subMapChangesList);
                     }
                     subMapChangesList.add(subsequentChange.getSubMapAtomicChange(subMapKey));
@@ -611,7 +611,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             if (this.subMapAtomicChanges == null)
             {
-                this.subMapAtomicChanges = new HashMap<String, AtomicChange>(4);
+                this.subMapAtomicChanges = new HashMap<>(4);
             }
             AtomicChange subMapAtomicChange = this.subMapAtomicChanges.get(subMapKey);
             if (subMapAtomicChange == null)

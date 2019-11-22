@@ -20,7 +20,6 @@ import java.nio.charset.Charset;
 
 import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
 
@@ -40,24 +39,17 @@ class ByteArrayFragment
     static final Charset UTF8 = Charset.forName("UTF-8");
 
     static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
-        new MultiThreadReusableObjectPool<ByteArrayFragment>("RxFragmentPool",
-            new IReusableObjectBuilder<ByteArrayFragment>()
+        new MultiThreadReusableObjectPool<>("RxFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
+        {
+            @Override
+            public ByteArrayFragment newInstance()
             {
-                @Override
-                public ByteArrayFragment newInstance()
-                {
-                    final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
-                    byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL;
-                    return byteArrayFragment;
-                }
-            }, new IReusableObjectFinalizer<ByteArrayFragment>()
-            {
-                @Override
-                public void reset(ByteArrayFragment instance)
-                {
-                    instance.initialise(-1, -1, (byte) -1, null, -1, -1);
-                }
-            }, TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
+                final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
+                byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL;
+                return byteArrayFragment;
+            }
+        }, (instance) -> instance.initialise(-1, -1, (byte) -1, null, -1, -1),
+            TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
     
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}

@@ -54,7 +54,7 @@ public class BenchmarkPublisher
             new Publisher(context, new StringProtocolCodec(), args.length == 0 ? TcpChannelUtils.LOCALHOST_IP : args[0],
                 22222);
 
-        final AtomicReference<CountDownLatch> runLatch = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> runLatch = new AtomicReference<>();
 
         // this RPC is called by the subscriber after each run completes
         context.createRpc(new RpcInstance(new IRpcExecutionHandler()

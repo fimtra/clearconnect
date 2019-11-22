@@ -84,6 +84,7 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei, Paul Mackinlay
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class PlatformUtils
 {
     public final static String VERSION;
@@ -120,7 +121,7 @@ public class PlatformUtils
 
         StringBuilder sb = new StringBuilder();
         sb.append(newline).append("============ START System Properties ============").append(newline);
-        TreeSet<String> sortedKeys = new TreeSet<String>();
+        TreeSet<String> sortedKeys = new TreeSet<>();
         final Enumeration<Object> keys = System.getProperties().keys();
         while (keys.hasMoreElements())
         {
@@ -137,8 +138,9 @@ public class PlatformUtils
         sb.append("ClearConnect ").append(version).append(newline);
         sb.append(newline).append("Licensed under the Apache License, Version 2.0 (the \"License\");").append(newline);
         sb.append("\thttp://www.apache.org/licenses/LICENSE-2.0").append(newline);
-        sb.append(newline).append("Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
-            newline).append(newline);
+        sb.append(newline).append(
+            "Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
+                newline).append(newline);
 
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
@@ -210,18 +212,11 @@ public class PlatformUtils
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
         final IObserverContext context, final String servicesRecordName, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
             new NotifyingCache<IServiceAvailableListener, String>(
-                new IDestructor<NotifyingCache<IServiceAvailableListener, String>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IServiceAvailableListener, String> ref)
-                    {
-                        context.removeObserver(listenerReference.get(), servicesRecordName);
-                    }
-                })
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), servicesRecordName))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -241,7 +236,7 @@ public class PlatformUtils
             public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
                 final Set<String> newServices = atomicChange.getPutEntries().keySet();
-                final List<String> toLog = new LinkedList<String>();
+                final List<String> toLog = new LinkedList<>();
                 for (String serviceFamily : newServices)
                 {
                     if (ContextUtils.isSystemRecordName(serviceFamily))
@@ -289,18 +284,12 @@ public class PlatformUtils
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
         final IObserverContext context, final String serviceInstancesPerServiceRecordName, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
             new NotifyingCache<IServiceInstanceAvailableListener, String>(
-                new IDestructor<NotifyingCache<IServiceInstanceAvailableListener, String>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IServiceInstanceAvailableListener, String> ref)
-                    {
-                        context.removeObserver(listenerReference.get(), serviceInstancesPerServiceRecordName);
-                    }
-                })
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(),
+                    serviceInstancesPerServiceRecordName))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -362,18 +351,11 @@ public class PlatformUtils
     static NotifyingCache<IRecordAvailableListener, String> createRecordAvailableNotifyingCache(
         final IObserverContext context, final String contextRecordsRecordName, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordAvailableListener, String> recordAvailableNotifyingCache =
             new NotifyingCache<IRecordAvailableListener, String>(
-                new IDestructor<NotifyingCache<IRecordAvailableListener, String>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IRecordAvailableListener, String> ref)
-                    {
-                        context.removeObserver(listenerReference.get(), contextRecordsRecordName);
-                    }
-                })
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), contextRecordsRecordName))
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordAvailableListener listener, String key, String data)
@@ -418,18 +400,11 @@ public class PlatformUtils
     static NotifyingCache<IRpcAvailableListener, IRpcInstance> createRpcAvailableNotifyingCache(
         final IObserverContext context, final String contextRpcRecordName, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRpcAvailableListener, IRpcInstance> rpcAvailableNotifyingCache =
             new NotifyingCache<IRpcAvailableListener, IRpcInstance>(
-                new IDestructor<NotifyingCache<IRpcAvailableListener, IRpcInstance>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IRpcAvailableListener, IRpcInstance> ref)
-                    {
-                        context.removeObserver(listenerReference.get(), contextRpcRecordName);
-                    }
-                })
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), contextRpcRecordName))
             {
                 @Override
                 protected void notifyListenerDataAdded(IRpcAvailableListener listener, String key, IRpcInstance data)
@@ -491,18 +466,11 @@ public class PlatformUtils
     static NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> createSubscriptionNotifyingCache(
         final IObserverContext context, final String contextSubscriptionsRecordName, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> subscriptionNotifyingCache =
             new NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>(
-                new IDestructor<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo> ref)
-                    {
-                        context.removeObserver(listenerReference.get(), contextSubscriptionsRecordName);
-                    }
-                })
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), contextSubscriptionsRecordName))
             {
                 @Override
                 protected void notifyListenerDataAdded(IRecordSubscriptionListener listener, String key,
@@ -566,19 +534,12 @@ public class PlatformUtils
     static NotifyingCache<IRecordConnectionStatusListener, IValue> createRecordConnectionStatusNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IRecordConnectionStatusListener, IValue> recordStatusNotifyingCache =
             new NotifyingCache<IRecordConnectionStatusListener, IValue>(
-                new IDestructor<NotifyingCache<IRecordConnectionStatusListener, IValue>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IRecordConnectionStatusListener, IValue> ref)
-                    {
-                        proxyContext.removeObserver(listenerReference.get(),
-                            ProxyContext.RECORD_CONNECTION_STATUS_NAME);
-                    }
-                })
+                (IDestructor) (ref) -> proxyContext.removeObserver(listenerReference.get(),
+                    ProxyContext.RECORD_CONNECTION_STATUS_NAME))
             {
                 @Override
                 protected void notifyListenerDataRemoved(IRecordConnectionStatusListener listener, String key,
@@ -638,18 +599,12 @@ public class PlatformUtils
     static NotifyingCache<IProxyConnectionListener, IValue> createProxyConnectionNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IProxyConnectionListener, IValue> proxyConnectionNotifyingCache =
             new NotifyingCache<IProxyConnectionListener, IValue>(
-                new IDestructor<NotifyingCache<IProxyConnectionListener, IValue>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IProxyConnectionListener, IValue> ref)
-                    {
-                        proxyContext.removeObserver(listenerReference.get(), ISystemRecordNames.CONTEXT_CONNECTIONS);
-                    }
-                })
+                (IDestructor) (ref) -> proxyContext.removeObserver(listenerReference.get(),
+                    ISystemRecordNames.CONTEXT_CONNECTIONS))
             {
                 @Override
                 protected void notifyListenerDataRemoved(IProxyConnectionListener listener, String key, IValue data)
@@ -665,7 +620,7 @@ public class PlatformUtils
             };
         final IRecordListener observer = new IRecordListener()
         {
-            final Map<String, String> current = new HashMap<String, String>();
+            final Map<String, String> current = new HashMap<>();
 
             @Override
             public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
@@ -673,8 +628,8 @@ public class PlatformUtils
                 final Set<String> subMapKeys = atomicChange.getSubMapKeys();
                 final Set<String> currentConnections = imageCopy.getSubMapKeys();
 
-                final Set<String> added = new HashSet<String>();
-                final Set<String> removed = new HashSet<String>();
+                final Set<String> added = new HashSet<>();
+                final Set<String> removed = new HashSet<>();
                 IValue proxyId;
                 for (String connectionId : subMapKeys)
                 {
@@ -728,18 +683,12 @@ public class PlatformUtils
     static NotifyingCache<IServiceConnectionStatusListener, Connection> createServiceConnectionStatusNotifyingCache(
         final IObserverContext proxyContext, final Object logContext)
     {
-        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<IRecordListener>();
+        final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceConnectionStatusListener, Connection> serviceStatusNotifyingCache =
             new NotifyingCache<IServiceConnectionStatusListener, Connection>(
-                new IDestructor<NotifyingCache<IServiceConnectionStatusListener, Connection>>()
-                {
-                    @Override
-                    public void destroy(NotifyingCache<IServiceConnectionStatusListener, Connection> ref)
-                    {
-                        proxyContext.removeObserver(listenerReference.get(), ISystemRecordNames.CONTEXT_STATUS);
-                    }
-                })
+                (IDestructor) (ref) -> proxyContext.removeObserver(listenerReference.get(),
+                    ISystemRecordNames.CONTEXT_STATUS))
             {
                 @Override
                 protected void notifyListenerDataRemoved(IServiceConnectionStatusListener listener, String key,
@@ -976,7 +925,7 @@ public class PlatformUtils
             return rpc;
         }
 
-        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
+        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
         final IRpcAvailableListener rpcListener = EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
         {

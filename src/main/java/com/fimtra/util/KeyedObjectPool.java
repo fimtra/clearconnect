@@ -85,8 +85,8 @@ public class KeyedObjectPool<K, T>
     {
         this.name = name;
         this.maxSize = maxSize;
-        this.pool = new ConcurrentHashMap<K, T>();
-        this.order = (maxSize > 0 ? new LowGcLinkedList<T>() : null);
+        this.pool = new ConcurrentHashMap<>();
+        this.order = (maxSize > 0 ? new LowGcLinkedList<>() : null);
         this.weakRef = new WeakReference<KeyedObjectPool<?,?>>(this);
         synchronized (pools)
         {

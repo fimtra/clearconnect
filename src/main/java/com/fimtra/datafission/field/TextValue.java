@@ -31,7 +31,7 @@ import com.fimtra.util.is;
  */
 public final class TextValue extends AbstractValue
 {
-    static final KeyedObjectPool<String, TextValue> pool = new KeyedObjectPool<String, TextValue>("TextValues",
+    static final KeyedObjectPool<String, TextValue> pool = new KeyedObjectPool<>("TextValues",
         DataFissionProperties.Values.TEXT_VALUE_POOL_SIZE);
 
     static final CharSubArrayKeyedPool<TextValue> charSubArraysPool = new CharSubArrayKeyedPool<TextValue>(

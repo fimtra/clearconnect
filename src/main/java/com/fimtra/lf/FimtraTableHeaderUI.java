@@ -107,7 +107,7 @@ public class FimtraTableHeaderUI extends BasicTableHeaderUI {
                     	
                         columnIndex = table.convertColumnIndexToModel(
                                 columnIndex);
-                            List<SortKey> keys = new ArrayList<SortKey>(sorter.getSortKeys());
+                            List<SortKey> keys = new ArrayList<>(sorter.getSortKeys());
                             SortKey sortKey;
                             int sortIndex;
                             for (sortIndex = keys.size() - 1; sortIndex >= 0; sortIndex--) {

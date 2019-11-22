@@ -759,7 +759,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
 
-        final List<String> names = new ArrayList<String>(bijTokenLen[0]);
+        final List<String> names = new ArrayList<>(bijTokenLen[0]);
         // the first item will be the command - we ignore this
         for (int i = 1; i < bijTokenLen[0]; i++)
         {
@@ -865,7 +865,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
     {
-        final Map<String, IValue> callDetails = new HashMap<String, IValue>();
+        final Map<String, IValue> callDetails = new HashMap<>();
         callDetails.put(Remote.RESULT_RECORD_NAME, TextValue.valueOf(resultRecordName));
         callDetails.put(Remote.ARGS_COUNT, LongValue.valueOf(args.length));
         for (int i = 0; i < args.length; i++)

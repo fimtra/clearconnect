@@ -45,12 +45,10 @@ import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.CollectionUtils;
-import com.fimtra.util.IReusableObjectBuilder;
-import com.fimtra.util.IReusableObjectFinalizer;
 import com.fimtra.util.Log;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
@@ -176,23 +174,10 @@ public class TcpChannel implements ITransportChannel
             ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
 
     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
-        new MultiThreadReusableObjectPool<RxFrameResolver>("RxFrameResolverPool",
-            new IReusableObjectBuilder<RxFrameResolver>()
-            {
-                @Override
-                public RxFrameResolver newInstance()
-                {
-                    return new RxFrameResolver();
-                }
-            }, new IReusableObjectFinalizer<RxFrameResolver>()
-            {
-                @Override
-                public void reset(RxFrameResolver instance)
-                {
-                    instance.buffer.clear();
-                    instance.channel = null;
-                }
-            }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
+        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", () -> new RxFrameResolver(), (instance) -> {
+            instance.buffer.clear();
+            instance.channel = null;
+        }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
 
     /**
      * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
@@ -224,7 +209,7 @@ public class TcpChannel implements ITransportChannel
 
     /** The chain per writer - acces must be synchronized on the TcpChannel class */
     private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =
-        new HashMap<SelectorProcessor, SendChannelChain>();
+        new HashMap<>();
 
     /**
      * Add the channel into the chain. If it already there, does nothing.

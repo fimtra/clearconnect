@@ -56,7 +56,7 @@ import com.fimtra.util.LazyObject.IDestructor;
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
     final static Executor IMAGE_NOTIFIER =
-        new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+        new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
             ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
 
     static final Executor SYNCHRONOUS_EXECUTOR = new Executor()
@@ -130,10 +130,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor, Executor executor)
     {
         this.destructor = destructor;
-        this.cache = new LinkedHashMap<String, DATA>(2);
+        this.cache = new LinkedHashMap<>(2);
         this.listeners = new ArrayList<LISTENER_CLASS>(1);
         this.listenersToNotifyWithInitialImages =
-            Collections.synchronizedMap(new HashMap<LISTENER_CLASS, Map<String, DATA>>());
+            Collections.synchronizedMap(new HashMap<>());
         this.executor = executor;
         final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
         this.readLock = reentrantReadWriteLock.readLock();
@@ -166,7 +166,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.readLock.lock();
         try
         {
-            return new HashSet<String>(this.cache.keySet());
+            return new HashSet<>(this.cache.keySet());
         }
         finally
         {
@@ -200,7 +200,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.readLock.lock();
         try
         {
-            return new LinkedHashMap<String, DATA>(this.cache);
+            return new LinkedHashMap<>(this.cache);
         }
         finally
         {
@@ -241,7 +241,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                             }
 
                             final Map<String, DATA> notifiedData =
-                                Collections.synchronizedMap(new HashMap<String, DATA>());
+                                Collections.synchronizedMap(new HashMap<>());
                             synchronized (NotifyingCache.this.listenersToNotifyWithInitialImages)
                             {
                                 NotifyingCache.this.listenersToNotifyWithInitialImages.put(listener, notifiedData);
@@ -256,7 +256,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
                             latch.countDown();
 
-                            keysSnapshot = new LinkedHashSet<String>(NotifyingCache.this.cache.keySet());
+                            keysSnapshot = new LinkedHashSet<>(NotifyingCache.this.cache.keySet());
                             command = new Runnable()
                             {
                                 @Override
@@ -519,7 +519,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             {
                 // remove all data from the cache and trigger listeners
                 for (Iterator<Map.Entry<String, DATA>> it =
-                    new HashMap<String, DATA>(this.cache).entrySet().iterator(); it.hasNext();)
+                    new HashMap<>(this.cache).entrySet().iterator(); it.hasNext();)
                 {
                     notifyListenersDataRemoved(it.next().getKey());
                 }

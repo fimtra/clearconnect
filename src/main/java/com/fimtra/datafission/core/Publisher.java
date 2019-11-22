@@ -187,14 +187,14 @@ public class Publisher
         ProxyContextMultiplexer(IEndPointService service)
         {
             super();
-            this.subscribers = new SubscriptionManager<String, ProxyContextPublisher>(ProxyContextPublisher.class);
+            this.subscribers = new SubscriptionManager<>(ProxyContextPublisher.class);
             this.teleporter =
                 new AtomicChangeTeleporter(DataFissionProperties.Values.PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE);
             this.service = service;
 
             this.systemRecordPublishers =
-                new HashMap<String, CoalescingRecordListener>(ContextUtils.SYSTEM_RECORDS.size());
-            this.systemRecordSequences = new HashMap<String, AtomicLong>(ContextUtils.SYSTEM_RECORDS.size());
+                new HashMap<>(ContextUtils.SYSTEM_RECORDS.size());
+            this.systemRecordSequences = new HashMap<>(ContextUtils.SYSTEM_RECORDS.size());
 
             for (String systemRecord : ContextUtils.SYSTEM_RECORDS)
             {
@@ -292,7 +292,7 @@ public class Publisher
             {
                 synchronized (Publisher.this.lock)
                 {
-                    final List<String> increment = new LinkedList<String>();
+                    final List<String> increment = new LinkedList<>();
                     for (final String name : names)
                     {
                         try
@@ -390,8 +390,8 @@ public class Publisher
         {
             synchronized (Publisher.this.lock)
             {
-                final List<String> decrement = new LinkedList<String>();
-                final List<String> remove = new LinkedList<String>();
+                final List<String> decrement = new LinkedList<>();
+                final List<String> remove = new LinkedList<>();
                 for (String name : names)
                 {
                     if (ProxyContextMultiplexer.this.subscribers.removeSubscriberFor(name, publisher))
@@ -485,10 +485,10 @@ public class Publisher
     private final class ProxyContextPublisher implements ITransportChannel
     {
         final ITransportChannel channel;
-        final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<String>());
+        final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<>());
         // note: unsynchronized
-        final Set<String> firstPublishPending = new HashSet<String>();
-        final Set<String> firstPublishDone = Collections.synchronizedSet(new HashSet<String>());
+        final Set<String> firstPublishPending = new HashSet<>();
+        final Set<String> firstPublishDone = Collections.synchronizedSet(new HashSet<>());
         final long start;
         /**
          * NOTE: this is only used for handling subscribe and RPC commands. The
@@ -875,7 +875,7 @@ public class Publisher
         this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
-        this.subscribeTasks = new LinkedList<Runnable>();
+        this.subscribeTasks = new LinkedList<>();
         this.throttleTask = new Runnable()
         {
             @Override
@@ -1096,7 +1096,7 @@ public class Publisher
                         {
                             // check each connection is still active - remove if not
                             final Set<String> connectionIds =
-                                new HashSet<String>(Publisher.this.connectionsRecord.getSubMapKeys());
+                                new HashSet<>(Publisher.this.connectionsRecord.getSubMapKeys());
                             final Set<ITransportChannel> channels = Publisher.this.proxyContextPublishers.keySet();
                             for (ITransportChannel channel : channels)
                             {
@@ -1211,7 +1211,7 @@ public class Publisher
         // break up into batches
         int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
         int batchCounter = 0;
-        List<String> batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+        List<String> batchSubscribeRecordNames = new ArrayList<>(batchSize);
         final int size = recordNames.size();
         int i;
         for (i = 0; i < size; i++)
@@ -1220,7 +1220,7 @@ public class Publisher
             if (++batchCounter == batchSize)
             {
                 subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i + 1, size);
-                batchSubscribeRecordNames = new ArrayList<String>(batchSize);
+                batchSubscribeRecordNames = new ArrayList<>(batchSize);
                 batchCounter = 0;
             }
         }
@@ -1239,8 +1239,8 @@ public class Publisher
             (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : ""));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
-        final List<String> ackSubscribes = new LinkedList<String>();
-        final List<String> nokSubscribes = new LinkedList<String>();
+        final List<String> ackSubscribes = new LinkedList<>();
+        final List<String> nokSubscribes = new LinkedList<>();
         final Runnable finallyTask = new Runnable()
         {
             @Override
@@ -1279,7 +1279,7 @@ public class Publisher
             return;
         }
 
-        final Map<String, IValue> puts = new HashMap<String, IValue>(recordNames.size());
+        final Map<String, IValue> puts = new HashMap<>(recordNames.size());
         final LongValue dummy = LongValue.valueOf(1);
         for (String recordName : recordNames)
         {

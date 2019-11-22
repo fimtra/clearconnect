@@ -63,7 +63,7 @@ final class AtomicChangeTeleporter
     
     static String getRecordName(String recordName)
     {
-        final AtomicReference<String> name = new AtomicReference<String>();
+        final AtomicReference<String> name = new AtomicReference<>();
         getNameAndPart(recordName, name, new AtomicInteger());
         if (name.get() == null)
         {
@@ -266,13 +266,13 @@ final class AtomicChangeTeleporter
 
     final int maxChangesPerPart;
     final ConcurrentMap<String, AtomicChange> receivedParts;
-    final AtomicReference<String> nameRef = new AtomicReference<String>();
+    final AtomicReference<String> nameRef = new AtomicReference<>();
     final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
 
     AtomicChangeTeleporter(int maxChangesPerPart)
     {
         this.maxChangesPerPart = maxChangesPerPart;
-        this.receivedParts = new ConcurrentHashMap<String, AtomicChange>();
+        this.receivedParts = new ConcurrentHashMap<>();
     }
     
     void reset()

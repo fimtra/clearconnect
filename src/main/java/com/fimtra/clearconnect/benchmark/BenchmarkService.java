@@ -83,7 +83,7 @@ public class BenchmarkService
             RedundancyModeEnum.FAULT_TOLERANT);
         this.benchmarkService = this.agent.getPlatformServiceInstance(BENCHMARK_SERVICE, "primary");
 
-        final Set<String> echoServiceNames = new HashSet<String>();
+        final Set<String> echoServiceNames = new HashSet<>();
         this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
@@ -203,10 +203,10 @@ public class BenchmarkService
         Log.log(this, "Test " + maxRecordCount + " records, " + maxFieldCount + " fields");
 
         final CountDownLatch totalUpdateCounter = new CountDownLatch(echoServiceCount * maxRecordCount * runCount);
-        final List<Long> roundTripLatency = new CopyOnWriteArrayList<Long>();
+        final List<Long> roundTripLatency = new CopyOnWriteArrayList<>();
         final ConcurrentMap<String, CountDownLatch> recordUpdateCounters =
-            new ConcurrentHashMap<String, CountDownLatch>();
-        final ConcurrentMap<String, String> recordSignatures = new ConcurrentHashMap<String, String>();
+            new ConcurrentHashMap<>();
+        final ConcurrentMap<String, String> recordSignatures = new ConcurrentHashMap<>();
 
         String recordName;
 
@@ -255,7 +255,7 @@ public class BenchmarkService
 
         try
         {
-            final AtomicReference<String> name = new AtomicReference<String>();
+            final AtomicReference<String> name = new AtomicReference<>();
 
             /*
              * SUBSCRIBE FOR THE PING RECORD IN THE ECHO SERVICE

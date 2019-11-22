@@ -73,8 +73,8 @@ final class Config implements IConfig {
 		this.serviceName = serviceName;
 		this.serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(this.serviceName, serviceMemberName);
 		this.proxyForConfigService = proxyForConfigService;
-		this.properties = new ConcurrentHashMap<String, IValue>();
-		this.configChangeListeners = new CopyOnWriteArrayList<IConfigChangeListener>();
+		this.properties = new ConcurrentHashMap<>();
+		this.configChangeListeners = new CopyOnWriteArrayList<>();
 		this.masterConfigChangeListener = new MasterConfigChangeListener(this.proxyForConfigService, this.serviceInstanceId);
 
 		init();
@@ -131,7 +131,7 @@ final class Config implements IConfig {
 
 	private Map<String, IValue> readLocalProperties() {
 		ResourceBundle configResources = null;
-		Map<String, IValue> localProperties = new HashMap<String, IValue>();
+		Map<String, IValue> localProperties = new HashMap<>();
 		try {
 			ClassLoader classLoader = new URLClassLoader(new URL[] { this.localConfigDir.toURI().toURL() });
 			configResources = ResourceBundle.getBundle(this.localServiceInstanceIdConfig, Locale.getDefault(), classLoader);
@@ -177,7 +177,7 @@ final class Config implements IConfig {
 		}
 		if (isListenersChanged) {
 			// All entries in this.properties are immutable to this is like a deep copy
-			Map<String, IValue> propertiesCopy = new HashMap<String, IValue>(this.properties);
+			Map<String, IValue> propertiesCopy = new HashMap<>(this.properties);
 			for (Entry<String, IValue> property : propertiesCopy.entrySet()) {
 				listener.onPropertyChange(property.getKey(), property.getValue());
 			}
@@ -319,7 +319,7 @@ class SimplePropertiesConfig implements IConfig {
 	@Override
 	public Set<String> getPropertyKeys() {
 		final Set<Object> keySet = this.properties.keySet();
-		Set<String> keys = new HashSet<String>(keySet.size());
+		Set<String> keys = new HashSet<>(keySet.size());
 		for (Object object : keySet) {
 			keys.add(ObjectUtils.safeToString(object));
 		}

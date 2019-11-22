@@ -65,7 +65,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
     static Pair<String, String> getRecordLookupKey(String recordName, String contextName)
     {
-        return new Pair<String, String>(contextName, recordName);
+        return new Pair<>(contextName, recordName);
     }
 
     final ConcurrentMap<String, IRecordListener> recordRemovedListeners;
@@ -103,17 +103,17 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
     public RowOrientedRecordTableModel()
     {
-        this.recordIndexByName = new HashMap<Pair<String, String>, Integer>();
-        this.records = new ArrayList<IRecord>();
-        this.fieldIndexes = new ArrayList<String>();
-        this.fieldIndexLookupMap = new HashMap<String, AtomicInteger>();
-        this.recordRemovedListeners = new ConcurrentHashMap<String, IRecordListener>();
+        this.recordIndexByName = new HashMap<>();
+        this.records = new ArrayList<>();
+        this.fieldIndexes = new ArrayList<>();
+        this.fieldIndexLookupMap = new HashMap<>();
+        this.recordRemovedListeners = new ConcurrentHashMap<>();
 
         this.batchUpdateScheduled = new AtomicBoolean();
         this.batchRemoveScheduled = new AtomicBoolean();
-        this.pendingBatchUpdates = new HashMap<Pair<String, String>, IRecord>();
-        this.pendingBatchAtomicChanges = new HashMap<Pair<String, String>, IRecordChange>();
-        this.pendingBatchRemoves = new HashMap<String, List<String>>();
+        this.pendingBatchUpdates = new HashMap<>();
+        this.pendingBatchAtomicChanges = new HashMap<>();
+        this.pendingBatchRemoves = new HashMap<>();
 
         // add these by hand
         this.fieldIndexes.add(RecordTableUtils.NAME);
@@ -141,7 +141,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                     final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
                     if (removedRecords.size() > 0)
                     {
-                        recordUnsubscribedBatch(new HashSet<String>(removedRecords), context.getName());
+                        recordUnsubscribedBatch(new HashSet<>(removedRecords), context.getName());
                     }
                 }
             };
@@ -236,7 +236,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
     public void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
         Map<Pair<String, String>, IRecordChange> recordAtomicChanges)
     {
-        final Set<String> fieldsToDelete = new HashSet<String>();
+        final Set<String> fieldsToDelete = new HashSet<>();
         final AtomicBoolean stuctureChanged = new AtomicBoolean();
 
         int startInsert = -1;
@@ -370,7 +370,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
             List<String> list = this.pendingBatchRemoves.get(contextName);
             if (list == null)
             {
-                list = new ArrayList<String>(recordNames.size());
+                list = new ArrayList<>(recordNames.size());
                 this.pendingBatchRemoves.put(contextName, list);
             }
             list.addAll(recordNames);
@@ -391,7 +391,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
     void scheduleHandlePendingRemoves()
     {
-        final Map<String, List<String>> local = new HashMap<String, List<String>>();
+        final Map<String, List<String>> local = new HashMap<>();
 
         synchronized (this.pendingBatchRemoves)
         {
@@ -401,7 +401,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
             this.batchRemoveScheduled.set(false);
         }
 
-        final Set<Pair<String, String>> nameAndContextToRemove = new HashSet<Pair<String, String>>();
+        final Set<Pair<String, String>> nameAndContextToRemove = new HashSet<>();
 
         Map.Entry<String, List<String>> entry = null;
         String contextName = null;
@@ -430,7 +430,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
     void handlePendingRemoves(final Set<Pair<String, String>> nameAndContextToRemove)
     {
-        List<IRecord> copy = new ArrayList<IRecord>(this.records);
+        List<IRecord> copy = new ArrayList<>(this.records);
         this.records.clear();
 
         int singleIndex = -1;
@@ -475,7 +475,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
     public void recordUnsubscribed(IRecord record)
     {
-        final Set<String> recordNames = new HashSet<String>();
+        final Set<String> recordNames = new HashSet<>();
         recordNames.add(record.getName());
         recordUnsubscribedBatch(recordNames, record.getContextName());
     }

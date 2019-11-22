@@ -67,7 +67,7 @@ public final class ObjectSerializer
     public ObjectSerializer()
     {
         super();
-        this.refs = new ConcurrentHashMap<String, Object>();
+        this.refs = new ConcurrentHashMap<>();
         this.classTemplates = new ConcurrentHashMap<Class<?>, ClassTemplate>();
     }
 
@@ -164,7 +164,7 @@ final class ClassTemplate
 {
     private final static List<FieldTemplate> getFieldTemplates(Field[] declaredFields, int level)
     {
-        List<FieldTemplate> result = new ArrayList<FieldTemplate>(declaredFields.length);
+        List<FieldTemplate> result = new ArrayList<>(declaredFields.length);
         Class<?> type;
         for (Field field : declaredFields)
         {
@@ -183,7 +183,7 @@ final class ClassTemplate
 
     ClassTemplate(Class<?> clazz)
     {
-        List<FieldTemplate> templates = new ArrayList<FieldTemplate>();
+        List<FieldTemplate> templates = new ArrayList<>();
         Class<?> c = clazz;
         int i = 0;
         do

@@ -241,7 +241,7 @@ public final class PlatformMetaDataModel
 
     static void removeRecordsNotUpdated(final Set<String> updatedRecords, Context context)
     {
-        final Set<String> previous = new HashSet<String>();
+        final Set<String> previous = new HashSet<>();
         for (String con : context.getRecordNames())
         {
             if (ContextUtils.isSystemRecordName(con))
@@ -545,10 +545,10 @@ public final class PlatformMetaDataModel
         this.serviceProxiesContext = new Context("serviceProxies");
         this.serviceInstancesContext = new Context("serviceInstances");
 
-        this.serviceRpcsContext = new ConcurrentHashMap<String, Context>();
-        this.serviceRecordsContext = new ConcurrentHashMap<String, Context>();
-        this.serviceInstanceRpcsContext = new ConcurrentHashMap<String, Context>();
-        this.serviceInstanceRecordsContext = new ConcurrentHashMap<String, Context>();
+        this.serviceRpcsContext = new ConcurrentHashMap<>();
+        this.serviceRecordsContext = new ConcurrentHashMap<>();
+        this.serviceInstanceRpcsContext = new ConcurrentHashMap<>();
+        this.serviceInstanceRecordsContext = new ConcurrentHashMap<>();
 
         this.agent.addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
         {
@@ -895,8 +895,8 @@ public final class PlatformMetaDataModel
         }
     }
 
-    final Set<String> sessionAttributes = Collections.synchronizedSet(new HashSet<String>());
-    final Map<String, String> sessionIds = Collections.synchronizedMap(new HashMap<String, String>());
+    final Set<String> sessionAttributes = Collections.synchronizedSet(new HashSet<>());
+    final Map<String, String> sessionIds = Collections.synchronizedMap(new HashMap<>());
 
     private void registerSessionProvider(String serviceFamily)
     {
@@ -1119,7 +1119,7 @@ public final class PlatformMetaDataModel
 
     void handleRecordsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
         removeSystemRecords(currentRecordNames);
 
         handleRecordsForContext(removePrefixRecordsPerService(imageCopy.getName()), this.serviceRecordsContext,
@@ -1129,7 +1129,7 @@ public final class PlatformMetaDataModel
 
     void handleRecordsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
         removeSystemRecords(currentRecordNames);
 
         handleRecordsForContext(removePrefixRecordsPerInstance(imageCopy.getName()), this.serviceInstanceRecordsContext,
@@ -1139,7 +1139,7 @@ public final class PlatformMetaDataModel
 
     void handleRpcsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
 
         handleRecordsForContext(removePrefixRpcsPerService(imageCopy.getName()), this.serviceRpcsContext,
             currentRecordNames, change.getPutEntries(), ServiceRpcMetaDataRecordDefinition.Definition.toString());
@@ -1147,7 +1147,7 @@ public final class PlatformMetaDataModel
 
     void handleRpcsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
     {
-        final Set<String> currentRecordNames = new HashSet<String>(imageCopy.keySet());
+        final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
 
         handleRecordsForContext(removePrefixRpcsPerInstance(imageCopy.getName()), this.serviceInstanceRpcsContext,
             currentRecordNames, change.getPutEntries(),
@@ -1194,12 +1194,12 @@ public final class PlatformMetaDataModel
 
     void handleConnectionsUpdate(IRecord imageCopy)
     {
-        final Set<String> nodesUpdated = new HashSet<String>();
-        final Set<String> agentsUpdated = new HashSet<String>();
-        final Set<String> serviceProxiesUpdated = new HashSet<String>();
-        final Map<String, Set<String>> instancesPerNode = new HashMap<String, Set<String>>();
-        final Map<String, AtomicInteger> connectionsPerService = new HashMap<String, AtomicInteger>();
-        final Map<String, AtomicInteger> connectionsPerServiceInstance = new HashMap<String, AtomicInteger>();
+        final Set<String> nodesUpdated = new HashSet<>();
+        final Set<String> agentsUpdated = new HashSet<>();
+        final Set<String> serviceProxiesUpdated = new HashSet<>();
+        final Map<String, Set<String>> instancesPerNode = new HashMap<>();
+        final Map<String, AtomicInteger> connectionsPerService = new HashMap<>();
+        final Map<String, AtomicInteger> connectionsPerServiceInstance = new HashMap<>();
         final Set<String> connectionKeys = imageCopy.getSubMapKeys();
 
         IRecord connectionRecord = null;
@@ -1339,7 +1339,7 @@ public final class PlatformMetaDataModel
                 set = instancesPerNode.get(publisherNode.textValue());
                 if (set == null)
                 {
-                    set = new HashSet<String>();
+                    set = new HashSet<>();
                     instancesPerNode.put(publisherNode.textValue(), set);
                 }
                 set.add(platformServiceInstanceID);

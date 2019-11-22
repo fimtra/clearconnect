@@ -26,7 +26,6 @@ import java.io.Writer;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.nio.CharBuffer;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,11 +54,10 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.BlobValue;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.TaskStatistics;
 import com.fimtra.thimble.ThimbleExecutor;
-import com.fimtra.thimble.ContextExecutorFactory;
-import com.fimtra.util.ArrayUtils;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
@@ -96,7 +94,7 @@ public final class ContextUtils
     {
         final IRecordListener allRecordsListener;
         final IObserverContext context;
-        final Set<String> subscribed = new HashSet<String>();
+        final Set<String> subscribed = new HashSet<>();
 
         AllRecordsRegistrationManager(IRecordListener allRecordsListener, IObserverContext context)
         {
@@ -108,7 +106,7 @@ public final class ContextUtils
         public void destroy()
         {
             this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
-            List<String> temp = new LinkedList<String>();
+            List<String> temp = new LinkedList<>();
             for (String recordName : this.subscribed)
             {
                 temp.add(recordName);
@@ -123,7 +121,7 @@ public final class ContextUtils
         @Override
         public void onChange(IRecord imageCopy, IRecordChange atomicChange)
         {
-            List<String> temp = new LinkedList<String>();
+            List<String> temp = new LinkedList<>();
             for (String recordName : atomicChange.getPutEntries().keySet())
             {
                 if (!ContextUtils.isSystemRecordName(recordName) && this.subscribed.add(recordName))
@@ -136,7 +134,7 @@ public final class ContextUtils
                 this.context.addObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }
 
-            temp = new LinkedList<String>();
+            temp = new LinkedList<>();
             for (String recordName : atomicChange.getRemovedEntries().keySet())
             {
                 if (this.subscribed.remove(recordName))
@@ -167,7 +165,7 @@ public final class ContextUtils
 
     static
     {
-        Set<String> set = new HashSet<String>();
+        Set<String> set = new HashSet<>();
         set.add(ISystemRecordNames.CONTEXT_RPCS);
         set.add(ISystemRecordNames.CONTEXT_STATUS);
         set.add(ISystemRecordNames.CONTEXT_RECORDS);
@@ -263,14 +261,14 @@ public final class ContextUtils
                 {
                     final Map<Object, TaskStatistics> coalescingTaskStatistics =
                         thimbleExecutor.getCoalescingTaskStatistics();
-                    stats = coalescingTaskStatistics.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+                    stats = coalescingTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
 
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                         thimbleExecutor.getSequentialTaskStatistics();
-                    stats = sequentialTaskStatistics.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+                    stats = sequentialTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
@@ -370,7 +368,7 @@ public final class ContextUtils
 
             final String getStats(Map<Object, TaskStatistics> taskStatisticsMap)
             {
-                final TaskStatistics stats = taskStatisticsMap.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+                final TaskStatistics stats = taskStatisticsMap.get(IContextExecutor.QUEUE_LEVEL_STATS);
                 final StringBuilder sb = new StringBuilder(50);
 
                 long overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
@@ -399,7 +397,7 @@ public final class ContextUtils
     public static long[] getCoreStats()
     {
         // todo should this be the summary across all thimble executors?
-        final TaskStatistics stats = coreStats.get(ThimbleExecutor.QUEUE_LEVEL_STATS);
+        final TaskStatistics stats = coreStats.get(IContextExecutor.QUEUE_LEVEL_STATS);
         final long totalSubmitted = stats.getTotalSubmitted();
         final long totalExecuted = stats.getTotalExecuted();
         return new long[] { (totalSubmitted - totalExecuted), totalSubmitted, totalExecuted };
@@ -702,7 +700,7 @@ public final class ContextUtils
     static Map<String, IValue> mergeMaps(final Map<String, IValue> dataMap,
         final Map<String, Map<String, IValue>> subMaps)
     {
-        Map<String, IValue> flatMap = new HashMap<String, IValue>(dataMap);
+        Map<String, IValue> flatMap = new HashMap<>(dataMap);
 
         Map.Entry<String, Map<String, IValue>> entry = null;
         String subMapKey = null;
@@ -737,7 +735,7 @@ public final class ContextUtils
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static Map<?, ?>[] demergeMaps(final Map<String, IValue> mergedMap)
     {
-        Map[] result = new Map[] { new HashMap<String, IValue>(), new HashMap<String, Map<String, IValue>>(2) };
+        Map[] result = new Map[] { new HashMap<>(), new HashMap<>(2) };
 
         Map.Entry<String, IValue> entry = null;
         String key = null;
@@ -965,7 +963,7 @@ public final class ContextUtils
         // NOTE: even though the ProxyContext subscribes for the ContextRpcs record on construction,
         // race conditions may mean that the record has not been fully received yet, hence if the
         // record does not have the rpc name we add our own listener (then remove it).
-        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<IRpcInstance>();
+        final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
         final IRecordListener observer = new IRecordListener()
         {

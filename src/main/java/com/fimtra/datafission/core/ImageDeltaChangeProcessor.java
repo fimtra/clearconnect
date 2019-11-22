@@ -45,8 +45,8 @@ final class ImageDeltaChangeProcessor
 
     ImageDeltaChangeProcessor()
     {
-        this.cachedDeltas = new ConcurrentHashMap<String, LowGcLinkedList<IRecordChange>>();
-        this.imageReceived = new ConcurrentHashMap<String, Boolean>();
+        this.cachedDeltas = new ConcurrentHashMap<>();
+        this.imageReceived = new ConcurrentHashMap<>();
     }
 
     /**
@@ -98,7 +98,7 @@ final class ImageDeltaChangeProcessor
                 LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.get(name);
                 if (deltas == null)
                 {
-                    deltas = new LowGcLinkedList<IRecordChange>();
+                    deltas = new LowGcLinkedList<>();
                     this.cachedDeltas.put(name, deltas);
                 }
                 deltas.add(changeToApply);

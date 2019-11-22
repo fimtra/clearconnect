@@ -37,9 +37,9 @@ import com.fimtra.datafission.ISessionProtocol;
  */
 public class SessionContexts
 {
-    final static Map<String, ISessionManager> managers = new HashMap<String, ISessionManager>();
+    final static Map<String, ISessionManager> managers = new HashMap<>();
 
-    final static Map<String, ISessionAttributesProvider> providers = new HashMap<String, ISessionAttributesProvider>();
+    final static Map<String, ISessionAttributesProvider> providers = new HashMap<>();
 
     public static final ISessionAttributesProvider DEFAULT_PROVIDER = new ISessionAttributesProvider()
     {

@@ -198,9 +198,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
         this.createLock = new ReentrantLock();
         this.destroyCalled = new AtomicBoolean(false);
-        this.localPlatformServiceInstances = new ConcurrentHashMap<String, PlatformServiceInstance>();
-        this.serviceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
-        this.serviceInstanceProxies = new ConcurrentHashMap<String, PlatformServiceProxy>();
+        this.localPlatformServiceInstances = new ConcurrentHashMap<>();
+        this.serviceProxies = new ConcurrentHashMap<>();
+        this.serviceInstanceProxies = new ConcurrentHashMap<>();
 
         // make the actual connection to the registry
         this.registryProxy =
@@ -366,7 +366,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     Log.log(this, "No registry RPCs available");
                     return;
                 }
-                final HashSet<String> rpcNames = new HashSet<String>(remoteRpcs.keySet());
+                final HashSet<String> rpcNames = new HashSet<>(remoteRpcs.keySet());
                 if (!platformRegistryRpcsAvailable(rpcNames))
                 {
                     Log.log(this, "Waiting for registry RPCs, currently have: ", ObjectUtils.safeToString(rpcNames));
@@ -1221,7 +1221,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public Map<String, IPlatformServiceProxy> getActiveProxies()
     {
-        return new HashMap<String, IPlatformServiceProxy>(this.serviceProxies);
+        return new HashMap<>(this.serviceProxies);
     }
 
     void registerServiceWithRetry(PlatformServiceInstance platformServiceInstance, final Runnable failureTask)

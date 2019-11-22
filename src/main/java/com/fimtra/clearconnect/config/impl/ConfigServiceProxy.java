@@ -160,7 +160,7 @@ public final class ConfigServiceProxy implements IConfigServiceProxy
     public ConfigServiceProxy(IPlatformServiceProxy proxyForConfigService)
     {
         this.proxyForConfigService = proxyForConfigService;
-        this.configManagers = new HashMap<String, ConfigManager>(2);
+        this.configManagers = new HashMap<>(2);
     }
 
     @Override

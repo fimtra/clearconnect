@@ -31,9 +31,8 @@ import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
-import com.fimtra.datafission.IValue;
-import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ICoalescingRunnable;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ThimbleExecutor;
 
 /**
@@ -119,7 +118,7 @@ public class CoalescingRecordListener implements IRecordListener
             super();
             this.service = service;
             this.periodMillis = periodMillis;
-            this.pending = new HashSet<String>();
+            this.pending = new HashSet<>();
         }
 
         @Override
@@ -253,8 +252,8 @@ public class CoalescingRecordListener implements IRecordListener
                 if (changes != null)
                 {
                     final AtomicChange mergedAtomicChange =
-                        new AtomicChange(this.name, new HashMap<String, IValue>(), new HashMap<String, IValue>(),
-                            new HashMap<String, IValue>());
+                        new AtomicChange(this.name, new HashMap<>(), new HashMap<>(),
+                            new HashMap<>());
 
                     mergedAtomicChange.coalesce(changes);
                     if (CoalescingRecordListener.this.cachePolicy != CachePolicyEnum.NO_IMAGE_NEEDED)
@@ -373,8 +372,8 @@ public class CoalescingRecordListener implements IRecordListener
         super();
         this.cachedImages =
             cachePolicy == CachePolicyEnum.NO_IMAGE_NEEDED ? Collections.EMPTY_MAP
-                : new ConcurrentHashMap<String, IRecord>(2);
-        this.cachedAtomicChanges = new ConcurrentHashMap<String, List<IRecordChange>>(2);
+                : new ConcurrentHashMap<>(2);
+        this.cachedAtomicChanges = new ConcurrentHashMap<>(2);
         this.delegate = delegate;
         this.strategy = strategy;
         this.cachePolicy = cachePolicy;
@@ -390,7 +389,7 @@ public class CoalescingRecordListener implements IRecordListener
             List<IRecordChange> list = this.cachedAtomicChanges.get(name);
             if (list == null)
             {
-                list = new ArrayList<IRecordChange>(1);
+                list = new ArrayList<>(1);
                 this.cachedAtomicChanges.put(name, list);
             }
             list.add(atomicChange);

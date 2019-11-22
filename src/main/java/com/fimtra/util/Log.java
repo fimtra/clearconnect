@@ -48,7 +48,7 @@ public abstract class Log
     private static final Lock lock = new ReentrantLock();
     private static PrintStream consoleStream = System.err;
 
-    static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<LogMessage>();
+    static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<>();
     static final CharSequence LINE_SEPARATOR = SystemUtils.lineSeparator();
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;

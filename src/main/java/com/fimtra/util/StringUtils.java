@@ -106,7 +106,7 @@ public abstract class StringUtils
         }
 
         final char[] chars = stringToSplit.toCharArray();
-        List<String> tokens = new ArrayList<String>();
+        List<String> tokens = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
         char c;
         boolean lastWasDelimiter = false;
