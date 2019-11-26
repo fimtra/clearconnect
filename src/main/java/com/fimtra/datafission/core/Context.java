@@ -118,40 +118,35 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            Log.log(Context.class, "JVM shutting down...");
+            final DeadlockDetector deadlockDetector = new DeadlockDetector();
+            final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
+            final File threadDumpOnShutdownFile =
+                FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
+            final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();
+            if (threads != null)
             {
-                Log.log(Context.class, "JVM shutting down...");
-                final DeadlockDetector deadlockDetector = new DeadlockDetector();
-                final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
-                final File threadDumpOnShutdownFile =
-                    FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
-                final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();
-                if (threads != null)
+                PrintWriter pw = null;
+                try
                 {
-                    PrintWriter pw = null;
-                    try
+                    pw = new PrintWriter(threadDumpOnShutdownFile);
+                    for (int i = 0; i < threads.length; i++)
                     {
-                        pw = new PrintWriter(threadDumpOnShutdownFile);
-                        for (int i = 0; i < threads.length; i++)
-                        {
-                            pw.print(threads[i].toString());
-                            pw.flush();
-                        }
-                        Log.log(Context.class, "Thread dump successful: ", threadDumpOnShutdownFile.toString());
+                        pw.print(threads[i].toString());
+                        pw.flush();
                     }
-                    catch (Exception e)
+                    Log.log(Context.class, "Thread dump successful: ", threadDumpOnShutdownFile.toString());
+                }
+                catch (Exception e)
+                {
+                    Log.log(Context.class, "Could not produce threaddump file on exit", e);
+                }
+                finally
+                {
+                    if (pw != null)
                     {
-                        Log.log(Context.class, "Could not produce threaddump file on exit", e);
-                    }
-                    finally
-                    {
-                        if (pw != null)
-                        {
-                            pw.close();
-                        }
+                        pw.close();
                     }
                 }
             }
@@ -755,29 +750,24 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         final Map<String, Boolean> resultMap = new HashMap<>(recordNames.length);
-        final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<>(new Runnable()
-        {
-            @Override
-            public void run()
+        final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<>(() -> {
+            final List<String> permissionedRecords = new LinkedList<>();
+            for (int i = 0; i < recordNames.length; i++)
             {
-                final List<String> permissionedRecords = new LinkedList<>();
-                for (int i = 0; i < recordNames.length; i++)
+                if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
                 {
-                    if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
-                    {
-                        permissionedRecords.add(recordNames[i]);
-                        Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
-                        resultMap.put(recordNames[i], Boolean.TRUE);
-                    }
-                    else
-                    {
-                        resultMap.put(recordNames[i], Boolean.FALSE);
-                    }
+                    permissionedRecords.add(recordNames[i]);
+                    Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
+                    resultMap.put(recordNames[i], Boolean.TRUE);
                 }
-
-                // perform the add for the records with valid permission tokens
-                addSingleObserver(observer, permissionedRecords);
+                else
+                {
+                    resultMap.put(recordNames[i], Boolean.FALSE);
+                }
             }
+
+            // perform the add for the records with valid permission tokens
+            addSingleObserver(observer, permissionedRecords);
         }, resultMap);
 
         futureResult.run();
@@ -1160,14 +1150,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final boolean added = this.validators.add(validator);
         if (added)
         {
-            this.coreExecutor.execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    validator.onRegistration(Context.this);
-                }
-            });
+            this.coreExecutor.execute(() -> validator.onRegistration(Context.this));
         }
         return added;
     }
@@ -1207,14 +1190,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final boolean removed = this.validators.remove(validator);
         if (removed)
         {
-            this.coreExecutor.execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    validator.onDeregistration(Context.this);
-                }
-            });
+            this.coreExecutor.execute(() -> validator.onDeregistration(Context.this));
         }
         return removed;
     }

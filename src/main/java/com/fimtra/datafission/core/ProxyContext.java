@@ -166,7 +166,10 @@ public final class ProxyContext implements IObserverContext
     private static final CountDownLatch DEFAULT_COUNT_DOWN_LATCH = new CountDownLatch(0);
 
     private static final int MINIMUM_RECONNECT_PERIOD_MILLIS = 50;
-
+    
+    private static final Runnable NOOP = () -> {
+    };
+    
     /**
      * Encapsulates all the remote system records. These are effectively the system records in a
      * remote context.
@@ -1130,13 +1133,7 @@ public final class ProxyContext implements IObserverContext
     {
         final Map<String, Boolean> subscribeResults = new HashMap<>(recordNames.length);
 
-        final RunnableFuture<Map<String, Boolean>> futureResult = new FutureTask<>(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-            }
-        }, subscribeResults);
+        final RunnableFuture<Map<String, Boolean>> futureResult = new FutureTask<>(NOOP, subscribeResults);
 
         synchronized (this.lock)
         {
@@ -1162,25 +1159,12 @@ public final class ProxyContext implements IObserverContext
                 // only issue the subscribe if connected
                 if (this.connected)
                 {
-                    task = new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            subscribe(permissionToken, recordsToSubscribeFor);
-                        }
-                    };
+                    task = () -> subscribe(permissionToken, recordsToSubscribeFor);
                 }
                 else
                 {
                     // use a no-op to execute the subscribe task as we need a latch
-                    task = new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                        }
-                    };
+                    task = NOOP;
                 }
 
                 executeTask(recordsToSubscribeFor, SUBSCRIBE, task, futureResult, subscribeResults);
@@ -1208,14 +1192,7 @@ public final class ProxyContext implements IObserverContext
                 // only send an unsubscribe if connected
                 if (this.connected)
                 {
-                    final Runnable task = new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            unsubscribe(recordsToUnsubscribe);
-                        }
-                    };
+                    final Runnable task = () -> unsubscribe(recordsToUnsubscribe);
                     latch = executeTask(recordsToUnsubscribe, UNSUBSCRIBE, task, null, null);
                 }
 
@@ -1650,14 +1627,8 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
                 Long.toString(this.reconnectPeriodMillis), "ms ");
 
-            this.reconnectTask = RECONNECT_TASKS.schedule(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    reconnect();
-                }
-            }, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
+            this.reconnectTask =
+                RECONNECT_TASKS.schedule(() -> reconnect(), this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
     }
 

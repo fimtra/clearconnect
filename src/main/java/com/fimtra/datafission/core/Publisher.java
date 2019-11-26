@@ -433,20 +433,12 @@ public class Publisher
                 final AtomicChange change = new AtomicChange(record);
                 if (isSystemRecordUpdateCoalesced(record.getName()))
                 {
-                    SYSTEM_RECORD_PUBLISHER.execute(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            // NOTE: sequences increment-then-get, hence
-                            // to send the previous image, we need to
-                            // subtract 1
-                            change.setSequence(
-                                ProxyContextMultiplexer.this.systemRecordSequences.get(recordNameToRepublish).get()
-                                    - 1);
-                            publishImageOnSubscribe(publisher, change);
-                        }
-
+                    SYSTEM_RECORD_PUBLISHER.execute(() -> {
+                        // NOTE: sequences increment-then-get, hence
+                        // to send the previous image, we need to
+                        // subtract 1
+                        change.setSequence(this.systemRecordSequences.get(recordNameToRepublish).get() - 1);
+                        publishImageOnSubscribe(publisher, change);
                     });
                 }
                 else
@@ -527,7 +519,7 @@ public class Publisher
                 TextValue.valueOf(this.codec.getClass().getSimpleName()));
             submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
                 TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
-
+            
             Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
             
             scheduleStatsUpdateTask();
@@ -601,10 +593,8 @@ public class Publisher
                         (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
                     submapConnections.put(IContextConnectionsRecordFields.TX_QUEUE_SIZE,
                         LongValue.valueOf(ProxyContextPublisher.this.channel.getTxQueueSize()));
-      
                     submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
                         intervalMessagesPublished == 0 ? 0 : intervalBytesPublished / intervalMessagesPublished));
-
 
                     if (ProxyContextPublisher.this.active)
                     {
@@ -876,37 +866,32 @@ public class Publisher
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         this.subscribeTasks = new LinkedList<>();
-        this.throttleTask = new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                Publisher.this.throttleRunning = false;
+        this.throttleTask = () -> {
+            this.throttleRunning = false;
 
-                Runnable task = null;
-                int size = 0;
-                do
+            Runnable task = null;
+            int size = 0;
+            do
+            {
+                synchronized (this.subscribeTasks)
                 {
-                    synchronized (Publisher.this.subscribeTasks)
+                    size = this.subscribeTasks.size();
+                    if (size > 0)
                     {
-                        size = Publisher.this.subscribeTasks.size();
-                        if (size > 0)
-                        {
-                            task = Publisher.this.subscribeTasks.remove(0);
-                        }
-                        size--;
+                        task = this.subscribeTasks.remove(0);
                     }
-                    if (task != null)
-                    {
-                        task.run();
-                    }
-                    if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
-                    {
-                        LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
-                    }
+                    size--;
                 }
-                while (size > 0);
+                if (task != null)
+                {
+                    task.run();
+                }
+                if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
+                {
+                    LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
+                }
             }
+            while (size > 0);
         };
 
         this.mainCodec = codec;
@@ -1241,18 +1226,13 @@ public class Publisher
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new LinkedList<>();
         final List<String> nokSubscribes = new LinkedList<>();
-        final Runnable finallyTask = new Runnable()
-        {
-            @Override
-            public void run()
+        final Runnable finallyTask = () -> {
+            if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
             {
-                if (ackSubscribes.size() + nokSubscribes.size() == recordNames.size())
-                {
-                    Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete ",
-                        Integer.toString(ackSubscribes.size()), ":", Integer.toString(nokSubscribes.size()));
-                    sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                    sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                }
+                Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete ",
+                    Integer.toString(ackSubscribes.size()), ":", Integer.toString(nokSubscribes.size()));
+                sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
             }
         };
 

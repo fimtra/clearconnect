@@ -128,17 +128,12 @@ public class CoalescingRecordListener implements IRecordListener
             {
                 if (this.pending.add(name))
                 {
-                    this.service.schedule(new Runnable()
-                    {
-                        @Override
-                        public void run()
+                    this.service.schedule(() -> {
+                        synchronized (this.pending)
                         {
-                            synchronized (TimedCoalescingStrategy.this.pending)
-                            {
-                                TimedCoalescingStrategy.this.pending.remove(name);
-                            }
-                            coalescingListener.new CoalescingRecordUpdateRunnable(name, null).run();
+                            this.pending.remove(name);
                         }
+                        coalescingListener.new CoalescingRecordUpdateRunnable(name, null).run();
                     }, this.periodMillis, TimeUnit.MILLISECONDS);
                 }
             }
