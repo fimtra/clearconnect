@@ -72,6 +72,7 @@ public final class LazyObject<T>
         if (this.ref != null)
         {
             this.destructor.destroy(this.ref);
+            this.ref = null;
         }
     }
 
