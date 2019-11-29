@@ -191,10 +191,9 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         try
         {
-            if (this.subscribersForRecord == null)
-            {
-                this.subscribersForRecord = this.context.recordObservers.getSubscribersFor(this.name);
-            }
+            // NOTE: always get the subscribers in the context of the record change - ensures no
+            // images are missed by a listener being registered at this very moment
+            this.subscribersForRecord = this.context.recordObservers.getSubscribersFor(this.name);
             this.context.doPublishChange(this.name, this, this.sequence.get().longValue(), this.subscribersForRecord);
         }
         finally
