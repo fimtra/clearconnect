@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
@@ -143,7 +142,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     // members needed for the ISequentialRunnable use
     Context context;
     CountDownLatch latch;
-    IRecordListener[] subscribersForRecord;
 
     /**
      * Construct the atomic change to represent the record.
@@ -179,11 +177,10 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 
     // ==== methods used to support use as the ISequentialRunnable
 
-    void preparePublish(CountDownLatch latch, IRecordListener[] subscribersForRecord, Context context)
+    void preparePublish(CountDownLatch latch, Context context)
     {
         this.latch = latch;
         this.context = context;
-        this.subscribersForRecord = subscribersForRecord;
     }
 
     @Override
@@ -191,10 +188,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         try
         {
-            // NOTE: always get the subscribers in the context of the record change - ensures no
-            // images are missed by a listener being registered at this very moment
-            this.subscribersForRecord = this.context.recordObservers.getSubscribersFor(this.name);
-            this.context.doPublishChange(this.name, this, this.sequence.get().longValue(), this.subscribersForRecord);
+            this.context.doPublishChange(this.name, this, this.sequence.get().longValue());
         }
         finally
         {

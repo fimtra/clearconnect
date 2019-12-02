@@ -499,7 +499,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         // always force a publish for the initial create - guaranteed to be sequence 0
-        publishAtomicChange(name, true, null);
+        publishAtomicChange(name, true);
 
         return record;
     }
@@ -679,11 +679,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch publishAtomicChange(final String name)
     {
-        return publishAtomicChange(name, false, null);
+        return publishAtomicChange(name, false);
     }
 
-    CountDownLatch publishAtomicChange(final String name, final boolean forcePublish,
-        final IRecordListener[] subscribersForRecord)
+    CountDownLatch publishAtomicChange(final String name, final boolean forcePublish)
     {
         if (name == null)
         {
@@ -720,8 +719,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 final long sequence = atomicChange.getSequence();
                 ((Record) record).setSequence(sequence);
 
-                atomicChange.preparePublish(latch, subscribersForRecord, this);
+                atomicChange.preparePublish(latch, this);
                 
+                // this will call doPublishChange
                 executeSequentialCoreTask(atomicChange);
                 
                 return latch;
@@ -955,7 +955,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     {
                         observerCount = LongValue.valueOf(0);
                         contextSubscriptions.remove(recordName);
-                        Context.this.tokenPerRecord.remove(recordName);
+                        this.tokenPerRecord.remove(recordName);
                     }
                     else
                     {
@@ -1279,16 +1279,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return Collections.unmodifiableMap(this.rpcInstances);
     }
 
-    void doPublishChange(final String name, final IRecordChange atomicChange, long sequence,
-        IRecordListener[] subscribersForRecord)
+    void doPublishChange(final String recordName, final IRecordChange atomicChange, long sequence)
     {
         if (sequence == 0)
         {
-            this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, this.noopChangeManager));
+            this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this.noopChangeManager));
         }
 
         // update the image with the atomic changes in the runnable
-        final IRecord notifyImage = this.imageCache.updateInstance(name, atomicChange);
+        final IRecord notifyImage = this.imageCache.updateInstance(recordName, atomicChange);
 
         // this can happen if there is a concurrent delete
         if (notifyImage == null)
@@ -1306,7 +1305,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         long start;
         IRecordListener listener = null;
-        IRecordListener[] listenersToNotify = subscribersForRecord;
+
+        // NOTE: always get the subscribers to notify in the context of the handling the record
+        // change! If we had a snapshot of the subscribers taken outside of the context, we would
+        // miss the new listener and if the new listener was added and got its initial image
+        // first (could happen), it would never get this update - see addSingleObserver
+        IRecordListener[] listenersToNotify = this.recordObservers.getSubscribersFor(recordName);
 
         // if there are any pending initial images waiting, we need to ensure we
         // don't notify this update to the registered listener
@@ -1324,7 +1328,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // lead to a deadlock as the lock order with initialImagePending
                 // will then become broken
                 initialImagePending = this.listenersToNotifyWithInitialImages.get(listener);
-                if (initialImagePending != null && initialImagePending.contains(name))
+                if (initialImagePending != null && initialImagePending.contains(recordName))
                 {
                     // don't notify - let the initial image task do this
                     // as it will pass in a full image as the atomic change
@@ -1347,7 +1351,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 listener = listenersToNotify[i];
                 start = System.nanoTime();
                 listener.onChange(notifyImage, atomicChange);
-                ContextUtils.measureTask(name, "local record update", listener, (System.nanoTime() - start));
+                ContextUtils.measureTask(recordName, "local record update", listener, (System.nanoTime() - start));
             }
             catch (Exception e)
             {
