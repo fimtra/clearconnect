@@ -197,7 +197,7 @@ public abstract class DataFissionProperties
          * The name of the system property to define the period, in milliseconds, for a
          * {@link Publisher} to publish updates to the
          * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
-         * E.g. <code>-DdataFission.connectionsRecordPublishPeriodMillis=10000</code>
+         * E.g. <code>-DdataFission.connectionsRecordPublishPeriodMillis=30000</code>
          */
         String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = BASE + "connectionsRecordPublishPeriodMillis";
 
@@ -463,12 +463,12 @@ public abstract class DataFissionProperties
          * The period, in milliseconds, for a {@link Publisher} to publish updates to the
          * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
          * <p>
-         * Default is 10000.
+         * Default is 30000.
          * 
          * @see Names#CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS
          */
         long CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS =
-            Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "10000"));
+            Long.parseLong(System.getProperty(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, "30000"));
 
         /**
          * The maximum size for the rx frame handling tasks pool in a {@link ProxyContext}.<br>
