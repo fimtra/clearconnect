@@ -677,24 +677,27 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     @Override
     public void applyCompleteAtomicChangeToRecord(IRecord record)
     {
-        // user code should not be able to set sequences, hence the instance-of check
-        if (record instanceof Record)
+        synchronized (record.getWriteLock())
         {
-            ((Record) record).setSequence(this.sequence.get().longValue());
-        }
-
-        applyTo(record);
-
-        if (this.subMapAtomicChanges != null)
-        {
-            Map<String, IValue> subMap;
-            for (String subMapKey : this.subMapAtomicChanges.keySet())
+            // user code should not be able to set sequences, hence the instance-of check
+            if (record instanceof Record)
             {
-                subMap = record.getOrCreateSubMap(subMapKey);
-                getSubMapAtomicChange(subMapKey).applyTo(subMap);
-                if (subMap.size() == 0)
+                ((Record) record).setSequence(this.sequence.get().longValue());
+            }
+
+            applyTo(record);
+
+            if (this.subMapAtomicChanges != null)
+            {
+                Map<String, IValue> subMap;
+                for (String subMapKey : this.subMapAtomicChanges.keySet())
                 {
-                    record.removeSubMap(subMapKey);
+                    subMap = record.getOrCreateSubMap(subMapKey);
+                    getSubMapAtomicChange(subMapKey).applyTo(subMap);
+                    if (subMap.size() == 0)
+                    {
+                        record.removeSubMap(subMapKey);
+                    }
                 }
             }
         }

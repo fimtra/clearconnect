@@ -504,21 +504,24 @@ public class Publisher
             this.channel = channel;
                     
             // add the connection record static parts
-            final Map<String, IValue> submapConnections =
-                Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(channel));
-            final EndPointAddress endPointAddress = Publisher.this.server.getEndPointAddress();
-            final String clientSocket = channel.getEndPointDescription();
-            submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_ID,
-                TextValue.valueOf(Publisher.this.context.getName()));
-            submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_NODE,
-                TextValue.valueOf(endPointAddress.getNode()));
-            submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_PORT,
-                LongValue.valueOf(endPointAddress.getPort()));
-            submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, TextValue.valueOf(clientSocket));
-            submapConnections.put(IContextConnectionsRecordFields.PROTOCOL,
-                TextValue.valueOf(this.codec.getClass().getSimpleName()));
-            submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
-                TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
+            synchronized (Publisher.this.connectionsRecord)
+            {
+                final Map<String, IValue> submapConnections =
+                    Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(channel));
+                final EndPointAddress endPointAddress = Publisher.this.server.getEndPointAddress();
+                final String clientSocket = channel.getEndPointDescription();
+                submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_ID,
+                    TextValue.valueOf(Publisher.this.context.getName()));
+                submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_NODE,
+                    TextValue.valueOf(endPointAddress.getNode()));
+                submapConnections.put(IContextConnectionsRecordFields.PUBLISHER_PORT,
+                    LongValue.valueOf(endPointAddress.getPort()));
+                submapConnections.put(IContextConnectionsRecordFields.PROXY_ENDPOINT, TextValue.valueOf(clientSocket));
+                submapConnections.put(IContextConnectionsRecordFields.PROTOCOL,
+                    TextValue.valueOf(this.codec.getClass().getSimpleName()));
+                submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
+                    TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
+            }
             
             Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
             
@@ -558,8 +561,6 @@ public class Publisher
                         ProxyContextPublisher.this.statsUpdateTask.cancel(false);
                         return;
                     }
-                    final Map<String, IValue> submapConnections = Publisher.this.connectionsRecord.getOrCreateSubMap(
-                        transmissionStatisticsFieldName);
 
                     final long nanoTime = System.nanoTime();
                     final long l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
@@ -575,26 +576,32 @@ public class Publisher
                     this.lastTimeNanos = nanoTime;
                     final double inverse_1K = 1 / 1024d;
                  
-                    submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC,
-                        LongValue.valueOf((long) (intervalMessagesPublished * perSec)));
-                    submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC,
-                        DoubleValue.valueOf((((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
-                    submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
-                        LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
-                            : ProxyContextPublisher.this.bytesPublished
-                                / ProxyContextPublisher.this.messagesPublished));
-                    submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
-                        LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
-                    submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
-                        LongValue.valueOf((long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
-                    submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
-                        LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
-                    submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
-                        (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
-                    submapConnections.put(IContextConnectionsRecordFields.TX_QUEUE_SIZE,
-                        LongValue.valueOf(ProxyContextPublisher.this.channel.getTxQueueSize()));
-                    submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
-                        intervalMessagesPublished == 0 ? 0 : intervalBytesPublished / intervalMessagesPublished));
+                    synchronized (Publisher.this.connectionsRecord)
+                    {
+                        final Map<String, IValue> submapConnections =
+                            Publisher.this.connectionsRecord.getOrCreateSubMap(transmissionStatisticsFieldName);
+
+                        submapConnections.put(IContextConnectionsRecordFields.MSGS_PER_SEC,
+                            LongValue.valueOf((long) (intervalMessagesPublished * perSec)));
+                        submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC, DoubleValue.valueOf(
+                            (((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
+                        submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
+                            LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
+                                : ProxyContextPublisher.this.bytesPublished
+                                    / ProxyContextPublisher.this.messagesPublished));
+                        submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
+                            LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
+                        submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
+                            LongValue.valueOf((long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
+                        submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
+                            LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
+                        submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
+                            (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
+                        submapConnections.put(IContextConnectionsRecordFields.TX_QUEUE_SIZE,
+                            LongValue.valueOf(ProxyContextPublisher.this.channel.getTxQueueSize()));
+                        submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
+                            intervalMessagesPublished == 0 ? 0 : intervalBytesPublished / intervalMessagesPublished));
+                    }
 
                     if (ProxyContextPublisher.this.active)
                     {
@@ -867,31 +874,31 @@ public class Publisher
 
         this.subscribeTasks = new LinkedList<>();
         this.throttleTask = () -> {
-            this.throttleRunning = false;
+                this.throttleRunning = false;
 
-            Runnable task = null;
-            int size = 0;
-            do
-            {
-                synchronized (this.subscribeTasks)
+                Runnable task = null;
+                int size = 0;
+                do
                 {
-                    size = this.subscribeTasks.size();
-                    if (size > 0)
+                    synchronized (this.subscribeTasks)
                     {
-                        task = this.subscribeTasks.remove(0);
+                        size = this.subscribeTasks.size();
+                        if (size > 0)
+                        {
+                            task = this.subscribeTasks.remove(0);
+                        }
+                        size--;
                     }
-                    size--;
+                    if (task != null)
+                    {
+                        task.run();
+                    }
+                    if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
+                    {
+                        LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
+                    }
                 }
-                if (task != null)
-                {
-                    task.run();
-                }
-                if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
-                {
-                    LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
-                }
-            }
-            while (size > 0);
+                while (size > 0);
         };
 
         this.mainCodec = codec;
