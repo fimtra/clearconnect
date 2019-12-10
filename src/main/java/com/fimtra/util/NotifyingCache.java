@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -85,7 +84,14 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * also be occurring.
      */
     final Map<LISTENER_CLASS, Map<String, DATA>> listenersToNotifyWithInitialImages;
-    int listenersBeingNotifiedWithInitialImages;
+    volatile int listenersBeingNotifiedWithInitialImages;
+
+    /**
+     * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still
+     * not lose update order
+     */
+    final List<Runnable> notifyTasks;
+    final Runnable notifyingTasksRunner;
 
     /**
      * Construct a <b>synchronously</b> updating instance
@@ -125,6 +131,24 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.destructor = destructor;
         this.cache = new LinkedHashMap<>(2);
         this.listeners = new ArrayList<LISTENER_CLASS>(1);
+        this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
+        this.notifyingTasksRunner = () -> {
+            if (this.notifyTasks.size() > 0)
+            {
+                final Runnable task = this.notifyTasks.remove(0);
+                if (task != null)
+                {
+                    try
+                    {
+                        task.run();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(this, "Could not execute notification", e);
+                    }
+                }
+            }
+        };
         this.listenersToNotifyWithInitialImages = Collections.synchronizedMap(new HashMap<>());
         this.executor = executor;
         final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
@@ -320,7 +344,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 return false;
             }
 
-            List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
+            List<LISTENER_CLASS> copy = new ArrayList<>(this.listeners);
             final boolean removed = copy.remove(listener);
             // take another copy so we have the correct size
             copy = new ArrayList<LISTENER_CLASS>(copy);
@@ -398,7 +422,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 // order of execution
                 if (this.executor != SYNCHRONOUS_EXECUTOR)
                 {
-                    this.executor.execute(command);
+                    this.notifyTasks.add(command);
+                    this.executor.execute(this.notifyingTasksRunner);
                 }
             }
         }
@@ -454,7 +479,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 // order of execution
                 if (this.executor != SYNCHRONOUS_EXECUTOR)
                 {
-                    this.executor.execute(command);
+                    this.notifyTasks.add(command);
+                    this.executor.execute(this.notifyingTasksRunner);
                 }
             }
         }
@@ -489,12 +515,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             try
             {
                 // remove all data from the cache and trigger listeners
-                for (Iterator<Map.Entry<String, DATA>> it =
-                    new HashMap<>(this.cache).entrySet().iterator(); it.hasNext();)
+                for (String key : new HashSet<>(this.cache.keySet()))
                 {
-                    notifyListenersDataRemoved(it.next().getKey());
+                    notifyListenersDataRemoved(key);
                 }
-
                 this.listeners = Collections.emptyList();
                 this.cache.clear();
             }
