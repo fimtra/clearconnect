@@ -328,7 +328,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * also be occurring.
      */
     final Map<IRecordListener, Set<String>> listenersToNotifyWithInitialImages;
-    int listenersBeingNotifiedWithInitialImages;
+    volatile int listenersBeingNotifiedWithInitialImages;
 
     final ContextThrottle throttle;
 
@@ -803,18 +803,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 for (String name : recordNames)
                 {
                     // check if the observer has already been registered
-                    if (!initialImagePending.add(name))
-                    {
-                        continue;
-                    }
-
                     if (this.recordObservers.addSubscriberFor(name, observer))
                     {
                         subscriberAdded.add(name);
-                    }
-                    else
-                    {
-                        initialImagePending.remove(name);
+                        initialImagePending.add(name);
                     }
                 }
                 updateListenerCountsForInitialImages(observer, initialImagePending);
