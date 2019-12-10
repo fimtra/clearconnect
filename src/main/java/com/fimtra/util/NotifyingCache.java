@@ -284,14 +284,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
                                     if (data != null)
                                     {
-                                        try
-                                        {
-                                            notifyListenerDataAdded(listener, key, data);
-                                        }
-                                        catch (Exception e)
-                                        {
-                                            handleException(key, data, listener, e, "INITIAL IMAGE");
-                                        }
+                                        safeNotifyAdd(key, data, listener, "INITIAL IMAGE");
                                     }
                                 }
                             }
@@ -392,28 +385,14 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                                 continue;
                             }
 
-                            try
-                            {
-                                notifyListenerDataAdded(listener, key, data);
-                            }
-                            catch (Exception e)
-                            {
-                                handleException(key, data, listener, e, "ADD");
-                            }
+                            safeNotifyAdd(key, data, listener, "ADD");
                         }
                     }
                     else
                     {
                         for (LISTENER_CLASS listener : listenersToNotify)
                         {
-                            try
-                            {
-                                notifyListenerDataAdded(listener, key, data);
-                            }
-                            catch (Exception e)
-                            {
-                                handleException(key, data, listener, e, "ADD");
-                            }
+                            safeNotifyAdd(key, data, listener, "ADD");
                         }
                     }
                 };
@@ -464,14 +443,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                 command = () -> {
                     for (LISTENER_CLASS listener : listenersToNotify)
                     {
-                        try
-                        {
-                            notifyListenerDataRemoved(listener, key, removedData);
-                        }
-                        catch (Exception e)
-                        {
-                            handleException(key, removedData, listener, e, "REMOVE");
-                        }
+                        safeNotifyRemove(key, removedData, listener, "REMOVE");
                     }
                 };
 
@@ -495,6 +467,30 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
 
         return removed;
+    }
+
+    private final void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    {
+        try
+        {
+            notifyListenerDataAdded(listener, key, data);
+        }
+        catch (Exception e)
+        {
+            handleException(key, data, listener, e, action);
+        }
+    }
+
+    private final void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    {
+        try
+        {
+            notifyListenerDataRemoved(listener, key, data);
+        }
+        catch (Exception e)
+        {
+            handleException(key, data, listener, e, action);
+        }
     }
 
     void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e, String operation)
