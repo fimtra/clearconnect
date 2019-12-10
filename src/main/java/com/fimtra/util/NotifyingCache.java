@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -371,29 +372,35 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             {
                 final List<LISTENER_CLASS> listenersToNotify = this.listeners;
                 command = () -> {
+
+                    List<LISTENER_CLASS> localListenersRef = listenersToNotify;
+
                     // if there are listeners that are being notified with initial images
                     // signal an update will happen for this key
                     // THIS PREVENTS DUPLICATE NOTIFICATIONS
                     if (this.listenersBeingNotifiedWithInitialImages > 0)
                     {
-                        for (LISTENER_CLASS listener : listenersToNotify)
+                        // find the listeners to notify with this data
+                        localListenersRef = new LinkedList<>();
+                        synchronized (this.listenersToNotifyWithInitialImages)
                         {
-                            final Map<String, DATA> imagesNotified =
-                                this.listenersToNotifyWithInitialImages.get(listener);
-                            if (imagesNotified != null && is.eq(data, imagesNotified.put(key, data)))
+                            Map<String, DATA> imagesNotified;
+                            for (LISTENER_CLASS listener : listenersToNotify)
                             {
-                                continue;
+                                imagesNotified = this.listenersToNotifyWithInitialImages.get(listener);
+                                // check if this update is the first one to be sent to the new
+                                // listener
+                                if (imagesNotified == null || !is.eq(data, imagesNotified.put(key, data)))
+                                {
+                                    localListenersRef.add(listener);
+                                }
                             }
-
-                            safeNotifyAdd(key, data, listener, "ADD");
                         }
                     }
-                    else
+
+                    for (LISTENER_CLASS listener : localListenersRef)
                     {
-                        for (LISTENER_CLASS listener : listenersToNotify)
-                        {
-                            safeNotifyAdd(key, data, listener, "ADD");
-                        }
+                        safeNotifyAdd(key, data, listener, "ADD");
                     }
                 };
 
