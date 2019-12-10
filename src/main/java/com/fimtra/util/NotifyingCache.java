@@ -238,80 +238,66 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             final CountDownLatch latch = new CountDownLatch(1);
 
             final Runnable addTask = () -> {
+                final Set<String> keysSnapshot;
+                Map<String, DATA> notifiedData = null;
+
+                // hold the lock and add the listener in the task to ensure the listener is
+                // added and notified without clashing with a concurrent update
+                this.writeLock.lock();
                 try
                 {
-                    final Runnable command;
-                    final Set<String> keysSnapshot;
-
-                    // hold the lock and add the listener in the task to ensure the listener is
-                    // added and notified without clashing with a concurrent update
-                    this.writeLock.lock();
-                    try
+                    if (listener == null || this.listeners.contains(listener))
                     {
-                        if (listener == null || this.listeners.contains(listener))
-                        {
-                            return;
-                        }
-
-                        final Map<String, DATA> notifiedData = Collections.synchronizedMap(new HashMap<>());
-                        synchronized (this.listenersToNotifyWithInitialImages)
-                        {
-                            this.listenersToNotifyWithInitialImages.put(listener, notifiedData);
-                            this.listenersBeingNotifiedWithInitialImages =
-                                this.listenersToNotifyWithInitialImages.size();
-                        }
-
-                        final List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
-                        result.set(copy.add(listener));
-                        this.listeners = copy;
-
-                        latch.countDown();
-
-                        keysSnapshot = new LinkedHashSet<>(this.cache.keySet());
-                        command = () -> {
-                            try
-                            {
-                                DATA data;
-                                for (String key : keysSnapshot)
-                                {
-                                    // given the snapshot of the keys, get the "live" data
-                                    data = get(key);
-
-                                    if (is.eq(data, notifiedData.put(key, data)))
-                                    {
-                                        // already notified by a concurrent update
-                                        continue;
-                                    }
-
-                                    if (data != null)
-                                    {
-                                        safeNotifyAdd(key, data, listener, "INITIAL IMAGE");
-                                    }
-                                }
-                            }
-                            finally
-                            {
-                                synchronized (this.listenersToNotifyWithInitialImages)
-                                {
-                                    this.listenersToNotifyWithInitialImages.remove(listener);
-                                    this.listenersBeingNotifiedWithInitialImages =
-                                        this.listenersToNotifyWithInitialImages.size();
-                                }
-                            }
-                        };
-                    }
-                    finally
-                    {
-                        this.writeLock.unlock();
+                        return;
                     }
 
-                    command.run();
+                    notifiedData = Collections.synchronizedMap(new HashMap<>());
+                    synchronized (this.listenersToNotifyWithInitialImages)
+                    {
+                        this.listenersToNotifyWithInitialImages.put(listener, notifiedData);
+                        this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
+                    }
+
+                    final List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
+                    result.set(copy.add(listener));
+                    this.listeners = copy;
+
+                    keysSnapshot = new LinkedHashSet<>(this.cache.keySet());
                 }
                 finally
                 {
                     latch.countDown();
+                    this.writeLock.unlock();
                 }
 
+                try
+                {
+                    DATA data;
+                    for (String key : keysSnapshot)
+                    {
+                        // given the snapshot of the keys, get the "live" data
+                        data = get(key);
+
+                        if (is.eq(data, notifiedData.put(key, data)))
+                        {
+                            // already notified by a concurrent update
+                            continue;
+                        }
+
+                        if (data != null)
+                        {
+                            safeNotifyAdd(key, data, listener, "INITIAL IMAGE");
+                        }
+                    }
+                }
+                finally
+                {
+                    synchronized (this.listenersToNotifyWithInitialImages)
+                    {
+                        this.listenersToNotifyWithInitialImages.remove(listener);
+                        this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
+                    }
+                }
             };
 
             // use the image-notifier executor (unbounded threads) to handle initial image

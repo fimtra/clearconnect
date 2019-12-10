@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Vector;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -231,7 +232,7 @@ public class NotifyingCacheTest
             {
                 return 0;
             }
-            
+
             @Override
             public String getFailureReason()
             {
@@ -264,7 +265,19 @@ public class NotifyingCacheTest
         assertTrue(this.candidate.notifyListenersDataRemoved("1"));
         assertEquals(this.candidate.cache, this.candidate.getCacheSnapshot());
     }
-    
+
+    @Test
+    public void testAddDuplicateListener()
+    {
+        List<String> listener = new ArrayList<>();
+        assertTrue(this.candidate.addListener(listener));
+        long start = System.nanoTime();
+        final boolean secondAttempt = this.candidate.addListener(listener);
+        long end = System.nanoTime();
+        assertFalse(secondAttempt);
+        assertTrue((end - start) < 1_000_000_000 );
+    }
+
     @Test
     public void testAddDuplicatesData()
     {
@@ -272,17 +285,17 @@ public class NotifyingCacheTest
         assertFalse(this.candidate.notifyListenersDataRemoved(null));
         assertFalse(this.candidate.notifyListenersDataAdded("null", null));
         assertFalse(this.candidate.notifyListenersDataRemoved("null"));
-        
+
         assertTrue(this.candidate.notifyListenersDataAdded(null, "1"));
         assertFalse(this.candidate.notifyListenersDataAdded(null, "1"));
         assertTrue(this.candidate.notifyListenersDataRemoved(null));
         assertFalse(this.candidate.notifyListenersDataRemoved(null));
-        
+
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertFalse(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataRemoved("1"));
         assertFalse(this.candidate.notifyListenersDataRemoved("1"));
-        
+
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("1", null));
         assertFalse(this.candidate.notifyListenersDataAdded("1", null));
@@ -302,7 +315,7 @@ public class NotifyingCacheTest
             {
                 return listener.size();
             }
-            
+
             @Override
             public Object expect()
             {
@@ -320,7 +333,7 @@ public class NotifyingCacheTest
             {
                 return listener.size();
             }
-            
+
             @Override
             public Object expect()
             {
