@@ -55,17 +55,12 @@ import com.fimtra.util.LazyObject.IDestructor;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
-    final static Executor IMAGE_NOTIFIER =
+    private static final Executor IMAGE_NOTIFIER =
         new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
             ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
 
-    static final Executor SYNCHRONOUS_EXECUTOR = new Executor()
-    {
-        @Override
-        public void execute(Runnable command)
-        {
-            command.run();
-        }
+    private static final Executor SYNCHRONOUS_EXECUTOR = (command) -> {
+        command.run();
     };
 
     @SuppressWarnings("rawtypes")
@@ -390,13 +385,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                     }
                 };
 
-                // if asynchronous execution, add to the executor whilst holding the lock to ensure
-                // order of execution
-                if (this.executor != SYNCHRONOUS_EXECUTOR)
-                {
-                    this.notifyTasks.add(command);
-                    this.executor.execute(this.notifyingTasksRunner);
-                }
+                // add the notifying task whilst holding the lock to ensure order of execution
+                this.notifyTasks.add(command);
             }
         }
         finally
@@ -404,9 +394,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             this.writeLock.unlock();
         }
 
-        if (added && this.executor == SYNCHRONOUS_EXECUTOR)
+        if (added)
         {
-            this.executor.execute(command);
+            this.executor.execute(this.notifyingTasksRunner);
         }
 
         return added;
@@ -440,13 +430,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                     }
                 };
 
-                // if asynchronous execution, add to the executor whilst holding the lock to ensure
-                // order of execution
-                if (this.executor != SYNCHRONOUS_EXECUTOR)
-                {
-                    this.notifyTasks.add(command);
-                    this.executor.execute(this.notifyingTasksRunner);
-                }
+                // add the notifying task whilst holding the lock to ensure order of execution
+                this.notifyTasks.add(command);
             }
         }
         finally
@@ -454,9 +439,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             this.writeLock.unlock();
         }
 
-        if (removed && this.executor == SYNCHRONOUS_EXECUTOR)
+        if (removed)
         {
-            this.executor.execute(command);
+            this.executor.execute(this.notifyingTasksRunner);
         }
 
         return removed;
