@@ -1514,7 +1514,6 @@ public final class ProxyContext implements IObserverContext
         final IValue definition = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).get(name);
         if (definition == null)
         {
-            this.rpcTemplates.remove(name);
             return null;
         }
 
