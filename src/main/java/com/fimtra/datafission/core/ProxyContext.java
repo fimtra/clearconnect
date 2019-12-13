@@ -159,17 +159,17 @@ public final class ProxyContext implements IObserverContext
 
     static final String SUBSCRIBE = "subscribe";
     static final String UNSUBSCRIBE = "unsubscribe";
-    
-    static final AtomicLong MESSAGES_RECEIVED = new AtomicLong(); 
+
+    static final AtomicLong MESSAGES_RECEIVED = new AtomicLong();
     static final AtomicLong BYTES_RECEIVED = new AtomicLong();
-    
+
     private static final CountDownLatch DEFAULT_COUNT_DOWN_LATCH = new CountDownLatch(0);
 
     private static final int MINIMUM_RECONNECT_PERIOD_MILLIS = 50;
-    
+
     private static final Runnable NOOP = () -> {
     };
-    
+
     /**
      * Encapsulates all the remote system records. These are effectively the system records in a
      * remote context.
@@ -530,7 +530,7 @@ public final class ProxyContext implements IObserverContext
             this.data = data;
             this.source = source;
             this.receiver = receiver;
-            if(this.receiver != null)
+            if (this.receiver != null)
             {
                 this.proxyContext = receiver.proxyContext;
             }
@@ -545,7 +545,7 @@ public final class ProxyContext implements IObserverContext
             this.proxyContext = null;
             this.atomicChangeHandler.initialise(null, null, null);
         }
-        
+
         @Override
         public void run()
         {
@@ -928,13 +928,8 @@ public final class ProxyContext implements IObserverContext
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord image, IRecordChange atomicChange)
-            {
-                updateRpcTemplates(atomicChange);
-            }
+        this.context.addObserver((image, atomicChange) -> {
+            updateRpcTemplates(atomicChange);
         }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
@@ -1051,18 +1046,13 @@ public final class ProxyContext implements IObserverContext
     {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<IRecord> image = new AtomicReference<>();
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            if (latch.getCount() != 0)
             {
-                if (latch.getCount() != 0)
+                image.set(ImmutableSnapshotRecord.create(imageCopy));
+                if (imageCopy.size() > 0)
                 {
-                    image.set(ImmutableSnapshotRecord.create(imageCopy));
-                    if (imageCopy.size() > 0)
-                    {
-                        latch.countDown();
-                    }
+                    latch.countDown();
                 }
             }
         };
@@ -1696,7 +1686,7 @@ public final class ProxyContext implements IObserverContext
                 Log.log(this, "Not reconnecting proxy as it is not active: ", getShortName());
                 return;
             }
-            
+
             updateConnectionStatus(Connection.RECONNECTING);
 
             String endPoint = ObjectUtils.safeToString(this.channel);
@@ -1813,7 +1803,8 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) subscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")", (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToSubscribeFor) : ""));
+            Integer.toString(total), ")",
+            (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToSubscribeFor) : ""));
 
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
             insertPermissionToken(permissionToken, recordsToSubscribeFor)));
@@ -1865,7 +1856,8 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) unsubscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")", (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToUnsubscribe) : ""));
+            Integer.toString(total), ")",
+            (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToUnsubscribe) : ""));
 
         finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
 
