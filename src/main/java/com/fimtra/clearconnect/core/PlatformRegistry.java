@@ -1156,7 +1156,7 @@ final class EventHandler
     {
         final Set<String> hosts = new HashSet<>();
         final int agentCount;
-        synchronized (this.registry.runtimeStatus)
+        synchronized (this.registry.runtimeStatus.getWriteLock())
         {
             final Set<String> agentNames = this.registry.runtimeStatus.getSubMapKeys();
             agentCount = agentNames.size();
@@ -1168,7 +1168,7 @@ final class EventHandler
         }
 
         int serviceInstanceCount = 0;
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             for (String serviceName : this.registry.serviceInstancesPerServiceFamily.getSubMapKeys())
             {
@@ -1180,7 +1180,7 @@ final class EventHandler
         final int servicesCount = this.registry.services.size();
         final int connectionsCount = this.registry.platformConnections.getSubMapKeys().size();
 
-        synchronized (this.registry.platformSummary)
+        synchronized (this.registry.platformSummary.getWriteLock())
         {
             this.registry.platformSummary.put(IPlatformSummaryRecordFields.NODES, LongValue.valueOf(hosts.size()));
             this.registry.platformSummary.put(IPlatformSummaryRecordFields.SERVICES, LongValue.valueOf(servicesCount));
@@ -1218,7 +1218,7 @@ final class EventHandler
         }
 
         Map<String, IValue> serviceInstances = Collections.emptyMap();
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
             {
@@ -1389,7 +1389,7 @@ final class EventHandler
         // matching connections from the publisher that is now dead
         synchronized (this.connectionsLock)
         {
-            synchronized (this.registry.platformConnections)
+            synchronized (this.registry.platformConnections.getWriteLock())
             {
                 for (String connection : new HashSet<>(this.registry.platformConnections.getSubMapKeys()))
                 {
@@ -1431,7 +1431,7 @@ final class EventHandler
         // remove the service instance from the instances-per-agent
         Map<String, IValue> instancesPerAgent;
         Set<String> agentsWithNoServiceInstance = new HashSet<>();
-        synchronized (this.registry.serviceInstancesPerAgent)
+        synchronized (this.registry.serviceInstancesPerAgent.getWriteLock())
         {
             for (String agentName : this.registry.serviceInstancesPerAgent.getSubMapKeys())
             {
@@ -1771,7 +1771,7 @@ final class EventHandler
         // register the service member
         final Map<String, IValue> servicesInstancesForFamilySubMap;
         final int serviceFamilyInstancesSize;
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             servicesInstancesForFamilySubMap =
                 this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
@@ -1780,7 +1780,7 @@ final class EventHandler
         }
         publishTimed(this.registry.serviceInstancesPerServiceFamily);
 
-        synchronized (this.registry.serviceInstancesPerAgent)
+        synchronized (this.registry.serviceInstancesPerAgent.getWriteLock())
         {
             // register the service instance against the agent
             this.registry.serviceInstancesPerAgent.getOrCreateSubMap(agentName).put(serviceInstanceId,
@@ -1789,7 +1789,7 @@ final class EventHandler
         publishTimed(this.registry.serviceInstancesPerAgent);
 
         this.registry.services.put(serviceFamily, redundancyModeEnum.name());
-        synchronized (this.registry.serviceStats)
+        synchronized (this.registry.serviceStats.getWriteLock())
         {
             this.registry.serviceStats.getOrCreateSubMap(serviceFamily).put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
                 LongValue.valueOf(serviceFamilyInstancesSize));
@@ -1805,7 +1805,7 @@ final class EventHandler
     private void handleRpcRuntimeStatic(final IValue... args)
     {
         final String agentName = args[0].textValue();
-        synchronized (this.registry.runtimeStatus)
+        synchronized (this.registry.runtimeStatus.getWriteLock())
         {
             Map<String, IValue> runtimeRecord = this.registry.runtimeStatus.getOrCreateSubMap(agentName);
             runtimeRecord.put(PlatformRegistry.IRuntimeStatusRecordFields.RUNTIME_HOST, args[1]);
@@ -1821,7 +1821,7 @@ final class EventHandler
     {
         final String agentName = args[0].textValue();
         boolean publish = true;
-        synchronized (this.registry.runtimeStatus)
+        synchronized (this.registry.runtimeStatus.getWriteLock())
         {
             if (this.registry.runtimeStatus.getSubMapKeys().contains(agentName))
             {
@@ -1851,7 +1851,7 @@ final class EventHandler
     private void handleConnectionsUpdate_callInFamilyScope(final IRecordChange atomicChange, String serviceFamily,
         String serviceMember)
     {
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             // check if the service instance is still registered
             if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
@@ -1905,7 +1905,7 @@ final class EventHandler
                     }
                 }
 
-                synchronized (this.registry.platformConnections)
+                synchronized (this.registry.platformConnections.getWriteLock())
                 {
                     connection = this.registry.platformConnections.getOrCreateSubMap(connectionId);
                     subMapAtomicChange.applyTo(connection);
@@ -1923,7 +1923,7 @@ final class EventHandler
             }
 
             // aggregate stats at the service-level service
-            synchronized (this.registry.platformConnections)
+            synchronized (this.registry.platformConnections.getWriteLock())
             {
                 for (String connectionId : connectionIds)
                 {
@@ -1946,7 +1946,7 @@ final class EventHandler
             }
         }
 
-        synchronized (this.registry.serviceStats)
+        synchronized (this.registry.serviceStats.getWriteLock())
         {
             final Map<String, IValue> familyStats = this.registry.serviceStats.getOrCreateSubMap(serviceFamily);
             familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbPublished));
@@ -2111,7 +2111,7 @@ final class EventHandler
              * service level; if it exists in ANY service instance, it cannot be removed from the
              * service level
              */
-            final Map<String, IValue>[] objectsForEachServiceInstanceOfThisService =
+            final IRecord[] objectsForEachServiceInstanceOfThisService =
                 getObjectsForEachServiceInstanceOfThisServiceName(serviceFamily,
                     servicesObjectCountField == IServiceRecordFields.RECORD_COUNT);
 
@@ -2122,7 +2122,7 @@ final class EventHandler
                  * more occurrences of the object across all the service instances and thus we can
                  * remove the object from the service (serviceObjects) record
                  */
-                Map<String, IValue> objectsPerServiceInstance;
+                IRecord objectsPerServiceInstance;
                 final Set<String> removedEntryKeys = atomicChange.getRemovedEntries().keySet();
                 final Set<String> removedKeys = new HashSet<>(removedEntryKeys);
                 for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
@@ -2130,7 +2130,7 @@ final class EventHandler
                     if (removedKeys.size() > 0)
                     {
                         objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
-                        synchronized (objectsPerServiceInstance)
+                        synchronized (objectsPerServiceInstance.getWriteLock())
                         {
                             for (Iterator<String> iterator = removedKeys.iterator(); iterator.hasNext();)
                             {
@@ -2165,7 +2165,7 @@ final class EventHandler
                     for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
                     {
                         objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
-                        synchronized (objectsPerServiceInstance)
+                        synchronized (objectsPerServiceInstance.getWriteLock())
                         {
                             // aggregate the long value of all objects of the same name across all
                             // instances of this service
@@ -2247,7 +2247,7 @@ final class EventHandler
             return true;
         }
 
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             return (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily)
                 && !this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).containsKey(
@@ -2418,12 +2418,11 @@ final class EventHandler
         serviceProxy.removeObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, IValue>[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
+    private IRecord[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
         boolean objectsAreRecords)
     {
         String[] serviceInstancesNamesForThisServiceArray = null;
-        synchronized (this.registry.serviceInstancesPerServiceFamily)
+        synchronized (this.registry.serviceInstancesPerServiceFamily.getWriteLock())
         {
             if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
             {
@@ -2437,7 +2436,7 @@ final class EventHandler
 
         if (serviceInstancesNamesForThisServiceArray != null)
         {
-            final List<Map<String, IValue>> objectsForAllServiceInstancesOfThisService =
+            final List<IRecord> objectsForAllServiceInstancesOfThisService =
                 new ArrayList<>(serviceInstancesNamesForThisServiceArray.length);
             String serviceInstanceId;
             for (int i = 0; i < serviceInstancesNamesForThisServiceArray.length; i++)
@@ -2448,7 +2447,7 @@ final class EventHandler
                     ? getRecordsPerServiceInstance(serviceInstanceId) : getRpcsPerServiceInstance(serviceInstanceId));
             }
             return objectsForAllServiceInstancesOfThisService.toArray(
-                new Map[objectsForAllServiceInstancesOfThisService.size()]);
+                new IRecord[objectsForAllServiceInstancesOfThisService.size()]);
         }
         else
         {
@@ -2468,7 +2467,7 @@ final class EventHandler
 
         final LongValue recordCounts =
             LongValue.valueOf(this.registry.context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size());
-        synchronized (this.registry.serviceStats)
+        synchronized (this.registry.serviceStats.getWriteLock())
         {
             final Map<String, IValue> registryServiceSubMap =
                 this.registry.serviceStats.getOrCreateSubMap(PlatformRegistry.SERVICE_NAME);
