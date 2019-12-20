@@ -434,49 +434,33 @@ public final class PlatformRegistry
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
         this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,
             LongValue.valueOf(nextSequence()));
-        // todo replace with lambda
-        this.context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
-            {
-                PlatformRegistry.this.eventHandler.executeHandleRegistryRecordsUpdate(atomicChange);
-            }
-        }, ISystemRecordNames.CONTEXT_RECORDS);
+        this.context.addObserver(
+            (imageCopy,
+                atomicChange) -> PlatformRegistry.this.eventHandler.executeHandleRegistryRecordsUpdate(atomicChange),
+            ISystemRecordNames.CONTEXT_RECORDS);
 
         this.context.publishAtomicChange(this.services);
 
         // log when platform summary changes occur
-        this.context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
-            {
-                Log.log(PlatformRegistry.this, imageCopy.toString());
-            }
-        }, IRegistryRecordNames.PLATFORM_SUMMARY);
+        this.context.addObserver((imageCopy, atomicChange) -> Log.log(PlatformRegistry.this, imageCopy.toString()),
+            IRegistryRecordNames.PLATFORM_SUMMARY);
 
         // handle real-time updates for the platform summary
-        final IRecordListener platformSummaryListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        final IRecordListener platformSummaryListener = (imageCopy, atomicChange) -> {
+            PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
             {
-                PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
+                @Override
+                public void run()
                 {
-                    @Override
-                    public void run()
-                    {
-                        PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
-                    }
+                    PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
+                }
 
-                    @Override
-                    public Object context()
-                    {
-                        return IRegistryRecordNames.PLATFORM_SUMMARY;
-                    }
-                });
-            }
+                @Override
+                public Object context()
+                {
+                    return IRegistryRecordNames.PLATFORM_SUMMARY;
+                }
+            });
         };
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.RUNTIME_STATUS);
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICES);
@@ -484,14 +468,11 @@ public final class PlatformRegistry
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.PLATFORM_CONNECTIONS);
 
         // the registry's connections
-        this.context.addObserver(new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
-            {
-                PlatformRegistry.this.eventHandler.executeHandleRegistryConnectionsUpdate(atomicChange);
-            }
-        }, ISystemRecordNames.CONTEXT_CONNECTIONS, CachePolicyEnum.NO_IMAGE_NEEDED),
+        this.context.addObserver(
+            new CoalescingRecordListener(this.coalescingExecutor,
+                (imageCopy, atomicChange) -> PlatformRegistry.this.eventHandler.executeHandleRegistryConnectionsUpdate(
+                    atomicChange),
+                ISystemRecordNames.CONTEXT_CONNECTIONS, CachePolicyEnum.NO_IMAGE_NEEDED),
             ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         createGetServiceInfoRecordNameForServiceRpc();
@@ -800,21 +781,16 @@ final class EventHandler
             }
 
             final long now = System.currentTimeMillis();
-            SERVICES_LOG_EXECUTOR.execute(new Runnable()
-            {
-                @Override
-                public void run()
+            SERVICES_LOG_EXECUTOR.execute(() -> {
+                try
                 {
-                    try
-                    {
-                        SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(
-                            SystemUtils.lineSeparator());
-                        SERVICES_LOG.flush();
-                    }
-                    catch (IOException e)
-                    {
-                        Log.log(EventHandler.class, "Could not log service message", e);
-                    }
+                    SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(
+                        SystemUtils.lineSeparator());
+                    SERVICES_LOG.flush();
+                }
+                catch (IOException e)
+                {
+                    Log.log(EventHandler.class, "Could not log service message", e);
                 }
             });
         }
@@ -824,13 +800,8 @@ final class EventHandler
         }
     }
 
-    private final static IRecordListener NOOP_OBSERVER = new IRecordListener()
-    {
-        @Override
-        public void onChange(IRecord image, IRecordChange atomicChange)
-        {
-            // noop
-        }
+    private final static IRecordListener NOOP_OBSERVER = (imageCopy, atomicChange) -> {
+        // noop
     };
 
     private static interface IDescriptiveRunnable extends ISequentialRunnable
@@ -840,13 +811,8 @@ final class EventHandler
 
     static FutureTask<String> createStubFuture(final String serviceInstanceId)
     {
-        final FutureTask<String> futureTask = new FutureTask<>(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                // noop
-            }
+        final FutureTask<String> futureTask = new FutureTask<>(() -> {
+            // noop
         }, serviceInstanceId);
         futureTask.run();
         return futureTask;
@@ -1043,21 +1009,16 @@ final class EventHandler
         registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, agentName,
             serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
 
-        executeTaskWithIO(new Runnable()
-        {
-            @Override
-            public void run()
+        executeTaskWithIO(() -> {
+            try
             {
-                try
-                {
-                    registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily,
-                        agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology);
-                }
-                catch (Exception e)
-                {
-                    logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
-                        "Could not connect");
-                }
+                registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken, serviceFamily,
+                    agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology);
+            }
+            catch (Exception e)
+            {
+                logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
+                    "Could not connect");
             }
         });
     }
@@ -1246,7 +1207,7 @@ final class EventHandler
 
         final int servicesCount = this.registry.services.size();
         final int connectionsCount = this.registry.platformConnections.getSubMapKeys().size();
-        
+
         synchronized (this.registry.platformSummary)
         {
             this.registry.platformSummary.put(IPlatformSummaryRecordFields.NODES, LongValue.valueOf(hosts.size()));
@@ -1716,102 +1677,89 @@ final class EventHandler
 
         if (RedundancyModeEnum.FAULT_TOLERANT == redundancyModeEnum)
         {
-            // todo replace anon with lambda
-            executeTaskWithIO(new Runnable()
-            {
-                @Override
-                public void run()
+            executeTaskWithIO(() -> {
+                // always trigger standby first
+                if (callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false))
                 {
-                    // always trigger standby first
-                    if (callFtServiceStatusRpc(registrationToken, serviceFamily, serviceInstanceId, false))
+                    // after calling standby, continue with the rest of the registration
+                    execute(new IDescriptiveRunnable()
                     {
-                        // after calling standby, continue with the rest of the registration
-                        execute(new IDescriptiveRunnable()
+                        @Override
+                        public String getDescription()
                         {
-                            @Override
-                            public String getDescription()
-                            {
-                                return "publishServiceDetails:" + serviceInstanceId;
-                            }
+                            return "publishServiceDetails:" + serviceInstanceId;
+                        }
 
-                            @Override
-                            public Object context()
-                            {
-                                return serviceFamily;
-                            }
+                        @Override
+                        public Object context()
+                        {
+                            return serviceFamily;
+                        }
 
-                            @Override
-                            public void run()
+                        @Override
+                        public void run()
+                        {
+                            try
                             {
-                                try
-                                {
-                                    registerStep4_publishServiceDetails(agentName, serviceInstanceId,
-                                        serviceRecordStructure, redundancyModeEnum, serviceFamily, serviceMember);
+                                registerStep4_publishServiceDetails(agentName, serviceInstanceId,
+                                    serviceRecordStructure, redundancyModeEnum, serviceFamily, serviceMember);
 
-                                    // todo replace anon with lambda
-                                    executeTaskWithIO(new Runnable()
+                                executeTaskWithIO(() -> {
+                                    try
                                     {
-                                        @Override
-                                        public void run()
+                                        registerStep5_registerListenersForServiceInstance(serviceFamily, serviceMember,
+                                            serviceInstanceId, serviceProxy);
+
+                                        // this will ensure the service FT signals are
+                                        // triggered
+                                        execute(new IDescriptiveRunnable()
                                         {
-                                            try
+                                            @Override
+                                            public String getDescription()
                                             {
-                                                registerStep5_registerListenersForServiceInstance(serviceFamily,
-                                                    serviceMember, serviceInstanceId, serviceProxy);
+                                                return "ftService_selectNextInstance:" + serviceInstanceId;
+                                            }
 
-                                                // this will ensure the service FT signals are
-                                                // triggered
-                                                execute(new IDescriptiveRunnable()
+                                            @Override
+                                            public Object context()
+                                            {
+                                                return serviceFamily;
+                                            }
+
+                                            @Override
+                                            public void run()
+                                            {
+                                                try
                                                 {
-                                                    @Override
-                                                    public String getDescription()
-                                                    {
-                                                        return "ftService_selectNextInstance:" + serviceInstanceId;
-                                                    }
+                                                    selectNextInstance_callInFamilyScope(serviceFamily,
+                                                        "register " + registrationToken);
 
-                                                    @Override
-                                                    public Object context()
-                                                    {
-                                                        return serviceFamily;
-                                                    }
-
-                                                    @Override
-                                                    public void run()
-                                                    {
-                                                        try
-                                                        {
-                                                            selectNextInstance_callInFamilyScope(serviceFamily,
-                                                                "register " + registrationToken);
-
-                                                            banner(EventHandler.this,
-                                                                "Registered " + registrationToken + " "
-                                                                    + redundancyModeEnum + " (monitoring with "
-                                                                    + serviceProxy.getChannelString() + ")");
-                                                        }
-                                                        catch (Exception e)
-                                                        {
-                                                            logExceptionAndDeregister_familyScope(registrationToken,
-                                                                serviceInstanceId, e);
-                                                        }
-                                                    }
-                                                });
+                                                    banner(EventHandler.this,
+                                                        "Registered " + registrationToken + " " + redundancyModeEnum
+                                                            + " (monitoring with " + serviceProxy.getChannelString()
+                                                            + ")");
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    logExceptionAndDeregister_familyScope(registrationToken,
+                                                        serviceInstanceId, e);
+                                                }
                                             }
-                                            catch (Exception e)
-                                            {
-                                                logExceptionAndExecuteDeregister(registrationToken, serviceFamily,
-                                                    serviceInstanceId, e,
-                                                    "Could not register service record listeners");
-                                            }
-                                        }
-                                    });
-                                }
-                                catch (Exception e)
-                                {
-                                    logExceptionAndDeregister_familyScope(registrationToken, serviceInstanceId, e);
-                                }
+                                        });
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        logExceptionAndExecuteDeregister(registrationToken, serviceFamily,
+                                            serviceInstanceId, e, "Could not register service record listeners");
+                                    }
+                                });
                             }
-                        });
-                    }
+                            catch (Exception e)
+                            {
+                                logExceptionAndDeregister_familyScope(registrationToken, serviceInstanceId, e);
+                            }
+                        }
+                    });
                 }
             });
         }
@@ -1822,24 +1770,19 @@ final class EventHandler
             registerStep4_publishServiceDetails(agentName, serviceInstanceId, serviceRecordStructure,
                 redundancyModeEnum, serviceFamily, serviceMember);
 
-            executeTaskWithIO(new Runnable()
-            {
-                @Override
-                public void run()
+            executeTaskWithIO(() -> {
+                try
                 {
-                    try
-                    {
-                        registerStep5_registerListenersForServiceInstance(serviceFamily, serviceMember,
-                            serviceInstanceId, serviceProxy);
+                    registerStep5_registerListenersForServiceInstance(serviceFamily, serviceMember, serviceInstanceId,
+                        serviceProxy);
 
-                        banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyModeEnum
-                            + " (monitoring with " + serviceProxy.getChannelString() + ")");
-                    }
-                    catch (Exception e)
-                    {
-                        logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
-                            "Could not register service record listeners");
-                    }
+                    banner(EventHandler.this, "Registered " + registrationToken + " " + redundancyModeEnum
+                        + " (monitoring with " + serviceProxy.getChannelString() + ")");
+                }
+                catch (Exception e)
+                {
+                    logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
+                        "Could not register service record listeners");
                 }
             });
         }
@@ -2074,54 +2017,46 @@ final class EventHandler
             activeServiceInstanceId))
         {
             final AtomicReference<FutureTask<String>> futureTaskRef = new AtomicReference<>();
-            final FutureTask<String> futureTask = new FutureTask<>(new Runnable()
-            {
-                @Override
-                public void run()
+            final FutureTask<String> futureTask = new FutureTask<>(() -> {
+                try
                 {
-                    try
+                    if (previousMasterInstance != null)
                     {
-                        if (previousMasterInstance != null)
+                        final RegistrationToken previousInstanceRegistrationToken =
+                            EventHandler.this.registrationTokenPerInstance.get(previousMasterInstance);
+                        if (previousInstanceRegistrationToken != null)
                         {
-                            final RegistrationToken previousInstanceRegistrationToken =
-                                EventHandler.this.registrationTokenPerInstance.get(previousMasterInstance);
-                            if (previousInstanceRegistrationToken != null)
-                            {
-                                callFtServiceStatusRpc(previousInstanceRegistrationToken, serviceFamily,
-                                    previousMasterInstance, false);
-                            }
-                            else
-                            {
-                                Log.log(EventHandler.this,
-                                    "Not signalling STANDBY instance (no registration token found, it has probably been deregistered already): '",
-                                    previousMasterInstance, "'");
-                            }
+                            callFtServiceStatusRpc(previousInstanceRegistrationToken, serviceFamily,
+                                previousMasterInstance, false);
+                        }
+                        else
+                        {
+                            Log.log(EventHandler.this,
+                                "Not signalling STANDBY instance (no registration token found, it has probably been deregistered already): '",
+                                previousMasterInstance, "'");
                         }
                     }
-                    catch (Exception e)
-                    {
-                        Log.log(EventHandler.this, "Could not signal STANDBY instance '" + previousMasterInstance + "'",
-                            e);
-                    }
+                }
+                catch (Exception e)
+                {
+                    Log.log(EventHandler.this, "Could not signal STANDBY instance '" + previousMasterInstance + "'", e);
+                }
 
-                    boolean signalMasterInstanceResult = false;
-                    try
-                    {
-                        signalMasterInstanceResult =
-                            callFtServiceStatusRpc(registrationToken, serviceFamily, activeServiceInstanceId, true);
-                    }
-                    catch (Exception e)
-                    {
-                        Log.log(EventHandler.this, "Could not signal MASTER instance " + registrationToken, e);
-                    }
+                boolean signalMasterInstanceResult = false;
+                try
+                {
+                    signalMasterInstanceResult =
+                        callFtServiceStatusRpc(registrationToken, serviceFamily, activeServiceInstanceId, true);
+                }
+                catch (Exception e)
+                {
+                    Log.log(EventHandler.this, "Could not signal MASTER instance " + registrationToken, e);
+                }
 
-                    if (!signalMasterInstanceResult)
-                    {
-                        EventHandler.this.pendingMasterInstancePerFtService.remove(serviceFamily,
-                            activeServiceInstanceId);
-                        EventHandler.this.confirmedMasterInstancePerFtService.remove(serviceFamily,
-                            futureTaskRef.get());
-                    }
+                if (!signalMasterInstanceResult)
+                {
+                    EventHandler.this.pendingMasterInstancePerFtService.remove(serviceFamily, activeServiceInstanceId);
+                    EventHandler.this.confirmedMasterInstancePerFtService.remove(serviceFamily, futureTaskRef.get());
                 }
             }, activeServiceInstanceId);
             futureTaskRef.set(futureTask);
@@ -2321,17 +2256,12 @@ final class EventHandler
             {
                 if (this.pendingPublish.add(record.getName()))
                 {
-                    this.publishExecutor.schedule(new Runnable()
-                    {
-                        @Override
-                        public void run()
+                    this.publishExecutor.schedule(() -> {
+                        synchronized (EventHandler.this.pendingPublish)
                         {
-                            synchronized (EventHandler.this.pendingPublish)
-                            {
-                                EventHandler.this.pendingPublish.remove(record.getName());
-                            }
-                            EventHandler.this.registry.context.publishAtomicChange(record);
+                            EventHandler.this.pendingPublish.remove(record.getName());
                         }
+                        EventHandler.this.registry.context.publishAtomicChange(record);
                     }, PlatformCoreProperties.Values.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
                 }
             }
@@ -2387,152 +2317,130 @@ final class EventHandler
         final String serviceMember, final String serviceInstanceId, final ProxyContext serviceProxy)
     {
         // add a listener to get the service-level statistics
-        serviceProxy.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+        serviceProxy.addObserver((imageCopy, atomicChange) -> {
+            execute(new IDescriptiveRunnable()
             {
-                EventHandler.this.execute(new IDescriptiveRunnable()
+                @Override
+                public String getDescription()
                 {
-                    @Override
-                    public String getDescription()
-                    {
-                        return "handle service stats record change: " + serviceProxy.getName();
-                    }
+                    return "handle service stats record change: " + serviceProxy.getName();
+                }
 
-                    @Override
-                    public Object context()
-                    {
-                        return serviceFamily;
-                    }
+                @Override
+                public Object context()
+                {
+                    return serviceFamily;
+                }
 
-                    @Override
-                    public void run()
+                @Override
+                public void run()
+                {
+                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                     {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeServiceStats(serviceInstanceId);
-                        }
-                        else
-                        {
-                            final Map<String, IValue> statsForService =
-                                EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
-                            statsForService.putAll(imageCopy);
-                            publishTimed(EventHandler.this.registry.serviceInstanceStats);
-                        }
+                        removeServiceStats(serviceInstanceId);
                     }
-                });
-            }
+                    else
+                    {
+                        final Map<String, IValue> statsForService =
+                            EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
+                        statsForService.putAll(imageCopy);
+                        publishTimed(EventHandler.this.registry.serviceInstanceStats);
+                    }
+                }
+            });
         }, PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
 
         // add a listener to cache the context connections record of the service locally in
         // the platformConnections record
-        serviceProxy.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        serviceProxy.addObserver((imageCopy, atomicChange) -> {
+            execute(new IDescriptiveRunnable()
             {
-                EventHandler.this.execute(new IDescriptiveRunnable()
+                @Override
+                public String getDescription()
                 {
-                    @Override
-                    public String getDescription()
-                    {
-                        return "handleConnectionsUpdate: " + serviceProxy.getName();
-                    }
+                    return "handleConnectionsUpdate: " + serviceProxy.getName();
+                }
 
-                    @Override
-                    public Object context()
-                    {
-                        return serviceFamily;
-                    }
+                @Override
+                public Object context()
+                {
+                    return serviceFamily;
+                }
 
-                    @Override
-                    public void run()
-                    {
-                        handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
-                    }
-                });
-            }
+                @Override
+                public void run()
+                {
+                    handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
+                }
+            });
         }, REMOTE_CONTEXT_CONNECTIONS);
 
         // add listeners to handle platform objects published by this instance
-        serviceProxy.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        serviceProxy.addObserver((imageCopy, atomicChange) -> {
+            execute(new IDescriptiveRunnable()
             {
-                EventHandler.this.execute(new IDescriptiveRunnable()
+                @Override
+                public String getDescription()
                 {
-                    @Override
-                    public String getDescription()
-                    {
-                        return "handle RemoteContextRecords record change: " + serviceProxy.getName();
-                    }
+                    return "handle RemoteContextRecords record change: " + serviceProxy.getName();
+                }
 
-                    @Override
-                    public Object context()
-                    {
-                        return serviceFamily;
-                    }
+                @Override
+                public Object context()
+                {
+                    return serviceFamily;
+                }
 
-                    @Override
-                    public void run()
+                @Override
+                public void run()
+                {
+                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                     {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                        }
-                        else
-                        {
-                            final IRecord serviceInstanceObjectsRecord =
-                                getRecordsPerServiceInstance(serviceInstanceId);
-                            final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
-                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                                serviceInstanceObjectsRecord, serviceObjectsRecord, true,
-                                IServiceRecordFields.RECORD_COUNT);
-                        }
+                        removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
                     }
-                });
-            }
+                    else
+                    {
+                        final IRecord serviceInstanceObjectsRecord = getRecordsPerServiceInstance(serviceInstanceId);
+                        final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
+                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                            serviceInstanceObjectsRecord, serviceObjectsRecord, true,
+                            IServiceRecordFields.RECORD_COUNT);
+                    }
+                }
+            });
         }, REMOTE_CONTEXT_RECORDS);
 
-        serviceProxy.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        serviceProxy.addObserver((imageCopy, atomicChange) -> {
+            execute(new IDescriptiveRunnable()
             {
-                EventHandler.this.execute(new IDescriptiveRunnable()
+                @Override
+                public String getDescription()
                 {
-                    @Override
-                    public String getDescription()
-                    {
-                        return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
-                    }
+                    return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
+                }
 
-                    @Override
-                    public Object context()
-                    {
-                        return serviceFamily;
-                    }
+                @Override
+                public Object context()
+                {
+                    return serviceFamily;
+                }
 
-                    @Override
-                    public void run()
+                @Override
+                public void run()
+                {
+                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                     {
-                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                        {
-                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                        }
-                        else
-                        {
-                            final IRecord serviceInstanceObjectsRecord = getRpcsPerServiceInstance(serviceInstanceId);
-                            final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
-                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                                serviceInstanceObjectsRecord, serviceObjectsRecord, false,
-                                IServiceRecordFields.RPC_COUNT);
-                        }
+                        removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
                     }
-                });
-            }
+                    else
+                    {
+                        final IRecord serviceInstanceObjectsRecord = getRpcsPerServiceInstance(serviceInstanceId);
+                        final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
+                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                            serviceInstanceObjectsRecord, serviceObjectsRecord, false, IServiceRecordFields.RPC_COUNT);
+                    }
+                }
+            });
         }, REMOTE_CONTEXT_RPCS);
         // remove the NOOP observer as we have a real listener attached to the RPC record now
         serviceProxy.removeObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
