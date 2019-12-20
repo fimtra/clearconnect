@@ -84,10 +84,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
 
         // set the channel builder factory to use an end-point factory that gets end-points from the
         // registry
-        this.proxyContext.setTransportChannelBuilderFactory(
-            TransportChannelBuilderFactoryLoader.load(codec.getFrameEncodingFormat(), () -> {
-                return getServiceEndPointAddress();
-            }));
+        this.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
+            codec.getFrameEncodingFormat(), () -> getServiceEndPointAddress()));
 
         this.rpcAvailableNotifyingCache =
             new LazyObject<>(() -> PlatformUtils.createRpcAvailableNotifyingCache(this.proxyContext,
