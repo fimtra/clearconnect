@@ -960,7 +960,7 @@ final class EventHandler
             @Override
             public String getDescription()
             {
-                return context().toString();
+                return "handleRpcRuntimeDynamic";
             }
 
             @Override
@@ -984,7 +984,7 @@ final class EventHandler
             @Override
             public String getDescription()
             {
-                return "handleRpcStaticRuntime";
+                return "handleRpcRuntimeStatic";
             }
 
             @Override
@@ -996,7 +996,7 @@ final class EventHandler
             @Override
             public void run()
             {
-                handleRpcStaticRuntime(args);
+                handleRpcRuntimeStatic(args);
             }
         });
     }
@@ -1075,8 +1075,7 @@ final class EventHandler
             @Override
             public Object context()
             {
-                // todo should this be PlatformRegistry.SERVICE_NAME
-                return RUNTIME_STATUS;
+                return PlatformRegistry.SERVICE_NAME;
             }
 
             @Override
@@ -1804,7 +1803,7 @@ final class EventHandler
         publishTimed(this.registry.services);
     }
 
-    private void handleRpcStaticRuntime(final IValue... args)
+    private void handleRpcRuntimeStatic(final IValue... args)
     {
         final String agentName = args[0].textValue();
         synchronized (this.registry.runtimeStatus)
