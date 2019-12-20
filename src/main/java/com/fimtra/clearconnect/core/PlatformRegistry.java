@@ -452,7 +452,7 @@ public final class PlatformRegistry
                 @Override
                 public void run()
                 {
-                    PlatformRegistry.this.eventHandler.executeComputePlatformSummary();
+                    PlatformRegistry.this.eventHandler.computePlatformSummary();
                 }
 
                 @Override
@@ -1154,33 +1154,7 @@ final class EventHandler
         return result.get();
     }
 
-    void executeComputePlatformSummary()
-    {
-        // todo this could end up having many executions on the sequential queueu
-        // todo better to run with the coalescing executor
-        execute(new IDescriptiveRunnable()
-        {
-            @Override
-            public String getDescription()
-            {
-                return "computePlatformSummary";
-            }
-
-            @Override
-            public Object context()
-            {
-                return RUNTIME_STATUS;
-            }
-
-            @Override
-            public void run()
-            {
-                computePlatformSummary();
-            }
-        });
-    }
-
-    private void computePlatformSummary()
+    void computePlatformSummary()
     {
         final Set<String> hosts = new HashSet<>();
         final int agentCount;
@@ -2257,11 +2231,11 @@ final class EventHandler
                 if (this.pendingPublish.add(record.getName()))
                 {
                     this.publishExecutor.schedule(() -> {
-                        synchronized (EventHandler.this.pendingPublish)
+                        synchronized (this.pendingPublish)
                         {
-                            EventHandler.this.pendingPublish.remove(record.getName());
+                            this.pendingPublish.remove(record.getName());
                         }
-                        EventHandler.this.registry.context.publishAtomicChange(record);
+                        this.registry.context.publishAtomicChange(record);
                     }, PlatformCoreProperties.Values.REGISTRY_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
                 }
             }
