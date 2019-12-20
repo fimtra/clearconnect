@@ -230,47 +230,42 @@ public class PlatformUtils
                     listener.onServiceUnavailable(data);
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            final Set<String> newServices = atomicChange.getPutEntries().keySet();
+            final List<String> toLog = new LinkedList<>();
+            for (String serviceFamily : newServices)
             {
-                final Set<String> newServices = atomicChange.getPutEntries().keySet();
-                final List<String> toLog = new LinkedList<>();
-                for (String serviceFamily : newServices)
+                if (ContextUtils.isSystemRecordName(serviceFamily))
                 {
-                    if (ContextUtils.isSystemRecordName(serviceFamily))
-                    {
-                        continue;
-                    }
-                    if (serviceAvailableListeners.notifyListenersDataAdded(serviceFamily, serviceFamily))
-                    {
-                        toLog.add(serviceFamily);
-                    }
+                    continue;
                 }
-                if (toLog.size() > 0)
+                if (serviceAvailableListeners.notifyListenersDataAdded(serviceFamily, serviceFamily))
                 {
-                    Log.log(logContext, "Services available: ", toLog.toString());
+                    toLog.add(serviceFamily);
                 }
-                toLog.clear();
-                final Set<String> removedServices = atomicChange.getRemovedEntries().keySet();
-                for (String serviceFamily : removedServices)
-                {
-                    if (ContextUtils.isSystemRecordName(serviceFamily))
-                    {
-                        continue;
-                    }
-                    if (serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
-                    {
-                        toLog.add(serviceFamily);
-                    }
-                }
-                if (toLog.size() > 0)
-                {
-                    Log.log(logContext, "Services lost: ", toLog.toString());
-                }
-                updateWaitLatch.countDown();
             }
+            if (toLog.size() > 0)
+            {
+                Log.log(logContext, "Services available: ", toLog.toString());
+            }
+            toLog.clear();
+            final Set<String> removedServices = atomicChange.getRemovedEntries().keySet();
+            for (String serviceFamily : removedServices)
+            {
+                if (ContextUtils.isSystemRecordName(serviceFamily))
+                {
+                    continue;
+                }
+                if (serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
+                {
+                    toLog.add(serviceFamily);
+                }
+            }
+            if (toLog.size() > 0)
+            {
+                Log.log(logContext, "Services lost: ", toLog.toString());
+            }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         context.addObserver(observer, servicesRecordName);
@@ -305,38 +300,30 @@ public class PlatformUtils
                     listener.onServiceInstanceUnavailable(data);
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            /*
+             * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT the
+             * service instance ID), value=system time when registered/last used}
+             */
+            IRecordChange changesForService;
+            String serviceInstanceId;
+            for (String serviceFamily : atomicChange.getSubMapKeys())
             {
-                /*
-                 * sub-map key: serviceFamily sub-map structure: {key=service member name (NOT the
-                 * service instance ID), value=system time when registered/last used}
-                 */
-                IRecordChange changesForService;
-                String serviceInstanceId;
-                for (String serviceFamily : atomicChange.getSubMapKeys())
+                changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
+                Set<String> newServices = changesForService.getPutEntries().keySet();
+                for (String serviceMember : newServices)
                 {
-                    changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
-                    Set<String> newServices = changesForService.getPutEntries().keySet();
-                    for (String serviceMember : newServices)
-                    {
-                        serviceInstanceId =
-                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId,
-                            serviceInstanceId);
-                    }
-                    Set<String> removedServices = changesForService.getRemovedEntries().keySet();
-                    for (String serviceMember : removedServices)
-                    {
-                        serviceInstanceId =
-                            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                        serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId);
-                    }
+                    serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                    serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId, serviceInstanceId);
                 }
-                updateWaitLatch.countDown();
+                Set<String> removedServices = changesForService.getRemovedEntries().keySet();
+                for (String serviceMember : removedServices)
+                {
+                    serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+                    serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstanceId);
+                }
             }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         context.addObserver(observer, serviceInstancesPerServiceRecordName);
@@ -369,23 +356,18 @@ public class PlatformUtils
                     listener.onRecordUnavailable(data);
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            Set<String> newRecords = atomicChange.getPutEntries().keySet();
+            for (String recordName : newRecords)
             {
-                Set<String> newRecords = atomicChange.getPutEntries().keySet();
-                for (String recordName : newRecords)
-                {
-                    recordAvailableNotifyingCache.notifyListenersDataAdded(recordName, recordName);
-                }
-                Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
-                for (String recordName : removedRecords)
-                {
-                    recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName);
-                }
-                updateWaitLatch.countDown();
+                recordAvailableNotifyingCache.notifyListenersDataAdded(recordName, recordName);
             }
+            Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
+            for (String recordName : removedRecords)
+            {
+                recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName);
+            }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         context.addObserver(observer, contextRecordsRecordName);
@@ -418,40 +400,36 @@ public class PlatformUtils
                     listener.onRpcUnavailable(data);
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            Log.log(logContext, "RPC change: " + atomicChange.toString());
+            Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
+            for (Entry<String, IValue> newRpc : newRpcs)
             {
-                Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
-                for (Entry<String, IValue> newRpc : newRpcs)
+                final IRpcInstance rpc = context.getRpc(newRpc.getKey());
+                if (rpc != null)
                 {
-                    final IRpcInstance rpc = context.getRpc(newRpc.getKey());
-                    if (rpc != null)
+                    if (rpcAvailableNotifyingCache.notifyListenersDataAdded(rpc.getName(), rpc))
                     {
-                        if (rpcAvailableNotifyingCache.notifyListenersDataAdded(rpc.getName(), rpc))
-                        {
-                            Log.log(logContext, "RPC available: '", newRpc.getKey(), "' in ",
-                                ObjectUtils.safeToString(logContext));
-                        }
-                    }
-                    else
-                    {
-                        Log.log(logContext, "RPC '", newRpc.getKey(), "' available but not found in ",
+                        Log.log(logContext, "RPC available: '", newRpc.getKey(), "' in ",
                             ObjectUtils.safeToString(logContext));
                     }
                 }
-                Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
-                for (Entry<String, IValue> removedRpc : removedRpcs)
+                else
                 {
-                    if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(removedRpc.getKey()))
-                    {
-                        Log.log(logContext, "RPC removed: '", removedRpc.getKey(), "' in ",
-                            ObjectUtils.safeToString(logContext));
-                    }
+                    Log.log(logContext, "RPC '", newRpc.getKey(), "' available but not found in ",
+                        ObjectUtils.safeToString(logContext));
                 }
-                updateWaitLatch.countDown();
             }
+            Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
+            for (Entry<String, IValue> removedRpc : removedRpcs)
+            {
+                if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(removedRpc.getKey()))
+                {
+                    Log.log(logContext, "RPC removed: '", removedRpc.getKey(), "' in ",
+                        ObjectUtils.safeToString(logContext));
+                }
+            }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         context.addObserver(observer, contextRpcRecordName);
@@ -486,41 +464,36 @@ public class PlatformUtils
                     // noop
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
+            for (Entry<String, IValue> subsription : subscriptions)
             {
-                Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
-                for (Entry<String, IValue> subsription : subscriptions)
+                IValue previous = atomicChange.getOverwrittenEntries().get(subsription.getKey());
+                int previousSubscriberCount = 0;
+                if (previous != null)
                 {
-                    IValue previous = atomicChange.getOverwrittenEntries().get(subsription.getKey());
-                    int previousSubscriberCount = 0;
-                    if (previous != null)
-                    {
-                        previousSubscriberCount = (int) previous.longValue();
-                    }
-                    int currentSubscriberCount = (int) subsription.getValue().longValue();
-                    SubscriptionInfo info =
-                        new SubscriptionInfo(subsription.getKey(), currentSubscriberCount, previousSubscriberCount);
-                    subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
+                    previousSubscriberCount = (int) previous.longValue();
                 }
-
-                Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
-                for (Entry<String, IValue> removed : removedSubscriptions)
-                {
-                    int currentSubscriberCount = 0;
-                    int previousSubscriberCount = (int) removed.getValue().longValue();
-                    SubscriptionInfo info =
-                        new SubscriptionInfo(removed.getKey(), currentSubscriberCount, previousSubscriberCount);
-                    subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
-                    if (currentSubscriberCount == 0)
-                    {
-                        subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName());
-                    }
-                }
-                updateWaitLatch.countDown();
+                int currentSubscriberCount = (int) subsription.getValue().longValue();
+                SubscriptionInfo info =
+                    new SubscriptionInfo(subsription.getKey(), currentSubscriberCount, previousSubscriberCount);
+                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
             }
+
+            Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
+            for (Entry<String, IValue> removed : removedSubscriptions)
+            {
+                int currentSubscriberCount = 0;
+                int previousSubscriberCount = (int) removed.getValue().longValue();
+                SubscriptionInfo info =
+                    new SubscriptionInfo(removed.getKey(), currentSubscriberCount, previousSubscriberCount);
+                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
+                if (currentSubscriberCount == 0)
+                {
+                    subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName());
+                }
+            }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         context.addObserver(observer, contextSubscriptionsRecordName);
@@ -568,24 +541,19 @@ public class PlatformUtils
                     }
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            Map.Entry<String, IValue> entry = null;
+            String key = null;
+            IValue value = null;
+            for (Iterator<Map.Entry<String, IValue>> it =
+                atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
             {
-                Map.Entry<String, IValue> entry = null;
-                String key = null;
-                IValue value = null;
-                for (Iterator<Map.Entry<String, IValue>> it =
-                    atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
-                {
-                    entry = it.next();
-                    key = entry.getKey();
-                    value = entry.getValue();
-                    recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
-                }
-                updateWaitLatch.countDown();
+                entry = it.next();
+                key = entry.getKey();
+                value = entry.getValue();
+                recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
             }
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         proxyContext.addObserver(observer, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
@@ -717,15 +685,10 @@ public class PlatformUtils
                     }
                 }
             };
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(final IRecord imageCopy, IRecordChange atomicChange)
-            {
-                Connection status = IStatusAttribute.Utils.getStatus(Connection.class, imageCopy);
-                serviceStatusNotifyingCache.notifyListenersDataAdded(Connection.class.getSimpleName(), status);
-                updateWaitLatch.countDown();
-            }
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            Connection status = IStatusAttribute.Utils.getStatus(Connection.class, imageCopy);
+            serviceStatusNotifyingCache.notifyListenersDataAdded(Connection.class.getSimpleName(), status);
+            updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
         proxyContext.addObserver(observer, ISystemRecordNames.CONTEXT_STATUS);
