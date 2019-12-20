@@ -504,7 +504,7 @@ public class Publisher
             this.channel = channel;
                     
             // add the connection record static parts
-            synchronized (Publisher.this.connectionsRecord)
+            synchronized (Publisher.this.connectionsRecord.getWriteLock())
             {
                 final Map<String, IValue> submapConnections =
                     Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(channel));
@@ -576,7 +576,7 @@ public class Publisher
                     this.lastTimeNanos = nanoTime;
                     final double inverse_1K = 1 / 1024d;
                  
-                    synchronized (Publisher.this.connectionsRecord)
+                    synchronized (Publisher.this.connectionsRecord.getWriteLock())
                     {
                         final Map<String, IValue> submapConnections =
                             Publisher.this.connectionsRecord.getOrCreateSubMap(transmissionStatisticsFieldName);
