@@ -871,7 +871,6 @@ final class EventHandler
     {
         if (this.eventCount.incrementAndGet() % 50 == 0)
         {
-            // todo ideally we want to see any grouping of contexts to identify busy service family
             Log.log(this, "*** Event queue: " + this.eventCount.get());
         }
 
@@ -1100,7 +1099,7 @@ final class EventHandler
             @Override
             public Object context()
             {
-                return RUNTIME_STATUS;
+                return PlatformRegistry.SERVICE_NAME;
             }
 
             @Override
