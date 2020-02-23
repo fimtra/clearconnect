@@ -85,44 +85,57 @@ public class PlatformRegistryTest
             final String suffix = i + "-" + System.nanoTime();
             agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
             agents[i].setRegistryReconnectPeriodMillis(500);
-            agents[i].addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
-            {
-                @Override
-                public void onRegistryDisconnected()
+            agents[i].addRegistryAvailableListener(
+                EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
                 {
-                    disconnectedLatch.get().countDown();
-                }
+                    @Override
+                    public void onRegistryDisconnected()
+                    {
+                        disconnectedLatch.get().countDown();
+                    }
 
-                @Override
-                public void onRegistryConnected()
-                {
-                    connectedLatch.get().countDown();
-                }
-            }));
+                    @Override
+                    public void onRegistryConnected()
+                    {
+                        connectedLatch.get().countDown();
+                    }
+                }));
         }
-        assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
-        this.candidate.destroy();
-        assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
-
-        connectedLatch.set(new CountDownLatch(MAX));
-
-        this.candidate = null;
-        int i = 0;
-        while (this.candidate == null && i++ < 60)
+        try
         {
-            try
+            assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
+            this.candidate.destroy();
+            assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
+
+            connectedLatch.set(new CountDownLatch(MAX));
+
+            this.candidate = null;
+            int i = 0;
+            while (this.candidate == null && i++ < 60)
             {
-                this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+                try
+                {
+                    this.candidate =
+                        new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                }
             }
-            catch (Exception e)
+
+            final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
+            assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
+
+        }
+        finally
+        {
+            for (PlatformRegistryAgent agent : agents)
             {
-                e.printStackTrace();
-                Thread.sleep(1000);
+                agent.destroy();
             }
         }
-        
-        final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
-        assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
     }
 
     @Test

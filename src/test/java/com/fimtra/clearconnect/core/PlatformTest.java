@@ -22,21 +22,20 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -62,10 +61,12 @@ import com.fimtra.clearconnect.event.IRecordSubscriptionListener;
 import com.fimtra.clearconnect.event.IRecordSubscriptionListener.SubscriptionInfo;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
+import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 import com.fimtra.datafission.core.RpcInstance;
@@ -282,7 +283,7 @@ public class PlatformTest
     static int servicePort2 = 33001;
     static int servicePort = 32001;
     static int registryPort = 31001;
-    
+
     PlatformRegistry registry;
     PlatformRegistryAgent agent, agent008;
 
@@ -305,15 +306,13 @@ public class PlatformTest
 
     void createAgent() throws IOException
     {
-        this.agent =
-            new PlatformRegistryAgent(getAgentName(), this.registryHost, registryPort);
+        this.agent = new PlatformRegistryAgent(getAgentName(), this.registryHost, registryPort);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
     }
 
     void createAgent008() throws IOException
     {
-        this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008", this.registryHost,
-            registryPort);
+        this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008", this.registryHost, registryPort);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
     }
 
@@ -336,11 +335,11 @@ public class PlatformTest
                 {
                     PlatformTest.this.agent008.destroy();
                 }
-                
-                Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName() + " =============================");
+
+                Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName()
+                    + " =============================");
             }
         }, "tearDown-" + this.name.getMethodName()).start();
-
 
         ChannelUtils.WATCHDOG.configure(5000);
     }
@@ -385,7 +384,7 @@ public class PlatformTest
                 Thread.sleep(1000);
             }
         }
-        
+
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
         this.registry.publisher.publishContextConnectionsRecordAtPeriod(RECONNECT_PERIOD / 2);
 
@@ -495,29 +494,31 @@ public class PlatformTest
         final SubscriptionInfo expectedSubscriptionInfo = new SubscriptionInfo("record1", 1, 0);
 
         final CountDownLatch s1latch = new CountDownLatch(1);
-        IRecordSubscriptionListener s1recordListener = EventListenerUtils.synchronizedListener((new IRecordSubscriptionListener()
-        {
-            @Override
-            public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+        IRecordSubscriptionListener s1recordListener =
+            EventListenerUtils.synchronizedListener((new IRecordSubscriptionListener()
             {
-                if (subscriptionInfo.equals(expectedSubscriptionInfo))
+                @Override
+                public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
                 {
-                    s1latch.countDown();
+                    if (subscriptionInfo.equals(expectedSubscriptionInfo))
+                    {
+                        s1latch.countDown();
+                    }
                 }
-            }
-        }));
+            }));
         final CountDownLatch s2latch = new CountDownLatch(1);
-        IRecordSubscriptionListener s2recordListener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
-        {
-            @Override
-            public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+        IRecordSubscriptionListener s2recordListener =
+            EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
             {
-                if (subscriptionInfo.equals(expectedSubscriptionInfo))
+                @Override
+                public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
                 {
-                    s2latch.countDown();
+                    if (subscriptionInfo.equals(expectedSubscriptionInfo))
+                    {
+                        s2latch.countDown();
+                    }
                 }
-            }
-        });
+            });
 
         s1.addRecordSubscriptionListener(s1recordListener);
         s2.addRecordSubscriptionListener(s2recordListener);
@@ -534,6 +535,43 @@ public class PlatformTest
 
         assertTrue("Did not get notified for record1", s1latch.await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         assertTrue("Did not get notified for record1", s2latch.await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testConnectionsToFaultToleranceService() throws InterruptedException, IOException
+    {
+        final String SERVICE1 = logStart();
+        createAgent();
+        assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        final PlatformServiceInstance platformServiceInstance =
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
+        platformServiceInstance.addRecordListener((image, change) -> {
+            for (String subMapKey : change.getSubMapKeys())
+            {
+                // the submap has been removed due to the change
+                if (!image.containsKey(subMapKey))
+                {
+                    latch.countDown();
+                }
+            }
+        }, ISystemRecordNames.CONTEXT_CONNECTIONS);
+
+        final IPlatformServiceProxy proxy = this.agent.getPlatformServiceProxy(SERVICE1);
+
+        IServiceConnectionStatusListener listener = mock(IServiceConnectionStatusListener.class);
+        proxy.addServiceConnectionStatusListener(listener);
+        verify(listener, timeout(2000).times(1)).onConnected(eq(SERVICE1), anyInt());
+
+        // simulate changing FT master state
+        platformServiceInstance.doSetFtState(Boolean.FALSE);
+
+        verify(listener, timeout(1000).times(1)).onDisconnected(eq(SERVICE1), anyInt());
+        verify(listener, timeout(2000).times(2)).onConnected(eq(SERVICE1), anyInt());
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
     }
 
     @Test
@@ -1080,8 +1118,8 @@ public class PlatformTest
         int newPort = registryPort += 1;
 
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
-        this.agent = new PlatformRegistryAgent(getAgentName(),
-            new EndPointAddress(this.registryHost, oldPort), alternate);
+        this.agent =
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
@@ -1152,8 +1190,8 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent = new PlatformRegistryAgent(getAgentName(),
-            new EndPointAddress(this.registryHost, oldPort), alternate);
+        this.agent =
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008",
@@ -1332,8 +1370,8 @@ public class PlatformTest
         int newPort = registryPort += 1;
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
-        this.agent = new PlatformRegistryAgent(getAgentName(),
-            new EndPointAddress(this.registryHost, oldPort), alternate);
+        this.agent =
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
@@ -1447,8 +1485,7 @@ public class PlatformTest
         this.registry.destroy();
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost);
 
-        this.agent = new PlatformRegistryAgent(getAgentName(),
-            this.registry.publisher.getEndPointAddress().getNode());
+        this.agent = new PlatformRegistryAgent(getAgentName(), this.registry.publisher.getEndPointAddress().getNode());
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         verifyPlatformName(this.agent);
@@ -1460,7 +1497,7 @@ public class PlatformTest
 
     String getAgentName()
     {
-        return PlatformUtils.composeHostQualifiedName() + "-" + this.name.getMethodName();
+        return "agent:" + PlatformUtils.composeHostQualifiedName() + "-" + this.name.getMethodName();
     }
 
     String getPlatformName()
@@ -1490,14 +1527,14 @@ public class PlatformTest
             }
         };
         this.agent.registryProxy.addObserver(serviceListener, PlatformRegistry.IRegistryRecordNames.SERVICES);
-        
+
         final long timeoutSecs = 5;
         assertTrue(serviceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
         assertNotNull("Got: " + serviceRecordImage.get(), serviceRecordImage.get());
         assertEquals("Got: " + serviceRecordImage.get(), 1, serviceRecordImage.get().size());
 
         serviceLatch.set(new CountDownLatch(1));
-        
+
         final AtomicReference<CountDownLatch> serviceInstanceLatch =
             new AtomicReference<CountDownLatch>(new CountDownLatch(2));
         final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<IRecord>();
@@ -1899,7 +1936,7 @@ public class PlatformTest
         int SERVICE1_SECONDARY_RECORD_COUNT = 7;
         int SERVICE2_PRIMARY_RECORD_COUNT = 7;
         int SERVICE2_SECONDARY_RECORD_COUNT = 7;
-        
+
         final String service1_primary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
         final String service1_secondary = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
         final String service2_primary = PlatformUtils.composePlatformServiceInstanceID(SERVICE2, this.primary);
@@ -1921,7 +1958,6 @@ public class PlatformTest
         checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
         checkServiceInstanceContainsRecord(SERVICE2, this.primary, "LB_REC1");
         checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC1");
-    
 
         // publish a second record
         lb2.createRecord("LB_REC2");
@@ -1964,8 +2000,7 @@ public class PlatformTest
         checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
         checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC1");
         checkServiceInstanceContainsRecord(SERVICE2, this.secondary, "LB_REC2");
-         
-  
+
         // we will be removing these records (lb2)
         // service2.LB_REC2=SLB_REC2
         // service2.LB_REC1=SLB_REC1
@@ -1973,7 +2008,7 @@ public class PlatformTest
         // after this, LB_REC1 is gone from the LB service (so this service now only has 1 instance
         // live with 6 records)
         this.agent008.destroyPlatformServiceInstance(SERVICE2, this.secondary);
-        
+
         checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE1), SERVICE1_RECORD_COUNT);
         checkRecordSize(this.registry.eventHandler.getRecordsPerServiceFamily(SERVICE2), SERVICE2_RECORD_COUNT - 1);
 
@@ -1983,11 +2018,10 @@ public class PlatformTest
             SERVICE1_SECONDARY_RECORD_COUNT);
         checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_primary),
             SERVICE2_PRIMARY_RECORD_COUNT - 1);
-        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary),
-            0);
+        checkRecordSize(this.registry.eventHandler.getRecordsPerServiceInstance(service2_secondary), 0);
 
         checkServiceInstanceContainsRecord(SERVICE1, this.primary, "FT_REC1");
-        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");    
+        checkServiceInstanceContainsRecord(SERVICE1, this.secondary, "FT_REC1");
     }
 
     void waitForPrimaryToBeActive(final String SERVICE1)

@@ -127,7 +127,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         TransportTechnologyEnum transportTechnology)
     {
         this.startTimeMillis = System.currentTimeMillis();
-        
+
         this.platformName = platformName;
         this.serviceFamily = serviceFamily;
         this.serviceMember = serviceMember;
@@ -145,76 +145,75 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.context =
             new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), coreExecutor,
                 rpcExecutor, utilityExecutor);
-        
+
         this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
-        
+
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
-        
+
         // update service stats periodically
         this.statsUpdateTask = this.context.getUtilityExecutor().scheduleWithFixedDelay(
             new Runnable()
+        {
+            long lastMessagesPublished = 0;
+            long lastBytesPublished = 0;
+            long lastTimeNanos;
+
+            @Override
+            public void run()
             {
-                long lastMessagesPublished = 0;
-                long lastBytesPublished = 0;
-                long lastTimeNanos;
-                
-                @Override
-                public void run()
+                IRecord subscriptions =
+                    PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+
+                int subscriptionCount = 0;
+                for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
                 {
-                    IRecord subscriptions =
-                        PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-
-                    int subscriptionCount = 0;
-                    for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
-                    {
-                        subscriptionCount += it.next().getValue().longValue();
-                    }
-
-                    final long nanoTime = System.nanoTime();
-                    // can be null on the first call
-                    final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                        : PlatformServiceInstance.this.publisher.getMessagesPublished();
-                    final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                        : PlatformServiceInstance.this.publisher.getBytesPublished();
-
-                    final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
-                    final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
-
-                    this.lastMessagesPublished = messagesPublished;
-                    this.lastBytesPublished = bytesPublished;
-
-                    final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
-                    this.lastTimeNanos = nanoTime;
-                    final double inverse_1K = 1 / 1024d;
-
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
-                        DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_PER_SEC,
-                        DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
-                        // use the period stats for calculating the average message size
-                        LongValue.valueOf(
-                            msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
-                        LongValue.valueOf(subscriptionCount));
-                    PlatformServiceInstance.this.stats.put(
-                        IServiceStatsRecordFields.UPTIME,
-                        LongValue.valueOf((long) ((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) * 0.001d)));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
-                        LongValue.valueOf(messagesPublished));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
-                        LongValue.valueOf((long) (bytesPublished * inverse_1K)));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RECORD_COUNT,
-                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
-                    PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
-                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
-
-
-                    PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
+                    subscriptionCount += it.next().getValue().longValue();
                 }
-            }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
-        
+
+                final long nanoTime = System.nanoTime();
+                // can be null on the first call
+                final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
+                    : PlatformServiceInstance.this.publisher.getMessagesPublished();
+                final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
+                    : PlatformServiceInstance.this.publisher.getBytesPublished();
+
+                final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
+                final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
+
+                this.lastMessagesPublished = messagesPublished;
+                this.lastBytesPublished = bytesPublished;
+
+                final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
+                this.lastTimeNanos = nanoTime;
+                final double inverse_1K = 1 / 1024d;
+
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
+                    DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_PER_SEC,
+                    DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
+                    // use the period stats for calculating the average message size
+                    LongValue.valueOf(
+                        msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
+                    LongValue.valueOf(subscriptionCount));
+                PlatformServiceInstance.this.stats.put(
+                    IServiceStatsRecordFields.UPTIME,
+                    LongValue.valueOf((long) ((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) * 0.001d)));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
+                    LongValue.valueOf(messagesPublished));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
+                    LongValue.valueOf((long) (bytesPublished * inverse_1K)));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RECORD_COUNT,
+                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
+                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
+                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
+
+                PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
+            }
+        }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+
         this.recordAvailableNotifyingCache =
             PlatformUtils.createRecordAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RECORDS, this);
         this.rpcAvailableNotifyingCache =
@@ -242,7 +241,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         // NOTE: we need to return the actual port used by the publisher for transport assigned port
         // (e.g. ephemeral port for TCP)
         this.endPointAddress = new EndPointAddress(host, this.publisher.getEndPointAddress().getPort());
-        
+
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
@@ -306,7 +305,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         return this.context.getRpc(rpcName);
     }
-    
+
     @Override
     public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
         ExecutionException
@@ -582,7 +581,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             @Override
             public boolean accept(String permissionToken, String recordName)
             {
-                if(SERVICE_STATS_RECORD_NAME.equals(recordName))
+                if (SERVICE_STATS_RECORD_NAME.equals(recordName))
                 {
                     return true;
                 }
@@ -596,7 +595,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         return this.context.getName();
     }
-
 
     void setFtState(final Boolean isMaster)
     {
@@ -617,11 +615,25 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (!isFtMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
         {
+            final Boolean previousState = this.isFtMasterInstance;
             this.isFtMasterInstance = isFtMaster;
-            
+
             final boolean isMaster = isFtMaster.booleanValue();
-            
+
             Log.banner(this, this.toString() + " " + (isMaster ? "ACTIVE" : "STANDBY"));
+
+            // if we are not the master but previously we were, we need to cut all connections so
+            // proxies reconnect to the new master
+            if (!isFtMaster.booleanValue() && previousState != null)
+            {
+                // "->PlatformRegistry"
+                final String registryConnection =
+                    PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
+                
+                // disconnect all clients EXCEPT the registry connection
+                this.publisher.disconnectClients("No longer master instance",
+                    (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
+            }
 
             for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
             {

@@ -112,6 +112,10 @@ public class PlatformUtils
                     }
                     break;
                 }
+                else
+                {
+                    version = "";
+                }
             }
         }
         catch (Exception e)

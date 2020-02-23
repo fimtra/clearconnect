@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -32,6 +33,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Function;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointService;
@@ -94,7 +96,7 @@ public class Publisher
      * Controls logging of outbound traffic. Only the first 200 bytes per message are logged.
      */
     public static boolean logTx = Boolean.getBoolean("logTx." + ProxyContextPublisher.class.getCanonicalName());
-    
+
     /**
      * Controls logging of:
      * <ul>
@@ -110,9 +112,9 @@ public class Publisher
      * {@link ISystemRecordNames#CONTEXT_STATUS}
      */
     public static final String ATTR_DELIM = ",";
-    
-    static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong(); 
-    static final AtomicLong BYTES_PUBLISHED = new AtomicLong(); 
+
+    static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong();
+    static final AtomicLong BYTES_PUBLISHED = new AtomicLong();
 
     /**
      * @return the field name for the transmission statistics for a connection to a single
@@ -160,7 +162,7 @@ public class Publisher
 
     final Object lock;
     final AtomicLong subscribeCounter = new AtomicLong();
-    
+
     /**
      * This converts each record's atomic change into the <code>byte[]</code> to transmit and
      * notifies the relevant {@link ProxyContextPublisher} objects that have subscribed for the
@@ -227,7 +229,7 @@ public class Publisher
                 handleRecordChange(atomicChange);
             }
         }
-        
+
         void handleRecordChange(IRecordChange atomicChange)
         {
             final AtomicChange[] parts = this.teleporter.split((AtomicChange) atomicChange);
@@ -248,18 +250,18 @@ public class Publisher
                 for (int i = 0; i < parts.length; i++)
                 {
                     txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
-                    
+
                     loopBroadcastCount = this.service.broadcast(name, txMessage, clients);
-                    bytesPublished +=  loopBroadcastCount * txMessage.length;
+                    bytesPublished += loopBroadcastCount * txMessage.length;
                     broadcastCount += loopBroadcastCount;
-                   
+
                     // even if the service is broadcast capable, perform this loop to capture stats
                     for (j = 0; j < clients.length; j++)
                     {
                         clients[j].publish(txMessage, false, name);
                     }
                 }
-                
+
                 Publisher.this.messagesPublished += broadcastCount;
                 MESSAGES_PUBLISHED.addAndGet(broadcastCount);
                 Publisher.this.bytesPublished += bytesPublished;
@@ -268,7 +270,7 @@ public class Publisher
             else
             {
                 txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(atomicChange);
-                
+
                 broadcastCount = this.service.broadcast(name, txMessage, clients);
 
                 Publisher.this.messagesPublished += broadcastCount;
@@ -494,7 +496,7 @@ public class Publisher
         String identity;
         volatile boolean active;
         boolean codecSyncExpected;
-        
+
         ProxyContextPublisher(ITransportChannel channel, ICodec codec)
         {
             this.active = true;
@@ -502,7 +504,7 @@ public class Publisher
             this.codec = codec;
             this.start = System.currentTimeMillis();
             this.channel = channel;
-                    
+
             // add the connection record static parts
             synchronized (Publisher.this.connectionsRecord.getWriteLock())
             {
@@ -522,9 +524,9 @@ public class Publisher
                 submapConnections.put(IContextConnectionsRecordFields.TRANSPORT,
                     TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
             }
-            
+
             Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
-            
+
             scheduleStatsUpdateTask();
 
             Log.log(this, "Constructed for ", ObjectUtils.safeToString(channel));
@@ -541,7 +543,7 @@ public class Publisher
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
                 long lastTimeNanos;
-                
+
                 @Override
                 public void run()
                 {
@@ -553,7 +555,7 @@ public class Publisher
                             logFirstPublishDone();
                         }
                     }
-                    
+
                     final String transmissionStatisticsFieldName =
                         getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel);
                     if (!Publisher.this.connectionsRecord.getSubMapKeys().contains(transmissionStatisticsFieldName))
@@ -575,7 +577,7 @@ public class Publisher
                     final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
                     this.lastTimeNanos = nanoTime;
                     final double inverse_1K = 1 / 1024d;
-                 
+
                     synchronized (Publisher.this.connectionsRecord.getWriteLock())
                     {
                         final Map<String, IValue> submapConnections =
@@ -621,7 +623,7 @@ public class Publisher
             }
             this.bytesPublished += txMessage.length;
             this.messagesPublished++;
-            
+
             // peek at the size before attempting the synchronize block
             if (logVerboseSubscribes && this.firstPublishPending.size() > 0)
             {
@@ -676,7 +678,7 @@ public class Publisher
                 Log.log(ProxyContextPublisher.this, "Could not subscribe " + names, e);
             }
         }
-        
+
         void unsubscribe(Collection<String> names)
         {
             try
@@ -735,13 +737,13 @@ public class Publisher
                 copy = CollectionUtils.newHashSet(this.subscriptions);
             }
             unsubscribe(copy);
-            
+
             if (Publisher.this.connectionsRecord.removeSubMap(
                 getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel)) != null)
             {
                 Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
             }
-            
+
             Log.log(this, "Destroyed ", this.identity, ", removed ", Integer.toString(copy.size()), " subscriptions (",
                 Long.toString(System.currentTimeMillis() - time), "ms)");
         }
@@ -825,7 +827,7 @@ public class Publisher
     final List<Runnable> subscribeTasks;
     final Runnable throttleTask;
     volatile boolean throttleRunning;
-    
+
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
      * {@link ProxyContext} objects.
@@ -874,31 +876,31 @@ public class Publisher
 
         this.subscribeTasks = new LinkedList<>();
         this.throttleTask = () -> {
-                this.throttleRunning = false;
+            this.throttleRunning = false;
 
-                Runnable task = null;
-                int size = 0;
-                do
+            Runnable task = null;
+            int size = 0;
+            do
+            {
+                synchronized (this.subscribeTasks)
                 {
-                    synchronized (this.subscribeTasks)
+                    size = this.subscribeTasks.size();
+                    if (size > 0)
                     {
-                        size = this.subscribeTasks.size();
-                        if (size > 0)
-                        {
-                            task = this.subscribeTasks.remove(0);
-                        }
-                        size--;
+                        task = this.subscribeTasks.remove(0);
                     }
-                    if (task != null)
-                    {
-                        task.run();
-                    }
-                    if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
-                    {
-                        LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
-                    }
+                    size--;
                 }
-                while (size > 0);
+                if (task != null)
+                {
+                    task.run();
+                }
+                if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
+                {
+                    LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
+                }
+            }
+            while (size > 0);
         };
 
         this.mainCodec = codec;
@@ -1053,7 +1055,7 @@ public class Publisher
             });
 
         this.multiplexer = new ProxyContextMultiplexer(this.server);
-        
+
         // prepare to periodically publish status changes
         this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
     }
@@ -1221,7 +1223,7 @@ public class Publisher
             subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
         }
     }
-    
+
     private void subscribeBatch(final List<String> recordNames, final ITransportChannel client,
         final String permissionToken, int current, int total)
     {
@@ -1295,7 +1297,7 @@ public class Publisher
         if (proxyContextPublisher == null)
         {
             // ProxyContextPublisher only constructed on channel connection!
-            throw new NullPointerException(                
+            throw new NullPointerException(
                 "No ProxyContextPublisher for " + ObjectUtils.safeToString(client) + ", is the channel closed?");
         }
         return proxyContextPublisher;
@@ -1330,6 +1332,17 @@ public class Publisher
         {
             this.throttleRunning = true;
             SUBSCRIBE_THROTTLE.execute(this.throttleTask);
+        }
+    }
+
+    public void disconnectClients(String reason, Function<String, Boolean> connectionIdentityCheck)
+    {
+        for (Entry<ITransportChannel, ProxyContextPublisher> entry : this.proxyContextPublishers.entrySet())
+        {
+            if (Boolean.TRUE == connectionIdentityCheck.apply(entry.getValue().identity))
+            {
+                entry.getKey().destroy(reason);
+            }
         }
     }
 }
