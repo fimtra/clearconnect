@@ -69,6 +69,8 @@ public class ShadowRegistryTest
         final int millis = 5000;
         verify(listener, timeout(millis)).onRegistryConnected();
 
+        Thread.sleep(1000);
+        
         this.primary.destroy();
 
         verify(listener, timeout(millis)).onRegistryDisconnected();
