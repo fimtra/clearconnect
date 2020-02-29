@@ -103,19 +103,19 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             DeadlockDetector.newDeadlockDetectorTask(DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS,
                 new DeadlockObserver()
-            {
-                @Override
-                public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
                 {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                    for (int i = 0; i < deadlocks.length; i++)
+                    @Override
+                    public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
                     {
-                        sb.append(deadlocks[i].toString());
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
+                        for (int i = 0; i < deadlocks.length; i++)
+                        {
+                            sb.append(deadlocks[i].toString());
+                        }
+                        System.err.println(sb.toString());
                     }
-                    System.err.println(sb.toString());
-                }
-            }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
+                }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -297,17 +297,23 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /**
      * Tracks pending atomic changes to records. An entry for a record only exists if there is an
      * observer for the record, otherwise there is no need to track changes.
+     * <p>
+     * Access with record lock (locking record)
      */
-    final ConcurrentMap<String, AtomicChange> pendingAtomicChanges;
-    final ConcurrentMap<String, IRpcInstance> rpcInstances;
-    final ConcurrentMap<String, AtomicLong> sequences;
-    final ConcurrentMap<String, List<IRecordChange>> coalescingChanges;
+    final Map<String, AtomicChange> pendingAtomicChanges;
+    /** cheap read-write lock semantics */
+    volatile Map<String, IRpcInstance> rpcInstances;
+    /**
+     * Tracks sequence counts per record name
+     * <p>
+     * Access with record lock (locking record)
+     */
+    final Map<String, AtomicLong> sequences;
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
     final IContextExecutor rpcExecutor;
     final IContextExecutor coreExecutor;
-    @Deprecated
     final IContextExecutor systemExecutor;
     final ScheduledExecutorService utilityExecutor;
     final Object recordCreateLock;
@@ -374,17 +380,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             + "-" + UUID.randomUUID();
 
         final int initialSize = 1024;
-        this.sequences = new ConcurrentHashMap<>(initialSize);
+        this.sequences = new HashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
         this.records = new ConcurrentHashMap<>(initialSize);
-        this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
+        this.pendingAtomicChanges = new HashMap<>(initialSize);
         this.tokenPerRecord = new ConcurrentHashMap<>(initialSize);
-        this.coalescingChanges = new ConcurrentHashMap<>(initialSize);
-        this.rpcInstances = new ConcurrentHashMap<>();
+        this.rpcInstances = new HashMap<>();
         this.validators = new CopyOnWriteArraySet<>();
-        
-        this.listenersToNotifyWithInitialImages =
-            Collections.synchronizedMap(new HashMap<>());
+
+        this.listenersToNotifyWithInitialImages = Collections.synchronizedMap(new HashMap<>());
 
         // create the special records by hand
         createSystemRecord(ISystemRecordNames.CONTEXT_RECORDS);
@@ -540,7 +544,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus
         // starting at 0
         this.sequences.put(name, new AtomicLong(-1));
-        getPendingAtomicChangesForWrite(name).setScope(IRecordChange.IMAGE_SCOPE_CHAR);
+        synchronized (record.getWriteLock())
+        {
+            getPendingAtomicChangesForWrite(name).setScope(IRecordChange.IMAGE_SCOPE_CHAR);
+        }
 
         // this will set off an atomic change for the construction
         record.putAll(initialData);
@@ -559,11 +566,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         if (ContextUtils.isSystemRecordName(name))
         {
             throw new IllegalArgumentException("Cannot remove [" + name + "]");
-        }
-
-        if (!this.records.containsKey(name))
-        {
-            return null;
         }
 
         final IRecord removed = this.records.remove(name);
@@ -706,9 +708,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             synchronized (record.getWriteLock())
             {
                 final AtomicChange atomicChange = this.pendingAtomicChanges.remove(name);
-                // need to prevent empty changes BUT also allow the initial create if it had blank
-                // data
-                if (!forcePublish && (atomicChange == null || atomicChange.isEmpty()))
+                // Note: theory for how atomicChange can be null here:
+                // 1. T1 created record
+                // 2. T2 calls publish atomicChange with name - publishes
+                // 3. T1 has created record and finishes createRecord which calls
+                // publishAtomicChange - pending change will have been used
+
+                // prevent empty changes BUT also allow the initial create if it had blank data
+                if (atomicChange == null || (!forcePublish && atomicChange.isEmpty()))
                 {
                     latch.countDown();
                     this.throttle.eventFinish();
@@ -720,10 +727,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 ((Record) record).setSequence(sequence);
 
                 atomicChange.preparePublish(latch, this);
-                
+
                 // this will call doPublishChange
                 executeSequentialCoreTask(atomicChange);
-                
+
                 return latch;
             }
         }
@@ -978,12 +985,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     private AtomicChange getPendingAtomicChangesForWrite(String name)
     {
         AtomicChange atomicChange = this.pendingAtomicChanges.get(name);
-        if (atomicChange == null && this.records.containsKey(name))
+        if (atomicChange == null)
         {
-            atomicChange = new AtomicChange(name);
-            atomicChange.setSequence(this.sequences.get(name).incrementAndGet());
-            this.pendingAtomicChanges.put(name, atomicChange);
+            final AtomicLong sequence = this.sequences.get(name);
+            if (sequence != null)
+            {
+                atomicChange = new AtomicChange(name);
+                atomicChange.setSequence(sequence.incrementAndGet());
+                this.pendingAtomicChanges.put(name, atomicChange);
+            }
         }
+        // note: can be null, this is OK
         return atomicChange;
     }
 
@@ -1006,7 +1018,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             atomicChange.mergeBulkSubMapChanges(subMapKey, changes);
         }
     }
-    
+
     @Override
     public void addEntryUpdatedToAtomicChange(Record record, String key, IValue current, IValue previous)
     {
@@ -1073,7 +1085,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 {
                     throw new IllegalStateException("An RPC already exists with name [" + rpc.getName() + "]");
                 }
-                this.rpcInstances.put(rpc.getName(), rpc);
+                final Map<String, IRpcInstance> copy = new HashMap<>(this.rpcInstances);
+                copy.put(rpc.getName(), rpc);
+                this.rpcInstances = copy;
                 contextRpcs.put(rpc.getName(), TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
                 publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
                 Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc), " in ", getName());
@@ -1089,7 +1103,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             synchronized (contextRpcs.getWriteLock())
             {
-                final IRpcInstance rpc = this.rpcInstances.remove(rpcName);
+                final Map<String, IRpcInstance> copy = new HashMap<>(this.rpcInstances);
+                final IRpcInstance rpc = copy.remove(rpcName);
+                this.rpcInstances = copy;
                 if (rpc != null)
                 {
                     Log.log(this, "Removing RPC ", ObjectUtils.safeToString(rpc), " from ", getName());
@@ -1199,7 +1215,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
-        // todo system-level differentiation not needed
         final Object context = sequentialRunnable.context();
         if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
         {
