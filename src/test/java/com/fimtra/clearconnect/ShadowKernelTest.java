@@ -65,7 +65,7 @@ public class ShadowKernelTest
     }
 
     @Test
-    public void test()
+    public void test() throws InterruptedException
     {
         IRegistryAvailableListener listener = mock(IRegistryAvailableListener.class);
         this.agent.addRegistryAvailableListener(listener);
@@ -73,6 +73,8 @@ public class ShadowKernelTest
 
         verify(listener, timeout(millis).times(1)).onRegistryConnected();
 
+        Thread.sleep(1000);
+        
         this.primary.destroy();
 
         Log.log(this, ">>>>> destroyed kernel");
