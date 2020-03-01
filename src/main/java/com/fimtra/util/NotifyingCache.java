@@ -16,11 +16,11 @@
 package com.fimtra.util;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.fimtra.util.LazyObject.IDestructor;
@@ -68,19 +69,36 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         // noop
     };
 
+    private static boolean isLatest(String key, Long sequence, Map<String, Long> notifySequences)
+    {
+        if (notifySequences != null && sequence != null)
+        {
+            final Long existing = notifySequences.get(key);
+            if (existing == null || sequence.longValue() > existing.longValue())
+            {
+                notifySequences.put(key, sequence);
+                return true;
+            }
+        }
+        return false;
+    }
+
     final Map<String, DATA> cache;
+    /** Tracks the change sequence per data item in the cache */
+    final Map<String, Long> sequences;
     final Executor executor;
     final Lock readLock;
     final Lock writeLock;
     List<LISTENER_CLASS> listeners;
     final IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor;
     /**
+     * This tracks the notification sequence number per data key per listener.
+     * <p>
      * This is populated when a listener is registered and prevents duplicate updates being sent to
      * the listener during its phase of receiving initial images whilst any concurrent updates may
      * also be occurring.
      */
-    final Map<LISTENER_CLASS, Map<String, DATA>> listenersToNotifyWithInitialImages;
-    volatile int listenersBeingNotifiedWithInitialImages;
+    final Map<LISTENER_CLASS, Map<String, Long>> listenerSequences;
 
     /**
      * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still
@@ -88,6 +106,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     final List<Runnable> notifyTasks;
     final Runnable notifyingTasksRunner;
+    /** Allows one update thread - blocks all images */
+    final Lock updateLock;
+    /** Allows multiple image notifications - blocks updates */
+    final Lock imageLock;
 
     /**
      * Construct a <b>synchronously</b> updating instance
@@ -126,30 +148,44 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     {
         this.destructor = destructor;
         this.cache = new LinkedHashMap<>(2);
+        this.sequences = new HashMap<>();
         this.listeners = new ArrayList<LISTENER_CLASS>(1);
         this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
+        final Object runnerLock = new Object();
         this.notifyingTasksRunner = () -> {
             if (this.notifyTasks.size() > 0)
             {
-                final Runnable task = this.notifyTasks.remove(0);
-                if (task != null)
+                // lock to ensure only 1 task runs at any time (ensures ordering if the
+                // executor is multi-threaded)
+                synchronized (runnerLock)
                 {
-                    try
+                    final Runnable task = this.notifyTasks.remove(0);
+                    if (task != null)
                     {
-                        task.run();
-                    }
-                    catch (Exception e)
-                    {
-                        Log.log(this, "Could not execute notification", e);
+                        try
+                        {
+                            task.run();
+                        }
+                        catch (Exception e)
+                        {
+                            Log.log(this, "Could not execute notification", e);
+                        }
                     }
                 }
             }
         };
-        this.listenersToNotifyWithInitialImages = Collections.synchronizedMap(new HashMap<>());
+        this.listenerSequences = Collections.synchronizedMap(new HashMap<>());
         this.executor = executor;
-        final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
+
+        final boolean fairLock = UtilProperties.Values.NOTIFYING_CACHE_FAIR_LOCK_POLICY;
+
+        final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock(fairLock);
         this.readLock = reentrantReadWriteLock.readLock();
         this.writeLock = reentrantReadWriteLock.writeLock();
+
+        final ReentrantReadWriteLock notificationLock = new ReentrantReadWriteLock(fairLock);
+        this.updateLock = notificationLock.writeLock();
+        this.imageLock = notificationLock.readLock();
     }
 
     /**
@@ -233,8 +269,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             final CountDownLatch latch = new CountDownLatch(1);
 
             final Runnable addTask = () -> {
-                final Set<String> keysSnapshot;
-                Map<String, DATA> notifiedData = null;
+                final Map<String, DATA> cacheSnapshot;
+                final Map<String, Long> sequencesSnapshot;
+                final Map<String, Long> notifySequence;
 
                 // hold the lock and add the listener in the task to ensure the listener is
                 // added and notified without clashing with a concurrent update
@@ -246,18 +283,16 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         return;
                     }
 
-                    notifiedData = Collections.synchronizedMap(new HashMap<>());
-                    synchronized (this.listenersToNotifyWithInitialImages)
-                    {
-                        this.listenersToNotifyWithInitialImages.put(listener, notifiedData);
-                        this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
-                    }
+                    notifySequence = new HashMap<>(this.cache.size());
+                    this.listenerSequences.put(listener, notifySequence);
 
+                    // add the listener
                     final List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
                     result.set(copy.add(listener));
                     this.listeners = copy;
 
-                    keysSnapshot = new LinkedHashSet<>(this.cache.keySet());
+                    cacheSnapshot = new LinkedHashMap<>(this.cache);
+                    sequencesSnapshot = new HashMap<>(this.sequences);
                 }
                 finally
                 {
@@ -265,33 +300,32 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                     this.writeLock.unlock();
                 }
 
+                // NOTE: we hold the lock to ensure that after identifying the update is the latest,
+                // the update is notified to the listener - prevents this scenario for thread
+                // scheduling:
+                // T1 - seq=4, is latest, will notify with value for seq=4
+                // T2 - updates to seq=5
+                // T2 - notifies listener with seq=5
+                // T1 - notifies listener with seq=4 (!!!)
+                this.imageLock.lock();
                 try
                 {
-                    DATA data;
-                    for (String key : keysSnapshot)
+                    // notify the listener with the initial images - this will skip any that have
+                    // been updated since the writeLock was released - in this case, the listener
+                    // will have the latest version already notified
+                    String key;
+                    for (Map.Entry<String, DATA> entry : cacheSnapshot.entrySet())
                     {
-                        // given the snapshot of the keys, get the "live" data
-                        data = get(key);
-
-                        if (is.eq(data, notifiedData.put(key, data)))
+                        key = entry.getKey();
+                        if (isLatest(key, sequencesSnapshot.get(key), notifySequence))
                         {
-                            // already notified by a concurrent update
-                            continue;
-                        }
-
-                        if (data != null)
-                        {
-                            safeNotifyAdd(key, data, listener, "INITIAL IMAGE");
+                            safeNotifyAdd(key, entry.getValue(), listener, "INITIAL IMAGE");
                         }
                     }
                 }
                 finally
                 {
-                    synchronized (this.listenersToNotifyWithInitialImages)
-                    {
-                        this.listenersToNotifyWithInitialImages.remove(listener);
-                        this.listenersBeingNotifiedWithInitialImages = this.listenersToNotifyWithInitialImages.size();
-                    }
+                    this.imageLock.unlock();
                 }
             };
 
@@ -325,6 +359,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             copy = new ArrayList<LISTENER_CLASS>(copy);
             this.listeners = copy;
 
+            this.listenerSequences.remove(listener);
+
             return removed;
         }
         finally
@@ -351,38 +387,54 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             added = !is.eq(this.cache.put(key, data), data);
             if (added)
             {
-                final List<LISTENER_CLASS> listenersToNotify = this.listeners;
+                final Long sequence = Long.valueOf(System.nanoTime());
+                this.sequences.put(key, sequence);
+
+                final List<LISTENER_CLASS> listenersSnapshot = this.listeners;
+
                 command = () -> {
-
-                    List<LISTENER_CLASS> localListenersRef = listenersToNotify;
-
-                    // if there are listeners that are being notified with initial images
-                    // signal an update will happen for this key
-                    // THIS PREVENTS DUPLICATE NOTIFICATIONS
-                    if (this.listenersBeingNotifiedWithInitialImages > 0)
+                    long start = System.nanoTime();
+                    do
                     {
-                        // find the listeners to notify with this data
-                        localListenersRef = new LinkedList<>();
-                        synchronized (this.listenersToNotifyWithInitialImages)
+                        // we need to try for the lock - we must not lock out any imageLock
+                        // operations until its free
+                        if (this.updateLock.tryLock())
                         {
-                            Map<String, DATA> imagesNotified;
-                            for (LISTENER_CLASS listener : listenersToNotify)
+                            try
                             {
-                                imagesNotified = this.listenersToNotifyWithInitialImages.get(listener);
-                                // check if this update is the first one to be sent to the new
-                                // listener
-                                if (imagesNotified == null || !is.eq(data, imagesNotified.put(key, data)))
+                                final List<LISTENER_CLASS> listenersToNotify = new LinkedList<>();
+                                // find listeners that have not been notified with this update
+                                // sequence - THIS PREVENTS DUPLICATE NOTIFICATIONS, typically with
+                                // concurrent addListener calls and also skips redundant updates if
+                                // the same key is updated in quick succession
+                                synchronized (this.listenerSequences)
                                 {
-                                    localListenersRef.add(listener);
+                                    for (LISTENER_CLASS listener : listenersSnapshot)
+                                    {
+                                        if (isLatest(key, sequence, this.listenerSequences.get(listener)))
+                                        {
+                                            listenersToNotify.add(listener);
+                                        }
+                                    }
+                                }
+
+                                for (LISTENER_CLASS listener : listenersToNotify)
+                                {
+                                    safeNotifyAdd(key, data, listener, "ADD");
                                 }
                             }
+                            finally
+                            {
+                                this.updateLock.unlock();
+                            }
+                            break;
+                        }
+                        else
+                        {
+                            start = updateLockFailed(key, start);
                         }
                     }
-
-                    for (LISTENER_CLASS listener : localListenersRef)
-                    {
-                        safeNotifyAdd(key, data, listener, "ADD");
-                    }
+                    while (true);
                 };
 
                 // add the notifying task whilst holding the lock to ensure order of execution
@@ -422,12 +474,50 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             removed = removedData != null;
             if (removed)
             {
+                this.sequences.remove(key);
+
                 final List<LISTENER_CLASS> listenersToNotify = this.listeners;
+
                 command = () -> {
-                    for (LISTENER_CLASS listener : listenersToNotify)
+                    long start = System.nanoTime();
+                    do
                     {
-                        safeNotifyRemove(key, removedData, listener, "REMOVE");
+                        if (this.updateLock.tryLock())
+                        {
+                            try
+                            {
+                                // remove the data key from all notification sequences held for all
+                                // listeners
+                                final Collection<Map<String, Long>> notificationSequences;
+                                synchronized (this.listenerSequences)
+                                {
+                                    notificationSequences = new ArrayList<>(this.listenerSequences.values());
+                                }
+                                for (Map<String, Long> map : notificationSequences)
+                                {
+                                    // note: the map is only mutated whilst holding either the
+                                    // updateLock or
+                                    // imageLock
+                                    map.remove(key);
+                                }
+
+                                for (LISTENER_CLASS listener : listenersToNotify)
+                                {
+                                    safeNotifyRemove(key, removedData, listener, "REMOVE");
+                                }
+                            }
+                            finally
+                            {
+                                this.updateLock.unlock();
+                            }
+                            break;
+                        }
+                        else
+                        {
+                            start = updateLockFailed(key, start);
+                        }
                     }
+                    while (true);
                 };
 
                 // add the notifying task whilst holding the lock to ensure order of execution
@@ -435,6 +525,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             }
         }
         finally
+
         {
             this.writeLock.unlock();
         }
@@ -445,6 +536,18 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
 
         return removed;
+    }
+
+    private long updateLockFailed(final String key, long start)
+    {
+        LockSupport.parkNanos(10);
+
+        if ((System.nanoTime() - start) / 1_000_000 > 1000)
+        {
+            Log.log(this, "Waiting > 1 second for updateLock to notify " + key);
+            return System.nanoTime();
+        }
+        return start;
     }
 
     private final void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
@@ -471,7 +574,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e, String operation)
+    private void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e, String operation)
     {
         Log.log(this, "Could not notify " + ObjectUtils.safeToString(listener) + " with " + operation + " " + key + "="
             + ObjectUtils.safeToString(data), e);

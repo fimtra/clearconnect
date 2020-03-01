@@ -113,6 +113,12 @@ public abstract class UtilProperties
          * E.g. <code>-Dutil.byteArrayPoolSize=1024</code>
          */
         String BYTE_ARRAY_MAX_POOL_SIZE = BASE + "byteArrayMaxPoolSize";
+        
+        /**
+         * The system property name to define the locking policy for the {@link NotifyingCache}.<br>
+         * E.g. <code>-Dutil.notifyingCacheFairLockPolicy=true</code>
+         */
+        String NOTIFYING_CACHE_FAIR_LOCK_POLICY = BASE + "notifyingCacheFairLockPolicy";
     }
 
     /**
@@ -200,8 +206,14 @@ public abstract class UtilProperties
          * 
          * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
          */
-        int BYTE_ARRAY_MAX_POOL_SIZE = Integer.parseInt(System.getProperty(
-            Names.BYTE_ARRAY_MAX_POOL_SIZE, "1000"));
+        int BYTE_ARRAY_MAX_POOL_SIZE = Integer.parseInt(System.getProperty(Names.BYTE_ARRAY_MAX_POOL_SIZE, "1000"));
+
+        /**
+         * Defines the locking policy for the {@link NotifyingCache}.<br>
+         * Default is <code>true</code>.
+         */
+        boolean NOTIFYING_CACHE_FAIR_LOCK_POLICY =
+            Boolean.parseBoolean(System.getProperty(Names.NOTIFYING_CACHE_FAIR_LOCK_POLICY, "true"));
     }
 
 }

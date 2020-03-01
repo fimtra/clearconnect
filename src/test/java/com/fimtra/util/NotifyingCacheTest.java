@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.Vector;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -38,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
@@ -258,7 +261,34 @@ public class NotifyingCacheTest
     }
 
     @Test
-    public void testgetCacheSnapshot()
+    public void testSequencing()
+    {
+        assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
+        assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
+
+        final long seq1 = this.candidate.sequences.get("1").longValue();
+        final long seq2 = this.candidate.sequences.get("2").longValue();
+        assertTrue(seq1 < seq2);
+
+        assertTrue(this.candidate.notifyListenersDataAdded("1", "1.1"));
+        
+        final long seq1_1 = this.candidate.sequences.get("1").longValue();
+        assertTrue(seq1 < seq1_1);
+        
+        assertEquals(seq2, this.candidate.sequences.get("2").longValue());
+
+        // check version is removed
+        assertTrue(this.candidate.notifyListenersDataRemoved("1"));
+        assertNull(this.candidate.sequences.get("1"));
+        assertEquals(seq2, this.candidate.sequences.get("2").longValue());
+
+        assertTrue(this.candidate.notifyListenersDataAdded("1", "1.2"));
+        final long seq1_2 = this.candidate.sequences.get("1").longValue();
+        assertTrue(seq1_1 < seq1_2);
+    }
+
+    @Test
+    public void testGetCacheSnapshot()
     {
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
@@ -275,7 +305,7 @@ public class NotifyingCacheTest
         final boolean secondAttempt = this.candidate.addListener(listener);
         long end = System.nanoTime();
         assertFalse(secondAttempt);
-        assertTrue((end - start) < 1_000_000_000 );
+        assertTrue((end - start) < 1_000_000_000);
     }
 
     @Test
@@ -453,8 +483,7 @@ public class NotifyingCacheTest
         assertTrue("Got: " + listener2, listener2.contains("1"));
         assertFalse("Got: " + listener2, listener2.contains("2"));
 
-        assertEquals(0, this.candidate.listenersToNotifyWithInitialImages.size());
-        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
+        assertEquals(1, this.candidate.listenerSequences.size());
     }
 
     @Test
@@ -480,7 +509,6 @@ public class NotifyingCacheTest
                 listener.update(null, data);
             }
         };
-        candidate.notifyListenersDataAdded("key", "data1");
 
         doDeadlockTest(candidate);
     }
@@ -503,7 +531,6 @@ public class NotifyingCacheTest
                     listener.update(null, data);
                 }
             };
-        candidate.notifyListenersDataAdded("key", "data1");
 
         doDeadlockTest(candidate);
     }
@@ -513,42 +540,52 @@ public class NotifyingCacheTest
         final CountDownLatch latch1 = new CountDownLatch(1);
         final CountDownLatch latch2 = new CountDownLatch(1);
 
-        candidate.addListener(new Observer()
-        {
-            @Override
-            public void update(Observable o, Object arg)
+        // prepare the cache and wait for the first notification
+        final CountDownLatch start = new CountDownLatch(1);
+        candidate.notifyListenersDataAdded("key", "data1");
+        candidate.addListener((o, arg) -> {
+            System.err.println(arg);
+            if ("data1".equals(arg))
             {
-                latch1.countDown();
-                try
-                {
-                    latch2.await();
-                }
-                catch (InterruptedException e)
-                {
-                    e.printStackTrace();
-                }
+                start.countDown();
+            }
+        });
+        // wait for the start
+        assertTrue(start.await(1, TimeUnit.SECONDS));
+
+        candidate.addListener((o, arg) -> {
+            latch1.countDown();
+            try
+            {
+                latch2.await();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
             }
         });
 
         assertTrue(latch1.await(1, TimeUnit.SECONDS));
-
-        new Thread(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                candidate.addListener(new Observer()
-                {
-                    @Override
-                    public void update(Observable o, Object arg)
-                    {
-                        latch2.countDown();
-                    }
-                });
-            }
+        
+        new Thread(() -> {
+            candidate.addListener((o, arg) -> {
+                latch2.countDown();
+            });
         }).start();
 
-        assertTrue(latch2.await(1, TimeUnit.SECONDS));
+        final boolean await = latch2.await(2, TimeUnit.SECONDS);
+        if (!await)
+        {
+            System.err.println("fail");
+            final ThreadInfoWrapper[] threads = new DeadlockDetector().getThreadInfoWrappers();
+            final StringBuilder sb = new StringBuilder(1024);
+            for (int i = 0; i < threads.length; i++)
+            {
+                sb.append(threads[i].toString());
+            }
+            System.err.println(sb);
+        }
+        assertTrue(await);
     }
 
     @Test
@@ -556,8 +593,8 @@ public class NotifyingCacheTest
     {
         final List<Object> notifiedAdded = new Vector<Object>();
         final List<Object> notifiedRemoved = new Vector<Object>();
-        Object o1 = new Object();
-        Object o2 = new Object();
+        Object o1 = "o1";
+        Object o2 = "o2";
         NotifyingCache<Object, String> candidate = new NotifyingCache<Object, String>()
         {
             @Override
@@ -584,7 +621,18 @@ public class NotifyingCacheTest
         assertTrue(candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(candidate.notifyListenersDataRemoved("1"));
 
+        int i = 0;
+        while (notifiedAdded.size() != expectedNotifiedAdded.size() && i++ < 100)
+        {
+            Thread.sleep(10);
+        }
         assertEquals(expectedNotifiedAdded, notifiedAdded);
+
+        i = 0;
+        while (notifiedRemoved.size() != expectedNotifiedRemoved.size() && i++ < 100)
+        {
+            Thread.sleep(10);
+        }
         assertEquals(expectedNotifiedRemoved, notifiedRemoved);
     }
 }
