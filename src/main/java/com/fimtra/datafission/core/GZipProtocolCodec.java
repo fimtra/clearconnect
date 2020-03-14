@@ -17,11 +17,10 @@ package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.function.Function;
 
 import com.fimtra.datafission.ICodec;
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.ISessionProtocol;
-import com.fimtra.datafission.IValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.GZipUtils;
@@ -35,21 +34,20 @@ import com.fimtra.util.GZipUtils;
 public class GZipProtocolCodec extends StringProtocolCodec
 {
     final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
- 
+
+    private static Function<ByteBuffer, byte[]> createEncodedBytesHandler()
+    {
+        return (encoded) -> GZipUtils.compress(encoded);
+    }
+
     public GZipProtocolCodec()
     {
-        super();
+        super(createEncodedBytesHandler());
     }
 
     protected GZipProtocolCodec(ISessionProtocol sessionSyncProtocol)
     {
-        super(sessionSyncProtocol);
-    }
-
-    @Override
-    public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
-    {
-        return GZipUtils.compress(super.getTxMessageForAtomicChange(atomicChange));
+        super(sessionSyncProtocol, createEncodedBytesHandler());
     }
 
     @Override
@@ -71,19 +69,13 @@ public class GZipProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
-    {
-        return GZipUtils.compress(super.getTxMessageForRpc(rpcName, args, resultRecordName));
-    }
-
-    @Override
     public char[] decode(ByteBuffer data)
     {
         final ByteBuffer uncompressed = GZipUtils.uncompress(this.sessionSyncProtocol.decode(data));
         final char[] decoded = ISO_8859_1.decode(uncompressed).array();
         ByteArrayPool.offer(uncompressed.array());
         return decoded;
-    }    
+    }
 
     @Override
     public FrameEncodingFormatEnum getFrameEncodingFormat()

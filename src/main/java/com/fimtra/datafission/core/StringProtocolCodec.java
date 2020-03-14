@@ -16,14 +16,18 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
@@ -114,15 +118,28 @@ public class StringProtocolCodec implements ICodec<char[]>
     static final int DOUBLE_KEY_PREAMBLE_LENGTH = 2;
 
     final ISessionProtocol sessionSyncProtocol;
+    final Function<ByteBuffer, byte[]> encodedBytesHandler;
 
     public StringProtocolCodec()
     {
         this(new SimpleSessionProtocol());
     }
 
+    protected StringProtocolCodec(Function<ByteBuffer, byte[]> handler)
+    {
+        this(new SimpleSessionProtocol(), handler);
+    }
+
     protected StringProtocolCodec(ISessionProtocol sessionSyncProtocol)
     {
+        this(sessionSyncProtocol, (encoded) -> Arrays.copyOf(encoded.array(), encoded.limit()));
+    }
+
+    protected StringProtocolCodec(ISessionProtocol sessionSyncProtocol,
+        Function<ByteBuffer, byte[]> encodedBytesHandler)
+    {
         this.sessionSyncProtocol = sessionSyncProtocol;
+        this.encodedBytesHandler = encodedBytesHandler;
     }
 
     @Override
@@ -167,6 +184,11 @@ public class StringProtocolCodec implements ICodec<char[]>
         return true;
     }
 
+    Function<ByteBuffer, byte[]> getEncodedBytesHandler()
+    {
+        return this.encodedBytesHandler;
+    }
+
     /**
      * Get the string representing the record changes to transmit to a {@link ProxyContext}.
      * 
@@ -181,7 +203,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForAtomicChange(IRecordChange atomicChange)
     {
-        return encodeAtomicChange(DELIMITER_CHARS, atomicChange, getCharset());
+        return encodeAtomicChange(DELIMITER_CHARS, atomicChange, getCharset(), getEncodedBytesHandler());
     }
 
     @Override
@@ -263,7 +285,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
             final String name = stringFromCharBuffer(decodedMessage, bijTokenOffset[0][1], bijTokenLimit[0][1]);
             final AtomicChange atomicChange = new AtomicChange(name);
-            
+
             // optimise the locking for the internal getXXX methods
             synchronized (atomicChange)
             {
@@ -384,6 +406,20 @@ public class StringProtocolCodec implements ICodec<char[]>
         CharArrayReference keyCharArrayRef;
         char[] escapedChars;
         StringAppender sb;
+
+        final IdentityHashMap<Charset, CharsetEncoder> encoders = new IdentityHashMap<>(4);
+
+        CharsetEncoder getEncoder(Charset cs)
+        {
+            CharsetEncoder encoder = this.encoders.get(cs);
+            if (encoder == null)
+            {
+                encoder = cs.newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(
+                    CodingErrorAction.REPLACE);
+                this.encoders.put(cs, encoder);
+            }
+            return encoder.reset();
+        }
     }
 
     final static ThreadLocal<EncodingBuffers> ENCODING_BUFFERS = new ThreadLocal<EncodingBuffers>()
@@ -406,7 +442,8 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     };
 
-    static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet)
+    static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet,
+        Function<ByteBuffer, byte[]> encodedHandler)
     {
         final Map<String, IValue> putEntries;
         final Map<String, IValue> removedEntries;
@@ -440,8 +477,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
         addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
-        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars,
-            keyCharArrayRef);
+        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
         IRecordChange subMapAtomicChange;
         if (subMapKeys.size() > 0)
         {
@@ -465,9 +501,15 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
             }
         }
-        
-        final ByteBuffer encoded = charSet.encode(sb.getCharBuffer());
-        return Arrays.copyOf(encoded.array(), encoded.limit());
+
+        try
+        {
+            return encodedHandler.apply(encodingBuffers.getEncoder(charSet).encode(sb.getCharBuffer()));
+        }
+        catch (CharacterCodingException e)
+        {
+            throw new RuntimeException("Could not encode " + atomicChange, e);
+        }
     }
 
     private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
@@ -838,7 +880,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // an even number means they are escaped so a "|" is a token
                     slashCount++;
                     break;
-                case 0 :
+                case 0:
                     // when decoding a byte[] into a char[], the byte[] and char[] lengths are the
                     // same BUT characters taking up 2 bytes for encoding only take up 1 char so we
                     // end up with trailing 0 in the char[], e.g. '£' = [-62][-93] for bytes but is
@@ -865,7 +907,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
     {
-        final Map<String, IValue> callDetails = new HashMap<>();
+        final AtomicChange atomicChange = new AtomicChange(rpcName);
+        final Map<String, IValue> callDetails = atomicChange.internalGetPutEntries();
         callDetails.put(Remote.RESULT_RECORD_NAME, TextValue.valueOf(resultRecordName));
         callDetails.put(Remote.ARGS_COUNT, LongValue.valueOf(args.length));
         for (int i = 0; i < args.length; i++)
@@ -873,8 +916,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             callDetails.put(Remote.ARG_ + i, args[i]);
         }
 
-        return encodeAtomicChange(RPC_COMMAND_CHARS,
-            new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP), getCharset());
+        return encodeAtomicChange(RPC_COMMAND_CHARS, atomicChange, getCharset(), getEncodedBytesHandler());
     }
 
     @Override
