@@ -403,8 +403,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     private Record createSystemRecord(String recordName)
     {
         this.sequences.put(recordName, new AtomicLong());
-        this.pendingAtomicChanges.put(recordName, new AtomicChange(recordName));
-        this.pendingAtomicChanges.get(recordName).setSequence(this.sequences.get(recordName).incrementAndGet());
+        final AtomicChange atomicChange = new AtomicChange(recordName);  
+        this.pendingAtomicChanges.put(recordName, atomicChange);
+        atomicChange.setSequence(this.sequences.get(recordName).incrementAndGet());
         this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this.noopChangeManager));
         Record record = new Record(recordName, ContextUtils.EMPTY_MAP, this);
         this.records.put(recordName, record);

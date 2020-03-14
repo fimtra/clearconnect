@@ -15,11 +15,10 @@
  */
 package com.fimtra.datafission.core;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -247,7 +246,7 @@ final class AtomicChangeTeleporter
                 loopCount = 0;
                 partsIndex++;
                 parts[partsIndex] =
-                    new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
+                        new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
                 parts[partsIndex].scope = source.scope;
                 parts[partsIndex].sequence = source.sequence;
 
@@ -265,17 +264,17 @@ final class AtomicChangeTeleporter
     }
 
     final int maxChangesPerPart;
-    final ConcurrentMap<String, AtomicChange> receivedParts;
+    final Map<String, AtomicChange> receivedParts;
     final AtomicReference<String> nameRef = new AtomicReference<>();
     final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
 
     AtomicChangeTeleporter(int maxChangesPerPart)
     {
         this.maxChangesPerPart = maxChangesPerPart;
-        this.receivedParts = new ConcurrentHashMap<>();
+        this.receivedParts = new HashMap<>();
     }
     
-    void reset()
+    synchronized void reset()
     {
         this.receivedParts.clear();
     }
@@ -339,7 +338,7 @@ final class AtomicChangeTeleporter
      *         {@link AtomicChange} from all its received parts
      * @throws IncorrectSequenceException 
      */
-    AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException 
+    synchronized AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException 
     {
         this.nameRef.set(null);
         getNameAndPart(receivedPart.getName(), this.nameRef, this.part);
@@ -351,11 +350,11 @@ final class AtomicChangeTeleporter
             return receivedPart;
         }
 
-        AtomicChange atomicChange = new AtomicChange(name);
-        final AtomicChange putIfAbsent = this.receivedParts.putIfAbsent(name, atomicChange);
-        if (putIfAbsent != null)
+        AtomicChange atomicChange = this.receivedParts.get(name);
+        if (atomicChange == null)
         {
-            atomicChange = putIfAbsent;
+            atomicChange = new AtomicChange(name);
+            this.receivedParts.put(name, atomicChange);
         }
         try
         {
@@ -366,7 +365,7 @@ final class AtomicChangeTeleporter
             this.receivedParts.remove(name);
             throw e;
         }
-
+        
         if (this.part.get() == 1)
         {
             this.receivedParts.remove(name);

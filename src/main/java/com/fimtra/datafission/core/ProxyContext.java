@@ -379,7 +379,7 @@ public final class ProxyContext implements IObserverContext
                     iAtomicChangeObserver = subscribersFor[i];
                     start = System.nanoTime();
                     iAtomicChangeObserver.onChange(null, this.changeToApply);
-                    ContextUtils.measureTask(this.changeName, "remote record update", iAtomicChangeObserver,
+                    ContextUtils.measureTask(this.changeName, "RPC result handling", iAtomicChangeObserver,
                         (System.nanoTime() - start));
                 }
                 catch (Exception e)
@@ -913,6 +913,7 @@ public final class ProxyContext implements IObserverContext
         this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
         this.actionSubscribeResults = new ConcurrentHashMap<>();
         this.actionResponseLatches = new ConcurrentHashMap<>();
+        // todo why 0
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<>();
@@ -1364,7 +1365,7 @@ public final class ProxyContext implements IObserverContext
             if (subscribeResult.booleanValue() || changeName.startsWith(NOK, 0))
             {
                 handleSubscribeResult(changeToApply, changeName, subscribeResult);
-
+                
                 // EARLY RETURN
                 return false;
             }
@@ -1394,7 +1395,9 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
+        // todo free up list after?
         final List<String> recordNames = new ArrayList<>(changeToApply.getPutEntries().keySet());
+
         final String action = changeName.substring(ACK_LEN);
         // always ensure a NOK is logged
         if (!log && !logRx && !subscribeResult.booleanValue())

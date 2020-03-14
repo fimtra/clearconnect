@@ -17,7 +17,6 @@ package com.fimtra.datafission.core;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -246,9 +245,7 @@ public class CoalescingRecordListener implements IRecordListener
                 }
                 if (changes != null)
                 {
-                    final AtomicChange mergedAtomicChange =
-                        new AtomicChange(this.name, new HashMap<>(), new HashMap<>(),
-                            new HashMap<>());
+                    final AtomicChange mergedAtomicChange = new AtomicChange(this.name);
 
                     mergedAtomicChange.coalesce(changes);
                     if (CoalescingRecordListener.this.cachePolicy != CachePolicyEnum.NO_IMAGE_NEEDED)

@@ -250,7 +250,7 @@ public class Publisher
                 for (int i = 0; i < parts.length; i++)
                 {
                     txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
-
+                    
                     loopBroadcastCount = this.service.broadcast(name, txMessage, clients);
                     bytesPublished += loopBroadcastCount * txMessage.length;
                     broadcastCount += loopBroadcastCount;
@@ -261,7 +261,7 @@ public class Publisher
                         clients[j].publish(txMessage, false, name);
                     }
                 }
-
+                
                 Publisher.this.messagesPublished += broadcastCount;
                 MESSAGES_PUBLISHED.addAndGet(broadcastCount);
                 Publisher.this.bytesPublished += bytesPublished;
@@ -270,7 +270,7 @@ public class Publisher
             else
             {
                 txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(atomicChange);
-
+                
                 broadcastCount = this.service.broadcast(name, txMessage, clients);
 
                 Publisher.this.messagesPublished += broadcastCount;
@@ -440,7 +440,7 @@ public class Publisher
                         // to send the previous image, we need to
                         // subtract 1
                         change.setSequence(this.systemRecordSequences.get(recordNameToRepublish).get() - 1);
-                        publishImageOnSubscribe(publisher, change);
+                        publishImageOnSubscribe(publisher, change);                        
                     });
                 }
                 else
@@ -1268,14 +1268,14 @@ public class Publisher
             return;
         }
 
-        final Map<String, IValue> puts = new HashMap<>(recordNames.size());
+        final AtomicChange atomicChange = new AtomicChange(action + responseAction);
+        final Map<String, IValue> puts = atomicChange.internalGetPutEntries();
         final LongValue dummy = LongValue.valueOf(1);
         for (String recordName : recordNames)
         {
             puts.put(recordName, dummy);
         }
-        final IRecordChange atomicChange =
-            new AtomicChange(action + responseAction, puts, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP);
+
         if (log)
         {
             Log.log(Publisher.this, "(->) ", ObjectUtils.safeToString(atomicChange), " to [",

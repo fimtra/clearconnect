@@ -17,7 +17,6 @@ package com.fimtra.datafission.core;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -220,12 +219,12 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 }
                 else
                 {
-                    final Map<String, IValue> resultEntries = new HashMap<>(2);
 
                     // tell the remote caller we have started
-                    this.caller.send(
-                        this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
-                            resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
+                    final AtomicChange atomicChange = new AtomicChange(resultRecordName);
+                    final Map<String, IValue> resultEntries = atomicChange.internalGetPutEntries();
+                    
+                    this.caller.send(this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(atomicChange)));
                     if (logRpc(rpcName))
                     {
                         Log.log(CallReceiver.class, "(->) STARTED [", this.caller.getEndPointDescription(), "] ",
@@ -256,9 +255,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         Log.log(CallReceiver.class, "Exception handling RPC: " + callDetails, e);
                     }
 
-                    this.caller.send(
-                        this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(new AtomicChange(resultRecordName,
-                            resultEntries, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP))));
+                    this.caller.send(this.codec.finalEncode(this.codec.getTxMessageForAtomicChange(atomicChange)));
                     if (logRpc(rpcName))
                     {
                         if (logVerbose)
