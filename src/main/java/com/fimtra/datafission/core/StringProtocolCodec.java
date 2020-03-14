@@ -19,12 +19,12 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.ISessionProtocol;
@@ -37,6 +37,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
+import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringAppender;
 
@@ -233,19 +234,16 @@ public class StringProtocolCodec implements ICodec<char[]>
         int[] bijTokenLen;
     }
 
-    final static ThreadLocal<DecodingBuffers> DECODING_BUFFERS = new ThreadLocal<DecodingBuffers>()
-    {
-        @Override
-        protected DecodingBuffers initialValue()
-        {
+    static final MultiThreadReusableObjectPool<DecodingBuffers> DECODING_BUFFERS =
+        new MultiThreadReusableObjectPool<DecodingBuffers>("DecodingBuffers", () -> {
             final DecodingBuffers instance = new DecodingBuffers();
             instance.tempArr = new char[50];
             instance.bijTokenOffset = new int[1][10];
             instance.bijTokenLimit = new int[1][10];
             instance.bijTokenLen = new int[1];
             return instance;
-        }
-    };
+        }, (d) -> {
+        }, DataFissionProperties.Values.CORE_THREAD_COUNT + DataFissionProperties.Values.RPC_THREAD_COUNT);
 
     @SuppressWarnings("null")
     static IRecordChange decodeAtomicChange(char[] decodedMessage)
@@ -263,7 +261,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             findTokens(decodedMessage, bijTokenLen, bijTokenOffset, bijTokenLimit);
             final String name = stringFromCharBuffer(decodedMessage, bijTokenOffset[0][1], bijTokenLimit[0][1]);
             final AtomicChange atomicChange = new AtomicChange(name);
-            
+
             // optimise the locking for the internal getXXX methods
             synchronized (atomicChange)
             {
@@ -376,6 +374,10 @@ public class StringProtocolCodec implements ICodec<char[]>
         {
             throw new RuntimeException("Could not decode '" + new String(decodedMessage) + "'", e);
         }
+        finally
+        {
+            DECODING_BUFFERS.offer(decodingBuffers);
+        }
     }
 
     static class EncodingBuffers
@@ -465,8 +467,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
             }
         }
-        
+
         final ByteBuffer encoded = charSet.encode(sb.getCharBuffer());
+        // todo what about having a "closure" object handle this - string does below, gzip zips up - will skip 1 array copy + allocation
         return Arrays.copyOf(encoded.array(), encoded.limit());
     }
 
@@ -838,7 +841,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // an even number means they are escaped so a "|" is a token
                     slashCount++;
                     break;
-                case 0 :
+                case 0:
                     // when decoding a byte[] into a char[], the byte[] and char[] lengths are the
                     // same BUT characters taking up 2 bytes for encoding only take up 1 char so we
                     // end up with trailing 0 in the char[], e.g. '£' = [-62][-93] for bytes but is
@@ -865,7 +868,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName)
     {
-        final Map<String, IValue> callDetails = new HashMap<>();
+        final AtomicChange atomicChange = new AtomicChange(rpcName);
+        final Map<String, IValue> callDetails = atomicChange.internalGetPutEntries();
         callDetails.put(Remote.RESULT_RECORD_NAME, TextValue.valueOf(resultRecordName));
         callDetails.put(Remote.ARGS_COUNT, LongValue.valueOf(args.length));
         for (int i = 0; i < args.length; i++)
@@ -873,8 +877,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             callDetails.put(Remote.ARG_ + i, args[i]);
         }
 
-        return encodeAtomicChange(RPC_COMMAND_CHARS,
-            new AtomicChange(rpcName, callDetails, ContextUtils.EMPTY_MAP, ContextUtils.EMPTY_MAP), getCharset());
+        return encodeAtomicChange(RPC_COMMAND_CHARS, atomicChange, getCharset());
     }
 
     @Override
