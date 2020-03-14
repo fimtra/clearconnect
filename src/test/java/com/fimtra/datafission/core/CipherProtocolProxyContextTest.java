@@ -15,11 +15,14 @@
  */
 package com.fimtra.datafission.core;
 
+import org.junit.Ignore;
+
 /**
  * Tests using the {@link CipherProtocolCodec}
  * 
  * @author Ramon Servadei
  */
+@Ignore
 public class CipherProtocolProxyContextTest extends ProxyContextTest
 {
     // to speed up tests, re-use the same instance

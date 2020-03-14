@@ -223,9 +223,10 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
         change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
 
+        final StringProtocolCodec codec = new StringProtocolCodec();
         IRecordChange result =
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
-                StringProtocolCodec.RPC_COMMAND_CHARS, change, new StringProtocolCodec().getCharset())).toCharArray());
+                StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray());
 
         Map<String, IValue> map1 = new HashMap<String, IValue>();
         map1.put(k1, v3);

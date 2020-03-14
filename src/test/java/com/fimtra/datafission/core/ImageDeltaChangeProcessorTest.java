@@ -24,8 +24,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import java.util.LinkedHashMap;
-
 import org.junit.Before;
 import org.junit.Test;
 
