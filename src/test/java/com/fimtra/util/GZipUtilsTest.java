@@ -18,6 +18,7 @@ package com.fimtra.util;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.junit.Before;
@@ -43,6 +44,18 @@ public class GZipUtilsTest
     {
         String s = "hello";
         final byte[] zipped = GZipUtils.compress(s.getBytes());
+        final byte[] unzipped = GZipUtils.uncompress(zipped);
+        assertEquals(s, new String(unzipped));
+    }
+    
+    @Test
+    public void testSimpleZipUnzipByteBuffer()
+    {
+        String s = "hello";
+        ByteBuffer b = ByteBuffer.allocate(50);
+        b.put(s.getBytes());
+        b.flip();
+        final byte[] zipped = GZipUtils.compress(b);
         final byte[] unzipped = GZipUtils.uncompress(zipped);
         assertEquals(s, new String(unzipped));
     }

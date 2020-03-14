@@ -492,6 +492,40 @@ public abstract class GZipUtils
             return new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1));
         }
     };
+    
+    /**
+     * Compress a ByteBuffer's byte[] with a {@link ReusableGZIPOutputStream}
+     * 
+     * @return the compressed byte[], <code>null</code> if there was a problem
+     */
+    public static final byte[] compress(final ByteBuffer uncompressedBuffer)
+    {
+        try
+        {
+            final byte[] array = uncompressedBuffer.array();
+            final int length = uncompressedBuffer.limit();
+            final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(length);
+            final ReusableGZIPOutputStream gZipOut = DEFLATER.get();
+            gZipOut.reset(outStream);
+            gZipOut.write(array, 0, length);
+            gZipOut.finish();
+            // NOTE: this stream is never closed
+
+            final int size = outStream.count;
+            final byte[] compressedData = new byte[size + 4];
+            compressedData[0] = (byte) (length >> 24);
+            compressedData[1] = (byte) (length >> 16);
+            compressedData[2] = (byte) (length >> 8);
+            compressedData[3] = (byte) (length);
+            System.arraycopy(outStream.buf, 0, compressedData, 4, size);
+            return compressedData;
+        }
+        catch (IOException e)
+        {
+            Log.log(GZipUtils.class, "Could not compress data", e);
+            return null;
+        }
+    }
 
     /**
      * Compress a byte[] with a {@link ReusableGZIPOutputStream}
