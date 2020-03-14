@@ -30,7 +30,6 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.is;
 
 /**
@@ -40,6 +39,8 @@ import com.fimtra.util.is;
  */
 public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
+    private static final Long SEQ_INIT = Long.valueOf(-1);
+
     static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(ContextUtils.EMPTY_MAP);
 
     final static IRecordChange NULL_CHANGE = new IRecordChange()
@@ -130,13 +131,19 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
     };
 
+    static <K, V> Map<K, V> newMap()
+    {
+        return new HashMap<>();
+    }
+
     final String name;
     AtomicReference<Character> scope = new AtomicReference<>(DELTA_SCOPE);
-    AtomicReference<Long> sequence = new AtomicReference<>(Long.valueOf(-1));
+    AtomicReference<Long> sequence = new AtomicReference<>(SEQ_INIT);
 
     Map<String, IValue> putEntries;
     Map<String, IValue> overwrittenEntries;
     Map<String, IValue> removedEntries;
+    Set<String> subMapKeys;
     Map<String, AtomicChange> subMapAtomicChanges;
 
     // members needed for the ISequentialRunnable use
@@ -292,13 +299,13 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             + (noRemovedEntries() ? "" : ", removedEntries=" + ContextUtils.mapToString(this.removedEntries))
             + (this.subMapAtomicChanges == null ? "" : " subMapAtomicChanges=" + this.subMapAtomicChanges) + "]";
     }
-    
+
     @Override
     public void coalesce(List<IRecordChange> subsequentChanges)
     {
-        final Map<String, IValue> putEntries = CollectionUtils.newMap();
-        final Map<String, IValue> overwrittenEntries = CollectionUtils.newMap();
-        final Map<String, IValue> removedEntries = CollectionUtils.newMap();
+        final Map<String, IValue> putEntries = newMap();
+        final Map<String, IValue> overwrittenEntries = newMap();
+        final Map<String, IValue> removedEntries = newMap();
         final Set<String> ultimatelyRemovedKeys = new HashSet<>();
         final Set<String> ultimatelyAddedKeys = new HashSet<>();
         Map<String, IValue> newPutEntries;
@@ -337,9 +344,9 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 
             if (subsequentChange instanceof AtomicChange)
             {
-                newPutEntries = ((AtomicChange)subsequentChange).internalGetPutEntries();
-                newOverwrittenEntries = ((AtomicChange)subsequentChange).internalGetOverwrittenEntries();
-                newRemovedEntries = ((AtomicChange)subsequentChange).internalGetRemovedEntries();
+                newPutEntries = ((AtomicChange) subsequentChange).internalGetPutEntries();
+                newOverwrittenEntries = ((AtomicChange) subsequentChange).internalGetOverwrittenEntries();
+                newRemovedEntries = ((AtomicChange) subsequentChange).internalGetRemovedEntries();
             }
             else
             {
@@ -392,7 +399,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             {
                 if (subMapChangesToMerge == null)
                 {
-                    subMapChangesToMerge = new HashMap<>();
+                    subMapChangesToMerge = newMap();
                 }
                 for (subMapKeysToMergeIterator = subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext();)
                 {
@@ -560,7 +567,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             if (this.putEntries == null)
             {
-                this.putEntries = CollectionUtils.newMap();
+                this.putEntries = newMap();
             }
             return this.putEntries;
         }
@@ -576,7 +583,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             if (this.removedEntries == null)
             {
-                this.removedEntries = CollectionUtils.newMap();
+                this.removedEntries = newMap();
             }
             return this.removedEntries;
         }
@@ -592,7 +599,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             if (this.overwrittenEntries == null)
             {
-                this.overwrittenEntries = CollectionUtils.newMap();
+                this.overwrittenEntries = newMap();
             }
             return this.overwrittenEntries;
         }
@@ -604,7 +611,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             if (this.subMapAtomicChanges == null)
             {
-                this.subMapAtomicChanges = new HashMap<>(4);
+                this.subMapAtomicChanges = newMap();
+                this.subMapKeys = Collections.unmodifiableSet(this.subMapAtomicChanges.keySet());
             }
             AtomicChange subMapAtomicChange = this.subMapAtomicChanges.get(subMapKey);
             if (subMapAtomicChange == null)
@@ -623,8 +631,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         if (this.subMapAtomicChanges != null)
         {
-            // todo not very inefficient
-            return Collections.unmodifiableSet(CollectionUtils.newHashSet(internalGetSubMapKeys()));
+            return this.subMapKeys;
         }
         else
         {
@@ -769,7 +776,7 @@ final class ThreadLocalBulkChanges
     {
         return THREAD_LOCAL.get();
     }
-    
+
     String[] putKeys;
     IValue[][] putValues;
     String[] removedKeys;
@@ -813,7 +820,7 @@ final class ThreadLocalBulkChanges
         // marked to zero
         this.putSize = 0;
         this.removedSize = 0;
-        
+
         return this;
     }
 }
