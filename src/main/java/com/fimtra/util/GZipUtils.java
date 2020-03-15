@@ -107,7 +107,7 @@ public abstract class GZipUtils
             int newcount = this.count + 1;
             if (newcount > this.buf.length)
             {
-                this.buf = Arrays.copyOf(this.buf, Math.max(this.buf.length << 1, newcount));
+                resize(newcount);
             }
             this.buf[this.count] = (byte) b;
             this.count = newcount;
@@ -119,10 +119,24 @@ public abstract class GZipUtils
             int newcount = this.count + len;
             if (newcount > this.buf.length)
             {
-                this.buf = Arrays.copyOf(this.buf, Math.max(this.buf.length << 1, newcount));
+                resize(newcount);
             }
             System.arraycopy(b, off, this.buf, this.count, len);
             this.count = newcount;
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+            super.close();
+            ByteArrayPool.offer(this.buf);
+        }
+
+        private void resize(int newcount)
+        {
+            final byte[] oldBuffer = this.buf;
+            this.buf = Arrays.copyOf(this.buf, Math.max(this.buf.length << 1, newcount));
+            ByteArrayPool.offer(oldBuffer);
         }
     }
 
@@ -500,11 +514,10 @@ public abstract class GZipUtils
      */
     public static final byte[] compress(final ByteBuffer uncompressedBuffer)
     {
-        try
+        final int length = uncompressedBuffer.limit();
+        try (final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(length))
         {
             final byte[] array = uncompressedBuffer.array();
-            final int length = uncompressedBuffer.limit();
-            final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(length);
             final ReusableGZIPOutputStream gZipOut = DEFLATER.get();
             gZipOut.reset(outStream);
             gZipOut.write(array, 0, length);
@@ -534,10 +547,9 @@ public abstract class GZipUtils
      */
     public static final byte[] compress(final byte[] uncompressedData)
     {
-        try
+        try (final UnsynchronizedByteArrayOutputStream outStream =
+            new UnsynchronizedByteArrayOutputStream(uncompressedData.length))
         {
-            final UnsynchronizedByteArrayOutputStream outStream =
-                new UnsynchronizedByteArrayOutputStream(uncompressedData.length);
             final ReusableGZIPOutputStream gZipOut = DEFLATER.get();
             gZipOut.reset(outStream);
             gZipOut.write(uncompressedData);
