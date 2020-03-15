@@ -95,6 +95,8 @@ abstract class AbstractReusableObjectPool<T>
                         }
                     }
 
+                    Log.log(AbstractReusableObjectPool.class,
+                        "TYPE[name get/offer available/size/max-size]");
                     for (Iterator<Map.Entry<String, AbstractReusableObjectPool<?>>> it =
                         ordered.entrySet().iterator(); it.hasNext();)
                     {
@@ -113,6 +115,8 @@ abstract class AbstractReusableObjectPool<T>
     private final Object[] pool;
     private final int poolLimit;
 
+    long getCount;
+    long offerCount;
     int highest;
     int poolPtr;
 
@@ -177,12 +181,17 @@ abstract class AbstractReusableObjectPool<T>
     {
         // note: we add 1 to the poolPtr and highest to represent these as 1-based (not as 0-based
         // for the array that they operate on).
-        return this.getClass().getSimpleName() + "[" + this.name + ", " + (this.poolPtr + 1) + "/" + (this.highest + 1)
-            + "/" + (this.pool.length) + "]";
+        final String string = this.getClass().getSimpleName() + "[" + this.name + " " + this.getCount + "/"
+            + this.offerCount + " " + (this.poolPtr + 1) + "/" + (this.highest + 1) + "/"
+            + (this.pool.length) + "]";
+        this.getCount = 0;
+        this.offerCount = 0;
+        return string;
     }
 
     final void doOffer(T instance)
     {
+        this.offerCount++;
         if (this.pool[this.poolPtr] == null)
         {
             this.finalizer.reset(instance);
@@ -205,6 +214,7 @@ abstract class AbstractReusableObjectPool<T>
     @SuppressWarnings("unchecked")
     final T doGet()
     {
+        this.getCount++;
         final T instance = (T) this.pool[this.poolPtr];
         if (instance != null)
         {
