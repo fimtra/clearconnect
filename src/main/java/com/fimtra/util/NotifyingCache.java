@@ -39,8 +39,8 @@ import com.fimtra.util.LazyObject.IDestructor;
 
 /**
  * Utility that caches data and notifies listeners of a specific type when data is added or removed.
- * Listeners are notified either synchronously or asynchronously, depending on which constructor is
- * used.
+ * Listeners are notified asynchronously and with different threads; initial images occur on
+ * separate threads to updates. There will be no concurrent or duplicate updates received.
  * <p>
  * This maintains an internal cache of the data that has been added/removed. The
  * {@link #getCacheSnapshot()} method returns a <b>clone</b> of the cache data so is expensive to
@@ -57,12 +57,12 @@ import com.fimtra.util.LazyObject.IDestructor;
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
     private static final Executor IMAGE_NOTIFIER =
-        new ThreadPoolExecutor(0, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
+        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
             ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
 
-    private static final Executor SYNCHRONOUS_EXECUTOR = (command) -> {
-        command.run();
-    };
+    private static final Executor UPDATE_NOTIFIER =
+        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
+            ThreadUtils.newDaemonThreadFactory("update-notifier"), new ThreadPoolExecutor.DiscardPolicy());
 
     @SuppressWarnings("rawtypes")
     private static final IDestructor NOOP_DESTRUCTOR = (ref) -> {
@@ -112,26 +112,24 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final Lock imageLock;
 
     /**
-     * Construct a <b>synchronously</b> updating instance
+     * Standard contructor
      */
     @SuppressWarnings("unchecked")
     public NotifyingCache()
     {
-        this(NOOP_DESTRUCTOR, SYNCHRONOUS_EXECUTOR);
+        this(NOOP_DESTRUCTOR, UPDATE_NOTIFIER);
     }
 
     /**
-     * Construct a <b>synchronously</b> updating instance
+     * Construct with specific destructor
      */
     public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor)
     {
-        this(destructor, SYNCHRONOUS_EXECUTOR);
+        this(destructor, UPDATE_NOTIFIER);
     }
 
     /**
-     * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
-     * executor MUST be a single threaded executor. A multi-threaded executor may produce
-     * out-of-sequence updates.</b>
+     * Construct using the passed in executor
      */
     @SuppressWarnings("unchecked")
     public NotifyingCache(Executor executor)
@@ -140,9 +138,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Construct an <b>asynchronously</b> updating instance using the passed in executor. <b>The
-     * executor MUST be a single threaded executor. A multi-threaded executor may produce
-     * out-of-sequence updates.</b>
+     * Construct using the passed in executor and destructor
      */
     public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor, Executor executor)
     {
