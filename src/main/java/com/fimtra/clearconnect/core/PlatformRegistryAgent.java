@@ -843,7 +843,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 }
                 Map<String, IValue> serviceInfoRecord =
                     this.registryProxy.getRemoteRecordImage(ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
-                        + serviceInstanceId, getRegistryReconnectPeriodMillis());
+                        + serviceInstanceId, getRemoteRecordImageTimeoutMillis());
                 if (serviceInfoRecord == null)
                 {
                     Log.log(PlatformRegistryAgent.this, "No service info record available for ", serviceInstanceId);
@@ -865,7 +865,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             Map<String, IValue> serviceInfoRecord =
                                 PlatformRegistryAgent.this.registryProxy.getRemoteRecordImage(
                                     ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
-                                    getRegistryReconnectPeriodMillis());
+                                    getRemoteRecordImageTimeoutMillis());
                             if (serviceInfoRecord == null)
                             {
                                 Log.log(this, "No service info record found for '", serviceInstanceId, "'");
@@ -1046,13 +1046,18 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 return null;
             }
             return this.registryProxy.getRemoteRecordImage(instanceForService.textValue(),
-                getRegistryReconnectPeriodMillis());
+                getRemoteRecordImageTimeoutMillis());
         }
         catch (Exception e)
         {
             Log.log(this, "Could not get service instance to use for service '" + serviceFamily + "'", e);
             return null;
         }
+    }
+
+    static long getRemoteRecordImageTimeoutMillis()
+    {
+        return PlatformCoreProperties.Values.PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS;
     }
 
     @Override

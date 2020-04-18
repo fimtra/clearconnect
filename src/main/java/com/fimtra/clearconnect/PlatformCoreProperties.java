@@ -40,14 +40,21 @@ public abstract class PlatformCoreProperties
         /**
          * The system property name to define the timeout in milliseconds that an agent waits for
          * the platform name.<br>
-         * E.g. <code>-Dplatform.agentInitialisationTimeout=2000</code><br>
+         * E.g. <code>-Dplatform.agentInitialisationTimeout=30000</code><br>
          */
         String PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = BASE + "agentInitialisationTimeout";
 
         /**
          * The system property name to define the timeout in milliseconds that an agent waits for
+         * results of remote record image requests.<br>
+         * E.g. <code>-Dplatform.agentRemoteRecordImageTimeoutMillis=30000</code><br>
+         */
+        String PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS = BASE + "agentRemoteRecordImageTimeoutMillis";
+
+        /**
+         * The system property name to define the timeout in milliseconds that an agent waits for
          * services to become available.<br>
-         * E.g. <code>-Dplatform.agentServicesAvailableTimeout=10000</code><br>
+         * E.g. <code>-Dplatform.agentServicesAvailableTimeout=60000</code><br>
          */
         String PLATFORM_AGENT_SERVICES_AVAILABLE_TIMEOUT_MILLIS = BASE + "agentServicesAvailableTimeout";
 
@@ -113,9 +120,9 @@ public abstract class PlatformCoreProperties
          * @see Names#REGISTRY_PORT
          */
         int REGISTRY_PORT = Integer.parseInt(System.getProperty(Names.REGISTRY_PORT, "22222"));
-
+        
         /**
-         * The period in milliseconds that an agent will wait for intialisation with a registry to
+         * The period in milliseconds that an agent will wait for initialisation with a registry to
          * complete.
          * <p>
          * Default is: 30000
@@ -124,6 +131,17 @@ public abstract class PlatformCoreProperties
          */
         long PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
             Names.PLATFORM_AGENT_INITIALISATION_TIMEOUT_MILLIS, "30000"));
+        
+        /**
+         * The period in milliseconds that an agent will wait for remote record results from a registry to
+         * complete.
+         * <p>
+         * Default is: 30000
+         * 
+         * @see Names#PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS
+         */
+        long PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS = Long.parseLong(System.getProperty(
+            Names.PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS, "30000"));
 
         /**
          * The period in milliseconds that an agent will wait for services to become available.
