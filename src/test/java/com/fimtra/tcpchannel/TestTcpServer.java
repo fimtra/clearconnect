@@ -152,7 +152,11 @@ public class TestTcpServer
     @Before
     public void setUp() throws Exception
     {
+        TcpServer.BLACKLISTED_HOSTS.clear();
+        TcpServer.BLOCKED_HOSTS.clear();
+        TcpServer.CONNECTING_HOSTS.clear();
         System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
+        System.clearProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL);
         System.err.println(this.name.getMethodName());
         Log.log(this, ">>> START ", this.name.getMethodName());
         PORT += 1;
@@ -164,6 +168,11 @@ public class TestTcpServer
     @After
     public void tearDown() throws Exception
     {
+        TcpServer.BLACKLISTED_HOSTS.clear();
+        TcpServer.BLOCKED_HOSTS.clear();
+        TcpServer.CONNECTING_HOSTS.clear();
+        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
+        System.clearProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL);
         this.server.destroy();
         // ensureServerSocketDestroyed();
     }
@@ -365,7 +374,7 @@ public class TestTcpServer
         }
         assertFalse(client.isConnected());
     }
-
+    
     @Test
     public void testServerACL_allowsClientConnection_exactIP() throws IOException, InterruptedException
     {
@@ -376,6 +385,30 @@ public class TestTcpServer
         System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL,
             "999.3.*;945.*;" + allowed + ";3453.23.45.5");
         this.server = new TcpServer(loopback, PORT, new EchoReceiver(), this.frameEncodingFormat);
+        
+        final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()
+        {
+            @Override
+            public void onDataReceived(ByteBuffer data, ITransportChannel source)
+            {
+            }
+        }, this.frameEncodingFormat);
+        
+        assertTrue(client.isConnected());
+    }
+
+    @Test
+    public void testServer_blacklist_blocksClientConnection_exactIP() throws IOException, InterruptedException
+    {
+        // NOTE: for this test we force use of loopback to ensure we know the IP
+        final String loopback = "127.0.0.1";
+        String pattern = "127\\.0\\.0\\.1";
+
+        // we check blacklist takes precedence over whitelist
+        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL, pattern);
+        System.setProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL,
+            "999.3.*;945.*;" + pattern + ";3453.23.45.5");
+        this.server = new TcpServer(loopback, PORT, new EchoReceiver(), this.frameEncodingFormat);
 
         final TcpChannel client = new TcpChannel(loopback, PORT, new NoopReceiver()
         {
@@ -385,7 +418,14 @@ public class TestTcpServer
             }
         }, this.frameEncodingFormat);
 
-        assertTrue(client.isConnected());
+        int i = 0;
+        while (i++ < 20 && client.isConnected())
+        {
+            // wait for a bit - the socket may initially seem connected but the server should kill
+            // it
+            Thread.sleep(50);
+        }
+        assertFalse(client.isConnected());
     }
 
     @Test

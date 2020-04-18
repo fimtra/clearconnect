@@ -138,7 +138,8 @@ public class TcpServer implements IEndPointService
 
     final InetSocketAddress localSocketAddress;
 
-    final Set<Pattern> aclPatterns;
+    final Set<Pattern> whitelistAclPatterns;
+    final Set<Pattern> blacklistAclPatterns;
 
     /**
      * Construct the TCP server with default server and client receive buffer sizes and frame format
@@ -193,10 +194,14 @@ public class TcpServer implements IEndPointService
         super();
         try
         {
-            final String acl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
-            this.aclPatterns =
-                Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(acl, ";")));
-            Log.log(this, "ACL is: ", this.aclPatterns.toString());
+            final String whitelistAcl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
+            final String whiteblackAcl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL);
+            this.whitelistAclPatterns =
+                    Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(whitelistAcl, ";")));
+            this.blacklistAclPatterns =
+                Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(whiteblackAcl, ";")));
+            Log.log(this, "WHITELIST ACL is: ", this.whitelistAclPatterns.toString());
+            Log.log(this, "BLACKLIST ACL is: ", this.blacklistAclPatterns.toString());
             this.serverSocketChannel = ServerSocketChannel.open();
             this.serverSocketChannel.configureBlocking(false);
 
@@ -205,120 +210,127 @@ public class TcpServer implements IEndPointService
 
             TcpChannelUtils.bind(this.serverSocketChannel.socket(), address, port);
 
-            TcpChannelUtils.ACCEPT_PROCESSOR.register(this.serverSocketChannel, new Runnable()
-            {
-                @Override
-                public void run()
+            TcpChannelUtils.ACCEPT_PROCESSOR.register(this.serverSocketChannel, () -> {
+                try
                 {
-                    try
+                    if (!this.serverSocketChannel.isOpen())
                     {
-                        if (!TcpServer.this.serverSocketChannel.isOpen())
-                        {
-                            Log.log(this, ObjectUtils.safeToString(TcpServer.this), " server socket closed");
-                            return;
-                        }
+                        Log.log(TcpServer.this, ObjectUtils.safeToString(TcpServer.this), " server socket closed");
+                        return;
+                    }
 
-                        SocketChannel socketChannel = TcpServer.this.serverSocketChannel.accept();
-                        if (socketChannel == null)
+                    SocketChannel socketChannel = this.serverSocketChannel.accept();
+                    if (socketChannel == null)
+                    {
+                        return;
+                    }
+                    Log.log(TcpServer.this, ObjectUtils.safeToString(TcpServer.this), " (<-) accepted inbound ",
+                        ObjectUtils.safeToString(socketChannel));
+                    String hostAddress = null;
+                    if (this.whitelistAclPatterns.size() > 0 || this.blacklistAclPatterns.size() > 0)
+                    {
+                        final SocketAddress remoteAddress = socketChannel.socket().getRemoteSocketAddress();
+                        if (remoteAddress instanceof InetSocketAddress)
                         {
-                            return;
-                        }
-                        Log.log(this, ObjectUtils.safeToString(TcpServer.this), " (<-) accepted inbound ",
-                            ObjectUtils.safeToString(socketChannel));
-                        String hostAddress = null;
-                        if (TcpServer.this.aclPatterns.size() > 0)
-                        {
-                            final SocketAddress remoteAddress = socketChannel.socket().getRemoteSocketAddress();
-                            if (remoteAddress instanceof InetSocketAddress)
+                            hostAddress = ((InetSocketAddress) remoteAddress).getAddress().getHostAddress();
+                            if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
                             {
-                                hostAddress = ((InetSocketAddress) remoteAddress).getAddress().getHostAddress();
-                                if (TcpChannelProperties.Values.SERVER_CONNECTION_LOGGING)
+                                final AtomicInteger counter = new AtomicInteger(0);
+                                final AtomicInteger connectionCount =
+                                    CONNECTING_HOSTS.putIfAbsent(hostAddress, counter);
+                                if (connectionCount == null)
                                 {
-                                    final AtomicInteger counter = new AtomicInteger(0);
-                                    final AtomicInteger connectionCount =
-                                        CONNECTING_HOSTS.putIfAbsent(hostAddress, counter);
-                                    if (connectionCount == null)
-                                    {
-                                        counter.incrementAndGet();
-                                    }
-                                    else
-                                    {
-                                        connectionCount.incrementAndGet();
-                                    }
+                                    counter.incrementAndGet();
                                 }
-                                boolean matched = false;
-                                if (isBlacklistedHost(hostAddress))
+                                else
                                 {
-                                    socketChannel.close();
-                                    BLACKLISTED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
-                                    return;
+                                    connectionCount.incrementAndGet();
                                 }
-                                for (Pattern pattern : TcpServer.this.aclPatterns)
+                            }
+                            if (isBlacklistedHost(hostAddress))
+                            {
+                                socketChannel.close();
+                                BLACKLISTED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
+                                return;
+                            }
+                            boolean whitelisted = false;
+                            boolean blacklisted = false;
+                            for (Pattern pattern : this.blacklistAclPatterns)
+                            {
+                                if (pattern.matcher(hostAddress).matches())
+                                {
+                                    blacklisted = true;
+                                    break;
+                                }
+                            }
+                            if (!blacklisted)
+                            {
+                                for (Pattern pattern : this.whitelistAclPatterns)
                                 {
                                     if (pattern.matcher(hostAddress).matches())
                                     {
-                                        matched = true;
+                                        whitelisted = true;
                                         break;
                                     }
                                 }
-                                if (!matched)
-                                {
-                                    Log.log(TcpServer.this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
-                                        " does not match any ACL pattern");
-                                    socketChannel.close();
-                                    BLOCKED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
-                                    return;
-                                }
                             }
-                            else
+                            if (!whitelisted || blacklisted)
                             {
-                                Log.log(TcpServer.this,
-                                    "*** WARNING *** rejecting connection, unhandled socket type (this should never happen!): ",
-                                    ObjectUtils.safeToString(socketChannel));
+                                Log.log(TcpServer.this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
+                                    (!blacklisted ? " does not match any ACL pattern" : " is blacklisted"));
                                 socketChannel.close();
+                                BLOCKED_HOSTS.putIfAbsent(hostAddress, Boolean.TRUE);
                                 return;
                             }
                         }
-
-                        socketChannel.configureBlocking(false);
-                        TcpServer.this.clients.put(new TcpChannel(socketChannel, new IReceiver()
+                        else
                         {
-                            @Override
-                            public void onDataReceived(ByteBuffer data, ITransportChannel source)
-                            {
-                                clientSocketReceiver.onDataReceived(data, source);
-                            }
-
-                            @Override
-                            public void onChannelConnected(ITransportChannel tcpChannel)
-                            {
-                                clientSocketReceiver.onChannelConnected(tcpChannel);
-                            }
-
-                            @Override
-                            public void onChannelClosed(ITransportChannel tcpChannel)
-                            {
-                                final Pair<String, Long> hostAndStartTime = TcpServer.this.clients.remove(tcpChannel);
-                                try
-                                {
-                                    clientSocketReceiver.onChannelClosed(tcpChannel);
-                                }
-                                finally
-                                {
-                                    if (hostAndStartTime != null)
-                                    {
-                                        checkShortLivedSocket(hostAndStartTime);
-                                    }
-                                }
-                            }
-                        }, clientSocketRxBufferSize, frameEncodingFormat),
-                            new Pair<>(hostAddress, Long.valueOf(System.currentTimeMillis())));
+                            Log.log(TcpServer.this,
+                                "*** WARNING *** rejecting connection, unhandled socket type (this should never happen!): ",
+                                ObjectUtils.safeToString(socketChannel));
+                            socketChannel.close();
+                            return;
+                        }
                     }
-                    catch (Exception e)
+
+                    socketChannel.configureBlocking(false);
+                    this.clients.put(new TcpChannel(socketChannel, new IReceiver()
                     {
-                        Log.log(this, ObjectUtils.safeToString(TcpServer.this) + " could not accept client connection",
-                            e);
-                    }
+                        @Override
+                        public void onDataReceived(ByteBuffer data, ITransportChannel source)
+                        {
+                            clientSocketReceiver.onDataReceived(data, source);
+                        }
+
+                        @Override
+                        public void onChannelConnected(ITransportChannel tcpChannel)
+                        {
+                            clientSocketReceiver.onChannelConnected(tcpChannel);
+                        }
+
+                        @Override
+                        public void onChannelClosed(ITransportChannel tcpChannel)
+                        {
+                            final Pair<String, Long> hostAndStartTime = TcpServer.this.clients.remove(tcpChannel);
+                            try
+                            {
+                                clientSocketReceiver.onChannelClosed(tcpChannel);
+                            }
+                            finally
+                            {
+                                if (hostAndStartTime != null)
+                                {
+                                    checkShortLivedSocket(hostAndStartTime);
+                                }
+                            }
+                        }
+                    }, clientSocketRxBufferSize, frameEncodingFormat),
+                        new Pair<>(hostAddress, Long.valueOf(System.currentTimeMillis())));
+                }
+                catch (Exception e)
+                {
+                    Log.log(TcpServer.this,
+                        ObjectUtils.safeToString(TcpServer.this) + " could not accept client connection", e);
                 }
             });
             this.localSocketAddress = (InetSocketAddress) this.serverSocketChannel.socket().getLocalSocketAddress();

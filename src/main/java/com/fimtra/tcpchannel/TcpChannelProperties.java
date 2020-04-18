@@ -52,13 +52,23 @@ public abstract class TcpChannelProperties
          */
         String PROPERTY_NAME_FRAME_ENCODING = BASE + "frameEncoding";
         /**
-         * The system property name to define the access control list (ACL) used by any
+         * The system property name to define the WHITELISTING access control list (ACL) used by any
          * {@link TcpServer} instances in the VM. This is a semi-colon separated list of regular
          * expressions that are matched against incoming TCP/IP remote host IP addresses. If a
          * remote host IP does not match, the connection is terminated.<br>
          * E.g. <code>-DtcpChannel.serverAcl=10.0.0.*;10.1.2.3 </code>
          */
         String PROPERTY_NAME_SERVER_ACL = BASE + "serverAcl";
+        /**
+         * The system property name to define the BLACKLISTING access control list (ACL) used by any
+         * {@link TcpServer} instances in the VM. This is a semi-colon separated list of regular
+         * expressions that are matched against incoming TCP/IP remote host IP addresses. If a
+         * remote host IP MATCHES, the connection is terminated.
+         * <p>
+         * <b>This takes precedence over the whitelisting ACL</b><br>
+         * E.g. <code>-DtcpChannel.serverBlacklistAcl=10.0.0.*;10.1.2.3 </code>
+         */
+        String PROPERTY_NAME_SERVER_BLACKLIST_ACL = BASE + "serverBlacklistAcl";
         /**
          * The system property name to define if connections to the {@link TcpServer} instances in
          * the runtime are logged. The logging will track the number of connections attempted from
