@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
@@ -70,32 +68,32 @@ public class TcpChannel implements ITransportChannel
     /** Expresses the encoding format for the data frames */
     public static enum FrameEncodingFormatEnum
     {
-            /**
-             * Length-based frame encoding, in the following format (ABNF notation):
-             * 
-             * <pre>
-             *  stream = 1*frame
-             *  frame = length data
-             * 
-             *  length = 4OCTET ; big-endian integer indicating the length of the data
-             *  data = 1*OCTET ; the data
-             * </pre>
-             */
-            LENGTH_BASED,
+        /**
+         * Length-based frame encoding, in the following format (ABNF notation):
+         * 
+         * <pre>
+         *  stream = 1*frame
+         *  frame = length data
+         * 
+         *  length = 4OCTET ; big-endian integer indicating the length of the data
+         *  data = 1*OCTET ; the data
+         * </pre>
+         */
+        LENGTH_BASED,
 
-            /**
-             * Terminator-based frame encoding, in the following format (ABNF notation):
-             * 
-             * <pre>
-             * stream = 1*frame
-             * 
-             * frame = data terminator
-             * data = 1*OCTET ; the data
-             * 
-             * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
-             * </pre>
-             */
-            TERMINATOR_BASED;
+        /**
+         * Terminator-based frame encoding, in the following format (ABNF notation):
+         * 
+         * <pre>
+         * stream = 1*frame
+         * 
+         * frame = data terminator
+         * data = 1*OCTET ; the data
+         * 
+         * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
+         * </pre>
+         */
+        TERMINATOR_BASED;
 
         /**
          * @param tcpChannel
@@ -118,7 +116,7 @@ public class TcpChannel implements ITransportChannel
 
     private enum StateEnum
     {
-            DESTROYED, IDLE, SENDING;
+        DESTROYED, IDLE, SENDING;
     }
 
     private static final String TCP_CHANNEL_CLOSED = "TcpChannel [closed ";
@@ -171,7 +169,7 @@ public class TcpChannel implements ITransportChannel
      * of threads as the TCP reader count.
      */
     private static final IContextExecutor RX_FRAME_PROCESSOR =
-            ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
+        ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
 
     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
         new MultiThreadReusableObjectPool<>("RxFrameResolverPool", () -> new RxFrameResolver(), (instance) -> {
@@ -208,8 +206,7 @@ public class TcpChannel implements ITransportChannel
     }
 
     /** The chain per writer - acces must be synchronized on the TcpChannel class */
-    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =
-        new HashMap<>();
+    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains = new HashMap<>();
 
     /**
      * Add the channel into the chain. If it already there, does nothing.
@@ -246,29 +243,37 @@ public class TcpChannel implements ITransportChannel
 
     private synchronized static final void unlinkChannel(TcpChannel channel)
     {
-        final SendChannelChain chain = channel.sendChannelChain;
-        if (channel.next != null)
+        switch(channel.state)
         {
-            channel.next.prev = channel.prev;
+            case DESTROYED:
+            case IDLE:
+                final SendChannelChain chain = channel.sendChannelChain;
+                if (channel.next != null)
+                {
+                    channel.next.prev = channel.prev;
+                }
+                if (channel.prev != null)
+                {
+                    channel.prev.next = channel.next;
+                }
+                // defensive check if chain is null
+                if (chain != null)
+                {
+                    if (channel == chain.first)
+                    {
+                        chain.first = channel.next;
+                    }
+                    if (channel == chain.last)
+                    {
+                        chain.last = channel.prev;
+                    }
+                }
+                channel.next = null;
+                channel.prev = null;
+                break;
+            default :
+                break;
         }
-        if (channel.prev != null)
-        {
-            channel.prev.next = channel.next;
-        }
-        // defensive check if chain is null
-        if (chain != null)
-        {
-            if (channel == chain.first)
-            {
-                chain.first = channel.next;
-            }
-            if (channel == chain.last)
-            {
-                chain.last = channel.prev;
-            }
-        }
-        channel.next = null;
-        channel.prev = null;
     }
 
     TcpChannel next;
@@ -305,10 +310,10 @@ public class TcpChannel implements ITransportChannel
      * only called once.
      */
     private final AtomicBoolean onChannelClosedCalled;
-    private final Lock lock = new ReentrantLock();
+    private final Object lock = new Object();
 
     /** The channel state - always access using the {@link #lock} */
-    StateEnum state = StateEnum.IDLE;
+    volatile StateEnum state = StateEnum.IDLE;
 
     SelectionKey writerKey;
     final SendChannelChain sendChannelChain;
@@ -516,10 +521,10 @@ public class TcpChannel implements ITransportChannel
             {
                 this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
             }
-
+            
             final Deque<TxByteArrayFragment> pendingTxFrames;
-            this.lock.lock();
-            try
+            StateEnum action = StateEnum.IDLE;
+            synchronized (this.lock)
             {
                 pendingTxFrames = this.txFrames[this.pendingQueue];
                 for (int i = 0; i < byteFragmentsToSend.length; i++)
@@ -532,9 +537,7 @@ public class TcpChannel implements ITransportChannel
                     case DESTROYED:
                         throw new ClosedChannelException();
                     case IDLE:
-                        this.state = StateEnum.SENDING;
-                        linkChannel(this);
-                        this.writer.setInterest(this.writerKey);
+                        action = this.state = StateEnum.SENDING;
                         break;
                     case SENDING:
                     default :
@@ -545,14 +548,27 @@ public class TcpChannel implements ITransportChannel
                 {
                     if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1]))
                     {
-                        destroy("Queue too large");
+                        action = this.state = StateEnum.DESTROYED;
                     }
                 }
             }
-            finally
+
+            // do linking/destroy outside of holding the channel lock
+            switch(action)
             {
-                this.lock.unlock();
+                case SENDING:
+                    if (linkChannel(this))
+                    {
+                        this.writer.setInterest(this.writerKey);
+                    }
+                    break;
+                case DESTROYED:
+                    destroy("Queue too large");
+                    break;
+                default :
+                    break;
             }
+
             return true;
         }
         catch (Exception e)
@@ -788,29 +804,36 @@ public class TcpChannel implements ITransportChannel
                 // empty do we go into here
                 if (channel.txFrames[channel.sendingQueue].size() == 0)
                 {
-                    channel.lock.lock();
-                    try
+                    StateEnum action;
+                    synchronized (channel.lock)
                     {
-                        if (channel.state == StateEnum.DESTROYED)
+                        if (channel.state != StateEnum.DESTROYED)
                         {
+                            // swap txFrames over
+                            final int temp = channel.sendingQueue;
+                            channel.sendingQueue = channel.pendingQueue;
+                            channel.pendingQueue = temp;
+
+                            if (channel.txFrames[channel.sendingQueue].size() == 0)
+                            {
+                                channel.state = StateEnum.IDLE;
+                            }
+                        }
+                        
+                        action = channel.state;
+                    }
+                    
+                    // handle unlink/idle operation outside of the channel lock
+                    switch(action)
+                    {
+                        case DESTROYED:
                             unlinkChannel(channel);
                             continue;
-                        }
-
-                        // swap txFrames over
-                        final int temp = channel.sendingQueue;
-                        channel.sendingQueue = channel.pendingQueue;
-                        channel.pendingQueue = temp;
-
-                        if (channel.txFrames[channel.sendingQueue].size() == 0)
-                        {
-                            setChannelIdle(channel);
+                        case IDLE:
+                            unlinkAndReset(channel);
                             continue;
-                        }
-                    }
-                    finally
-                    {
-                        channel.lock.unlock();
+                        default :
+                            break;
                     }
                 }
 
@@ -846,17 +869,19 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
-    private static final void setChannelIdle(TcpChannel channel)
+    private synchronized static final void unlinkAndReset(TcpChannel channel)
     {
-        channel.state = StateEnum.IDLE;
-        unlinkChannel(channel);
-        try
+        if (channel.state == StateEnum.IDLE)
         {
-            SelectorProcessor.resetInterest(channel.writerKey);
-        }
-        catch (CancelledKeyException e)
-        {
-            channel.destroy("Socket has been closed", e);
+            unlinkChannel(channel);
+            try
+            {
+                SelectorProcessor.resetInterest(channel.writerKey);
+            }
+            catch (CancelledKeyException e)
+            {
+                channel.destroy("Socket has been closed", e);
+            }
         }
     }
 
@@ -893,20 +918,15 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            this.lock.lock();
-            try
+            synchronized (this.lock)
             {
                 this.state = StateEnum.DESTROYED;
                 this.txFrames[this.pendingQueue].clear();
                 this.txFrames[this.sendingQueue].clear();
                 this.rxByteBuffer.clear();
-
-                unlinkChannel(this);
             }
-            finally
-            {
-                this.lock.unlock();
-            }
+            
+            unlinkChannel(this);
 
             if (this.socketChannel != null)
             {
