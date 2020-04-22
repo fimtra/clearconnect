@@ -239,23 +239,23 @@ public abstract class TcpChannelProperties
          * The threshold value for logging when RX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP RX handling.
          * <p>
-         * Default is: 50000000 (50ms)
+         * Default is: 10000000 (10ms)
          * 
          * @see Names#SLOW_RX_FRAME_THRESHOLD_NANOS
          */
         long SLOW_RX_FRAME_THRESHOLD_NANOS =
-                Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "50000000"));
+                Long.parseLong(System.getProperty(Names.SLOW_RX_FRAME_THRESHOLD_NANOS, "10000000"));
 
         /**
          * The threshold value for logging when TX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP TX handling.
          * <p>
-         * Default is: 50000000 (50ms)
+         * Default is: 10000000 (10ms)
          * 
          * @see Names#SLOW_TX_FRAME_THRESHOLD_NANOS
          */
         long SLOW_TX_FRAME_THRESHOLD_NANOS =
-            Long.parseLong(System.getProperty(Names.SLOW_TX_FRAME_THRESHOLD_NANOS, "50000000"));
+            Long.parseLong(System.getProperty(Names.SLOW_TX_FRAME_THRESHOLD_NANOS, "10000000"));
 
         /**
          * The value for the minimum alive time, in milliseconds, for a socket before it is
