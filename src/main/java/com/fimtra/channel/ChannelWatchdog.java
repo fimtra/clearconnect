@@ -52,26 +52,18 @@ import com.fimtra.util.Pair;
  */
 public final class ChannelWatchdog implements Runnable
 {
-    /**
-     * Controls logging of:
-     * <ul>
-     * <li>received heartbeats
-     * </ul>
-     */
-    static final boolean log = Boolean.getBoolean("log.ChannelWatchdog");
-
     /** The tolerance to allow before logging if a received heartbeat is too early or too late. */
     static final long HB_TOLERANCE_MILLIS =
         Long.parseLong(System.getProperty("channelWatchdog.hbToleranceMillis", "1000"));
 
     int heartbeatPeriodMillis;
+    long lateHeartbeatLimit;
     int missedHeartbeatCount;
     volatile Set<ITransportChannel> channels;
     /** Tracks channels that receive a HB */
     final Set<ITransportChannel> channelsReceivingHeartbeat;
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
     final Map<ITransportChannel, Long> channelsHeartbeatArrivalTime;
-    final Set<ITransportChannel> channelFirstHeartbeatWarning;
     final Object lock;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory()
@@ -97,7 +89,6 @@ public final class ChannelWatchdog implements Runnable
         this.channelsReceivingHeartbeat = new HashSet<>();
         this.channelsMissingHeartbeat = new HashMap<>();
         this.channelsHeartbeatArrivalTime = new ConcurrentHashMap<>();
-        this.channelFirstHeartbeatWarning = new HashSet<>();
         configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "30000")),
             Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
     }
@@ -146,6 +137,7 @@ public final class ChannelWatchdog implements Runnable
                 this.current.cancel(false);
             }
             this.heartbeatPeriodMillis = periodMillis;
+            this.lateHeartbeatLimit = this.heartbeatPeriodMillis + HB_TOLERANCE_MILLIS;
             this.missedHeartbeatCount = missedHeartbeats;
             this.current = this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis,
                 this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
@@ -166,14 +158,7 @@ public final class ChannelWatchdog implements Runnable
             copy.add(channel);
             this.channels = copy;
         }
-        this.executor.execute(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                channel.send(ChannelUtils.HEARTBEAT_SIGNAL);
-            }
-        });
+        this.executor.execute(() -> channel.send(ChannelUtils.HEARTBEAT_SIGNAL));
     }
 
     @Override
@@ -268,59 +253,30 @@ public final class ChannelWatchdog implements Runnable
             this.channelsReceivingHeartbeat.remove(channel);
             this.channelsMissingHeartbeat.remove(channel);
             this.channelsHeartbeatArrivalTime.remove(channel);
-            this.channelFirstHeartbeatWarning.remove(channel);
         }
     }
 
     public void onHeartbeat(final ITransportChannel channel)
     {
         final long timeIn = System.nanoTime();
+        // grab the previous time now, excludes latency in the executor 
+        final Long previous = this.channelsHeartbeatArrivalTime.put(channel, Long.valueOf(timeIn));
 
-        this.executor.execute(new Runnable()
-        {
-            @Override
-            public void run()
+        this.executor.execute(() -> {
+            if (!this.channels.contains(channel))
             {
-                if (!ChannelWatchdog.this.channels.contains(channel))
+                this.channelsHeartbeatArrivalTime.remove(channel);
+            }
+            else if (previous != null)
+            {
+                final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d);
+                if (hbDelta > this.lateHeartbeatLimit)
                 {
-                    return;
-                }
-
-                if (log)
-                {
-                    Log.log(this, "HB (rx=T-", Long.toString((System.nanoTime() - timeIn) / 1000), "us) ",
+                    Log.log(ChannelWatchdog.this, "LATE heartbeat ", Long.toString(hbDelta), "ms from ",
                         ObjectUtils.safeToString(channel));
                 }
 
-                final Long previous =
-                    ChannelWatchdog.this.channelsHeartbeatArrivalTime.put(channel, Long.valueOf(timeIn));
-                if (previous != null)
-                {
-                    // log early and late heartbeats - receiving early heartbeats is just as bad as
-                    // being late and early can indicate slowness on the senders side if it has
-                    // queued 3 HBs, say, but they are stuck on its queue and end up being sent all
-                    // at once
-                    final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d)
-                        - ChannelWatchdog.this.heartbeatPeriodMillis;
-                    if (hbDelta > HB_TOLERANCE_MILLIS)
-                    {
-                        if (!ChannelWatchdog.this.channelFirstHeartbeatWarning.add(channel))
-                        {
-                            Log.log(this, "Heartbeat received ", Long.toString(hbDelta), "ms too LATE from ",
-                                ObjectUtils.safeToString(channel));
-                        }
-                    }
-                    else if (hbDelta < -HB_TOLERANCE_MILLIS)
-                    {
-                        if (!ChannelWatchdog.this.channelFirstHeartbeatWarning.add(channel))
-                        {
-                            Log.log(this, "Heartbeat received ", Long.toString(-hbDelta), "ms too EARLY from ",
-                                ObjectUtils.safeToString(channel));
-                        }
-                    }
-                }
-
-                ChannelWatchdog.this.channelsReceivingHeartbeat.add(channel);
+                this.channelsReceivingHeartbeat.add(channel);
                 checkHeartbeatRecovered(channel);
             }
         });
