@@ -26,8 +26,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A simple logger that writes to a file and to <code>System.err</code>. Uses a
@@ -47,8 +45,8 @@ public abstract class Log
     private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
         ThreadUtils.newScheduledExecutorService("Log-file-appender", 1);
-    private static final Lock lock = new ReentrantLock();
-    private static final Lock qLock = new ReentrantLock();
+    private static final Object lock = new Object();
+    private static final Object qLock = new Object();
     private static final ExecutorService CONSOLE_WRITER_EXECUTOR =
         ThreadUtils.newSingleThreadExecutorService("console-writer");
     private static PrintStream consoleStream = System.err;
@@ -218,14 +216,9 @@ public abstract class Log
     public static final void setConsoleStream(PrintStream stream)
     {
         CONSOLE_WRITER_EXECUTOR.execute(() -> {
-            lock.lock();
-            try
+            synchronized (lock)
             {
                 consoleStream = stream;
-            }
-            finally
-            {
-                lock.unlock();
             }
         });
     }
@@ -247,14 +240,9 @@ public abstract class Log
 
     private static void log(final LogMessage message)
     {
-        qLock.lock();
-        try
+        synchronized (qLock)
         {
             LOG_MESSAGE_QUEUE.add(message);
-        }
-        finally
-        {
-            qLock.unlock();
         }
         if (!flushTaskPending)
         {
@@ -275,14 +263,9 @@ public abstract class Log
         if (LOG_TO_STDERR)
         {
             CONSOLE_WRITER_EXECUTOR.execute(() -> {
-                lock.lock();
-                try
+                synchronized (lock)
                 {
                     message.print(consoleStream);
-                }
-                finally
-                {
-                    lock.unlock();
                 }
             });
         }
@@ -318,8 +301,7 @@ public abstract class Log
     {
         flushTaskPending = false;
 
-        lock.lock();
-        try
+        synchronized (lock)
         {
             LogMessage message = null;
             if (exceptionEncountered)
@@ -358,22 +340,13 @@ public abstract class Log
                 }
             }
         }
-        finally
-        {
-            lock.unlock();
-        }
     }
 
     private static LogMessage pollMessages()
     {
-        qLock.lock();
-        try
+        synchronized (qLock)
         {
             return LOG_MESSAGE_QUEUE.poll();
-        }
-        finally
-        {
-            qLock.unlock();
         }
     }
 
