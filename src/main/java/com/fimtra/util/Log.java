@@ -19,9 +19,10 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -44,11 +45,15 @@ public abstract class Log
     private static final boolean LOG_TO_STDERR = UtilProperties.Values.LOG_TO_STDERR;
     private static final String DELIM = "|";
     private static final String MESSAGE_DELIM = DELIM + "    ";
-    private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR = ThreadUtils.newScheduledExecutorService("LogAsyncFileAppender", 1);
+    private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
+        ThreadUtils.newScheduledExecutorService("Log-file-appender", 1);
     private static final Lock lock = new ReentrantLock();
+    private static final Lock qLock = new ReentrantLock();
+    private static final ExecutorService CONSOLE_WRITER_EXECUTOR =
+        ThreadUtils.newSingleThreadExecutorService("console-writer");
     private static PrintStream consoleStream = System.err;
 
-    static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ConcurrentLinkedQueue<>();
+    static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ArrayDeque<>();
     static final CharSequence LINE_SEPARATOR = SystemUtils.lineSeparator();
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;
@@ -70,7 +75,7 @@ public abstract class Log
     private static final class LogMessage
     {
         private static final FastDateFormat fastDateFormat = new FastDateFormat();
-        
+
         final Thread t;
         final Object source;
         final CharSequence[] messages;
@@ -106,11 +111,11 @@ public abstract class Log
             {
                 return this.formattedMessage;
             }
-            
+
             int len = LOG_PREFIX_EST_SIZE;
             for (int i = 0; i < this.messages.length; i++)
             {
-                if(this.messages[i] != null)
+                if (this.messages[i] != null)
                 {
                     len += this.messages[i].length();
                 }
@@ -138,9 +143,9 @@ public abstract class Log
                 sb.append(this.messages[i]);
             }
             sb.append(LINE_SEPARATOR);
-            
+
             this.formattedMessage = sb.toString();
-            
+
             return this.formattedMessage;
         }
     }
@@ -212,15 +217,17 @@ public abstract class Log
      */
     public static final void setConsoleStream(PrintStream stream)
     {
-        lock.lock();
-        try
-        {
-            consoleStream = stream;
-        }
-        finally
-        {
-            lock.unlock();
-        }
+        CONSOLE_WRITER_EXECUTOR.execute(() -> {
+            lock.lock();
+            try
+            {
+                consoleStream = stream;
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        });
     }
 
     public static final void log(Object source, String... messages)
@@ -240,7 +247,15 @@ public abstract class Log
 
     private static void log(final LogMessage message)
     {
-        LOG_MESSAGE_QUEUE.add(message);
+        qLock.lock();
+        try
+        {
+            LOG_MESSAGE_QUEUE.add(message);
+        }
+        finally
+        {
+            qLock.unlock();
+        }
         if (!flushTaskPending)
         {
             flushTaskPending = true;
@@ -256,17 +271,20 @@ public abstract class Log
                 }
             }
         }
+
         if (LOG_TO_STDERR)
         {
-            lock.lock();
-            try
-            {
-                message.print(consoleStream);
-            }
-            finally
-            {
-                lock.unlock();
-            }
+            CONSOLE_WRITER_EXECUTOR.execute(() -> {
+                lock.lock();
+                try
+                {
+                    message.print(consoleStream);
+                }
+                finally
+                {
+                    lock.unlock();
+                }
+            });
         }
     }
 
@@ -306,14 +324,14 @@ public abstract class Log
             LogMessage message = null;
             if (exceptionEncountered)
             {
-                while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
+                while ((message = pollMessages()) != null)
                 {
                     message.print(System.err);
                 }
             }
             else
             {
-                while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
+                while ((message = pollMessages()) != null)
                 {
                     try
                     {
@@ -323,7 +341,7 @@ public abstract class Log
                     {
                         panic(e);
                         // print the remainder
-                        while ((message = LOG_MESSAGE_QUEUE.poll()) != null)
+                        while ((message = pollMessages()) != null)
                         {
                             message.print(System.err);
                         }
@@ -343,6 +361,19 @@ public abstract class Log
         finally
         {
             lock.unlock();
+        }
+    }
+
+    private static LogMessage pollMessages()
+    {
+        qLock.lock();
+        try
+        {
+            return LOG_MESSAGE_QUEUE.poll();
+        }
+        finally
+        {
+            qLock.unlock();
         }
     }
 
