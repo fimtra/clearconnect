@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A pool of re-usable objects that assumes its only accessed by a single thread.
@@ -107,7 +105,7 @@ abstract class AbstractReusableObjectPool<T>
         }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
     }
 
-    final Lock lock;
+    final Object lock;
     final IReusableObjectBuilder<T> builder;
     final IReusableObjectFinalizer<T> finalizer;
     final String name;
@@ -128,7 +126,7 @@ abstract class AbstractReusableObjectPool<T>
         this.poolLimit = this.pool.length - 2;
         this.builder = builder;
         this.finalizer = finalizer;
-        this.lock = new ReentrantLock();
+        this.lock = new Object();
         this.weakRef = new WeakReference<AbstractReusableObjectPool<?>>(this);
         synchronized (pools)
         {
@@ -138,17 +136,12 @@ abstract class AbstractReusableObjectPool<T>
 
     public final void destroy()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             for (int i = 0; i < this.pool.length; i++)
             {
                 this.pool[i] = null;
             }
-        }
-        finally
-        {
-            this.lock.unlock();
         }
 
         synchronized (pools)

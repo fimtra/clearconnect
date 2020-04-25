@@ -34,8 +34,7 @@ public final class MultiThreadReusableObjectPool<T> extends AbstractReusableObje
     @Override
     public T get()
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             final T instance = doGet();
             if (instance != null)
@@ -43,24 +42,15 @@ public final class MultiThreadReusableObjectPool<T> extends AbstractReusableObje
                 return instance;
             }
         }
-        finally
-        {
-            this.lock.unlock();
-        }
         return this.builder.newInstance();
     }
 
     @Override
     public void offer(T instance)
     {
-        this.lock.lock();
-        try
+        synchronized (this.lock)
         {
             doOffer(instance);
-        }
-        finally
-        {
-            this.lock.unlock();
         }
     }
 }
