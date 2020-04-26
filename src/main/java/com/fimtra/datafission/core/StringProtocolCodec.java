@@ -418,7 +418,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     CodingErrorAction.REPLACE);
                 this.encoders.put(cs, encoder);
             }
-            return encoder.reset();
+            return encoder;
         }
     }
 
