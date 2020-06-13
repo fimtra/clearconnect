@@ -73,6 +73,8 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
+    static final long IDLE_PERIOD_NANOS =
+        Long.parseLong(System.getProperty("thimble.idlePeriodMillis", "10000")) * 1_000_000;
 
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
@@ -215,8 +217,7 @@ public final class ThimbleExecutor implements IContextExecutor
     final LowGcLinkedList<Integer> freeNumbers;
     private final AtomicInteger threadCounter;
     TaskStatistics stats;
-    // 10 secs initial pause time
-    long idlePeriodNanos = 10_000_000_000l;
+    long idlePeriodNanos = IDLE_PERIOD_NANOS;
     long lastExecuteTimeNanos = System.nanoTime();
 
     volatile long[] tids = new long[0];
