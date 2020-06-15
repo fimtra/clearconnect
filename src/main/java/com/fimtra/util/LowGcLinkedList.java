@@ -35,8 +35,8 @@ import com.fimtra.util.UtilProperties.Values;
  * hold entries added to the list. This technique reduces garbage churn at the expense of a higher
  * memory footprint and some extra (minor) processing.
  * <p>
- * The size of the internal pool size can be set to not exceed a specific value. By default this is
- * {@link Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}
+ * The internal pool will adapt to resize to 1/4 of the list size but has a starting limit set by
+ * {@link Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}.
  * <p>
  * <b>This is not thread-safe.</b>
  * 
@@ -64,13 +64,13 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     Node<E> spare;
     int spareCount;
 
-    private final int maxInternalSparePoolSize;
-    
+    private int maxInternalSparePoolSize;
+
     public LowGcLinkedList(int maxInternalSparePoolSize)
     {
         this.maxInternalSparePoolSize = maxInternalSparePoolSize;
     }
-    
+
     public LowGcLinkedList()
     {
         this(Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);
@@ -796,7 +796,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     {
         return this.spareCount;
     }
-    
+
     private void release(Node<E> node)
     {
         node.prev = null;
@@ -809,6 +809,12 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
         }
         else
         {
+            // >> 2 for quarter
+            final int adaptedSize = this.size >> 2;
+            if (adaptedSize > this.maxInternalSparePoolSize)
+            {
+                this.maxInternalSparePoolSize = adaptedSize;
+            }
             if (this.spareCount < this.maxInternalSparePoolSize)
             {
                 node.prev = this.spare;
