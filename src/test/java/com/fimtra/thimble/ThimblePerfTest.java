@@ -165,8 +165,10 @@ public class ThimblePerfTest
             }
         }
         awaitLatch(queueLatch);
+        final long time = System.currentTimeMillis() - start;
+        // don't take destroy time into account for timings!
         executor.destroy();
-        return (System.currentTimeMillis() - start);
+        return time;
     }
 
     private static Runnable createQueueConsumer(final BlockingQueue<AtomicLong> queue, final CountDownLatch queueLatch)
