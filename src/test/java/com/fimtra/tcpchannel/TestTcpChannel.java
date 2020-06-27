@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
+import com.fimtra.util.Log;
 
 /**
  * Tests for the {@link TcpChannel}
@@ -41,7 +42,7 @@ import com.fimtra.channel.ITransportChannel;
 public class TestTcpChannel
 {
     static int SERVER_PORT = 20000;
-    
+
     TcpServer server;
     TcpChannel c1;
 
@@ -127,8 +128,11 @@ public class TestTcpChannel
 
         assertTrue("Got: " + rxData.size(), latch.await(10, TimeUnit.SECONDS));
         final long latency = System.nanoTime() - start;
-        System.err.println("TCP max velocity: " + (max / (latency / 1000000000)) + " msgs/s, "
-            + (size / (latency / 1000000000)) + " b/s");
+        final double latencyMillis = latency / 1000000000d;
+        final String msg =
+            "TCP max velocity: " + (long) (max / latencyMillis) + " msgs/s, " + (long) (size / latencyMillis) + " b/s";
+        Log.log(this, msg);
+        System.err.println(msg);
         assertEquals("", data, rxData);
     }
 
