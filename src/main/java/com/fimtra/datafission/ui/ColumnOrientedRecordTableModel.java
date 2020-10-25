@@ -74,13 +74,13 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
     /**
      * Record updates keyed by {recordname,context}
      * 
-     * @see {@link #getRecordLookupKey(String, String)}
+     * @see {@link RowOrientedRecordTableModel#getRecordLookupKey(String, String)}
      */
     final Map<Pair<String, String>, IRecord> pendingBatchUpdates;
     /**
      * Coalesced atomic updates keyed by {recordname,context}
      * 
-     * @see {@link #getRecordLookupKey(String, String)}
+     * @see {@link RowOrientedRecordTableModel#getRecordLookupKey(String, String)}
      */
     final Map<Pair<String, String>, IRecordChange> pendingBatchAtomicChanges;
 
@@ -136,8 +136,6 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
     /**
      * Call to remove a 'record removed listener' previously added to the context via
      * {@link #addRecordRemovedListener(IObserverContext)}
-     * 
-     * @param context
      */
     public void removeRecordRemovedListener(final IObserverContext context)
     {
@@ -239,9 +237,9 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         // we do +1 because the table always shows the field names at index 0
         int column_plus1;
         Integer index;
-        for (Iterator<Map.Entry<Pair<String, String>, IRecord>> it = recordImages.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<Pair<String, String>, IRecord> pairIRecordEntry : recordImages.entrySet())
         {
-            entry = it.next();
+            entry = pairIRecordEntry;
             nameAndContext = entry.getKey();
             imageCopy = entry.getValue();
 
@@ -253,7 +251,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 column_plus1 = columnIndex + 1;
                 ColumnOrientedRecordTableModel.this.records.add(imageCopy);
                 ColumnOrientedRecordTableModel.this.recordIndexByName.put(
-                    RowOrientedRecordTableModel.getRecordLookupKey(imageCopy), Integer.valueOf(columnIndex));
+                        RowOrientedRecordTableModel.getRecordLookupKey(imageCopy),
+                        Integer.valueOf(columnIndex));
                 fireTableStructureChanged();
 
                 // as its a new record, we need to add the fields (some might be new)
@@ -269,7 +268,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 }
                 if (inserts.size() > 0)
                 {
-                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    fireTableRowsInserted(inserts.get(0).intValue(),
+                            inserts.get(inserts.size() - 1).intValue());
                     inserts.clear();
                 }
             }
@@ -297,7 +297,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 }
                 if (inserts.size() > 0)
                 {
-                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    fireTableRowsInserted(inserts.get(0).intValue(),
+                            inserts.get(inserts.size() - 1).intValue());
                     inserts.clear();
                 }
 
@@ -358,29 +359,24 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
 
     public void recordUnsubscribed(final String recordName, final String contextName)
     {
-        SwingUtilities.invokeLater(new Runnable()
-        {
-            @Override
-            public void run()
+        SwingUtilities.invokeLater(() -> {
+            final Integer index =
+                ColumnOrientedRecordTableModel.this.recordIndexByName.remove(RowOrientedRecordTableModel.getRecordLookupKey(
+                    recordName, contextName));
+            if (index != null)
             {
-                final Integer index =
-                    ColumnOrientedRecordTableModel.this.recordIndexByName.remove(RowOrientedRecordTableModel.getRecordLookupKey(
-                        recordName, contextName));
-                if (index != null)
-                {
-                    final IRecord removed = ColumnOrientedRecordTableModel.this.records.remove(index.intValue());
-                    removeRows(new HashSet<>(), removed.keySet());
+                final IRecord removed = ColumnOrientedRecordTableModel.this.records.remove(index.intValue());
+                removeRows(new HashSet<>(), removed.keySet());
 
-                    // rebuild indexes
-                    ColumnOrientedRecordTableModel.this.recordIndexByName.clear();
-                    for (int i = 0; i < ColumnOrientedRecordTableModel.this.records.size(); i++)
-                    {
-                        ColumnOrientedRecordTableModel.this.recordIndexByName.put(
-                            RowOrientedRecordTableModel.getRecordLookupKey(ColumnOrientedRecordTableModel.this.records.get(i)),
-                            Integer.valueOf(i));
-                    }
-                    fireTableStructureChanged();
+                // rebuild indexes
+                ColumnOrientedRecordTableModel.this.recordIndexByName.clear();
+                for (int i = 0; i < ColumnOrientedRecordTableModel.this.records.size(); i++)
+                {
+                    ColumnOrientedRecordTableModel.this.recordIndexByName.put(
+                        RowOrientedRecordTableModel.getRecordLookupKey(ColumnOrientedRecordTableModel.this.records.get(i)),
+                        Integer.valueOf(i));
                 }
+                fireTableStructureChanged();
             }
         });
     }

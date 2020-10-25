@@ -153,7 +153,6 @@ public final class ColumnOrientedRecordTable extends JTable implements ICellUpda
             final Map<String, Integer> widths = new HashMap<>();
             getTableHeader().getColumnModel().addColumnModelListener(new TableColumnModelListener()
             {
-
                 @Override
                 public void columnSelectionChanged(ListSelectionEvent e)
                 {
