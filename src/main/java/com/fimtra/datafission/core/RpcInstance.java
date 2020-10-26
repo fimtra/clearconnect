@@ -89,7 +89,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
      * 
      * @author Ramon Servadei
      */
-    public static interface IRpcExecutionHandler
+    public interface IRpcExecutionHandler
     {
         /**
          * Handle an invokation of an RPC.

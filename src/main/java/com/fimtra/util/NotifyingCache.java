@@ -112,7 +112,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final Lock imageLock;
 
     /**
-     * Standard contructor
+     * Standard constructor
      */
     @SuppressWarnings("unchecked")
     public NotifyingCache()
@@ -145,7 +145,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.destructor = destructor;
         this.cache = new LinkedHashMap<>(2);
         this.sequences = new HashMap<>();
-        this.listeners = new ArrayList<LISTENER_CLASS>(1);
+        this.listeners = new ArrayList<>(1);
         this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
         final Object runnerLock = new Object();
         this.notifyingTasksRunner = () -> {
@@ -283,7 +283,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                     this.listenerSequences.put(listener, notifySequence);
 
                     // add the listener
-                    final List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
+                    final List<LISTENER_CLASS> copy = new ArrayList<>(this.listeners);
                     result.set(copy.add(listener));
                     this.listeners = copy;
 
@@ -352,7 +352,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             List<LISTENER_CLASS> copy = new ArrayList<>(this.listeners);
             final boolean removed = copy.remove(listener);
             // take another copy so we have the correct size
-            copy = new ArrayList<LISTENER_CLASS>(copy);
+            copy = new ArrayList<>(copy);
             this.listeners = copy;
 
             this.listenerSequences.remove(listener);
@@ -376,7 +376,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final boolean notifyListenersDataAdded(final String key, final DATA data)
     {
         final boolean added;
-        Runnable command = null;
+        Runnable command;
         this.writeLock.lock();
         try
         {
@@ -454,15 +454,15 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * Notify all registered listeners that the data for this key is removed. The notification is
      * done using the internal executor.
      * 
-     * @param the
-     *            key for the data that is removed
+     * @param key
+     *            the key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
      *         found (no listeners are notified in this case)
      */
     public final boolean notifyListenersDataRemoved(final String key)
     {
         final boolean removed;
-        Runnable command = null;
+        Runnable command;
         this.writeLock.lock();
         try
         {
@@ -499,7 +499,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
                                 for (LISTENER_CLASS listener : listenersToNotify)
                                 {
-                                    safeNotifyRemove(key, removedData, listener, "REMOVE");
+                                    safeNotifyRemove(key, removedData, listener);
                                 }
                             }
                             finally
@@ -536,6 +536,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     private long updateLockFailed(final String key, long start)
     {
+        // todo maybe wait 1ms?
         LockSupport.parkNanos(10);
 
         if ((System.nanoTime() - start) / 1_000_000 > 1000)
@@ -546,7 +547,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         return start;
     }
 
-    private final void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    private void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
     {
         try
         {
@@ -558,7 +559,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    private final void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    private void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener)
     {
         try
         {
@@ -566,7 +567,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
         catch (Exception e)
         {
-            handleException(key, data, listener, e, action);
+            handleException(key, data, listener, e, "REMOVE");
         }
     }
 

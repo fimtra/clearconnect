@@ -28,7 +28,7 @@ public final class LazyObject<T>
      * @author Ramon Servadei
      * @param <T>
      */
-    public static interface IConstructor<T>
+    public interface IConstructor<T>
     {
         T construct();
     }
@@ -39,7 +39,7 @@ public final class LazyObject<T>
      * @author Ramon Servadei
      * @param <T>
      */
-    public static interface IDestructor<T>
+    public interface IDestructor<T>
     {
         void destroy(T ref);
     }
@@ -59,7 +59,7 @@ public final class LazyObject<T>
      */
     public synchronized T get()
     {
-        if (this.ref == null)
+        if (this.constructor != null)
         {
             this.ref = this.constructor.construct();
             this.constructor = null;
@@ -71,9 +71,18 @@ public final class LazyObject<T>
     {
         if (this.ref != null)
         {
-            this.destructor.destroy(this.ref);
+            try
+            {
+                this.destructor.destroy(this.ref);
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.ref), e);
+            }
             this.ref = null;
         }
+        this.constructor = null;
+        this.destructor = null;
     }
 
     @Override
@@ -96,13 +105,9 @@ public final class LazyObject<T>
             return false;
         LazyObject<?> other = (LazyObject<?>) obj;
         if (this.ref == null)
-        {
-            if (other.ref != null)
-                return false;
-        }
-        else if (!this.ref.equals(other.ref))
-            return false;
-        return true;
+            return other.ref == null;
+        else
+            return this.ref.equals(other.ref);
     }
 
     @Override

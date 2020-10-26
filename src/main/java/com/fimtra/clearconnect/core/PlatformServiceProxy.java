@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay, Fimtra
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -54,54 +54,77 @@ import com.fimtra.util.ObjectUtils;
  * The standard platform service proxy.
  * <p>
  * Reconnection occurs automatically via its internal {@link ProxyContext}.
- * 
+ *
  * @author Ramon Servadei, Paul Mackinlay
  */
 final class PlatformServiceProxy implements IPlatformServiceProxy
 {
+    private interface ICacheAction<C, D>
+    {
+        boolean execute(NotifyingCache<C, D> c);
+    }
+
+    /**
+     * If the cache has been destroyed, the action is not executed
+     */
+    private static <C, D> boolean handle(LazyObject<NotifyingCache<C, D>> l, ICacheAction<C, D> a)
+    {
+        final NotifyingCache<C, D> notifyingCache = l.get();
+        if (notifyingCache == null)
+        {
+            return false;
+        }
+        return a.execute(notifyingCache);
+    }
+
     final PlatformRegistryAgent registryAgent;
     final ProxyContext proxyContext;
     final LazyObject<NotifyingCache<IRecordAvailableListener, String>> recordAvailableNotifyingCache;
     final LazyObject<NotifyingCache<IRpcAvailableListener, IRpcInstance>> rpcAvailableNotifyingCache;
-    final LazyObject<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>> subscriptionNotifyingCache;
-    final LazyObject<NotifyingCache<IRecordConnectionStatusListener, IValue>> recordConnectionStatusNotifyingCache;
-    final LazyObject<NotifyingCache<IServiceConnectionStatusListener, Connection>> serviceConnectionStatusNotifyingCache;
+    final LazyObject<NotifyingCache<IRecordSubscriptionListener, SubscriptionInfo>>
+            subscriptionNotifyingCache;
+    final LazyObject<NotifyingCache<IRecordConnectionStatusListener, IValue>>
+            recordConnectionStatusNotifyingCache;
+    final LazyObject<NotifyingCache<IServiceConnectionStatusListener, Connection>>
+            serviceConnectionStatusNotifyingCache;
     private final String platformName;
     final String serviceFamily;
 
     Map<String, IRpcInstance> allRpcs;
-    
+
     @SuppressWarnings({ "rawtypes" })
-    PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec, final String host,
-        final int port, TransportTechnologyEnum transportTechnology)
+    PlatformServiceProxy(PlatformRegistryAgent registryAgent, String serviceFamily, ICodec codec,
+            final String host, final int port, TransportTechnologyEnum transportTechnology)
     {
         this.platformName = registryAgent.getPlatformName();
         this.serviceFamily = serviceFamily;
         this.registryAgent = registryAgent;
         this.proxyContext =
-            new ProxyContext(PlatformUtils.composeProxyName(serviceFamily, registryAgent.getAgentName()), codec, host,
-                port, transportTechnology, serviceFamily);
+                new ProxyContext(PlatformUtils.composeProxyName(serviceFamily, registryAgent.getAgentName()),
+                        codec, host, port, transportTechnology, serviceFamily);
 
         // set the channel builder factory to use an end-point factory that gets end-points from the
         // registry
-        this.proxyContext.setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(
-            codec.getFrameEncodingFormat(), () -> getServiceEndPointAddress()));
+        this.proxyContext.setTransportChannelBuilderFactory(
+                TransportChannelBuilderFactoryLoader.load(codec.getFrameEncodingFormat(),
+                        this::getServiceEndPointAddress));
 
-        this.rpcAvailableNotifyingCache =
-            new LazyObject<>(() -> PlatformUtils.createRpcAvailableNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, this), (ref) -> ref.destroy());
-        this.subscriptionNotifyingCache =
-            new LazyObject<>(() -> PlatformUtils.createSubscriptionNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, this), (ref) -> ref.destroy());
-        this.recordAvailableNotifyingCache =
-            new LazyObject<>(() -> PlatformUtils.createRecordAvailableNotifyingCache(this.proxyContext,
-                IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, this), (ref) -> ref.destroy());
-        this.recordConnectionStatusNotifyingCache =
-            new LazyObject<>(() -> PlatformUtils.createRecordConnectionStatusNotifyingCache(this.proxyContext, this),
-                (ref) -> ref.destroy());
-        this.serviceConnectionStatusNotifyingCache =
-            new LazyObject<>(() -> PlatformUtils.createServiceConnectionStatusNotifyingCache(this.proxyContext, this),
-                (ref) -> ref.destroy());
+        this.rpcAvailableNotifyingCache = new LazyObject<>(
+                () -> PlatformUtils.createRpcAvailableNotifyingCache(this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, this), NotifyingCache::destroy);
+        this.subscriptionNotifyingCache = new LazyObject<>(
+                () -> PlatformUtils.createSubscriptionNotifyingCache(this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, this),
+                NotifyingCache::destroy);
+        this.recordAvailableNotifyingCache = new LazyObject<>(
+                () -> PlatformUtils.createRecordAvailableNotifyingCache(this.proxyContext,
+                        IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, this), NotifyingCache::destroy);
+        this.recordConnectionStatusNotifyingCache = new LazyObject<>(
+                () -> PlatformUtils.createRecordConnectionStatusNotifyingCache(this.proxyContext, this),
+                NotifyingCache::destroy);
+        this.serviceConnectionStatusNotifyingCache = new LazyObject<>(
+                () -> PlatformUtils.createServiceConnectionStatusNotifyingCache(this.proxyContext, this),
+                NotifyingCache::destroy);
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
@@ -114,7 +137,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
 
     @Override
     public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener,
-        String... recordNames)
+            String... recordNames)
     {
         return this.proxyContext.addObserver(permissionToken, listener, recordNames);
     }
@@ -134,37 +157,37 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public boolean addRecordAvailableListener(IRecordAvailableListener recordListener)
     {
-        return this.recordAvailableNotifyingCache.get().addListener(recordListener);
+        return handle(this.recordAvailableNotifyingCache, (c) -> c.addListener(recordListener));
     }
 
     @Override
     public boolean removeRecordAvailableListener(IRecordAvailableListener recordListener)
     {
-        return this.recordAvailableNotifyingCache.get().removeListener(recordListener);
+        return handle(this.recordAvailableNotifyingCache, (c) -> c.removeListener(recordListener));
     }
 
     @Override
     public boolean addRecordSubscriptionListener(IRecordSubscriptionListener listener)
     {
-        return this.subscriptionNotifyingCache.get().addListener(listener);
+        return handle(this.subscriptionNotifyingCache, (c) -> c.addListener(listener));
     }
 
     @Override
     public boolean removeRecordSubscriptionListener(IRecordSubscriptionListener listener)
     {
-        return this.subscriptionNotifyingCache.get().removeListener(listener);
+        return handle(this.subscriptionNotifyingCache, (c) -> c.removeListener(listener));
     }
 
     @Override
     public boolean addRecordConnectionStatusListener(IRecordConnectionStatusListener listener)
     {
-        return this.recordConnectionStatusNotifyingCache.get().addListener(listener);
+        return handle(this.recordConnectionStatusNotifyingCache, (c) -> c.addListener(listener));
     }
 
     @Override
     public boolean removeRecordConnectionStatusListener(IRecordConnectionStatusListener listener)
     {
-        return this.recordConnectionStatusNotifyingCache.get().removeListener(listener);
+        return handle(this.recordConnectionStatusNotifyingCache, (c) -> c.removeListener(listener));
     }
 
     @Override
@@ -175,7 +198,7 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
             if (this.allRpcs == null)
             {
                 final NotifyingCache<IRpcAvailableListener, IRpcInstance> notifyingCache =
-                    this.rpcAvailableNotifyingCache.get();
+                        this.rpcAvailableNotifyingCache.get();
                 final ConcurrentHashMap<String, IRpcInstance> innerMap = new ConcurrentHashMap<>();
                 notifyingCache.addListener(EventListenerUtils.synchronizedListener(new IRpcAvailableListener()
                 {
@@ -203,17 +226,17 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         return this.rpcAvailableNotifyingCache.get().get(rpcName);
     }
-    
+
     @Override
-    public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
-        ExecutionException
+    public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs)
+            throws TimeOutException, ExecutionException
     {
         return PlatformUtils.executeRpc(this, discoveryTimeoutMillis, rpcName, rpcArgs);
     }
 
     @Override
     public void executeRpcNoResponse(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs)
-        throws TimeOutException, ExecutionException
+            throws TimeOutException, ExecutionException
     {
         PlatformUtils.executeRpcNoResponse(this, discoveryTimeoutMillis, rpcName, rpcArgs);
     }
@@ -221,13 +244,13 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public boolean addRpcAvailableListener(IRpcAvailableListener rpcListener)
     {
-        return this.rpcAvailableNotifyingCache.get().addListener(rpcListener);
+        return handle(this.rpcAvailableNotifyingCache, (c) -> c.addListener(rpcListener));
     }
 
     @Override
     public boolean removeRpcAvailableListener(IRpcAvailableListener rpcListener)
     {
-        return this.rpcAvailableNotifyingCache.get().removeListener(rpcListener);
+        return handle(this.rpcAvailableNotifyingCache, (c) -> c.removeListener(rpcListener));
     }
 
     /**
@@ -255,8 +278,8 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public String toString()
     {
-        return "PlatformServiceProxy [platform{" + this.platformName + "} service{" + this.serviceFamily + "}] "
-            + this.proxyContext.getChannelString();
+        return "PlatformServiceProxy [platform{" + this.platformName + "} service{" + this.serviceFamily
+                + "}] " + this.proxyContext.getChannelString();
     }
 
     @Override
@@ -311,13 +334,13 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     @Override
     public boolean addServiceConnectionStatusListener(IServiceConnectionStatusListener listener)
     {
-        return this.serviceConnectionStatusNotifyingCache.get().addListener(listener);
+        return handle(this.serviceConnectionStatusNotifyingCache, (c) -> c.addListener(listener));
     }
 
     @Override
     public boolean removeServiceConnectionStatusListener(IServiceConnectionStatusListener listener)
     {
-        return this.serviceConnectionStatusNotifyingCache.get().removeListener(listener);
+        return handle(this.serviceConnectionStatusNotifyingCache, (c) -> c.removeListener(listener));
     }
 
     @Override
@@ -348,16 +371,18 @@ final class PlatformServiceProxy implements IPlatformServiceProxy
     {
         if (this.registryAgent.serviceAvailableListeners.keySet().contains(this.serviceFamily))
         {
-            Log.log(this, "Obtaining service info record for '", PlatformServiceProxy.this.serviceFamily, "'");
+            Log.log(this, "Obtaining service info record for '", PlatformServiceProxy.this.serviceFamily,
+                    "'");
             final Map<String, IValue> serviceInfoRecord =
-                this.registryAgent.getPlatformServiceInstanceInfoRecordImageForService(this.serviceFamily);
+                    this.registryAgent.getPlatformServiceInstanceInfoRecordImageForService(
+                            this.serviceFamily);
 
             if (serviceInfoRecord == null)
             {
                 Log.log(this, "No service info record found for '", this.serviceFamily, "'");
                 return null;
             }
-            
+
             final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
             final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
             final EndPointAddress next = new EndPointAddress(node, port);
