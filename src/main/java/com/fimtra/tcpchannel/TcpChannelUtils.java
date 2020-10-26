@@ -109,7 +109,7 @@ public abstract class TcpChannelUtils
 
     /**
      * Handles the connection result for a call to
-     * {@link TcpChannelUtils#connectSocketChannelInNonBlockingMode(SocketChannel, String, int, SelectorProcessor, IConnectionResultProcessor)}
+     * {@link TcpChannelUtils#createAndConnectNonBlockingSocketChannel(String, int)}
      */
     static interface IConnectionResultProcessor
     {

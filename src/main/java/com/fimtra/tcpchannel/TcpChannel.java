@@ -301,12 +301,12 @@ public class TcpChannel implements ITransportChannel
     /** The short-hand description of the end-point connections */
     final String shortSocketDescription;
     /**
-     * Tracks if the {@link IReceiver#onChannelConnected(ITcpChannel)} has been called. Ensures its
+     * Tracks if the {@link IReceiver#onChannelConnected(ITransportChannel)} has been called. Ensures its
      * only called once.
      */
     private boolean onChannelConnectedCalled;
     /**
-     * Tracks if the {@link IReceiver#onChannelClosed(ITcpChannel)} has been called. Ensures its
+     * Tracks if the {@link IReceiver#onChannelClosed(ITransportChannel)} has been called. Ensures its
      * only called once.
      */
     private final AtomicBoolean onChannelClosedCalled;
@@ -323,8 +323,8 @@ public class TcpChannel implements ITransportChannel
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
      * format.
      * 
-     * @see TcpChannelProperties#FRAME_ENCODING
-     * @see TcpChannelProperties#RX_BUFFER_SIZE
+     * @see TcpChannelProperties.Values#FRAME_ENCODING
+     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver) throws ConnectException
@@ -336,7 +336,7 @@ public class TcpChannel implements ITransportChannel
      * Construct a {@link TcpChannel} with a specific receive buffer size and default frame encoding
      * format.
      * 
-     * @see TcpChannelProperties#FRAME_ENCODING
+     * @see TcpChannelProperties.Values#FRAME_ENCODING
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver, int rxBufferSize) throws ConnectException
@@ -348,7 +348,7 @@ public class TcpChannel implements ITransportChannel
      * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
      * format.
      * 
-     * @see TcpChannelProperties#RX_BUFFER_SIZE
+     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
@@ -366,7 +366,7 @@ public class TcpChannel implements ITransportChannel
      * 
      * @param serverHost
      *            the target host for the TCP connection
-     * @param port
+     * @param serverPort
      *            the target port for the TCP connection
      * @param receiver
      *            the object that will receive all the communication data from the target host
@@ -1026,7 +1026,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     }
 
     /**
-     * Write the internal {@link #buffers} to the socket. This will continually try to write the
+     * Write the internal {@link #txBuffer} to the socket. This will continually try to write the
      * buffer to the socket until all the data has been written.
      * 
      * @throws IOException
@@ -1079,7 +1079,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 /**
  * Handles frame encoding using a terminator field after each frame.
  * 
- * @see TcpChannelUtils#decodeUsingTerminator(List, ByteBuffer, byte[])
+ * @see TcpChannelUtils#decodeUsingTerminator
  * @author Ramon Servadei
  */
 final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
@@ -1112,7 +1112,7 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
 /**
  * Handles frame encoding with a 4-byte length field before each frame.
  * 
- * @see TcpChannelUtils#decode(ByteBuffer)
+ * @see TcpChannelUtils#decode
  * @author Ramon Servadei
  */
 final class LengthBasedWriter extends AbstractFrameReaderWriter

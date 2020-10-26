@@ -55,14 +55,14 @@ public abstract class UtilProperties
         /**
          * The system property name to define if log messages are written to std.err (in addition to
          * the log file). <br>
-         * <b>SETTING THIS TO TRUE HAS A SEVERE PERFORMANCE IMPACT.</b><br>
+         * <b>This is done using a dedicated executor so should not block application performance.</b><br>
          * E.g. <code>-Dutil.logToStdErr=true</code>
          */
         String LOG_TO_STDERR = BASE + "logToStdErr";
 
         /**
          * The system property name to define if the {@link LowGcLinkedList} should be used by
-         * {@link CollectionUtils#newLinkedList()}. <br>
+         * {@link CollectionUtils#newDeque()}. <br>
          * E.g. <code>-Dutil.useLowGcLinkedList=true</code>
          */
         String USE_LOW_GC_LINKEDLIST = BASE + "useLowGcLinkedList";

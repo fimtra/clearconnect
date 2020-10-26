@@ -19,7 +19,6 @@ import java.net.URL;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -546,16 +545,9 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Map.Entry<String, IValue> entry = null;
-            String key = null;
-            IValue value = null;
-            for (Iterator<Map.Entry<String, IValue>> it =
-                atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
+            for (Entry<String, IValue> entry : atomicChange.getPutEntries().entrySet())
             {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
+                recordStatusNotifyingCache.notifyListenersDataAdded(entry.getKey(), entry.getValue());
             }
             updateWaitLatch.countDown();
         };
@@ -825,9 +817,6 @@ public class PlatformUtils
             index + SERVICE_INSTANCE_PREFIX.length(), length - SERVICE_INSTANCE_SUFFIX.length()) };
     }
 
-    public static final int DECOMPOSED_SERVICE_NAME_INDEX = 0;
-    public static final int DECOMPOSED_SERVICE_INSTANCE_NAME_INDEX = 0;
-
     /**
      * Convenience method to execute the RPC hosted by the service component - this waits for the
      * RPC to be published
@@ -860,7 +849,6 @@ public class PlatformUtils
      *            the RPC name
      * @param rpcArgs
      *            the arguments for the RPC
-     * @return the return value of the RPC execution
      */
     public static void executeRpcNoResponse(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException, ExecutionException

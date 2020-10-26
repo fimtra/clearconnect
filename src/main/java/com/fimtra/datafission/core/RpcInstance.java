@@ -29,7 +29,6 @@ import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
-import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -68,10 +67,9 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     {
         if (DataFissionProperties.Values.EXCLUDE_RPC_LOGGING != null)
         {
-            final String[] split = DataFissionProperties.Values.EXCLUDE_RPC_LOGGING.split(",");
-            for (int i = 0; i < split.length; i++)
+            for (String s : DataFissionProperties.Values.EXCLUDE_RPC_LOGGING.split(","))
             {
-                EXCLUDED_RPC_NAMES.add(split[i].trim());
+                EXCLUDED_RPC_NAMES.add(s.trim());
             }
         }
         Log.log(RpcInstance.class, "RPCs excluded from logging: ", DataFissionProperties.Values.EXCLUDE_RPC_LOGGING);
@@ -107,7 +105,6 @@ public final class RpcInstance implements IRpcInstance, Cloneable
          *            the arguments to execute the RPC with - <b>Note:</b> some or all of the
          *            arguments can be <code>null</code>
          * @return the result, can be <code>null</code>
-         * @return the response from the RPC
          * @throws TimeOutException
          *             if no response is received after a time
          * @throws ExecutionException
@@ -168,8 +165,6 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         /**
          * Receives RPC calls, executes them and then sends back the result to the caller.
          * 
-         * @param T
-         *            the object protocol, see {@link ICodec}
          * @see Caller
          * @author Ramon Servadei
          */
@@ -277,8 +272,6 @@ public final class RpcInstance implements IRpcInstance, Cloneable
          * Calls an RPC on a remote receiver. This handles the necessary plumbing to send the
          * details of the RPC to the remote receiver for invoking.
          * 
-         * @param T
-         *            the object protocol, see {@link ICodec}
          * @see CallReceiver
          * @author Ramon Servadei
          */
@@ -316,21 +309,16 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         + System.identityHashCode(this) + ":" + System.currentTimeMillis() + ":"
                         + Thread.currentThread().getId();
 
-                final IRecordListener resultHandler = new IRecordListener()
-                {
-                    @Override
-                    public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                final IRecordListener resultHandler = (imageCopy, atomicChange) -> {
+                    if (atomicChange.getPutEntries().containsKey(RESULT)
+                        || atomicChange.getPutEntries().containsKey(EXCEPTION))
                     {
-                        if (atomicChange.getPutEntries().containsKey(RESULT)
-                            || atomicChange.getPutEntries().containsKey(EXCEPTION))
-                        {
-                            result.set(atomicChange.getPutEntries());
-                            executionCompleteLatch.countDown();
-                        }
-                        else
-                        {
-                            executionStartedLatch.countDown();
-                        }
+                        result.set(atomicChange.getPutEntries());
+                        executionCompleteLatch.countDown();
+                    }
+                    else
+                    {
+                        executionStartedLatch.countDown();
                     }
                 };
 
@@ -501,7 +489,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
 
     /**
      * @return an {@link RpcInstance} representing the rpcName and definition
-     * @see #constructDefinitionFromInstance(RpcInstance)
+     * @see #constructDefinitionFromInstance(IRpcInstance)
      */
     public static RpcInstance constructInstanceFromDefinition(String name, String definition)
     {
@@ -548,8 +536,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             {
                 argNames = null;
             }
-            final RpcInstance rpcInstance = new RpcInstance(TypeEnum.valueOf(ret), name, argNames, argTypes);
-            return rpcInstance;
+            return new RpcInstance(TypeEnum.valueOf(ret), name, argNames, argTypes);
         }
         return null;
     }
@@ -613,9 +600,9 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             throw new IllegalArgumentException("Cannot have a null return type");
         }
         this.argTypes = argTypes;
-        for (int i = 0; i < argTypes.length; i++)
+        for (TypeEnum argType : argTypes)
         {
-            if (argTypes[i] == null)
+            if (argType == null)
             {
                 throw new IllegalArgumentException("Some argTypes were null:" + Arrays.toString(argTypes));
             }
@@ -662,9 +649,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         }
         else if (!this.name.equals(other.name))
             return false;
-        if (this.retType != other.retType)
-            return false;
-        return true;
+        return this.retType == other.retType;
     }
 
     @Override

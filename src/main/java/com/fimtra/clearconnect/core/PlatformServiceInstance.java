@@ -79,9 +79,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
      * Defines the fields for the service stats record.
      * <p>
      * This is different to the statistics in the {@link IContextConnectionsRecordFields}. The
-     * context connects record shows statistics about the individual connection between a Context
-     * (service) and ProxyContext (service proxy). The Service stats record shows the <b>overall</b>
-     * statistics for the service (Context).
+     * context-connections-record shows statistics about the individual connection between a Context
+     * (service) and ProxyContext (service proxy). The service-stats-record shows the <b>overall</b>
+     * statistics for the service instance (Context).
      * 
      * @author Ramon Servadei
      */

@@ -27,7 +27,6 @@ import com.fimtra.datafission.field.TextValue;
  * {@link ISystemRecordNames#CONTEXT_STATUS}). Each attribute class has a set of values that
  * describe the states the attribute can have (e.g. Connection can have CONNECTED, DISCONNECTED).
  * 
- * @see IObserverContext#getContextStatusName()
  * @author Ramon Servadei
  */
 public interface IStatusAttribute
