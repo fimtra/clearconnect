@@ -55,7 +55,6 @@ import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
-import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
@@ -102,52 +101,40 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         if (DataFissionProperties.Values.ENABLE_THREAD_DEADLOCK_CHECK)
         {
             DeadlockDetector.newDeadlockDetectorTask(DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS,
-                new DeadlockObserver()
-                {
-                    @Override
-                    public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
-                    {
+                    deadlocks -> {
                         StringBuilder sb = new StringBuilder();
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                        for (int i = 0; i < deadlocks.length; i++)
+                        for (ThreadInfoWrapper deadlock : deadlocks)
                         {
-                            sb.append(deadlocks[i].toString());
+                            sb.append(deadlock.toString());
                         }
                         System.err.println(sb.toString());
-                    }
-                }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
+                    }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
+
+        // resolves ClassNotFoundException on shutdown
+        final DeadlockDetector deadlockDetector = new DeadlockDetector();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Log.log(Context.class, "JVM shutting down...");
-            final DeadlockDetector deadlockDetector = new DeadlockDetector();
             final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
             final File threadDumpOnShutdownFile =
                 FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
             final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();
             if (threads != null)
             {
-                PrintWriter pw = null;
-                try
+                try (PrintWriter pw = new PrintWriter(threadDumpOnShutdownFile))
                 {
-                    pw = new PrintWriter(threadDumpOnShutdownFile);
-                    for (int i = 0; i < threads.length; i++)
+                    for (ThreadInfoWrapper thread : threads)
                     {
-                        pw.print(threads[i].toString());
+                        pw.print(thread.toString());
                         pw.flush();
                     }
                     Log.log(Context.class, "Thread dump successful: ", threadDumpOnShutdownFile.toString());
                 }
                 catch (Exception e)
                 {
-                    Log.log(Context.class, "Could not produce threaddump file on exit", e);
-                }
-                finally
-                {
-                    if (pw != null)
-                    {
-                        pw.close();
-                    }
+                    Log.log(Context.class, "Could not produce thread dump file on exit", e);
                 }
             }
         }, "datafission-shutdown"));
@@ -283,7 +270,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     }
 
     /**
-     * Manages the images of the contex's records.
+     * Manages the images of the context's records.
      * <p>
      * <b>NOTE: the images are only ever updated with atomic changes in the
      * {@link ISequentialRunnable} that notifies the {@link IRecordListener} instances. This ensures
@@ -760,17 +747,20 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final Map<String, Boolean> resultMap = new HashMap<>(recordNames.length);
         final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<>(() -> {
             final List<String> permissionedRecords = new LinkedList<>();
-            for (int i = 0; i < recordNames.length; i++)
+            for (String recordName : recordNames)
             {
-                if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
+                final String checkedPermissionToken =
+                        permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN :
+                                permissionToken;
+                if (recordName != null && permissionTokenValidForRecord(checkedPermissionToken, recordName))
                 {
-                    permissionedRecords.add(recordNames[i]);
-                    Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
-                    resultMap.put(recordNames[i], Boolean.TRUE);
+                    permissionedRecords.add(recordName);
+                    Context.this.tokenPerRecord.put(recordName, checkedPermissionToken);
+                    resultMap.put(recordName, Boolean.TRUE);
                 }
                 else
                 {
-                    resultMap.put(recordNames[i], Boolean.FALSE);
+                    resultMap.put(recordName, Boolean.FALSE);
                 }
             }
 
@@ -909,16 +899,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
 
             final List<String> toRemove = new LinkedList<>();
-            String name;
-            for (int i = 0; i < names.length; i++)
+            for (String name : names)
             {
-                name = names[i];
                 if (this.recordObservers.removeSubscriberFor(name, observer))
                 {
                     if (log)
                     {
                         Log.log(this, "Removed listener from [", name, "] listener=",
-                            ObjectUtils.safeToString(observer));
+                                ObjectUtils.safeToString(observer));
                     }
                     toRemove.add(name);
                 }
@@ -945,7 +933,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 LongValue observerCount;
                 for (String recordName : recordNames)
                 {
-                    observerCount = (LongValue) contextSubscriptions.get(recordName);
+                    observerCount = contextSubscriptions.get(recordName);
                     if (observerCount == null)
                     {
                         observerCount = LongValue.valueOf(0);
@@ -1251,7 +1239,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
         else
         {
-            return this.permissionFilter == null ? true : this.permissionFilter.accept(permissionToken, recordName);
+            return this.permissionFilter == null || this.permissionFilter.accept(permissionToken, recordName);
         }
     }
 
@@ -1263,11 +1251,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     final boolean isSystemRecordReady(IRecord systemRecord)
     {
-        if (systemRecord == null || !this.active)
-        {
-            return false;
-        }
-        return true;
+        return systemRecord != null && this.active;
     }
 
     final void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
@@ -1312,7 +1296,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         long start;
-        IRecordListener listener = null;
 
         // NOTE: always get the subscribers to notify in the context of the handling the record
         // change! If we had a snapshot of the subscribers taken outside of the context, we would
@@ -1327,10 +1310,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // work out who to notify, i.e. listeners NOT expecting an image
             Set<String> initialImagePending;
             final List<IRecordListener> listenersNotExpectingImage = new LinkedList<>();
-            for (int i = 0; i < listenersToNotify.length; i++)
+            for (IRecordListener listener : listenersToNotify)
             {
-                listener = listenersToNotify[i];
-
                 // NOTE: cannot optimise by locking
                 // listenersToNotifyWithInitialImages outside the loop - this can
                 // lead to a deadlock as the lock order with initialImagePending
@@ -1341,7 +1322,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     // don't notify - let the initial image task do this
                     // as it will pass in a full image as the atomic change
                     // (thus simulating the initial image)
-                    continue;
                 }
                 else
                 {
@@ -1349,17 +1329,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 }
             }
             listenersToNotify =
-                listenersNotExpectingImage.toArray(new IRecordListener[listenersNotExpectingImage.size()]);
+                listenersNotExpectingImage.toArray(new IRecordListener[0]);
         }
 
-        for (int i = 0; i < listenersToNotify.length; i++)
+        for (IRecordListener listener : listenersToNotify)
         {
             try
             {
-                listener = listenersToNotify[i];
                 start = System.nanoTime();
                 listener.onChange(notifyImage, atomicChange);
-                ContextUtils.measureTask(recordName, "local record update", listener, (System.nanoTime() - start));
+                ContextUtils.measureTask(recordName, "local record update", listener,
+                        (System.nanoTime() - start));
             }
             catch (Exception e)
             {
