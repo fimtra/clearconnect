@@ -112,6 +112,12 @@ public abstract class DataFissionProperties
         String SLOW_TASK_THRESHOLD_NANOS = BASE + "slowTaskThresholdNanos";
 
         /**
+         * The system property name to define the threshold, in nanos, for logging a slow publish.<br>
+         * E.g. <code>-DdataFission.slowPublishNanos=10000000</code>
+         */
+        String SLOW_PUBLISH_THRESHOLD_NANOS = BASE + "slowPublishNanos";
+
+        /**
          * The system property name to define the number of threads assigned to the runtime-wide
          * reconnect task scheduler used by all {@link ProxyContext} instances.<br>
          * E.g. <code>-DdataFission.reconnectThreadCount=2</code>
@@ -350,6 +356,15 @@ public abstract class DataFissionProperties
          */
         long SLOW_TASK_THRESHOLD_NANOS =
             Long.parseLong(System.getProperty(Names.SLOW_TASK_THRESHOLD_NANOS, "50000000"));
+        /**
+         * The threshold value for logging when a publish is slow, in nanos
+         * <p>
+         * Default is: 10000000 (10ms)
+         *
+         * @see Names#SLOW_PUBLISH_THRESHOLD_NANOS
+         */
+        long SLOW_PUBLISH_THRESHOLD_NANOS =
+            Long.parseLong(System.getProperty(Names.SLOW_PUBLISH_THRESHOLD_NANOS, "10000000"));
 
         /**
          * The number of threads used in the shared reconnect task scheduler used by all DataFission

@@ -159,7 +159,7 @@ public final class ContextUtils
     public static final ExtensionFileFilter RECORD_FILE_FILTER =
         new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
 
-    private static final double INVERSE_1000000 = 1d / 1000000;
+    static final double INVERSE_1000000 = 1d / 1000000;
 
     public static final Set<String> SYSTEM_RECORDS;
 
