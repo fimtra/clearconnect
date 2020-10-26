@@ -16,7 +16,6 @@
 package com.fimtra.clearconnect.core;
 
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,13 +46,11 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
-import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
-import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -85,7 +82,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
      * 
      * @author Ramon Servadei
      */
-    static interface IServiceStatsRecordFields
+    interface IServiceStatsRecordFields
     {
         String SUBSCRIPTION_COUNT = "Subscriptions";
         String MESSAGE_COUNT = "Msgs published";
@@ -166,9 +163,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
 
                 int subscriptionCount = 0;
-                for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
+                for (Map.Entry<String, IValue> stringIValueEntry : subscriptions.entrySet())
                 {
-                    subscriptionCount += it.next().getValue().longValue();
+                    subscriptionCount += stringIValueEntry.getValue().longValue();
                 }
 
                 final long nanoTime = System.nanoTime();
@@ -225,15 +222,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
-            {
-                @Override
-                public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
-                {
-                    setFtState(Boolean.valueOf(args[0].textValue()));
-                    return PlatformUtils.OK;
-                }
-
+            RpcInstance rpc = new RpcInstance(args -> {
+                setFtState(Boolean.valueOf(args[0].textValue()));
+                return PlatformUtils.OK;
             }, TypeEnum.TEXT, RPC_FT_SERVICE_STATUS, TypeEnum.TEXT);
             this.context.createRpc(rpc);
         }
@@ -482,21 +473,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.redundancyMode;
     }
 
-    boolean addValidator(IValidator validator)
-    {
-        return this.context.addValidator(validator);
-    }
-
-    void updateValidator(IValidator validator)
-    {
-        this.context.updateValidator(validator);
-    }
-
-    boolean removeValidator(IValidator validator)
-    {
-        return this.context.removeValidator(validator);
-    }
-
     @Override
     public Map<String, SubscriptionInfo> getAllSubscriptions()
     {
@@ -506,24 +482,19 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void addFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(new Runnable()
-        {
-            @Override
-            public void run()
+        this.context.getUtilityExecutor().execute(() -> {
+            PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
+            if (PlatformServiceInstance.this.isFtMasterInstance != null)
             {
-                PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
-                if (PlatformServiceInstance.this.isFtMasterInstance != null)
+                if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
                 {
-                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
-                    {
-                        ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
-                            PlatformServiceInstance.this.serviceMember);
-                    }
-                    else
-                    {
-                        ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
-                            PlatformServiceInstance.this.serviceMember);
-                    }
+                    ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
+                        PlatformServiceInstance.this.serviceMember);
+                }
+                else
+                {
+                    ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
+                        PlatformServiceInstance.this.serviceMember);
                 }
             }
         });
@@ -532,14 +503,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void removeFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                PlatformServiceInstance.this.ftStatusListeners.remove(ftStatusListener);
-            }
-        });
+        this.context.getUtilityExecutor().execute(
+                () -> PlatformServiceInstance.this.ftStatusListeners.remove(ftStatusListener));
     }
 
     @Override
@@ -555,38 +520,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.context.getUtilityExecutor();
     }
 
-    void updateServiceStats()
-    {
-        IRecord subscriptions = this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-
-        int subscriptionCount = 0;
-        for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
-        {
-            subscriptionCount += it.next().getValue().longValue();
-        }
-
-        this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT, subscriptionCount);
-        this.stats.put(IServiceStatsRecordFields.UPTIME, (System.currentTimeMillis() - this.startTimeMillis) / 1000);
-        this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT, this.publisher.getMessagesPublished());
-        this.stats.put(IServiceStatsRecordFields.KB_COUNT, LongValue.valueOf(this.publisher.getBytesPublished() / 1024));
-
-        this.context.publishAtomicChange(this.stats);
-    }
-
     @Override
     public void setPermissionFilter(final IPermissionFilter filter)
     {
-        this.context.setPermissionFilter(new IPermissionFilter()
-        {
-            @Override
-            public boolean accept(String permissionToken, String recordName)
+        this.context.setPermissionFilter((permissionToken, recordName) -> {
+            if (SERVICE_STATS_RECORD_NAME.equals(recordName))
             {
-                if (SERVICE_STATS_RECORD_NAME.equals(recordName))
-                {
-                    return true;
-                }
-                return filter.accept(permissionToken, recordName);
+                return true;
             }
+            return filter.accept(permissionToken, recordName);
         });
     }
 
@@ -600,14 +542,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.context.getUtilityExecutor().execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    doSetFtState(isMaster);
-                }
-            });
+            this.context.getUtilityExecutor().execute(() -> doSetFtState(isMaster));
         }
     }
 
