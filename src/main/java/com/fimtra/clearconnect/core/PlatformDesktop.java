@@ -1485,7 +1485,14 @@ public class PlatformDesktop
                     while (br.ready())
                     {
                         line = br.readLine();
-                        AbstractPlatformDesktopView.fromStateString(this, line);
+                        try
+                        {
+                            AbstractPlatformDesktopView.fromStateString(this, line);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.log(PlatformDesktop.this, "Could not view from state: " + line, e);
+                        }
                     }
                 }
             }
