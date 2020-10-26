@@ -150,14 +150,14 @@ public class PlatformRegistryTest
             final String suffix = i + "-" + System.nanoTime();
             agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
 
-            agents[i].createPlatformServiceInstance("Test-FTservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+            agents[i].createPlatformServiceInstance("Test-FTservice", suffix, TcpChannelUtils.LOCALHOST_IP, port++,
                 WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice-" + i, suffix));
+            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice" , suffix));
 
             // create a load balanced service
-            agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
+            agents[i].createPlatformServiceInstance("Test-LBservice", suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+                WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED);
+            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice" , suffix));
         }
 
         final CountDownLatch allConnections = new CountDownLatch(1);
@@ -169,19 +169,22 @@ public class PlatformRegistryTest
             @Override
             public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
+                if (imageValidInCallingThreadOnly.get(
+                        PlatformRegistry.IPlatformSummaryRecordFields.SERVICE_INSTANCES).longValue()
+                        == (MAX * 2) + 1)
                 {
                     this.connected = true;
                     allConnections.countDown();
                 }
 
                 // this is for when we destroy the agents
-                if (this.connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
+                if (this.connected && imageValidInCallingThreadOnly.get(
+                        PlatformRegistry.IPlatformSummaryRecordFields.SERVICE_INSTANCES).longValue() == 1)
                 {
                     noConnections.countDown();
                 }
             }
-        }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
+        }, IRegistryRecordNames.PLATFORM_SUMMARY);
 
         assertTrue(allConnections.await(10, TimeUnit.SECONDS));
 
@@ -199,8 +202,6 @@ public class PlatformRegistryTest
     {
         Thread.sleep(2000);
 
-        checkZeroSize(this.candidate.platformConnections);
-        checkZeroSize(this.candidate.serviceInstancesPerAgent);
         // the platform registry adds itself as a service instance
         checkSize(0, 1, this.candidate.serviceInstancesPerServiceFamily);
         checkZeroSize(this.candidate.serviceInstanceStats);
