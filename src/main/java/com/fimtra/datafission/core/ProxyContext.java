@@ -176,7 +176,7 @@ public final class ProxyContext implements IObserverContext
      * 
      * @author Ramon Servadei
      */
-    public static interface IRemoteSystemRecordNames
+    public interface IRemoteSystemRecordNames
     {
         String REMOTE = "Remote";
 
@@ -254,22 +254,13 @@ public final class ProxyContext implements IObserverContext
      */
     public static final TextValue RECORD_DISCONNECTED = TextValue.valueOf("DISCONNECTED");
 
-    final static Executor SYNCHRONOUS_EXECUTOR = new Executor()
-    {
-        @Override
-        public void execute(Runnable command)
-        {
-            command.run();
-        }
-    };
-
     // constructs to handle mapping of local system record names to remote names
     static final Map<String, String> remoteToLocalSystemRecordNameConversions;
     static final Map<String, String> localToRemoteSystemRecordNameConversions;
 
     static
     {
-        Map<String, String> mapping = null;
+        Map<String, String> mapping;
         mapping = new HashMap<>();
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, ISystemRecordNames.CONTEXT_RPCS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, ISystemRecordNames.CONTEXT_RECORDS);
@@ -313,18 +304,18 @@ public final class ProxyContext implements IObserverContext
         String... recordNames)
     {
         final List<String> records = new ArrayList<>(recordNames.length);
-        for (int i = 0; i < recordNames.length; i++)
+        for (String recordName : recordNames)
         {
-            if (!ContextUtils.isSystemRecordName(recordNames[i])
-                && !RECORD_CONNECTION_STATUS_NAME.equals(recordNames[i]))
+            if (!ContextUtils.isSystemRecordName(recordName) && !RECORD_CONNECTION_STATUS_NAME.equals(
+                    recordName))
             {
-                if (subscriptionManager.getSubscribersFor(recordNames[i]).length == count)
+                if (subscriptionManager.getSubscribersFor(recordName).length == count)
                 {
-                    records.add(substituteRemoteNameWithLocalName(recordNames[i]));
+                    records.add(substituteRemoteNameWithLocalName(recordName));
                 }
             }
         }
-        return records.toArray(new String[records.size()]);
+        return records.toArray(new String[0]);
     }
 
     static String[] insertPermissionToken(final String permissionToken, final String[] recordsToSubscribeFor)
@@ -365,27 +356,25 @@ public final class ProxyContext implements IObserverContext
             }
             final IRecordListener[] subscribersFor =
                 ProxyContext.this.context.recordObservers.getSubscribersFor(this.changeName);
-            IRecordListener iAtomicChangeObserver = null;
             long start;
             final int size = subscribersFor.length;
             if (size == 0)
             {
                 Log.log(ProxyContext.this, "*** Unexpected RPC result for ", this.changeName);
             }
-            for (int i = 0; i < size; i++)
+            for (IRecordListener iAtomicChangeObserver : subscribersFor)
             {
                 try
                 {
-                    iAtomicChangeObserver = subscribersFor[i];
                     start = System.nanoTime();
                     iAtomicChangeObserver.onChange(null, this.changeToApply);
                     ContextUtils.measureTask(this.changeName, "RPC result handling", iAtomicChangeObserver,
-                        (System.nanoTime() - start));
+                            (System.nanoTime() - start));
                 }
                 catch (Exception e)
                 {
                     Log.log(ProxyContext.this,
-                        "Could not notify " + iAtomicChangeObserver + " with " + this.changeToApply, e);
+                            "Could not notify " + iAtomicChangeObserver + " with " + this.changeToApply, e);
                 }
             }
         }
@@ -751,8 +740,8 @@ public final class ProxyContext implements IObserverContext
     }
 
     static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
-        new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", () -> new RxFrameHandler(),
-            (instance) -> instance.clear(), DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
+        new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", RxFrameHandler::new,
+                RxFrameHandler::clear, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
 
     final Object lock;
     volatile boolean active;
@@ -1137,11 +1126,13 @@ public final class ProxyContext implements IObserverContext
             // same remote record
             this.context.addObserver(observer, recordNames);
 
-            // store the token used for the record incase a reconnect happens and we need to
+            // store the token used for the record in case a reconnect happens and we need to
             // re-subscribe
+            final String checkedPermissionToken =
+                    permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN : permissionToken;
             for (String recordName : recordsToSubscribeFor)
             {
-                this.tokenPerRecord.put(recordName, permissionToken);
+                this.tokenPerRecord.put(recordName, checkedPermissionToken);
             }
 
             if (recordsToSubscribeFor.length > 0)
@@ -1150,7 +1141,7 @@ public final class ProxyContext implements IObserverContext
                 // only issue the subscribe if connected
                 if (this.connected)
                 {
-                    task = () -> subscribe(permissionToken, recordsToSubscribeFor);
+                    task = () -> subscribe(checkedPermissionToken, recordsToSubscribeFor);
                 }
                 else
                 {
@@ -1188,11 +1179,8 @@ public final class ProxyContext implements IObserverContext
                 }
 
                 // remove the records that are no longer subscribed
-                String recordName;
-                for (int i = 0; i < recordsToUnsubscribe.length; i++)
+                for (String recordName : recordsToUnsubscribe)
                 {
-                    recordName = recordsToUnsubscribe[i];
-
                     // ignore system record names - these can be in here because if we subscribe for
                     // RemoteContextRpcs, say, we actually send ContextRpcs (we need the ContextRpcs
                     // of the remote context).
@@ -1206,9 +1194,8 @@ public final class ProxyContext implements IObserverContext
                 // mark the records as disconnected
                 synchronized (this.remoteConnectionStatusRecord.getWriteLock())
                 {
-                    for (int i = 0; i < recordsToUnsubscribe.length; i++)
+                    for (String recordName : recordsToUnsubscribe)
                     {
-                        recordName = recordsToUnsubscribe[i];
                         this.remoteConnectionStatusRecord.put(recordName, RECORD_DISCONNECTED);
                     }
                     this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
@@ -1395,7 +1382,6 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        // todo free up list after?
         final List<String> recordNames = new ArrayList<>(changeToApply.getPutEntries().keySet());
 
         final String action = changeName.substring(ACK_LEN);
@@ -1405,11 +1391,8 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "(<-) ", SUBSCRIBE, NOK, ObjectUtils.safeToString(recordNames));
         }
         Queue<CountDownLatch> latches;
-        String recordName;
-        final int recordNameCount = recordNames.size();
-        for (int i = 0; i < recordNameCount; i++)
+        for (String recordName : recordNames)
         {
-            recordName = recordNames.get(i);
             latches = this.actionResponseLatches.remove(action + recordName);
             if (latches != null)
             {
@@ -1474,7 +1457,7 @@ public final class ProxyContext implements IObserverContext
                 }
             }
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
-                new String[] { substituteRemoteNameWithLocalName(name) }));
+                    substituteRemoteNameWithLocalName(name)));
 
             return true;
         }
@@ -1620,7 +1603,7 @@ public final class ProxyContext implements IObserverContext
                 Long.toString(this.reconnectPeriodMillis), "ms ");
 
             this.reconnectTask =
-                RECONNECT_TASKS.schedule(() -> reconnect(), this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
+                RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -1712,10 +1695,10 @@ public final class ProxyContext implements IObserverContext
         CountDownLatch latch = new CountDownLatch(recordNames.length);
         Queue<CountDownLatch> latches;
         Queue<CountDownLatch> pending;
-        for (int i = 0; i < recordNames.length; i++)
+        for (String recordName : recordNames)
         {
             pending = new ConcurrentLinkedQueue<>();
-            latches = this.actionResponseLatches.putIfAbsent(action + recordNames[i], pending);
+            latches = this.actionResponseLatches.putIfAbsent(action + recordName, pending);
             if (latches == null)
             {
                 latches = pending;
@@ -1770,7 +1753,7 @@ public final class ProxyContext implements IObserverContext
             if (batchSubscribeRecordNames.size() == batchSize)
             {
                 subscribeBatch(permissionToken,
-                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                    batchSubscribeRecordNames.toArray(new String[0]), i, size);
                 batchSubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
@@ -1778,7 +1761,7 @@ public final class ProxyContext implements IObserverContext
         if (batchSubscribeRecordNames.size() > 0)
         {
             subscribeBatch(permissionToken,
-                batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                batchSubscribeRecordNames.toArray(new String[0]), i, size);
         }
     }
 
@@ -1823,7 +1806,7 @@ public final class ProxyContext implements IObserverContext
         {
             if (batchUnsubscribeRecordNames.size() == batchSize)
             {
-                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
+                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
                     size);
                 batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
             }
@@ -1831,14 +1814,14 @@ public final class ProxyContext implements IObserverContext
         }
         if (batchUnsubscribeRecordNames.size() > 0)
         {
-            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
+            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
                 size);
         }
     }
 
     private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total)
     {
-        int i = 0;
+        int i;
         if (ProxyContext.this.channel instanceof ISubscribingChannel)
         {
             for (i = 0; i < recordsToUnsubscribe.length; i++)
@@ -1873,32 +1856,23 @@ public final class ProxyContext implements IObserverContext
     void doResubscribe(final String[] recordNamesToSubscribeFor)
     {
         final Map<String, List<String>> recordsPerToken = new HashMap<>();
-        String token = null;
+        String token;
         List<String> records;
 
         {
-            String recordName;
-            for (int i = 0; i < recordNamesToSubscribeFor.length; i++)
+            for (String recordName : recordNamesToSubscribeFor)
             {
-                recordName = recordNamesToSubscribeFor[i];
                 token = this.tokenPerRecord.get(recordName);
-                records = recordsPerToken.get(token);
-                if (records == null)
-                {
-                    records = new ArrayList<>();
-                    recordsPerToken.put(token, records);
-                }
+                records = recordsPerToken.computeIfAbsent(token, k -> new ArrayList<>());
                 records.add(recordName);
             }
         }
 
-        Map.Entry<String, List<String>> entry = null;
-        for (Iterator<Map.Entry<String, List<String>>> it = recordsPerToken.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, List<String>> entry : recordsPerToken.entrySet())
         {
-            entry = it.next();
             token = entry.getKey();
             records = entry.getValue();
-            subscribe(token, records.toArray(new String[records.size()]));
+            subscribe(token, records.toArray(new String[0]));
         }
     }
 
