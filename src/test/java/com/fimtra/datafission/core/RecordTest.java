@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,8 +31,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.fimtra.datafission.field.TextValue;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.fimtra.datafission.IRecordChange;
@@ -43,7 +46,7 @@ import com.fimtra.datafission.field.DoubleValue;
 
 /**
  * Test cases for the record
- * 
+ *
  * @author Ramon Servadei
  */
 @SuppressWarnings({ "unused" })
@@ -151,17 +154,21 @@ public class RecordTest
         this.candidate.put(K2, V2);
         this.candidate.put(K5, V5);
         assertEquals("size", 3, this.candidate.size());
-        final Collection<?> entrySet = this.candidate.entrySet();
+        final Set<Entry<String, IValue>> entrySet = this.candidate.entrySet();
         assertEquals("size", 3, entrySet.size());
-        final Iterator<?> iterator = entrySet.iterator();
+        final Iterator<Entry<String, IValue>> iterator = entrySet.iterator();
         int count = 0;
         while (iterator.hasNext())
         {
             count++;
-            final Entry<?, ?> next = (Entry<?, ?>) iterator.next();
+            final Entry<String, IValue> next = iterator.next();
             if (next.getKey().equals(K5))
             {
                 iterator.remove();
+            }
+            else if (next.getKey().equals(K1))
+            {
+                next.setValue(V5);
             }
         }
         this.context.publishAtomicChange(name).await();
@@ -172,7 +179,9 @@ public class RecordTest
         assertEquals("put", 2, getLatestChange().getPutEntries().size());
         assertEquals("removed", 1, getLatestChange().getRemovedEntries().size());
         assertEquals("removed contents: " + getLatestChange().getRemovedEntries(), V5,
-            getLatestChange().getRemovedEntries().get(K5));
+                getLatestChange().getRemovedEntries().get(K5));
+
+        assertEquals(V5, candidate.get(K1));
     }
 
     @Test
@@ -189,6 +198,110 @@ public class RecordTest
         assertTrue(this.candidate.isEmpty());
         this.candidate.put(K1, V1);
         assertFalse(this.candidate.isEmpty());
+    }
+
+    @Test
+    public void testSubMapKeySetPerformance() throws InterruptedException
+    {
+        Set<String> keys = new HashSet<>();
+        final Map<String, IValue> subMap = candidate.getOrCreateSubMap("testSubMapKeySetPerformance");
+        for (int i = 0; i < 100000; i++)
+        {
+            final String k = "" + i;
+            final TextValue v = TextValue.valueOf(k);
+            subMap.put(k, v);
+            keys.add(k);
+        }
+        long t = System.nanoTime();
+        keys.removeAll((subMap.keySet()));
+        t = System.nanoTime() - t;
+
+        System.err.println("took " + t + "ns");
+        assertEquals(0, keys.size());
+        assertTrue("took " + t + "ns", t < 100_000_000);
+    }
+
+    @Test
+    @Ignore("This test takes ~60 seconds")
+    public void testSubMapValuesPerformance() throws InterruptedException
+    {
+        Collection<IValue> values = new HashSet<>();
+        final Map<String, IValue> subMap = candidate.getOrCreateSubMap("testSubMapKeySetPerformance");
+        for (int i = 0; i < 100000; i++)
+        {
+            final String k = "" + i;
+            final TextValue v = TextValue.valueOf(k);
+            subMap.put(k, v);
+            values.add(v);
+        }
+        long t = System.nanoTime();
+        values.removeAll((subMap.values()));
+        t = System.nanoTime() - t;
+
+        System.err.println("took " + t + "ns");
+        assertEquals(0, values.size());
+        assertTrue("took " + t + "ns", t < 100_000_000);
+    }
+
+    @Test
+    public void testKeySetPerformance() throws InterruptedException
+    {
+        Set<String> keys = new HashSet<>();
+        for (int i = 0; i < 100000; i++)
+        {
+            final String k = "" + i;
+            this.candidate.put(k, k);
+            keys.add(k);
+        }
+        long t = System.nanoTime();
+        keys.removeAll((candidate.keySet()));
+        t = System.nanoTime() - t;
+
+        System.err.println("took " + t + "ns");
+        assertEquals(0, keys.size());
+        assertTrue("took " + t + "ns", t < 100_000_000);
+    }
+
+    @Test
+    @Ignore("This test takes ~90 seconds")
+    public void testEntrySetPerformance() throws InterruptedException
+    {
+        for (int i = 0; i < 100000; i++)
+        {
+            final String k = "" + i;
+            final TextValue v = TextValue.valueOf(k);
+            this.candidate.put(k, v);
+        }
+        Set<Entry<String, IValue>> entrySet = new HashSet<>(candidate.data.entrySet());
+
+        long t = System.nanoTime();
+        entrySet.removeAll(candidate.entrySet());
+        t = System.nanoTime() - t;
+
+        System.err.println("took " + t + "ns");
+        assertEquals(0, entrySet.size());
+        assertTrue("took " + t + "ns", t < 100_000_000);
+    }
+
+    @Test
+    @Ignore("This test takes ~50 seconds")
+    public void testValuesPerformance() throws InterruptedException
+    {
+        Collection<IValue> values = new HashSet<>();
+        for (int i = 0; i < 100000; i++)
+        {
+            final String k = "" + i;
+            final TextValue v = TextValue.valueOf(k);
+            this.candidate.put(k, v);
+            values.add(v);
+        }
+        long t = System.nanoTime();
+        values.removeAll(candidate.values());
+        t = System.nanoTime() - t;
+
+        System.err.println("took " + t + "ns");
+        assertEquals(0, values.size());
+        assertTrue("took " + t + "ns", t < 100_000_000_000l);
     }
 
     @Test
@@ -220,7 +333,8 @@ public class RecordTest
     {
         this.candidate.put(K1, (IValue) null);
         this.context.publishAtomicChange(name).await();
-        assertNull("put contents: " + getLatestChange().getPutEntries(), getLatestChange().getPutEntries().get(K1));
+        assertNull("put contents: " + getLatestChange().getPutEntries(),
+                getLatestChange().getPutEntries().get(K1));
     }
 
     @Test
@@ -232,9 +346,9 @@ public class RecordTest
         assertEquals("previous", 1, getLatestChange().getPutEntries().size());
         assertEquals("removed", 0, getLatestChange().getRemovedEntries().size());
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V1,
-            getLatestChange().getPutEntries().get(K1));
+                getLatestChange().getPutEntries().get(K1));
         assertNull("previous contents: " + getLatestChange().getOverwrittenEntries(),
-            getLatestChange().getOverwrittenEntries().get(K1));
+                getLatestChange().getOverwrittenEntries().get(K1));
 
         this.listener.reset();
 
@@ -245,9 +359,9 @@ public class RecordTest
         assertEquals("previous", 1, getLatestChange().getPutEntries().size());
         assertEquals("removed", 0, getLatestChange().getRemovedEntries().size());
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V2,
-            getLatestChange().getPutEntries().get(K1));
+                getLatestChange().getPutEntries().get(K1));
         assertEquals("previous contents: " + getLatestChange().getOverwrittenEntries(), V1,
-            getLatestChange().getOverwrittenEntries().get(K1));
+                getLatestChange().getOverwrittenEntries().get(K1));
     }
 
     @Test
@@ -259,9 +373,9 @@ public class RecordTest
         assertEquals("previous", 1, getLatestChange().getPutEntries().size());
         assertEquals("removed", 0, getLatestChange().getRemovedEntries().size());
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V1,
-            getLatestChange().getPutEntries().get(K1));
+                getLatestChange().getPutEntries().get(K1));
         assertNull("previous contents: " + getLatestChange().getOverwrittenEntries(),
-            getLatestChange().getOverwrittenEntries().get(K1));
+                getLatestChange().getOverwrittenEntries().get(K1));
 
         this.listener.reset();
 
@@ -285,13 +399,13 @@ public class RecordTest
         assertEquals("removed", 0, getLatestChange().getRemovedEntries().size());
 
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V1,
-            getLatestChange().getPutEntries().get(K1));
+                getLatestChange().getPutEntries().get(K1));
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V2,
-            getLatestChange().getPutEntries().get(K2));
+                getLatestChange().getPutEntries().get(K2));
         assertNull("previous contents: " + getLatestChange().getOverwrittenEntries(),
-            getLatestChange().getOverwrittenEntries().get(K1));
+                getLatestChange().getOverwrittenEntries().get(K1));
         assertNull("previous contents: " + getLatestChange().getOverwrittenEntries(),
-            getLatestChange().getOverwrittenEntries().get(K2));
+                getLatestChange().getOverwrittenEntries().get(K2));
 
         // check previous values get updated
         record = new HashMap<String, IValue>();
@@ -305,9 +419,9 @@ public class RecordTest
         assertEquals("removed", 0, getLatestChange().getRemovedEntries().size());
 
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V1,
-            getLatestChange().getPutEntries().get(K2));
+                getLatestChange().getPutEntries().get(K2));
         assertEquals("previous contents: " + getLatestChange().getOverwrittenEntries(), V2,
-            getLatestChange().getOverwrittenEntries().get(K2));
+                getLatestChange().getOverwrittenEntries().get(K2));
     }
 
     @Test
@@ -340,13 +454,14 @@ public class RecordTest
         assertEquals("size", 1, this.candidate.size());
         this.context.publishAtomicChange(name).await();
 
-        assertEquals("put events: " + getLatestChange().getPutEntries(), 1, getLatestChange().getPutEntries().size());
+        assertEquals("put events: " + getLatestChange().getPutEntries(), 1,
+                getLatestChange().getPutEntries().size());
         assertEquals("removed events", 1, getLatestChange().getRemovedEntries().size());
 
         assertEquals("put contents: " + getLatestChange().getPutEntries(), V2,
-            getLatestChange().getPutEntries().get(K2));
+                getLatestChange().getPutEntries().get(K2));
         assertEquals("removed contents: " + getLatestChange().getRemovedEntries(), V1,
-            getLatestChange().getRemovedEntries().get(K1));
+                getLatestChange().getRemovedEntries().get(K1));
     }
 
     @Test
@@ -369,10 +484,11 @@ public class RecordTest
     /**
      * Helper that checks there are 3 items in the collection, iterates over it and removes an item
      * via the iterator, checks there are 2 items left.
-     * 
+     *
      * @throws InterruptedException
      */
-    private void doCollectionTest(final Collection<?> collection, Object itemToRemove) throws InterruptedException
+    private void doCollectionTest(final Collection<?> collection, Object itemToRemove)
+            throws InterruptedException
     {
         assertEquals("size", 3, collection.size());
         final Iterator<?> iterator = collection.iterator();
@@ -392,7 +508,7 @@ public class RecordTest
         assertEquals("size", 2, this.candidate.size());
         assertEquals("removed", 1, getLatestChange().getRemovedEntries().size());
         assertEquals("removed contents: " + getLatestChange().getRemovedEntries(), V5,
-            getLatestChange().getRemovedEntries().get(K5));
+                getLatestChange().getRemovedEntries().get(K5));
     }
 
     private IRecordChange getLatestChange()
@@ -408,7 +524,7 @@ public class RecordTest
         this.context.publishAtomicChange(name).await();
         assertEquals("removed", 1, getLatestChange().getRemovedEntries().size());
         assertEquals("removed contents: " + getLatestChange().getRemovedEntries(), V1,
-            getLatestChange().getRemovedEntries().get(K1));
+                getLatestChange().getRemovedEntries().get(K1));
     }
 
     @Test
@@ -594,16 +710,26 @@ public class RecordTest
         this.context.publishAtomicChange(name).await();
         verifyImageSizes(2, 1);
 
-        int entrycount = 0;
+        assertEquals(V5, subMap.get(K2));
+        // check entry set can be used to modify the values
         Set<Entry<String, IValue>> entrySet = subMap.entrySet();
-        for (Iterator<Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext();)
+        for (Entry<String, IValue> entry : entrySet)
         {
-            Entry<String, IValue> entry = iterator.next();
+            if(entry.getKey().equals(K2))
+            {
+                entry.setValue(V1);
+            }
+        }
+        assertEquals(V1, subMap.get(K2));
+
+        int entrycount = 0;
+        for (Entry<String, IValue> entry : entrySet)
+        {
             entrycount++;
         }
         assertEquals(2, entrycount);
         entrySet = subMap.entrySet();
-        for (Iterator<Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext();)
+        for (Iterator<Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext(); )
         {
             Entry<String, IValue> entry = iterator.next();
             iterator.remove();
@@ -635,15 +761,14 @@ public class RecordTest
         expected.add(V2);
         int entrycount = 0;
         Collection<IValue> values = subMap.values();
-        for (Iterator<IValue> iterator = values.iterator(); iterator.hasNext();)
+        for (IValue iValue : values)
         {
-            IValue iValue = iterator.next();
             entrycount++;
             assertTrue("Did not find " + iValue + " in " + expected, expected.contains(iValue));
         }
         assertEquals(2, entrycount);
         values = subMap.values();
-        for (Iterator<IValue> iterator = values.iterator(); iterator.hasNext();)
+        for (Iterator<IValue> iterator = values.iterator(); iterator.hasNext(); )
         {
             iterator.next();
             iterator.remove();
@@ -675,15 +800,14 @@ public class RecordTest
         expected.add(K2);
         int entrycount = 0;
         Collection<String> keySet = subMap.keySet();
-        for (Iterator<String> iterator = keySet.iterator(); iterator.hasNext();)
+        for (String iValue : keySet)
         {
-            String iValue = iterator.next();
             assertTrue("Did not find " + iValue + " in " + expected, expected.contains(iValue));
             entrycount++;
         }
         assertEquals(2, entrycount);
         keySet = subMap.keySet();
-        for (Iterator<String> iterator = keySet.iterator(); iterator.hasNext();)
+        for (Iterator<String> iterator = keySet.iterator(); iterator.hasNext(); )
         {
             String iValue = iterator.next();
             iterator.remove();
@@ -767,17 +891,17 @@ public class RecordTest
         Map<String, IValue> m = new HashMap<String, IValue>();
         m.put(K1, V1);
         m.put(K2, V2);
-        
+
         this.context.publishAtomicChange(name).await();
         verifyImageSizes(2, 0);
-        
+
         Record clone = this.candidate.clone();
-        
+
         assertEquals(this.candidate, clone);
         assertEquals(this.candidate.sequence.get(), clone.sequence.get());
         assertNotSame(this.candidate, clone);
     }
-    
+
     @Test
     public void testCloneRecordAndSubMap() throws InterruptedException
     {
@@ -831,9 +955,10 @@ public class RecordTest
 
     void verifyImageSizes(int recordSize, int submapSize)
     {
-        assertEquals("got " + this.listener.getLatestImage(), recordSize, this.listener.getLatestImage().size());
+        assertEquals("got " + this.listener.getLatestImage(), recordSize,
+                this.listener.getLatestImage().size());
         assertEquals("got " + this.listener.getLatestImage(), submapSize,
-            this.listener.getLatestImage().getSubMapKeys().size());
+                this.listener.getLatestImage().getSubMapKeys().size());
     }
 
     void addK1K2ToCandidate()

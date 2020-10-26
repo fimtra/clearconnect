@@ -184,8 +184,6 @@ public abstract class CollectionUtils
     /**
      * Creates a map initialised with the default size 16
      * 
-     * @param size
-     *            the size
      * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap()
