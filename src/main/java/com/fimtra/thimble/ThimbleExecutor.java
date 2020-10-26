@@ -258,7 +258,7 @@ public final class ThimbleExecutor implements IContextExecutor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    ThimbleExecutor(int size)
+    public ThimbleExecutor(int size)
     {
         this(ThimbleExecutor.class.getSimpleName(), size);
     }
@@ -272,7 +272,7 @@ public final class ThimbleExecutor implements IContextExecutor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    ThimbleExecutor(String name, int size)
+    public ThimbleExecutor(String name, int size)
     {
         this.name = name;
         this.size = size;
@@ -294,7 +294,6 @@ public final class ThimbleExecutor implements IContextExecutor
     @Override
     public void execute(Runnable command)
     {
-
         final Runnable task;
         TaskRunner runner = null;
 
@@ -315,6 +314,10 @@ public final class ThimbleExecutor implements IContextExecutor
 
             if (this.taskRunners.size() == 0)
             {
+                // todo can we have an elastic executor that increases if all current threads are in use?
+                // todo always add 1, if we don't use it (because the task is part of a sequential task executing) the thread will be idle and either terminate or used by another
+                // todo BUT need to be sure we don't explode in creating threads for 100 contexts, say
+                // todo maybe if there are X items in the Q after Y time, we create a thread
                 if (this.taskRunnersRef.size() < this.size)
                 {
                     Integer number;
