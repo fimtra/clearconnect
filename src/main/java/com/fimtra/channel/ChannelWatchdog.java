@@ -267,17 +267,19 @@ public final class ChannelWatchdog implements Runnable
             {
                 this.channelsHeartbeatArrivalTime.remove(channel);
             }
-            else if (previous != null)
+            else
             {
-                final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d);
-                if (hbDelta > this.lateHeartbeatLimit)
-                {
-                    Log.log(ChannelWatchdog.this, "LATE heartbeat ", Long.toString(hbDelta), "ms from ",
-                        ObjectUtils.safeToString(channel));
-                }
-
                 this.channelsReceivingHeartbeat.add(channel);
-                checkHeartbeatRecovered(channel);
+                if (previous != null)
+                {
+                    final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d);
+                    if (hbDelta > this.lateHeartbeatLimit)
+                    {
+                        Log.log(ChannelWatchdog.this, "LATE heartbeat ", Long.toString(hbDelta), "ms from ",
+                                ObjectUtils.safeToString(channel));
+                    }
+                    checkHeartbeatRecovered(channel);
+                }
             }
         });
     }
