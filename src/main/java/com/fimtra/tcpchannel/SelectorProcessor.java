@@ -48,7 +48,7 @@ import com.fimtra.util.ThreadUtils;
 final class SelectorProcessor implements Runnable
 {
     /**
-     * Opposite of {@link #setInterest(SelectableChannel)}. After setting interest we need to reset
+     * Opposite of {@link #setInterest}. After setting interest we need to reset
      * the interest. So, for example, when a channel has completed writing all its data, this method
      * is called to reset the channel's interest in writing.
      */
@@ -211,7 +211,6 @@ final class SelectorProcessor implements Runnable
      * 
      * @return <code>true</code> if the registration completed, <code>false</code> if the internal
      *         selector is not open
-     * @throws ClosedChannelException
      */
     synchronized boolean register(SelectableChannel channel, Runnable operationTask) throws ClosedChannelException
     {

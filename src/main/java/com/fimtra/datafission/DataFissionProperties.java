@@ -37,7 +37,7 @@ public abstract class DataFissionProperties
      * 
      * @author Ramon Servadei
      */
-    public static interface Names
+    public interface Names
     {
         String BASE = "dataFission.";
 
@@ -254,7 +254,7 @@ public abstract class DataFissionProperties
      * 
      * @author Ramon Servadei
      */
-    public static interface Values
+    public interface Values
     {
         /**
          * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
@@ -295,7 +295,7 @@ public abstract class DataFissionProperties
          * <p>
          * Default is: 5000
          * 
-         * @See Names#RPC_EXECUTION_START_TIMEOUT_MILLIS
+         * @see Names#RPC_EXECUTION_START_TIMEOUT_MILLIS
          */
         Long RPC_EXECUTION_START_TIMEOUT_MILLIS =
             Long.valueOf(System.getProperty(Names.RPC_EXECUTION_START_TIMEOUT_MILLIS, "5000"));
@@ -305,7 +305,7 @@ public abstract class DataFissionProperties
          * <p>
          * Default is: 5000
          * 
-         * @See Names#RPC_EXECUTION_DURATION_TIMEOUT_MILLIS
+         * @see Names#RPC_EXECUTION_DURATION_TIMEOUT_MILLIS
          */
         Long RPC_EXECUTION_DURATION_TIMEOUT_MILLIS =
             Long.valueOf(System.getProperty(Names.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, "5000"));

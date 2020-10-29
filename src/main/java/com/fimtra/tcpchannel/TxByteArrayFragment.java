@@ -16,6 +16,7 @@
 package com.fimtra.tcpchannel;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.IReusableObjectBuilder;
@@ -157,8 +158,9 @@ final class TxByteArrayFragment extends ByteArrayFragment
         final StringBuilder sb = new StringBuilder(32);
         sb.append('|').append(this.id).append('|').append(this.sequenceId).append('|').append(this.lastElement).append(
             '|');
-        final byte[] idSeqLstElement = sb.toString().getBytes(UTF8);
-        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(idSeqLstElement.length).getBytes(UTF8);
+        final byte[] idSeqLstElement = sb.toString().getBytes(StandardCharsets.UTF_8);
+        final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(idSeqLstElement.length).getBytes(
+                StandardCharsets.UTF_8);
         final int headerLen = len.length + idSeqLstElement.length;
         if (this.header.length < headerLen)
         {

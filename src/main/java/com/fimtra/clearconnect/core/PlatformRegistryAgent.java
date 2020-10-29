@@ -837,31 +837,24 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         PlatformUtils.getTransportTechnologyFromServiceInfoRecord(serviceInfoRecord);
                 proxy = new PlatformServiceProxy(this, serviceFamily, codec, host, port, transportTechnology);
 
-                final IEndPointAddressFactory endPointAddressFactory = new IEndPointAddressFactory()
-                {
-                    @Override
-                    public EndPointAddress next()
+                final IEndPointAddressFactory endPointAddressFactory = () -> {
+                    Log.log(this, "Obtaining service info record for '", serviceInstanceId, "'");
+                    final Map<String, IValue> serviceInfoRecord1 = this.registryProxy.getRemoteRecordImage(
+                            ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
+                            getRemoteRecordImageTimeoutMillis());
+                    if (serviceInfoRecord1 == null)
                     {
-                        Log.log(PlatformRegistryAgent.this, "Obtaining service info record for '",
-                                serviceInstanceId, "'");
-                        final Map<String, IValue> serviceInfoRecord =
-                                PlatformRegistryAgent.this.registryProxy.getRemoteRecordImage(
-                                        ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX
-                                                + serviceInstanceId, getRemoteRecordImageTimeoutMillis());
-                        if (serviceInfoRecord == null)
-                        {
-                            Log.log(PlatformRegistryAgent.this, "No service info record found for '",
-                                    serviceInstanceId, "'");
-                            return null;
-                        }
-                        final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
-                        final int port = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord);
-                        final EndPointAddress endPointAddress = new EndPointAddress(node, port);
-                        Log.log(PlatformRegistryAgent.this, "Service instance '" + serviceInstanceId, "' ",
-                                ObjectUtils.safeToString(endPointAddress));
-                        return endPointAddress;
+                        Log.log(this, "No service info record found for '", serviceInstanceId, "'");
+                        return null;
                     }
+                    final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord1);
+                    final int port1 = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord1);
+                    final EndPointAddress endPointAddress = new EndPointAddress(node, port1);
+                    Log.log(this, "Service instance '" + serviceInstanceId, "' ",
+                            ObjectUtils.safeToString(endPointAddress));
+                    return endPointAddress;
                 };
+
                 proxy.proxyContext.setTransportChannelBuilderFactory(
                         TransportChannelBuilderFactoryLoader.load(codec.getFrameEncodingFormat(),
                                 endPointAddressFactory));

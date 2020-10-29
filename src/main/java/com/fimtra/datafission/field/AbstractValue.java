@@ -16,7 +16,7 @@
 package com.fimtra.datafission.field;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.ByteBufferUtils;
@@ -29,7 +29,6 @@ import com.fimtra.util.Log;
  */
 public abstract class AbstractValue implements IValue
 {
-    static final Charset UTF8 = Charset.forName("UTF-8");
 
     /**
      * Construct the {@link IValue} indicated by the type from the byte[] data in the
@@ -52,7 +51,8 @@ public abstract class AbstractValue implements IValue
             case LONG:
                 return LongValue.valueOf(buffer.getLong());
             case TEXT:
-                return TextValue.valueOf(new String(ByteBufferUtils.getBytesFromBuffer(buffer, len), UTF8));
+                return TextValue.valueOf(new String(ByteBufferUtils.getBytesFromBuffer(buffer, len),
+                        StandardCharsets.UTF_8));
             case BLOB:
                 return new BlobValue(ByteBufferUtils.getBytesFromBuffer(buffer, len));
             default :
@@ -80,7 +80,7 @@ public abstract class AbstractValue implements IValue
                 reuse8ByteBuffer.putLong(value.longValue());
                 return reuse8ByteBuffer.array();
             case TEXT:
-                return value.textValue().getBytes(UTF8);
+                return value.textValue().getBytes(StandardCharsets.UTF_8);
             case BLOB:
                 return ((BlobValue) value).value;
             default :
@@ -172,7 +172,7 @@ public abstract class AbstractValue implements IValue
                 return reuse8ByteBuffer.array();
             }
             case TEXT:
-                return textValue().getBytes(UTF8);
+                return textValue().getBytes(StandardCharsets.UTF_8);
             case BLOB:
                 return ((BlobValue) this).value;
             default :

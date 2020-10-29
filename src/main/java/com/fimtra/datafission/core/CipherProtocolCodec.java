@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
@@ -31,7 +32,7 @@ import com.fimtra.util.SymmetricCipher;
  */
 public final class CipherProtocolCodec extends GZipProtocolCodec
 {
-    final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
+    final static Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
 
     public CipherProtocolCodec()
     {

@@ -56,9 +56,9 @@ import com.fimtra.util.UtilProperties;
  * A TCP server socket component. A TcpServer is constructed with an {@link IReceiver} that will be
  * used to handle <b>all</b> client socket communication.
  * <p>
- * <h5>Threading</h5> All client messages are received using the thread of the
- * {@link TcpChannelUtils#READER}. The reader thread will invoke the
- * {@link IReceiver#onDataReceived(byte[], TcpChannel)} method for every TCP message received from a
+ * <h5>Threading</h5> All client messages are received using one of the
+ * {@link TcpChannelUtils#READER} threads. The reader thread will invoke the
+ * {@link IReceiver#onDataReceived} method for every TCP message received from a
  * connected client socket. Therefore the receiver implementation must be efficient so as not to
  * block other client messages from being processed.
  * 
@@ -144,8 +144,6 @@ public class TcpServer implements IEndPointService
     /**
      * Construct the TCP server with default server and client receive buffer sizes and frame format
      * as {@link FrameEncodingFormatEnum#TERMINATOR_BASED}.
-     * 
-     * @see #TcpServer(String, int, IReceiver, int, int, FrameEncodingFormatEnum)
      */
     public TcpServer(String address, int port, final IReceiver clientSocketReceiver)
     {
@@ -157,8 +155,6 @@ public class TcpServer implements IEndPointService
     /**
      * Construct the TCP server with default server and client receive buffer sizes and server
      * socket re-use address.
-     * 
-     * @see #TcpServer(String, int, IReceiver, int, int, FrameEncodingFormatEnum)
      */
     public TcpServer(String address, int port, final IReceiver clientSocketReceiver,
         TcpChannel.FrameEncodingFormatEnum frameEncodingFormat)
