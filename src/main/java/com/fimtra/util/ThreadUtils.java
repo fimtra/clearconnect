@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class ThreadUtils
 {
-    public static final ScheduledExecutorService UTILS_EXECUTOR =
+    static final ScheduledExecutorService UTILS_EXECUTOR =
             ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
 
     /**

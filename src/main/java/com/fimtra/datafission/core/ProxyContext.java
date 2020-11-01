@@ -64,6 +64,7 @@ import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
+import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.Log;
@@ -146,8 +147,8 @@ public final class ProxyContext implements IObserverContext
      * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
      * tasks
      */
-    private final static ScheduledExecutorService RECONNECT_TASKS = ThreadUtils.newPermanentScheduledExecutorService(
-        "fission-reconnect", DataFissionProperties.Values.RECONNECT_THREAD_COUNT);
+    private final static ScheduledExecutorService RECONNECT_TASKS =
+            ThreadUtils.newPermanentScheduledExecutorService("fission-reconnect", 1);
 
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
@@ -897,7 +898,7 @@ public final class ProxyContext implements IObserverContext
         };
         this.context = new Context(name);
         this.lock = new Object();
-        this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
+        this.actionSubscribeFutures = new ConcurrentHashMap<>();
         this.actionSubscribeResults = new ConcurrentHashMap<>();
         this.actionResponseLatches = new ConcurrentHashMap<>();
         // todo why 0
@@ -916,9 +917,8 @@ public final class ProxyContext implements IObserverContext
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver((image, atomicChange) -> {
-            updateRpcTemplates(atomicChange);
-        }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+        this.context.addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange),
+                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -987,8 +987,7 @@ public final class ProxyContext implements IObserverContext
      */
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
     {
-        this.reconnectPeriodMillis = reconnectPeriodMillis < MINIMUM_RECONNECT_PERIOD_MILLIS
-            ? MINIMUM_RECONNECT_PERIOD_MILLIS : reconnectPeriodMillis;
+        this.reconnectPeriodMillis = Math.max(reconnectPeriodMillis, MINIMUM_RECONNECT_PERIOD_MILLIS);
     }
 
     /**
@@ -1259,8 +1258,7 @@ public final class ProxyContext implements IObserverContext
         final ITransportChannelBuilder channelBuilder = this.channelBuilderFactory.nextBuilder();
         this.currentEndPoint = channelBuilder.getEndPointAddress();
         Log.log(this, "Constructing channel for ", getShortName(), " using ", ObjectUtils.safeToString(channelBuilder));
-        final ITransportChannel channel = channelBuilder.buildChannel(receiver);
-        return channel;
+        return channelBuilder.buildChannel(receiver);
 
     }
 
@@ -1600,8 +1598,21 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
                 Long.toString(this.reconnectPeriodMillis), "ms ");
 
-            this.reconnectTask =
-                RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
+            this.reconnectTask = RECONNECT_TASKS.schedule(
+                    () -> ContextUtils.CORE_EXECUTOR.execute(new ICoalescingRunnable()
+                    {
+                        @Override
+                        public Object context()
+                        {
+                            return ProxyContext.this;
+                        }
+
+                        @Override
+                        public void run()
+                        {
+                            reconnect();
+                        }
+                    }), this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
     }
 

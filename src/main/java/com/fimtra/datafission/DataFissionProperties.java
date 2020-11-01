@@ -118,13 +118,6 @@ public abstract class DataFissionProperties
         String SLOW_PUBLISH_THRESHOLD_NANOS = BASE + "slowPublishNanos";
 
         /**
-         * The system property name to define the number of threads assigned to the runtime-wide
-         * reconnect task scheduler used by all {@link ProxyContext} instances.<br>
-         * E.g. <code>-DdataFission.reconnectThreadCount=2</code>
-         */
-        String RECONNECT_THREAD_COUNT = BASE + "reconnectThreadCount";
-
-        /**
          * The system property name to define the maximum size of the keys pool used for record
          * keys.<br>
          * E.g. <code>-DdataFission.keysPoolMaxSize=200</code>
@@ -151,14 +144,6 @@ public abstract class DataFissionProperties
          * E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>
          */
         String STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = BASE + "textLengthLimitForTextValuePool";
-
-        /**
-         * The system property name to define the estimated maximum number of concurrent threads
-         * that will access {@link IRecord} objects in the runtime. This is used to specify the
-         * concurrency of the {@link ConcurrentHashMap} components backing the records.<br>
-         * E.g. <code>-DdataFission.maxRecordConcurrency=2</code>
-         */
-        String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
 
         /**
          * The coalescing window (in milliseconds) for system record publishing. This helps to
@@ -367,16 +352,6 @@ public abstract class DataFissionProperties
             Long.parseLong(System.getProperty(Names.SLOW_PUBLISH_THRESHOLD_NANOS, "10000000"));
 
         /**
-         * The number of threads used in the shared reconnect task scheduler used by all DataFission
-         * {@link ProxyContext} instances in the runtime.
-         * <p>
-         * Default is 2.
-         * 
-         * @see Names#RECONNECT_THREAD_COUNT
-         */
-        int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "1"));
-
-        /**
          * The maximum size for the keys pool for records.
          * <p>
          * Default is 0 (unlimited).
@@ -413,17 +388,6 @@ public abstract class DataFissionProperties
          */
         int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL =
             Integer.parseInt(System.getProperty(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, "5"));
-
-        /**
-         * The estimated maximum number of concurrent threads that would access an {@link IRecord}.
-         * This is used in constructing the {@link ConcurrentHashMap} components backing the
-         * records.
-         * <p>
-         * Default is 2.
-         * 
-         * @see Names#MAX_RECORD_CONCURRENCY
-         */
-        int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, "2"));
 
         /**
          * The coalescing window (in milliseconds) for system record publishing.

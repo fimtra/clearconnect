@@ -83,7 +83,8 @@ public final class ThimbleExecutor implements IContextExecutor
     static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
     static final long IDLE_PERIOD_NANOS =
             Long.parseLong(System.getProperty("thimble.idlePeriodMillis", "10000")) * 1_000_000;
-    static final ScheduledExecutorService ANTI_STALL = ThreadUtils.UTILS_EXECUTOR;
+    static final ScheduledExecutorService ANTI_STALL =
+            ThreadUtils.newPermanentScheduledExecutorService("anti-stall", 1);
 
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
