@@ -16,9 +16,13 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Before;
@@ -74,6 +78,26 @@ public class CollectionUtilsTest
         expected.add("2");
         expected.add("3");
         assertEquals(expected, CollectionUtils.newSetFromString("1  , 2,3", ","));
+    }
+
+    @Test
+    public void testNoopDeque()
+    {
+        final Deque<Object> candidate = CollectionUtils.noopDeque();
+
+        assertFalse(candidate.add(""));
+        candidate.addFirst("");
+        candidate.addLast("");
+        assertFalse(candidate.offer(""));
+        assertFalse(candidate.offerFirst(""));
+        assertFalse(candidate.offerLast(""));
+        candidate.push("");
+
+        List<String> l = new ArrayList<>();
+        l.add("");
+        assertFalse(candidate.addAll(l));
+
+        assertEquals(0, candidate.size());
     }
 
 }
