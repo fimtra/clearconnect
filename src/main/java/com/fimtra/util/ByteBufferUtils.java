@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Utilities for working with a {@link ByteBuffer}
- * 
+ *
  * @author Ramon Servadei
  */
 public abstract class ByteBufferUtils
@@ -32,18 +32,18 @@ public abstract class ByteBufferUtils
 
     /**
      * Copy the source into the target at the current position in the target
-     * 
+     *
      * @see #copyBytesIntoBuffer(byte[], ByteBuffer)
      */
-    public static final ByteBuffer copyBufferIntoBuffer(ByteBuffer source, ByteBuffer target)
+    public static ByteBuffer copyBufferIntoBuffer(ByteBuffer source, ByteBuffer target)
     {
         return copyBytesIntoBuffer(ByteBufferUtils.asBytes(source), target);
     }
 
     /**
-r     * @return a new byte[] that holds the data in the buffer from position-limit in the buffer
+     * r     * @return a new byte[] that holds the data in the buffer from position-limit in the buffer
      */
-    public static final byte[] asBytes(ByteBuffer buffer)
+    public static byte[] asBytes(ByteBuffer buffer)
     {
         final byte[] data = new byte[buffer.limit() - buffer.position()];
         if (data.length > 0)
@@ -57,10 +57,10 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
      * Copy the data into the buffer, resizing it if needed, position will be set to the end of the
      * copied data in the buffer, the limit is either the end of the buffers internal array (if its
      * resized) or unchanged if the copied data fitted into the buffer.
-     * 
+     *
      * @return the {@link ByteBuffer} with the data added to it (resized if needed)
      */
-    public static final ByteBuffer copyBytesIntoBuffer(byte[] data, ByteBuffer buffer)
+    public static ByteBuffer copyBytesIntoBuffer(byte[] data, ByteBuffer buffer)
     {
         if (data.length == 0)
         {
@@ -73,7 +73,8 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
             if (data.length + localBuf.position() > localBuf.limit())
             {
                 // resize the buffer
-                final ByteBuffer resizedBuffer = ByteBuffer.allocate(localBuf.capacity() + data.length + BLOCK_SIZE);
+                final ByteBuffer resizedBuffer =
+                        ByteBuffer.allocate(localBuf.capacity() + data.length + BLOCK_SIZE);
                 final int position = localBuf.position();
                 System.arraycopy(localBuf.array(), 0, resizedBuffer.array(), 0, position);
                 localBuf = resizedBuffer;
@@ -88,8 +89,9 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
         }
         catch (RuntimeException e)
         {
-            Log.log(ByteBufferUtils.class, "data.length=" + data.length + ", buffer.array=" + localBuf.array().length
-                + ", buffer=" + localBuf);
+            Log.log(ByteBufferUtils.class,
+                    "data.length=" + data.length + ", buffer.array=" + localBuf.array().length + ", buffer="
+                            + localBuf);
             throw e;
         }
         return localBuf;
@@ -97,11 +99,10 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
 
     /**
      * Get bytes out of a buffer, moves the buffer position to where the bytes finished
-     * 
-     * @param len
-     *            the number of bytes to retrieve
+     *
+     * @param len the number of bytes to retrieve
      */
-    public static final byte[] getBytesFromBuffer(ByteBuffer buffer, int len)
+    public static byte[] getBytesFromBuffer(ByteBuffer buffer, int len)
     {
         final int start = buffer.position();
         final byte[] bytes = new byte[len];
@@ -112,10 +113,10 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
 
     /**
      * Add the character to the buffer, extending the buffer if needed
-     * 
+     *
      * @return the same buffer if not extended, a new buffer if extended
      */
-    public static final ByteBuffer putChar(char c, ByteBuffer buffer)
+    public static ByteBuffer putChar(char c, ByteBuffer buffer)
     {
         ByteBuffer localBuf = buffer;
         if (capacityRemaining(buffer) < 2)
@@ -129,7 +130,7 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
     /**
      * @see #putChar(char, ByteBuffer)
      */
-    public static final ByteBuffer put(byte b, ByteBuffer buffer)
+    public static ByteBuffer put(byte b, ByteBuffer buffer)
     {
         ByteBuffer localBuf = buffer;
         if (capacityRemaining(buffer) < 1)
@@ -139,13 +140,13 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
         localBuf.put(b);
         return localBuf;
     }
-    
+
     /**
      * Add the int to the buffer, extending the buffer if needed
-     * 
+     *
      * @return the same buffer if not extended, a new buffer if extended
      */
-    public static final ByteBuffer putInt(int i, ByteBuffer buffer)
+    public static ByteBuffer putInt(int i, ByteBuffer buffer)
     {
         ByteBuffer localBuf = buffer;
         if (capacityRemaining(buffer) < 4)
@@ -158,10 +159,10 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
 
     /**
      * Add the long to the buffer, extending the buffer if needed
-     * 
+     *
      * @return the same buffer if not extended, a new buffer if extended
      */
-    public static final ByteBuffer putLong(long l, ByteBuffer buffer)
+    public static ByteBuffer putLong(long l, ByteBuffer buffer)
     {
         ByteBuffer localBuf = buffer;
         if (capacityRemaining(buffer) < 8)
@@ -175,7 +176,7 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
     /**
      * @see #putChar(char, ByteBuffer)
      */
-    public static final ByteBuffer put(byte[] b, ByteBuffer buffer)
+    public static ByteBuffer put(byte[] b, ByteBuffer buffer)
     {
         ByteBuffer localBuf = buffer;
         if (capacityRemaining(buffer) < b.length)
@@ -188,13 +189,12 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
 
     /**
      * Join all the buffers into a single new buffer.
-     * 
-     * @param buffers
-     *            the buffers to join
+     *
+     * @param buffers the buffers to join
      * @return the buffer with all the buffers concatenated into it, positin 0 and limit set to the
-     *         size of the concatenated buffer data
+     * size of the concatenated buffer data
      */
-    public static final ByteBuffer join(ByteBuffer... buffers)
+    public static ByteBuffer join(ByteBuffer... buffers)
     {
         ByteBuffer result = ByteBuffer.wrap(new byte[BLOCK_SIZE]);
         for (ByteBuffer byteBuffer : buffers)
@@ -202,14 +202,14 @@ r     * @return a new byte[] that holds the data in the buffer from position-lim
             final byte[] asBytes = asBytes(byteBuffer);
             result = copyBytesIntoBuffer(asBytes, result);
         }
-        
+
         // set the limit and position to reflect the joined buffer data
         result.limit(result.position());
         result.position(0);
-        
+
         return result;
     }
-    
+
     /**
      * @return a new buffer with the contents of the original buffer and extended by the size
      */

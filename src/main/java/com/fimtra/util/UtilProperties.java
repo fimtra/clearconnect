@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2014 Paul Mackinlay, Ramon Servadei 
- *  
+ * Copyright (c) 2014 Paul Mackinlay, Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Defines the properties and property keys used by Util
- * 
+ *
  * @author Paul Mackinlay
  * @author Ramon Servadei
  */
@@ -30,13 +30,12 @@ public abstract class UtilProperties
     }
 
     /**
-	 * The names of the properties
-     * 
+     * The names of the properties
+     *
      * @author Ramon Servadei
      * @author Paul Mackinlay
-     * 
      */
-    public static interface Names
+    public interface Names
     {
         String BASE = "util.";
 
@@ -70,11 +69,11 @@ public abstract class UtilProperties
         /**
          * The system property name that defines the size of the internal spare nodes pool of the {@link LowGcLinkedList}.<br>
          * E.g. <code>-Dutil.logGcLinkedListInternalSparePoolSize=50</code>
-         * 
+         *
          * @see Names#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE
          */
         String LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE = BASE + "logGcLinkedListInternalSparePoolSize";
-        
+
         /**
          * The system property name to define if the thread dumps use the same file or a rolling
          * file.<br>
@@ -113,7 +112,7 @@ public abstract class UtilProperties
          * E.g. <code>-Dutil.byteArrayPoolSize=1024</code>
          */
         String BYTE_ARRAY_MAX_POOL_SIZE = BASE + "byteArrayMaxPoolSize";
-        
+
         /**
          * The system property name to define the locking policy for the {@link NotifyingCache}.<br>
          * E.g. <code>-Dutil.notifyingCacheFairLockPolicy=true</code>
@@ -123,97 +122,101 @@ public abstract class UtilProperties
 
     /**
      * The values of the properties described in {@link Names}
-     * 
+     *
      * @author Ramon Servadei
      * @author Paul Mackinlay
      */
-    public static interface Values
+    public interface Values
     {
         /**
          * Determines if log messages are written to std.err. Default is <code>false</code>
-         * 
+         *
          * @see Names#LOG_TO_STDERR
          */
         boolean LOG_TO_STDERR = Boolean.parseBoolean(System.getProperty(Names.LOG_TO_STDERR, "false"));
 
         /**
          * The log directory. Default is <tt>./logs</tt>
-         * 
+         *
          * @see Names#SYSTEM_PROPERTY_LOG_DIR
          */
         String LOG_DIR = System.getProperty(UtilProperties.Names.SYSTEM_PROPERTY_LOG_DIR, "logs");
 
         /**
          * The log archive directory. Default is <tt>{@link Values#LOG_DIR}/archive</tt>
-         * 
+         *
          * @see Names#ARCHIVE_DIR
          */
         String ARCHIVE_DIR = System.getProperty(UtilProperties.Names.ARCHIVE_DIR, LOG_DIR + "/archive");
-        
+
         /**
          * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is <code>50</code>
-         * 
+         *
          * @see Names#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE
          */
         int LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE =
-            Integer.parseInt(System.getProperty(Names.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE, "50"));
+                Integer.parseInt(System.getProperty(Names.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE, "50"));
 
         /**
          * Determines if the {@link LowGcLinkedList} is used. Default is <code>true</code>
-         * 
+         *
          * @see Names#USE_LOW_GC_LINKEDLIST
          */
-        boolean USE_LOW_GC_LINKEDLIST = Boolean.parseBoolean(System.getProperty(Names.USE_LOW_GC_LINKEDLIST, "true"));
+        boolean USE_LOW_GC_LINKEDLIST =
+                Boolean.parseBoolean(System.getProperty(Names.USE_LOW_GC_LINKEDLIST, "true"));
 
         /**
          * Defines if a rolling thread dump file is used. Default is <code>false</code>
-         * 
+         *
          * @see Names#USE_ROLLING_THREADDUMP_FILE
          */
-        boolean USE_ROLLING_THREADDUMP_FILE = Boolean.parseBoolean(System.getProperty(
-            Names.USE_ROLLING_THREADDUMP_FILE, "false"));
+        boolean USE_ROLLING_THREADDUMP_FILE =
+                Boolean.parseBoolean(System.getProperty(Names.USE_ROLLING_THREADDUMP_FILE, "false"));
 
         /**
          * When logging initialises it will archive all files in the {@link Values#LOG_DIR} that are
          * older than this many minutes to an archive sub-directory. Default is <code>1</code>
          */
-        int ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(System.getProperty(
-            Names.ARCHIVE_LOGS_OLDER_THAN_MINUTES, "1"));
+        int ARCHIVE_LOGS_OLDER_THAN_MINUTES =
+                Integer.parseInt(System.getProperty(Names.ARCHIVE_LOGS_OLDER_THAN_MINUTES, "1"));
 
         /**
          * When logging initialises it will delete archive logs that are older than this many
          * minutes. Default is <code>20160</code> (14 days)
          */
-        int PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(System.getProperty(
-            Names.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES, String.valueOf(TimeUnit.MINUTES.convert(14, TimeUnit.DAYS))));
+        int PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES = Integer.parseInt(
+                System.getProperty(Names.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES,
+                        String.valueOf(TimeUnit.MINUTES.convert(14, TimeUnit.DAYS))));
 
         /**
          * The period of object pool logging in minutes. Default is 30<br>
-         * 
+         *
          * @see Names#OBJECT_POOL_SIZE_LOG_PERIOD_MINS
          */
-        int OBJECT_POOL_SIZE_LOG_PERIOD_MINS = Integer.parseInt(System.getProperty(
-            Names.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, "30"));
+        int OBJECT_POOL_SIZE_LOG_PERIOD_MINS =
+                Integer.parseInt(System.getProperty(Names.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, "30"));
 
         /**
          * Defines if rolled logs files are compressed. <br>
          * Default is <code>true</code>.
          */
-        boolean COMPRESS_ROLLED_LOGS = Boolean.parseBoolean(System.getProperty(Names.COMPRESS_ROLLED_LOGS, "true"));
+        boolean COMPRESS_ROLLED_LOGS =
+                Boolean.parseBoolean(System.getProperty(Names.COMPRESS_ROLLED_LOGS, "true"));
 
         /**
          * The maximum size of each internal pool of the {@link ByteArrayPool}. Default is 1000<br>
-         * 
+         *
          * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
          */
-        int BYTE_ARRAY_MAX_POOL_SIZE = Integer.parseInt(System.getProperty(Names.BYTE_ARRAY_MAX_POOL_SIZE, "1000"));
+        int BYTE_ARRAY_MAX_POOL_SIZE =
+                Integer.parseInt(System.getProperty(Names.BYTE_ARRAY_MAX_POOL_SIZE, "1000"));
 
         /**
          * Defines the locking policy for the {@link NotifyingCache}.<br>
          * Default is <code>true</code>.
          */
         boolean NOTIFYING_CACHE_FAIR_LOCK_POLICY =
-            Boolean.parseBoolean(System.getProperty(Names.NOTIFYING_CACHE_FAIR_LOCK_POLICY, "true"));
+                Boolean.parseBoolean(System.getProperty(Names.NOTIFYING_CACHE_FAIR_LOCK_POLICY, "true"));
     }
 
 }

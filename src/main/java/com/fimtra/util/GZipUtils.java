@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,7 +35,7 @@ import java.util.zip.InflaterInputStream;
 
 /**
  * Utility methods for working with GZIP streams
- * 
+ *
  * @author Ramon Servadei
  * @author Paul Mackinlay
  */
@@ -43,7 +43,7 @@ public abstract class GZipUtils
 {
     /**
      * Version of a {@link ByteArrayInputStream} with unsynchronized read methods
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class UnsynchronizedByteArrayInputStream extends InputStream
@@ -60,7 +60,7 @@ public abstract class GZipUtils
         }
 
         @Override
-        public int read() throws IOException
+        public int read()
         {
             return (this.pos < this.count) ? (this.buf[this.pos++] & 0xff) : -1;
         }
@@ -88,7 +88,7 @@ public abstract class GZipUtils
 
     /**
      * Version of a {@link ByteArrayOutputStream} with unsynchronized write methods
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class UnsynchronizedByteArrayOutputStream extends OutputStream
@@ -142,7 +142,7 @@ public abstract class GZipUtils
 
     /**
      * A copy of the {@link GZIPInputStream} that is re-usable. Cannot be closed.
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class ReusableGZIPInputStream extends InflaterInputStream
@@ -198,7 +198,7 @@ public abstract class GZipUtils
         }
 
         @Override
-        public void close() throws IOException
+        public void close()
         {
             // NOTE: unclosable
         }
@@ -212,7 +212,8 @@ public abstract class GZipUtils
 
         private int readHeader(InputStream this_in) throws IOException
         {
-            CheckedInputStream in = (CheckedInputStream) (this_in instanceof CheckedInputStream ? this_in : new CheckedInputStream(this_in, this.crc));
+            CheckedInputStream in = (CheckedInputStream) (this_in instanceof CheckedInputStream ? this_in :
+                    new CheckedInputStream(this_in, this.crc));
 
             this.crc.reset();
             // Check header magic
@@ -281,8 +282,8 @@ public abstract class GZipUtils
             }
             // Uses left-to-right evaluation order
             if ((readUInt(in) != this.crc.getValue()) ||
-            // rfc1952; ISIZE is the input size modulo 2^32
-                (readUInt(in) != (this.inf.getBytesWritten() & 0xffffffffL)))
+                    // rfc1952; ISIZE is the input size modulo 2^32
+                    (readUInt(in) != (this.inf.getBytesWritten() & 0xffffffffL)))
                 throw new IOException("Corrupt GZIP trailer");
 
             // If there are more bytes available in "in" or
@@ -329,12 +330,6 @@ public abstract class GZipUtils
             {
                 throw new EOFException();
             }
-            if (b < -1 || b > 255)
-            {
-                // Report on this.in, not argument in; see read{Header, Trailer}.
-                throw new IOException(
-                    this.in.getClass().getName() + ".read() returned value out of range -1..255: " + b);
-            }
             return b;
         }
 
@@ -355,7 +350,7 @@ public abstract class GZipUtils
     /**
      * A copy of the {@link GZIPOutputStream} that has unsynchronized write method and is re-usable.
      * Cannot be closed.
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class ReusableGZIPOutputStream extends DeflaterOutputStream
@@ -383,15 +378,11 @@ public abstract class GZipUtils
         /**
          * Writes array of bytes to the compressed output stream. This method will block until all
          * the bytes are written.
-         * 
-         * @param buf
-         *            the data to be written
-         * @param off
-         *            the start offset of the data
-         * @param len
-         *            the length of the data
-         * @exception IOException
-         *                If an I/O error has occurred.
+         *
+         * @param b   the data to be written
+         * @param off the start offset of the data
+         * @param len the length of the data
+         * @throws IOException If an I/O error has occurred.
          */
         @Override
         public void write(byte[] b, int off, int len) throws IOException
@@ -415,9 +406,8 @@ public abstract class GZipUtils
          * Finishes writing compressed data to the output stream without closing the underlying
          * stream. Use this method when applying multiple filters in succession to the same output
          * stream.
-         * 
-         * @exception IOException
-         *                if an I/O error has occurred
+         *
+         * @throws IOException if an I/O error has occurred
          */
         @Override
         public void finish() throws IOException
@@ -448,15 +438,15 @@ public abstract class GZipUtils
         }
 
         private final static byte[] header = { (byte) GZIP_MAGIC, // Magic number (short)
-            (byte) (GZIP_MAGIC >> 8), // Magic number (short)
-            Deflater.DEFLATED, // Compression method (CM)
-            0, // Flags (FLG)
-            0, // Modification time MTIME (int)
-            0, // Modification time MTIME (int)
-            0, // Modification time MTIME (int)
-            0, // Modification time MTIME (int)
-            0, // Extra flags (XFLG)
-            0 // Operating system (OS)
+                (byte) (GZIP_MAGIC >> 8), // Magic number (short)
+                Deflater.DEFLATED, // Compression method (CM)
+                0, // Flags (FLG)
+                0, // Modification time MTIME (int)
+                0, // Modification time MTIME (int)
+                0, // Modification time MTIME (int)
+                0, // Modification time MTIME (int)
+                0, // Extra flags (XFLG)
+                0 // Operating system (OS)
         };
 
         private void writeHeader() throws IOException
@@ -483,39 +473,28 @@ public abstract class GZipUtils
         }
 
         @Override
-        public void close() throws IOException
+        public void close()
         {
             // NOTE: unclosable
         }
     }
 
-    static final ThreadLocal<ReusableGZIPOutputStream> DEFLATER = new ThreadLocal<ReusableGZIPOutputStream>()
-    {
-        @Override
-        protected ReusableGZIPOutputStream initialValue()
-        {
-            return new ReusableGZIPOutputStream(new ByteArrayOutputStream(),
-                new Deflater(Deflater.DEFAULT_COMPRESSION, true));
-        }
-    };
-    static final ThreadLocal<ReusableGZIPInputStream> INFLATER = new ThreadLocal<ReusableGZIPInputStream>()
-    {
-        @Override
-        protected ReusableGZIPInputStream initialValue()
-        {
-            return new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1));
-        }
-    };
-    
+    static final ThreadLocal<ReusableGZIPOutputStream> DEFLATER = ThreadLocal.withInitial(
+            () -> new ReusableGZIPOutputStream(new ByteArrayOutputStream(),
+                    new Deflater(Deflater.DEFAULT_COMPRESSION, true)));
+    static final ThreadLocal<ReusableGZIPInputStream> INFLATER = ThreadLocal.withInitial(
+            () -> new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1)));
+
     /**
      * Compress a ByteBuffer's byte[] with a {@link ReusableGZIPOutputStream}
-     * 
+     *
      * @return the compressed byte[], <code>null</code> if there was a problem
      */
-    public static final byte[] compress(final ByteBuffer uncompressedBuffer)
+    public static byte[] compress(final ByteBuffer uncompressedBuffer)
     {
         final int length = uncompressedBuffer.limit();
-        try (final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(length))
+        try (final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(
+                length))
         {
             final byte[] array = uncompressedBuffer.array();
             final ReusableGZIPOutputStream gZipOut = DEFLATER.get();
@@ -542,13 +521,13 @@ public abstract class GZipUtils
 
     /**
      * Compress a byte[] with a {@link ReusableGZIPOutputStream}
-     * 
+     *
      * @return the compressed byte[], <code>null</code> if there was a problem
      */
-    public static final byte[] compress(final byte[] uncompressedData)
+    public static byte[] compress(final byte[] uncompressedData)
     {
-        try (final UnsynchronizedByteArrayOutputStream outStream =
-            new UnsynchronizedByteArrayOutputStream(uncompressedData.length))
+        try (final UnsynchronizedByteArrayOutputStream outStream = new UnsynchronizedByteArrayOutputStream(
+                uncompressedData.length))
         {
             final ReusableGZIPOutputStream gZipOut = DEFLATER.get();
             gZipOut.reset(outStream);
@@ -574,11 +553,11 @@ public abstract class GZipUtils
 
     /**
      * Unzip the data in the byte[] that was compressed using {@link #compress(byte[])}
-     * 
+     *
      * @return the uncompressed data, <code>null</code> if there was a problem
      */
     @Deprecated
-    public static final byte[] uncompress(byte[] compressedData)
+    public static byte[] uncompress(byte[] compressedData)
     {
         try
         {
@@ -603,11 +582,11 @@ public abstract class GZipUtils
 
     /**
      * Unzip the data in the {@link ByteBuffer} that was compressed using {@link #compress(byte[])}
-     * 
-     * @see ReusableGZIPInputStream
+     *
      * @return the uncompressed data, <code>null</code> if there was a problem
+     * @see ReusableGZIPInputStream
      */
-    public static final ByteBuffer uncompress(ByteBuffer compressedData)
+    public static ByteBuffer uncompress(ByteBuffer compressedData)
     {
         try
         {
@@ -616,7 +595,7 @@ public abstract class GZipUtils
             final ByteBuffer buffer = ByteBuffer.wrap(uncompressedData);
             final ReusableGZIPInputStream gZipIn = INFLATER.get();
             gZipIn.reset(compressedData.array(), compressedData.position(),
-                compressedData.limit() - compressedData.position());
+                    compressedData.limit() - compressedData.position());
             int len = 0;
             while ((len = uncompressedSize - buffer.position()) > 0)
             {
@@ -635,11 +614,11 @@ public abstract class GZipUtils
     /**
      * Compresses the data in the inputStream to the outputStream.
      */
-    public static void compressInputToOutput(InputStream inputStream, OutputStream outputStream) throws IOException
+    public static void compressInputToOutput(InputStream inputStream, OutputStream outputStream)
+            throws IOException
     {
-        final GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream);
         final byte[] buffer = ByteArrayPool.get(1024);
-        try
+        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream))
         {
             int length;
             while ((length = inputStream.read(buffer)) != -1)
@@ -649,7 +628,6 @@ public abstract class GZipUtils
         }
         finally
         {
-            gzipOutputStream.close();
             ByteArrayPool.offer(buffer);
         }
     }

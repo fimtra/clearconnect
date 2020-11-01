@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentMap;
  * manager against a subscription key.
  * <p>
  * <b>Calls to methods that add or remove subscribers should be synchronized.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
@@ -38,19 +38,20 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
     final Object[] emptyArray;
     final Class<?> subscriberClass;
 
-    /** Tracks the list of observers for a name. The list uses copy-on-write semantics */
-    final ConcurrentMap<SUBSCRIPTION_KEY, SUBSCRIBER[]> subscribersPerKey =
-        new ConcurrentHashMap<SUBSCRIPTION_KEY, SUBSCRIBER[]>(2);
-        
-    /** tracks subscribe order */
+    /**
+     * Tracks the list of observers for a name. The list uses copy-on-write semantics
+     */
+    final ConcurrentMap<SUBSCRIPTION_KEY, SUBSCRIBER[]> subscribersPerKey = new ConcurrentHashMap<>(2);
+
+    /**
+     * tracks subscribe order
+     */
     final Set<SUBSCRIPTION_KEY> subscribeOrder =
-        Collections.synchronizedSet(new LinkedHashSet<SUBSCRIPTION_KEY>());
-    
+            Collections.synchronizedSet(new LinkedHashSet<>());
+
     /**
      * Construct the subscription manager passing in the class for the subscriber. This is required
      * to ensure correct array component type is used internall.
-     * 
-     * @param subscriberClass
      */
     public SubscriptionManager(Class<?> subscriberClass)
     {
@@ -64,11 +65,10 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * <p>
      * <b>Calls to this method DO NOT NEED TO BE SYNCHRONIZED, unlike
      * {@link #addSubscriberFor(Object, Object)}.</b>
-     * 
-     * @param key
-     *            the subscription key
+     *
+     * @param key the subscription key
      * @return an array of subscribers for the key. This is NOT a copy - DO NOT MESS WITH IT. Will
-     *         never be <code>null</code>.
+     * never be <code>null</code>.
      */
     @SuppressWarnings("unchecked")
     public SUBSCRIBER[] getSubscribersFor(SUBSCRIPTION_KEY key)
@@ -89,13 +89,11 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * Add the subscriber to the list of subscribers for the key.
      * <p>
      * <b>Calls to this method should be synchronized.</b>
-     * 
-     * @param key
-     *            the subscription key
-     * @param subscriber
-     *            the subscriber <b>INSTANCE</b> to add
+     *
+     * @param key        the subscription key
+     * @param subscriber the subscriber <b>INSTANCE</b> to add
      * @return <code>true</code> if the subscriber was added, <code>false</code> if this
-     *         <b>INSTANCE</b> has already been added against this key
+     * <b>INSTANCE</b> has already been added against this key
      */
     @SuppressWarnings("unchecked")
     public boolean addSubscriberFor(SUBSCRIPTION_KEY key, SUBSCRIBER subscriber)
@@ -105,7 +103,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         {
             current = (SUBSCRIBER[]) Array.newInstance(this.subscriberClass, 1);
             current[0] = subscriber;
-            
+
             this.subscribeOrder.add(key);
         }
         else
@@ -127,13 +125,11 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * Remove a previously added subscriber from the list associated with the subscription key
      * <p>
      * <b>Calls to this method should be synchronized.</b>
-     * 
-     * @param key
-     *            the subscription key
-     * @param subscriber
-     *            the subscriber <b>INSTANCE</b> to remove
+     *
+     * @param key        the subscription key
+     * @param subscriber the subscriber <b>INSTANCE</b> to remove
      * @return <code>true</code> if the subscriber was removed, <code>false</code> if the subscriber
-     *         <b>INSTANCE</b> was not found for the subscription key
+     * <b>INSTANCE</b> was not found for the subscription key
      */
     @SuppressWarnings("unchecked")
     public boolean removeSubscriberFor(SUBSCRIPTION_KEY key, SUBSCRIBER subscriber)
@@ -149,7 +145,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         if (copy.size() > 0)
         {
             this.subscribersPerKey.put(key,
-                copy.toArray((SUBSCRIBER[]) Array.newInstance(this.subscriberClass, copy.size())));
+                    copy.toArray((SUBSCRIBER[]) Array.newInstance(this.subscriberClass, copy.size())));
         }
         else
         {
@@ -169,11 +165,10 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * Remove all subscribers for the key.
      * <p>
      * <b>Calls to this method should be synchronized.</b>
-     * 
-     * @param key
-     *            the subscription key
+     *
+     * @param key the subscription key
      * @return the subscribers that were removed, <code>null</code> if there were no subscribers for
-     *         this key
+     * this key
      */
     public SUBSCRIBER[] removeSubscribersFor(SUBSCRIPTION_KEY key)
     {
@@ -183,12 +178,12 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
 
     /**
      * <b>Calls to this method should be synchronized.</b>
-     * 
+     *
      * @return a new List with the subscription keys, in subscribe order, for this manager
      */
     public List<SUBSCRIPTION_KEY> getAllSubscriptionKeys()
     {
-        return new ArrayList<SUBSCRIPTION_KEY>(this.subscribeOrder);
+        return new ArrayList<>(this.subscribeOrder);
     }
 
     public void destroy()

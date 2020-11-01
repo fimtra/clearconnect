@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2017 Ramon Servadei
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,9 +22,9 @@ import com.fimtra.util.UtilProperties.Names;
  * pool is at the index of the size of arrays it manages. An internal pool manages byte[] instances
  * of the same size and all sizes in the {@link ByteArrayPool} are powers of 2. Each pool of byte[]
  * is limited to a fixed maximum size.
- * 
- * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
+ *
  * @author Ramon Servadei
+ * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
  */
 public class ByteArrayPool
 {
@@ -36,11 +36,10 @@ public class ByteArrayPool
      * <p>
      * NOTE: the returned array size will be sized to a power of 2 that is enough to hold the
      * requested size.
-     * 
-     * @param size
-     *            the size needed for the array
+     *
+     * @param size the size needed for the array
      * @return an array sized to the next power of 2 beyond the size. If requested size is beyond
-     *         the limits of the pool (2048) then a new byte[] is returned with the exact size.
+     * the limits of the pool (2048) then a new byte[] is returned with the exact size.
      */
     public static byte[] get(final int size)
     {
@@ -54,20 +53,9 @@ public class ByteArrayPool
             MultiThreadReusableObjectPool<byte[]> pool = POOLS[index];
             if (pool == null)
             {
-                pool = new MultiThreadReusableObjectPool<byte[]>("byte[" + index + "]", new IReusableObjectBuilder<byte[]>()
-                {
-                    @Override
-                    public byte[] newInstance()
-                    {
-                        return new byte[index];
-                    }
-                }, new IReusableObjectFinalizer<byte[]>()
-                {
-                    @Override
-                    public void reset(byte[] instance)
-                    {
-                    }
-                }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
+                pool = new MultiThreadReusableObjectPool<>("byte[" + index + "]", () -> new byte[index],
+                        instance -> { // noop
+                        }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
                 POOLS[index] = pool;
             }
             return pool.get();

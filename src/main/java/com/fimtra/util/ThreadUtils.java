@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,7 +15,6 @@
  */
 package com.fimtra.util;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -35,16 +34,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Provides utilities for working with threads
- * 
+ *
  * @author Ramon Servadei
  */
 public abstract class ThreadUtils
 {
-    public static final ScheduledExecutorService UTILS_EXECUTOR = ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
-   
+    public static final ScheduledExecutorService UTILS_EXECUTOR =
+            ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+
     /**
      * Logs the exception generated in the run method of a delegate runnable.
-     * 
+     *
      * @author Ramon Servadei
      */
     // todo pool version to reduce object churn..again...
@@ -72,6 +72,7 @@ public abstract class ThreadUtils
     }
 
     private static final String MAIN_METHOD_CLASSNAME;
+
     static
     {
         String name = null;
@@ -104,7 +105,7 @@ public abstract class ThreadUtils
             }
         }
         MAIN_METHOD_CLASSNAME = name;
-        
+
         if (Thread.getDefaultUncaughtExceptionHandler() == null)
         {
             Thread.setDefaultUncaughtExceptionHandler(
@@ -167,9 +168,8 @@ public abstract class ThreadUtils
      * the name.
      * <p>
      * <b>The created threads are NOT started by the factory</b>
-     * 
-     * @param threadName
-     *            the thread name for each thread created by the returned factory
+     *
+     * @param threadName the thread name for each thread created by the returned factory
      * @return a {@link ThreadFactory} instance that creates named daemon threads
      */
     public static ThreadFactory newDaemonThreadFactory(final String threadName)
@@ -201,20 +201,22 @@ public abstract class ThreadUtils
      * <p>
      * <b>NOTE:</b> all submitted {@link Runnable} tasks are wrapped in a
      * {@link ExceptionLoggingRunnable} to log any exception
-     * 
+     *
      * @see Executors#newScheduledThreadPool(int, ThreadFactory)
      */
-    public static ScheduledExecutorService newScheduledExecutorService(final String threadName, final int threadCount)
+    public static ScheduledExecutorService newScheduledExecutorService(final String threadName,
+            final int threadCount)
     {
         return new ScheduledExecutorService()
         {
             final ScheduledExecutorService newScheduledThreadPool =
-                Executors.newScheduledThreadPool(threadCount, newDaemonThreadFactory(threadName));
+                    Executors.newScheduledThreadPool(threadCount, newDaemonThreadFactory(threadName));
 
             @Override
             public ScheduledFuture<?> schedule(final Runnable command, long delay, TimeUnit unit)
             {
-                return this.newScheduledThreadPool.schedule(new ExceptionLoggingRunnable(command), delay, unit);
+                return this.newScheduledThreadPool.schedule(new ExceptionLoggingRunnable(command), delay,
+                        unit);
             }
 
             @Override
@@ -231,10 +233,10 @@ public abstract class ThreadUtils
 
             @Override
             public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
-                TimeUnit unit)
+                    TimeUnit unit)
             {
                 return this.newScheduledThreadPool.scheduleAtFixedRate(new ExceptionLoggingRunnable(command),
-                    initialDelay, period, unit);
+                        initialDelay, period, unit);
             }
 
             @Override
@@ -251,10 +253,10 @@ public abstract class ThreadUtils
 
             @Override
             public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
-                TimeUnit unit)
+                    TimeUnit unit)
             {
-                return this.newScheduledThreadPool.scheduleWithFixedDelay(new ExceptionLoggingRunnable(command),
-                    initialDelay, delay, unit);
+                return this.newScheduledThreadPool.scheduleWithFixedDelay(
+                        new ExceptionLoggingRunnable(command), initialDelay, delay, unit);
             }
 
             @Override
@@ -294,28 +296,29 @@ public abstract class ThreadUtils
             }
 
             @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException
             {
                 return this.newScheduledThreadPool.invokeAll(tasks);
             }
 
             @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
+                    TimeUnit unit) throws InterruptedException
             {
                 return this.newScheduledThreadPool.invokeAll(tasks, timeout, unit);
             }
 
             @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException,
-                ExecutionException
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException, ExecutionException
             {
                 return this.newScheduledThreadPool.invokeAny(tasks);
             }
 
             @Override
             public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException, ExecutionException, TimeoutException
+                    throws InterruptedException, ExecutionException, TimeoutException
             {
                 return this.newScheduledThreadPool.invokeAny(tasks, timeout, unit);
             }
@@ -358,9 +361,8 @@ public abstract class ThreadUtils
     /**
      * Pause the current thread for the specified millis by calling {@link Thread#sleep(long)}. This
      * is a convenience method that does not throw any exception.
-     * 
-     * @param millis
-     *            the milliseconds to pause
+     *
+     * @param millis the milliseconds to pause
      */
     public static void sleep(int millis)
     {
@@ -379,13 +381,14 @@ public abstract class ThreadUtils
      * {@link ScheduledExecutorService} cannot be shutdown
      */
     public static ScheduledExecutorService newPermanentScheduledExecutorService(final String threadName,
-        final int threadCount)
+            final int threadCount)
     {
         return new ScheduledExecutorService()
         {
-            private final ScheduledExecutorService delegate = newScheduledExecutorService(threadName, threadCount);
+            private final ScheduledExecutorService delegate =
+                    newScheduledExecutorService(threadName, threadCount);
             private final String name = threadName;
-            
+
             @Override
             public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit)
             {
@@ -406,7 +409,7 @@ public abstract class ThreadUtils
 
             @Override
             public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
-                TimeUnit unit)
+                    TimeUnit unit)
             {
                 return this.delegate.scheduleAtFixedRate(command, initialDelay, period, unit);
             }
@@ -414,19 +417,21 @@ public abstract class ThreadUtils
             @Override
             public void shutdown()
             {
-                Log.log(this, ObjectUtils.safeToString(this), " is a 'permanent' service and cannot be shutdown");
+                Log.log(this, ObjectUtils.safeToString(this),
+                        " is a 'permanent' service and cannot be shutdown");
             }
 
             @Override
             public List<Runnable> shutdownNow()
             {
-                Log.log(this, ObjectUtils.safeToString(this), " is a 'permanent' service and cannot be shutdown");
+                Log.log(this, ObjectUtils.safeToString(this),
+                        " is a 'permanent' service and cannot be shutdown");
                 return Collections.emptyList();
             }
 
             @Override
             public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
-                TimeUnit unit)
+                    TimeUnit unit)
             {
                 return this.delegate.scheduleWithFixedDelay(command, initialDelay, delay, unit);
             }
@@ -446,7 +451,8 @@ public abstract class ThreadUtils
             @Override
             public boolean awaitTermination(long timeout, TimeUnit unit)
             {
-                Log.log(this, ObjectUtils.safeToString(this), " is a 'permanent' service and will not terminate");
+                Log.log(this, ObjectUtils.safeToString(this),
+                        " is a 'permanent' service and will not terminate");
                 return false;
             }
 
@@ -469,28 +475,29 @@ public abstract class ThreadUtils
             }
 
             @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException
             {
                 return this.delegate.invokeAll(tasks);
             }
 
             @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
+                    TimeUnit unit) throws InterruptedException
             {
                 return this.delegate.invokeAll(tasks, timeout, unit);
             }
 
             @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException,
-                ExecutionException
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException, ExecutionException
             {
                 return this.delegate.invokeAny(tasks);
             }
 
             @Override
             public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                throws InterruptedException, ExecutionException, TimeoutException
+                    throws InterruptedException, ExecutionException, TimeoutException
             {
                 return this.delegate.invokeAny(tasks, timeout, unit);
             }

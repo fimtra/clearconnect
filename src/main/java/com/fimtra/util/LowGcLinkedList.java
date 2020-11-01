@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2015 Ramon Servadei 
- *  
+ * Copyright (c) 2015 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ import com.fimtra.util.UtilProperties.Values;
  * {@link Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}.
  * <p>
  * <b>This is not thread-safe.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deque<E>, Serializable
@@ -343,8 +343,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
 
         for (Object o : a)
         {
-            @SuppressWarnings("unchecked")
-            E e = (E) o;
+            @SuppressWarnings("unchecked") E e = (E) o;
             Node<E> newNode = wrap(pred, e, null);
             if (pred == null)
             {
@@ -375,7 +374,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
     @Override
     public void clear()
     {
-        for (Node<E> x = this.first; x != null;)
+        for (Node<E> x = this.first; x != null; )
         {
             Node<E> next = x.next;
             x.item = null;
@@ -460,24 +459,24 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
 
     Node<E> node(int index)
     {
+        Node<E> x;
         if (index < (this.size >> 1))
         {
-            Node<E> x = this.first;
+            x = this.first;
             for (int i = 0; i < index; i++)
             {
                 x = x.next;
             }
-            return x;
         }
         else
         {
-            Node<E> x = this.last;
+            x = this.last;
             for (int i = this.size - 1; i > index; i--)
             {
                 x = x.prev;
             }
-            return x;
         }
+        return x;
     }
 
     @Override
@@ -826,7 +825,7 @@ public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implemen
 
     private Node<E> wrap(Node<E> prev, E element, Node<E> next)
     {
-        Node<E> node = null;
+        Node<E> node;
         if (this.spare != null)
         {
             this.spareCount--;

@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2014 Ramon Servadei 
- *  
+ * Copyright (c) 2014 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -36,7 +36,7 @@ import java.util.Comparator;
  * <li>XYZ_10
  * </ul>
  * </tt>
- * 
+ *
  * @author Ramon Servadei
  */
 public final class StringWithNumbersComparator implements Comparator<String>
@@ -70,58 +70,41 @@ public final class StringWithNumbersComparator implements Comparator<String>
 
         int o1Length = o1.length();
         int o2Length = o2.length();
-        int val;
         if (o1Length > o2Length)
         {
-            for (int i = 0; i < o2Length; i++)
-            {
-                val = o1.charAt(i) - o2.charAt(i);
-                if (val != 0)
-                {
-                    // check for o2=XYZ_9 vs o1=XYZ_10
-                    if (Character.isDigit(o1.charAt(i + 1)) && Character.isDigit(o1.charAt(i))
-                        && Character.isDigit(o2.charAt(i)))
-                    {
-                        return 1;
-                    }
-                    return val;
-                }
-                else
-                {
-                    // check o1=10XYZ vs o2=1XYZ
-                    if (Character.isDigit(o1.charAt(i + 1)))
-                    {
-                        return 1;
-                    }
-                }
-            }
-            return 1;
+            return compare(o1, o2, o2Length);
         }
         else
         {
-            for (int i = 0; i < o1Length; i++)
+            return -compare(o2, o1, o1Length);
+        }
+    }
+
+    private static int compare(String o1, String o2, int o2Length)
+    {
+        int val;
+        for (int i = 0; i < o2Length; i++)
+        {
+            val = o1.charAt(i) - o2.charAt(i);
+            if (val != 0)
             {
-                val = o1.charAt(i) - o2.charAt(i);
-                if (val != 0)
+                // check for o2=XYZ_9 vs o1=XYZ_10
+                if (Character.isDigit(o1.charAt(i + 1)) && Character.isDigit(o1.charAt(i))
+                        && Character.isDigit(o2.charAt(i)))
                 {
-                    // check for o1=XYZ_9 vs o2=XYZ_10
-                    if (Character.isDigit(o2.charAt(i + 1)) && Character.isDigit(o2.charAt(i))
-                        && Character.isDigit(o1.charAt(i)))
-                    {
-                        return -1;
-                    }
-                    return val;
+                    return 1;
                 }
-                else
+                return val;
+            }
+            else
+            {
+                // check o1=10XYZ vs o2=1XYZ
+                if (Character.isDigit(o1.charAt(i + 1)))
                 {
-                    // check o2=10XYZ vs o1=1XYZ
-                    if (Character.isDigit(o2.charAt(i + 1)))
-                    {
-                        return -1;
-                    }
+                    return 1;
                 }
             }
-            return -1;
         }
+        return 1;
     }
 }

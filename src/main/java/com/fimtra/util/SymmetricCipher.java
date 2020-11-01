@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2016 Ramon Servadei 
- *  
+ * Copyright (c) 2016 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +18,6 @@ package com.fimtra.util;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
@@ -29,7 +28,7 @@ import javax.crypto.SecretKey;
  * encryption mechanism.
  * <p>
  * Thread-safe.
- * 
+ *
  * @author Ramon Servadei
  */
 public final class SymmetricCipher
@@ -38,9 +37,8 @@ public final class SymmetricCipher
 
     /**
      * Generate a {@link SecureRandom} 128bit key for the passed in algorithm.
-     * 
-     * @param algorithm
-     *            the key algorithm, e.g. "AES"
+     *
+     * @param algorithm the key algorithm, e.g. "AES"
      * @return the generated key
      */
     public static SecretKey generate128BitKey(String algorithm) throws NoSuchAlgorithmException
@@ -56,14 +54,12 @@ public final class SymmetricCipher
 
     /**
      * Create an instance using the desired key algorithm (the transformation) and the secret key
-     * 
-     * @param transformation
-     *            see {@link Cipher#getInstance(String)}
-     * @param key
-     *            the key
+     *
+     * @param transformation see {@link Cipher#getInstance(String)}
+     * @param key            the key
      */
     public SymmetricCipher(String transformation, SecretKey key)
-        throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
+            throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException
     {
         this.encryptCipher = Cipher.getInstance(transformation);
         this.encryptCipher.init(Cipher.ENCRYPT_MODE, key);
@@ -73,11 +69,9 @@ public final class SymmetricCipher
     }
 
     /**
-     * @param data
-     *            the data to encrypt
+     * @param data the data to encrypt
      * @return the encrypted data
-     * @throws RuntimeException
-     *             if there is a problem encrypting
+     * @throws RuntimeException if there is a problem encrypting
      */
     public synchronized byte[] encrypt(byte[] data)
     {
@@ -92,11 +86,9 @@ public final class SymmetricCipher
     }
 
     /**
-     * @param data
-     *            the data to decrypt
+     * @param data the data to decrypt
      * @return the decripted data
-     * @throws RuntimeException
-     *             if there is a problem decrypting
+     * @throws RuntimeException if there is a problem decrypting
      */
     public synchronized byte[] decrypt(byte[] data)
     {

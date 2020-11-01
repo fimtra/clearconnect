@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * task to check for deadlocks.
  * <p>
  * Also dumps all threads to a file.
- * 
+ *
  * @author Ramon Servadei
  */
 public final class DeadlockDetector
@@ -45,7 +45,7 @@ public final class DeadlockDetector
     /**
      * An observer that receives events when threads are deadlocked. Registered via
      * {@link DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)}
-     * 
+     *
      * @author Ramon Servadei
      */
     public static interface DeadlockObserver
@@ -59,30 +59,18 @@ public final class DeadlockDetector
      * <p>
      * This task will also dump the current active threads to a file. The file is either static or
      * rolling.
-     * 
-     * @param rollingThreaddumpFile
-     *            <code>true</code> to dump threads to a rolling log file, <code>false</code> for a
-     *            static file
-     * 
+     *
+     * @param rollingThreaddumpFile <code>true</code> to dump threads to a rolling log file, <code>false</code> for a
+     *                              static file
      * @return an Future that can terminate the task
      */
-    public static final Future<?> newDeadlockDetectorTask(final long checkPeriodMillis,
-        final DeadlockObserver deadlockObserver, final boolean rollingThreaddumpFile)
+    public static Future<?> newDeadlockDetectorTask(final long checkPeriodMillis,
+            final DeadlockObserver deadlockObserver, final boolean rollingThreaddumpFile)
     {
-        final RollingFileAppender appender;
-        {
-            if (rollingThreaddumpFile)
-            {
-                appender =
-                    RollingFileAppender.createStandardRollingFileAppender("threadDump",
-                        UtilProperties.Values.LOG_DIR);
-            }
-            else
-            {
-                appender = null;
-            }
-        }
-        
+        final RollingFileAppender appender = rollingThreaddumpFile ?
+                RollingFileAppender.createStandardRollingFileAppender("threadDump",
+                        UtilProperties.Values.LOG_DIR) : null;
+
         // prepare a static file for logging threaddumps if the rolling option is not used
         final File staticFile;
         if (appender == null)
@@ -103,52 +91,45 @@ public final class DeadlockDetector
             staticFile = null;
         }
 
-        
         final Runnable task = new Runnable()
         {
             final DeadlockDetector deadlockDetector = new DeadlockDetector();
-            
+
             @Override
             public void run()
             {
                 try
                 {
-                    if (appender != null || staticFile != null)
+                    final ThreadInfoWrapper[] threads = this.deadlockDetector.getThreadInfoWrappers();
+                    if (threads != null)
                     {
-                        final ThreadInfoWrapper[] threads = this.deadlockDetector.getThreadInfoWrappers();
-                        if (threads != null)
+                        final StringBuilder sb = new StringBuilder(1024);
+                        for (int i = 0; i < threads.length; i++)
                         {
-                            final StringBuilder sb = new StringBuilder(1024);
-                            for (int i = 0; i < threads.length; i++)
+                            sb.append(threads[i].toString());
+                        }
+                        if (appender != null)
+                        {
+                            appender.append("========  ").append(new Date().toString()).append(
+                                    "  ======").append(SystemUtils.lineSeparator());
+                            appender.append(sb);
+                            appender.flush();
+                        }
+                        else
+                        {
+                            PrintWriter staticThreadDump = new PrintWriter(staticFile);
+                            try
                             {
-                                sb.append(threads[i].toString());
+                                final StringBuilder header = new StringBuilder();
+                                header.append("========  ").append(new Date().toString()).append(
+                                        "  ======").append(SystemUtils.lineSeparator());
+                                staticThreadDump.print(header);
+                                staticThreadDump.print(sb);
+                                staticThreadDump.flush();
                             }
-                            if (appender != null)
+                            finally
                             {
-                                appender.append("========  ").append(new Date().toString()).append("  ======").append(
-                                    SystemUtils.lineSeparator());
-                                appender.append(sb);
-                                appender.flush();
-                            }
-                            else
-                            {
-                                if (staticFile != null)
-                                {
-                                    PrintWriter staticThreadDump = new PrintWriter(staticFile);
-                                    try
-                                    {
-                                        final StringBuilder header = new StringBuilder();
-                                        header.append("========  ").append(new Date().toString()).append(
-                                            "  ======").append(SystemUtils.lineSeparator());
-                                        staticThreadDump.print(header);
-                                        staticThreadDump.print(sb);
-                                        staticThreadDump.flush();
-                                    }
-                                    finally
-                                    {
-                                        staticThreadDump.close();
-                                    }
-                                }
+                                staticThreadDump.close();
                             }
                         }
                     }
@@ -173,7 +154,7 @@ public final class DeadlockDetector
             }
         };
         return ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(task, checkPeriodMillis, checkPeriodMillis,
-            TimeUnit.MILLISECONDS);
+                TimeUnit.MILLISECONDS);
     }
 
     final ThreadMXBean threadMxBean;
@@ -181,7 +162,7 @@ public final class DeadlockDetector
     /**
      * A wrapper for the {@link ThreadInfo} class and provides a {@link #toString()} that produces
      * the full stack trace for the thread.
-     * 
+     *
      * @author Ramon Servadei
      */
     public static final class ThreadInfoWrapper
@@ -280,16 +261,17 @@ public final class DeadlockDetector
         public String toString()
         {
             // take over the toString to remove the 8 frame limit in ThreadInfo
-            StringBuilder sb =
-                new StringBuilder("\"" + this.delegate.getThreadName() + "\"" + " Id=" + this.delegate.getThreadId()
-                    + " " + this.delegate.getThreadState());
+            StringBuilder sb = new StringBuilder(
+                    "\"" + this.delegate.getThreadName() + "\"" + " Id=" + this.delegate.getThreadId() + " "
+                            + this.delegate.getThreadState());
             if (this.delegate.getLockName() != null)
             {
                 sb.append(" on " + this.delegate.getLockName());
             }
             if (this.delegate.getLockOwnerName() != null)
             {
-                sb.append(" owned by \"" + this.delegate.getLockOwnerName() + "\" Id=" + this.delegate.getLockOwnerId());
+                sb.append(" owned by \"" + this.delegate.getLockOwnerName() + "\" Id="
+                        + this.delegate.getLockOwnerId());
             }
             if (this.delegate.isSuspended())
             {
@@ -316,14 +298,11 @@ public final class DeadlockDetector
                             sb.append(SystemUtils.lineSeparator());
                             break;
                         case WAITING:
-                            sb.append("\t-  waiting on " + this.delegate.getLockInfo());
-                            sb.append(SystemUtils.lineSeparator());
-                            break;
                         case TIMED_WAITING:
                             sb.append("\t-  waiting on " + this.delegate.getLockInfo());
                             sb.append(SystemUtils.lineSeparator());
                             break;
-                        default :
+                        default:
                     }
                 }
 
@@ -345,7 +324,8 @@ public final class DeadlockDetector
             LockInfo[] locks = this.delegate.getLockedSynchronizers();
             if (locks.length > 0)
             {
-                sb.append(SystemUtils.lineSeparator()).append("\tNumber of locked synchronizers = " + locks.length);
+                sb.append(SystemUtils.lineSeparator()).append(
+                        "\tNumber of locked synchronizers = " + locks.length);
                 sb.append(SystemUtils.lineSeparator());
                 for (LockInfo li : locks)
                 {
@@ -375,9 +355,9 @@ public final class DeadlockDetector
     }
 
     /**
-     * @see ThreadMXBean#findDeadlockedThreads()
      * @return <code>null</code> if no threads are deadlocked, otherwise an array of
-     *         {@link ThreadInfoWrapper} objects describing the threads that are deadlocked
+     * {@link ThreadInfoWrapper} objects describing the threads that are deadlocked
+     * @see ThreadMXBean#findDeadlockedThreads()
      */
     public ThreadInfoWrapper[] findDeadlocks()
     {
@@ -403,11 +383,11 @@ public final class DeadlockDetector
     {
         ThreadInfo[] threadInfos = this.threadMxBean.getThreadInfo(deadlockedThreadIds, true, true);
         List<ThreadInfoWrapper> wrappers = new LinkedList<>();
-        for (int i = 0; i < threadInfos.length; i++)
+        for (ThreadInfo threadInfo : threadInfos)
         {
-            if (threadInfos[i] != null)
+            if (threadInfo != null)
             {
-                wrappers.add(new ThreadInfoWrapper(threadInfos[i]));
+                wrappers.add(new ThreadInfoWrapper(threadInfo));
             }
         }
         return wrappers.toArray(new ThreadInfoWrapper[wrappers.size()]);
