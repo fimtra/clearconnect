@@ -29,14 +29,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -665,10 +660,6 @@ final class EventHandler
     private static final String RUNTIME_STATUS = "runtimeStatus";
     private static final String SLOW = "*** SLOW EVENT HANDLING *** ";
     private static final int SLOW_EVENT_MILLIS = 200;
-    private static final ThreadFactory IO_EXECUTOR_THREAD_FACTORY =
-            ThreadUtils.newDaemonThreadFactory("io-executor");
-    private static final ThreadFactory PUBLISH_EXECUTOR_THREAD_FACTORY =
-            ThreadUtils.newDaemonThreadFactory("publish-executor");
 
     private static final boolean SERVICES_LOG_DISABLED = Boolean.getBoolean("platform.servicesLogDisabled");
     private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null :
@@ -748,7 +739,7 @@ final class EventHandler
     final AtomicInteger eventCount;
     final Set<String> pendingPublish;
     final ScheduledExecutorService publishExecutor;
-    final ExecutorService ioExecutor;
+    final Executor ioExecutor;
     /**
      * Tracks services that are pending registration completion
      *
@@ -787,11 +778,9 @@ final class EventHandler
 
         this.pendingPublish = new HashSet<>();
         this.eventCount = new AtomicInteger(0);
-        this.publishExecutor = new ScheduledThreadPoolExecutor(1, PUBLISH_EXECUTOR_THREAD_FACTORY,
-                new ThreadPoolExecutor.DiscardPolicy());
-        this.ioExecutor =
-                new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
-                        IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
+        this.publishExecutor =
+                ThreadUtils.newScheduledExecutorService("publish-executor", 1);
+        this.ioExecutor = ContextExecutorFactory.create("io-executor");
     }
 
     void execute(String description, Object context, Runnable runnable)
