@@ -111,17 +111,6 @@ public abstract class TcpChannelUtils
     }
 
     /**
-     * Handles the connection result for a call to
-     * {@link TcpChannelUtils#createAndConnectNonBlockingSocketChannel(String, int)}
-     */
-    interface IConnectionResultProcessor
-    {
-        void onConnectionSuccess();
-
-        void onConnectionFailed(Exception e);
-    }
-
-    /**
      * Handles socket read operations for {@link TcpChannel} instances.
      */
     static final SelectorProcessor READER = new SelectorProcessor("tcp-channel-reader", SelectionKey.OP_READ);
