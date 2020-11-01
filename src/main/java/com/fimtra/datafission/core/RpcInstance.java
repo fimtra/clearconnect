@@ -36,6 +36,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.SerializationUtils;
 
@@ -368,8 +369,8 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                                     resultMapName);
                             }
                         }
-                        
-                        if (ContextUtils.isFrameworkThread())
+
+                        if (!ContextExecutorFactory.POOL_ACTIVE && ContextUtils.isFrameworkThread())
                         {
                             Log.log(this, "*** WARNING *** RPC ", this.rpcName,
                                 " is being called using a core/system/RPC thread - this can lead to a stall.");

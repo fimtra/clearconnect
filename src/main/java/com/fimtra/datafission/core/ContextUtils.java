@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay 
- *  
+ * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,7 +29,6 @@ import java.nio.CharBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +74,7 @@ import com.fimtra.util.is;
 
 /**
  * Utility objects and methods for datafission core
- * 
+ *
  * @author Ramon Servadei, Paul Mackinlay
  */
 public final class ContextUtils
@@ -87,7 +86,7 @@ public final class ContextUtils
      * <p>
      * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code
      * no longer requires the manager.
-     * 
+     *
      * @author Ramon Servadei
      */
     public static final class AllRecordsRegistrationManager implements IRecordListener
@@ -106,11 +105,7 @@ public final class ContextUtils
         public void destroy()
         {
             this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
-            List<String> temp = new LinkedList<>();
-            for (String recordName : this.subscribed)
-            {
-                temp.add(recordName);
-            }
+            List<String> temp = new LinkedList<>(this.subscribed);
             if (temp.size() > 0)
             {
                 this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
@@ -157,7 +152,7 @@ public final class ContextUtils
     private static final String RECORD_FILE_EXTENSION_NAME = "record";
     static final String RECORD_FILE_EXTENSION = "." + RECORD_FILE_EXTENSION_NAME;
     public static final ExtensionFileFilter RECORD_FILE_FILTER =
-        new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
+            new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
 
     static final double INVERSE_1000000 = 1d / 1000000;
 
@@ -177,17 +172,17 @@ public final class ContextUtils
     /**
      * This is the default shared {@link ThimbleExecutor} used for <b>system record</b> event
      * handling.
-     * 
+     *
      * @see #SYSTEM_RECORDS
      */
     final static IContextExecutor SYSTEM_RECORD_EXECUTOR =
-        ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
+            ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
 
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
      */
     final static IContextExecutor CORE_EXECUTOR =
-        ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
+            ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
      * This is dedicated to handle RPC results. If RPC results are handled by the
@@ -195,19 +190,21 @@ public final class ContextUtils
      * the thread that is waiting for the result!
      */
     final static IContextExecutor RPC_EXECUTOR =
-        ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
+            ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
 
     /**
      * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.
      */
     final static ScheduledExecutorService UTILITY_SCHEDULER =
-        ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
+            ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
-    final static RollingFileAppender qStatsLog = DataFissionProperties.Values.ENABLE_Q_STATS_LOGGING
-        ? RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) : null;
+    final static RollingFileAppender qStatsLog = DataFissionProperties.Values.ENABLE_Q_STATS_LOGGING ?
+            RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) :
+            null;
 
     static final RollingFileAppender runtimeStatsLog =
-        RollingFileAppender.createStandardRollingFileAppender("runtimeStats", UtilProperties.Values.LOG_DIR);
+            RollingFileAppender.createStandardRollingFileAppender("runtimeStats",
+                    UtilProperties.Values.LOG_DIR);
 
     static long gcDutyCycle;
 
@@ -217,6 +214,7 @@ public final class ContextUtils
     }
 
     static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
+
     static
     {
         UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
@@ -228,7 +226,7 @@ public final class ContextUtils
             {
                 final StringBuilder sb = new StringBuilder(1024);
                 sb.append(
-                    "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted, Msgs sent, Bytes sent, Msgs rcvd, Bytes rcvd").append(
+                        "Time, Memory use (Mb), GC duty, TX connections, TX Q, Max TX Q, Max TX Q connection, Event Qs overflow, Event Qs submitted, Msgs sent, Bytes sent, Msgs rcvd, Bytes rcvd").append(
                         SystemUtils.lineSeparator());
                 try
                 {
@@ -260,14 +258,14 @@ public final class ContextUtils
                 for (ThimbleExecutor thimbleExecutor : executors)
                 {
                     final Map<Object, TaskStatistics> coalescingTaskStatistics =
-                        thimbleExecutor.getCoalescingTaskStatistics();
+                            thimbleExecutor.getCoalescingTaskStatistics();
                     stats = coalescingTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
 
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
-                        thimbleExecutor.getSequentialTaskStatistics();
+                            thimbleExecutor.getSequentialTaskStatistics();
                     stats = sequentialTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
@@ -280,9 +278,9 @@ public final class ContextUtils
                     if (qStatsLog != null)
                     {
                         sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
-                            getStats(coalescingTaskStatistics));
+                                getStats(coalescingTaskStatistics));
                         sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
-                            getStats(sequentialTaskStatistics));
+                                getStats(sequentialTaskStatistics));
                     }
                 }
 
@@ -313,7 +311,7 @@ public final class ContextUtils
 
                 // compute the GC duty
                 long gcMillisInPeriod = 0;
-                long time = 0;
+                long time;
                 for (GarbageCollectorMXBean gcMxBean : ManagementFactory.getGarbageCollectorMXBeans())
                 {
                     time = gcMxBean.getCollectionTime();
@@ -326,7 +324,8 @@ public final class ContextUtils
                 time = this.gcTimeLastPeriod;
                 this.gcTimeLastPeriod = gcMillisInPeriod;
                 gcMillisInPeriod -= time;
-                final double inverseLoggingPeriodSecs = 1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
+                final double inverseLoggingPeriodSecs =
+                        1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                 // this is now the "% GC duty cycle per minute"
                 gcDutyCycle = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
 
@@ -349,11 +348,12 @@ public final class ContextUtils
                     }
                 }
                 sb.append(", ").append(channelStats.size()).append(", ").append(txQsize).append(", ").append(
-                    maxTxQ).append(", ").append(maxTxQName).append(", ").append(qOverflow).append(", ").append(
-                        qSubmitted).append(", ").append(Publisher.MESSAGES_PUBLISHED.getAndSet(0)).append(", ").append(
-                            Publisher.BYTES_PUBLISHED.getAndSet(0)).append(", ").append(
-                                ProxyContext.MESSAGES_RECEIVED.getAndSet(0)).append(", ").append(
-                                    ProxyContext.BYTES_RECEIVED.getAndSet(0));
+                        maxTxQ).append(", ").append(maxTxQName).append(", ").append(qOverflow).append(
+                        ", ").append(qSubmitted).append(", ").append(
+                        Publisher.MESSAGES_PUBLISHED.getAndSet(0)).append(", ").append(
+                        Publisher.BYTES_PUBLISHED.getAndSet(0)).append(", ").append(
+                        ProxyContext.MESSAGES_RECEIVED.getAndSet(0)).append(", ").append(
+                        ProxyContext.BYTES_RECEIVED.getAndSet(0));
 
                 try
                 {
@@ -392,7 +392,7 @@ public final class ContextUtils
 
     /**
      * @return a long[] for the sequential tasks statistics, format {queue-overflow,
-     *         queue-total-submitted, queue-total-executed}
+     * queue-total-submitted, queue-total-executed}
      */
     public static long[] getCoreStats()
     {
@@ -413,21 +413,20 @@ public final class ContextUtils
      * called {directory-name}-temp, then rename the temp directory to the directory argument.
      * <p>
      * <b>This is a non-atomic operation.</b>
-     * 
+     *
+     * @param context   the context to serialise
+     * @param directory the directory for the data files for each record in the context
      * @see #serializeRecordToFile(IRecord, File)
-     * @param context
-     *            the context to serialise
-     * @param directory
-     *            the directory for the data files for each record in the context
-     * @throws IOException
      */
-    public static void serializeContextToDirectory(IPublisherContext context, File directory) throws IOException
+    public static void serializeContextToDirectory(IPublisherContext context, File directory)
+            throws IOException
     {
         final File backupDir = new File(directory.getParent(), directory.getName() + "-backup");
         FileUtils.clearDirectory(backupDir);
         FileUtils.copyRecursive(directory, backupDir);
 
-        final File tmpDir = FileUtils.createDir(new File(directory.getParent(), directory.getName() + "-temp"));
+        final File tmpDir =
+                FileUtils.createDir(new File(directory.getParent(), directory.getName() + "-temp"));
         FileUtils.clearDirectory(tmpDir);
 
         for (String recordName : context.getRecordNames())
@@ -447,23 +446,21 @@ public final class ContextUtils
      * <p>
      * <b>NOTE:</b> records that currently exist in the context will have their state merged with
      * the data held in the record file that is loaded.
-     * 
+     *
+     * @param context   the context to resolve
+     * @param directory the directory for the data files for each record in the context
      * @see #resolveRecordFromFile(IRecord, File)
-     * @param context
-     *            the context to resolve
-     * @param directory
-     *            the directory for the data files for each record in the context
-     * @throws IOException
      */
-    public static void resolveContextFromDirectory(IPublisherContext context, File directory) throws IOException
+    public static void resolveContextFromDirectory(IPublisherContext context, File directory)
+            throws IOException
     {
         File[] recordFiles = FileUtils.readFiles(directory, RECORD_FILE_FILTER);
         String recordName;
         IRecord record;
         for (File recordFile : recordFiles)
         {
-            recordName =
-                recordFile.getName().substring(0, recordFile.getName().length() - RECORD_FILE_EXTENSION.length());
+            recordName = recordFile.getName().substring(0,
+                    recordFile.getName().length() - RECORD_FILE_EXTENSION.length());
             record = context.getOrCreateRecord(recordName);
             resolveRecordFromFile(record, directory);
         }
@@ -472,27 +469,19 @@ public final class ContextUtils
     /**
      * Convenience method to serialise a record to the directory. The record contents are serialised
      * to a flat file {record-name}.record in the directory.
-     * 
-     * @param record
-     *            the record to serialise
-     * @param directory
-     *            the directory for the data file
-     * @throws IOException
+     *
+     * @param record    the record to serialise
+     * @param directory the directory for the data file
      */
     public static void serializeRecordToFile(IRecord record, File directory) throws IOException
     {
         final File f = new File(directory, record.getName() + RECORD_FILE_EXTENSION + ".tmp");
-        final Writer writer = new BufferedWriter(new FileWriter(f));
         if (f.exists() || f.createNewFile())
         {
-            try
+            try (Writer writer = new BufferedWriter(new FileWriter(f)))
             {
                 record.serializeToStream(writer);
                 writer.flush();
-            }
-            finally
-            {
-                writer.close();
             }
             FileUtils.move(f, new File(directory, record.getName() + RECORD_FILE_EXTENSION));
         }
@@ -505,26 +494,18 @@ public final class ContextUtils
     /**
      * Convenience method to resolve a record's internal data from a data file in directory. The
      * record contents are serialised in a flat file {record-name}.record in the directory.
-     * 
-     * @param record
-     *            the record to resolve
-     * @param directory
-     *            the directory for the data file
-     * @throws IOException
+     *
+     * @param record    the record to resolve
+     * @param directory the directory for the data file
      */
     public static void resolveRecordFromFile(IRecord record, File directory) throws IOException
     {
         File f = new File(directory, record.getName() + RECORD_FILE_EXTENSION);
-        Reader reader = new BufferedReader(new FileReader(f));
         if (f.exists())
         {
-            try
+            try (Reader reader = new BufferedReader(new FileReader(f)))
             {
                 record.resolveFromStream(reader);
-            }
-            finally
-            {
-                reader.close();
             }
         }
         else
@@ -535,12 +516,9 @@ public final class ContextUtils
 
     /**
      * Convenience method to delete a record data file in directory.
-     * 
-     * @param recordName
-     *            the name of the record to be deleted
-     * @param directory
-     *            the directory for the data file
-     * 
+     *
+     * @param recordName the name of the record to be deleted
+     * @param directory  the directory for the data file
      * @return true of the record file was deleted.
      */
     public static boolean deleteRecordFile(String recordName, File directory)
@@ -556,12 +534,11 @@ public final class ContextUtils
     /**
      * Convenience method to get the record name from a record file. This expects the file name to
      * be in the format: {record name}.record
-     * 
-     * @param recordFile
-     *            the record file
+     *
+     * @param recordFile the record file
      * @return the record name of the file, <code>null</code> if not a record file
      */
-    public static final String getRecordNameFromFile(File recordFile)
+    public static String getRecordNameFromFile(File recordFile)
     {
         final String fileName = recordFile.getName();
         if (fileName.endsWith(RECORD_FILE_EXTENSION))
@@ -573,7 +550,7 @@ public final class ContextUtils
 
     /**
      * @return <code>true</code> if the record name is a reserved name (one of the system
-     *         CONTEXT_XXX record names)
+     * CONTEXT_XXX record names)
      * @see ISystemRecordNames#CONTEXT_RPCS
      * @see ISystemRecordNames#CONTEXT_STATUS
      * @see ISystemRecordNames#CONTEXT_RECORDS
@@ -596,16 +573,14 @@ public final class ContextUtils
      * allRecordsListener is added as an observer to the new record. <b>When finished with this, the
      * {@link AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a
      * memory leak. </b>
-     * 
-     * @param context
-     *            the context with the records that will be observed
-     * @param allRecordsListener
-     *            the observer that will be attached to every (non-system) record in the context //
+     *
+     * @param context            the context with the records that will be observed
+     * @param allRecordsListener the observer that will be attached to every (non-system) record in the context //
      * @return the object that will automatically manage registering the allRecordsListener to any
-     *         new records in the context.
+     * new records in the context.
      */
     public static AllRecordsRegistrationManager addAllRecordsListener(final IObserverContext context,
-        final IRecordListener allRecordsListener)
+            final IRecordListener allRecordsListener)
     {
         return new AllRecordsRegistrationManager(allRecordsListener, context);
     }
@@ -614,7 +589,8 @@ public final class ContextUtils
      * Copy the field from the source into the target record field. If the source field value is
      * <code>null</code> this does not perform a copy.
      */
-    public static void fieldCopy(Map<String, IValue> source, String sourceField, IRecord target, String targetField)
+    public static void fieldCopy(Map<String, IValue> source, String sourceField, IRecord target,
+            String targetField)
     {
         IValue value = source.get(sourceField);
         if (value != null)
@@ -641,7 +617,7 @@ public final class ContextUtils
                     // we have a line - escaped(key)=escaped(value)
                     key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
                     value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
-                        new char[cbuf.position() - (index + 1)]);
+                            new char[cbuf.position() - (index + 1)]);
                     map.put(key, value);
                     cbuf.position(0);
                     indexFound = false;
@@ -650,7 +626,7 @@ public final class ContextUtils
                 case '=':
                     indexFound = true;
                     //$FALL-THROUGH$
-                default :
+                default:
                     cbuf = CharBufferUtils.put((char) c, cbuf);
                     if (!indexFound)
                     {
@@ -663,7 +639,7 @@ public final class ContextUtils
         {
             key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
             value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
-                new char[cbuf.position() - (index + 1)]);
+                    new char[cbuf.position() - (index + 1)]);
             map.put(key, value);
         }
     }
@@ -671,18 +647,16 @@ public final class ContextUtils
     public static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException
     {
         final StringAppender sb = new StringAppender();
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
+        String key;
+        IValue value;
 
         final CharArrayReference chars = new CharArrayReference(new char[StringProtocolCodec.CHARRAY_SIZE]);
 
         final char[] escapedChars = new char[2];
         escapedChars[0] = StringProtocolCodec.CHAR_ESCAPE;
 
-        for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : map.entrySet())
         {
-            entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
             StringProtocolCodec.escape(key, sb, chars, escapedChars);
@@ -694,29 +668,25 @@ public final class ContextUtils
     }
 
     /**
-     * @see #demergeMaps(Map)
      * @return a map containing all the String-IValue key-pairs in the data map and sub-maps
+     * @see #demergeMaps(Map)
      */
     static Map<String, IValue> mergeMaps(final Map<String, IValue> dataMap,
-        final Map<String, Map<String, IValue>> subMaps)
+            final Map<String, Map<String, IValue>> subMaps)
     {
         Map<String, IValue> flatMap = new HashMap<>(dataMap);
 
-        Map.Entry<String, Map<String, IValue>> entry = null;
-        String subMapKey = null;
-        Map<String, IValue> value = null;
-        Map.Entry<String, IValue> entry2 = null;
-        String key2 = null;
-        IValue value2 = null;
-        for (Iterator<Map.Entry<String, Map<String, IValue>>> it = subMaps.entrySet().iterator(); it.hasNext();)
+        String subMapKey;
+        Map<String, IValue> value;
+        String key2;
+        IValue value2;
+        for (Map.Entry<String, Map<String, IValue>> entry : subMaps.entrySet())
         {
-            entry = it.next();
             subMapKey = entry.getKey();
             value = entry.getValue();
 
-            for (Iterator<Map.Entry<String, IValue>> it2 = value.entrySet().iterator(); it2.hasNext();)
+            for (Map.Entry<String, IValue> entry2 : value.entrySet())
             {
-                entry2 = it2.next();
                 key2 = entry2.getKey();
                 value2 = entry2.getValue();
                 flatMap.put(SubMap.encodeSubMapKey(subMapKey) + key2, value2);
@@ -728,23 +698,21 @@ public final class ContextUtils
 
     /**
      * Opposite of {@link #mergeMaps(Map, Map)}
-     * 
+     *
      * @return first index is a Map&lt;String, IValue>, second index is a Map&lt;String,
-     *         Map&lt;String, IValue>> ...
+     * Map&lt;String, IValue>> ...
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static Map<?, ?>[] demergeMaps(final Map<String, IValue> mergedMap)
     {
         Map[] result = new Map[] { new HashMap<>(), new HashMap<>(2) };
 
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
+        String key;
+        IValue value;
         String[] subMapKeys;
         Map<String, IValue> subMap;
-        for (Iterator<Map.Entry<String, IValue>> it = mergedMap.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : mergedMap.entrySet())
         {
-            entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
             subMapKeys = SubMap.decodeSubMapKeys(key);
@@ -771,13 +739,13 @@ public final class ContextUtils
      * Does the logic to handle executions of {@link IObserverContext#resubscribe(String...)}
      */
     static void resubscribeRecordsForContext(IObserverContext context,
-        final SubscriptionManager<String, IRecordListener> recordSubscribers, Map<String, String> tokenPerRecord,
-        String... recordNames)
+            final SubscriptionManager<String, IRecordListener> recordSubscribers,
+            Map<String, String> tokenPerRecord, String... recordNames)
     {
-        Map<String, IRecordListener[]> subscribers = new HashMap<String, IRecordListener[]>(recordNames.length);
+        Map<String, IRecordListener[]> subscribers = new HashMap<>(recordNames.length);
         // remove all subscribers from these records
         IRecordListener[] subscribersFor;
-        int i = 0;
+        int i;
         for (String recordName : recordNames)
         {
             subscribersFor = recordSubscribers.getSubscribersFor(recordName);
@@ -788,11 +756,12 @@ public final class ContextUtils
             }
         }
         // now re-subscribe
-        String permissionToken = null;
+        String permissionToken;
         for (String recordName : recordNames)
         {
             permissionToken = tokenPerRecord.get(recordName);
-            permissionToken = permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN : permissionToken;
+            permissionToken =
+                    permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN : permissionToken;
             subscribersFor = subscribers.get(recordName);
             for (i = 0; i < subscribersFor.length; i++)
             {
@@ -814,12 +783,10 @@ public final class ContextUtils
         StringBuilder sb = new StringBuilder(map.size() * 30);
         sb.append("{");
         boolean first = true;
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
-        for (Iterator<Map.Entry<String, IValue>> it = map.entrySet().iterator(); it.hasNext();)
+        String key;
+        IValue value;
+        for (Map.Entry<String, IValue> entry : map.entrySet())
         {
-            entry = it.next();
             key = entry.getKey();
             value = entry.getValue();
             if (first)
@@ -845,7 +812,8 @@ public final class ContextUtils
                     case TEXT:
                         if (value.textValue().length() > 64)
                         {
-                            sb.append("TextValue[").append(value.textValue().subSequence(0, 64)).append("...]");
+                            sb.append("TextValue[").append(value.textValue().subSequence(0, 64)).append(
+                                    "...]");
                         }
                         else
                         {
@@ -873,9 +841,9 @@ public final class ContextUtils
         IRecord record;
         for (String recordName : recordNames)
         {
-            if (ContextUtils.isSystemRecordName(recordName)
-                || ContextUtils.isSystemRecordName(ProxyContext.substituteRemoteNameWithLocalName(recordName))
-                || is.eq(recordName, ProxyContext.RECORD_CONNECTION_STATUS_NAME))
+            if (ContextUtils.isSystemRecordName(recordName) || ContextUtils.isSystemRecordName(
+                    ProxyContext.substituteRemoteNameWithLocalName(recordName)) || is.eq(recordName,
+                    ProxyContext.RECORD_CONNECTION_STATUS_NAME))
             {
                 continue;
             }
@@ -914,7 +882,7 @@ public final class ContextUtils
 
     /**
      * @return <code>true</code> if the thread is an internal thread, this covers core, rpc and
-     *         system threads
+     * system threads
      * @see #isCoreThread()
      * @see #isRpcThread()
      * @see #isSystemThread()
@@ -922,13 +890,18 @@ public final class ContextUtils
     public static boolean isFrameworkThread()
     {
         final long id = Thread.currentThread().getId();
-        return CORE_EXECUTOR.isExecutorThread(id) || RPC_EXECUTOR.isExecutorThread(id)
-            || SYSTEM_RECORD_EXECUTOR.isExecutorThread(id);
+        final boolean isCoreThread = CORE_EXECUTOR.isExecutorThread(id);
+        if (CORE_EXECUTOR == RPC_EXECUTOR)
+        {
+            return isCoreThread;
+        }
+        return isCoreThread || RPC_EXECUTOR.isExecutorThread(id) || SYSTEM_RECORD_EXECUTOR.isExecutorThread(
+                id);
     }
 
     /**
      * Logs when the elapsed time > a threshold
-     * 
+     *
      * @see Values#SLOW_TASK_THRESHOLD_NANOS
      */
     static void measureTask(String taskName, String action, Object context, long elapsedTimeNanos)
@@ -936,23 +909,20 @@ public final class ContextUtils
         if (elapsedTimeNanos > Values.SLOW_TASK_THRESHOLD_NANOS)
         {
             Log.log(context, "SLOW TASK: ", action, " [", taskName, "] took ",
-                Long.toString(((long) (elapsedTimeNanos * ContextUtils.INVERSE_1000000))), "ms");
+                    Long.toString(((long) (elapsedTimeNanos * ContextUtils.INVERSE_1000000))), "ms");
         }
     }
 
     /**
      * A convenience method to get the RPC from the {@link ProxyContext}
-     * 
-     * @param discoveryTimeoutMillis
-     *            the timeout to wait for the RPC to be available
-     * @param rpcName
-     *            the RPC name
+     *
+     * @param discoveryTimeoutMillis the timeout to wait for the RPC to be available
+     * @param rpcName                the RPC name
      * @return the RPC
-     * @throws TimeOutException
-     *             if the RPC is not found in the given time
+     * @throws TimeOutException if the RPC is not found in the given time
      */
-    public static IRpcInstance getRpc(final ProxyContext proxy, long discoveryTimeoutMillis, final String rpcName)
-        throws TimeOutException
+    public static IRpcInstance getRpc(final ProxyContext proxy, long discoveryTimeoutMillis,
+            final String rpcName) throws TimeOutException
     {
         final IRpcInstance rpc = proxy.getRpc(rpcName);
         if (rpc != null)
@@ -965,22 +935,17 @@ public final class ContextUtils
         // record does not have the rpc name we add our own listener (then remove it).
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
-        final IRecordListener observer = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            final IRpcInstance rpc1 = proxy.getRpc(rpcName);
+            if (rpc1 != null)
             {
-                final IRpcInstance rpc = proxy.getRpc(rpcName);
-                if (rpc != null)
+                try
                 {
-                    try
-                    {
-                        rpcRef.set(rpc);
-                    }
-                    finally
-                    {
-                        latch.countDown();
-                    }
+                    rpcRef.set(rpc1);
+                }
+                finally
+                {
+                    latch.countDown();
                 }
             }
         };
@@ -991,8 +956,9 @@ public final class ContextUtils
             {
                 if (!latch.await(discoveryTimeoutMillis, TimeUnit.MILLISECONDS))
                 {
-                    throw new TimeOutException("No RPC found with name [" + rpcName + "] during discovery period "
-                        + discoveryTimeoutMillis + "ms");
+                    throw new TimeOutException(
+                            "No RPC found with name [" + rpcName + "] during discovery period "
+                                    + discoveryTimeoutMillis + "ms");
                 }
             }
             catch (InterruptedException e)
@@ -1011,9 +977,8 @@ public final class ContextUtils
      * Utility to remove all records from a context.
      * <p>
      * Note: system records cannot be removed.
-     * 
-     * @param context
-     *            the context to remove records
+     *
+     * @param context the context to remove records
      */
     public static void removeRecords(Context context)
     {
@@ -1030,9 +995,8 @@ public final class ContextUtils
     /**
      * Utility to do a clean destroy by removing all records (listeners are notified) then
      * destroying the context.
-     * 
-     * @param context
-     *            the context to remove records from and then destroy
+     *
+     * @param context the context to remove records from and then destroy
      * @see #removeRecords(Context)
      */
     public static void removeRecordsAndDestroyContext(Context context)
@@ -1043,14 +1007,14 @@ public final class ContextUtils
 
     /**
      * @return <code>true</code> if the name includes a pattern used by the protocol between a
-     *         Context and a ProxyContext
+     * Context and a ProxyContext
      */
     static boolean isProtocolPrefixed(String name)
     {
         if (name.charAt(0) == PROTOCOL_PREFIX)
         {
             return name.startsWith(ProxyContext.ACK, 0) || name.startsWith(ProxyContext.NOK, 0)
-                || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
+                    || name.startsWith(RpcInstance.RPC_RECORD_RESULT_PREFIX, 0);
         }
         return false;
     }

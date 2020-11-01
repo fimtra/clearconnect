@@ -27,14 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.LazyObject.IDestructor;
 
 /**
@@ -56,13 +54,8 @@ import com.fimtra.util.LazyObject.IDestructor;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
-    private static final Executor IMAGE_NOTIFIER =
-        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
-            ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
-
-    private static final Executor UPDATE_NOTIFIER =
-        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
-            ThreadUtils.newDaemonThreadFactory("update-notifier"), new ThreadPoolExecutor.DiscardPolicy());
+    private static final Executor IMAGE_NOTIFIER = ContextExecutorFactory.create("image-notifier");
+    private static final Executor UPDATE_NOTIFIER = ContextExecutorFactory.create("update-notifier");
 
     @SuppressWarnings("rawtypes")
     private static final IDestructor NOOP_DESTRUCTOR = (ref) -> {
@@ -151,8 +144,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.notifyingTasksRunner = () -> {
             if (this.notifyTasks.size() > 0)
             {
-                // lock to ensure only 1 task runs at any time (ensures ordering if the
-                // executor is multi-threaded)
+                // lock to ensure only 1 task runs at any time (ensures ordering if the executor is multi-threaded)
                 synchronized (runnerLock)
                 {
                     final Runnable task = this.notifyTasks.remove(0);
@@ -482,8 +474,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         {
                             try
                             {
-                                // remove the data key from all notification sequences held for all
-                                // listeners
+                                // remove the data key from all notification sequences held for all listeners
                                 final Collection<Map<String, Long>> notificationSequences;
                                 synchronized (this.listenerSequences)
                                 {
@@ -491,9 +482,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                                 }
                                 for (Map<String, Long> map : notificationSequences)
                                 {
-                                    // note: the map is only mutated whilst holding either the
-                                    // updateLock or
-                                    // imageLock
+                                    // note: the map is only mutated whilst holding either the updateLock or imageLock
                                     map.remove(key);
                                 }
 

@@ -17,11 +17,11 @@ package com.fimtra.thimble;
 
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.LowGcLinkedList;
@@ -53,7 +53,7 @@ final class TaskQueue
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
         Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
 
-    static interface InternalTaskQueue<T> extends Runnable
+    interface InternalTaskQueue<T> extends Runnable
     {
         void offer(T t);
 
@@ -162,7 +162,7 @@ final class TaskQueue
      */
     final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
     {
-        ICoalescingRunnable latestTask;
+        final AtomicReference<ICoalescingRunnable> latestTask = new AtomicReference<>();
         Object context;
         TaskStatistics stats;
         boolean active;
@@ -188,20 +188,14 @@ final class TaskQueue
         @Override
         public void run()
         {
-            ICoalescingRunnable task;
-            synchronized (this)
-            {
-                task = this.latestTask;
-                this.latestTask = null;
-            }
-            task.run();
+            this.latestTask.getAndSet(null).run();
         }
 
         @Override
         public void onTaskFinished()
         {
             this.stats.itemExecuted();
-            if (this.latestTask != null)
+            if (this.latestTask.get() != null)
             {
                 TaskQueue.this.queue.offer(this);
             }
@@ -217,10 +211,7 @@ final class TaskQueue
         public void offer(ICoalescingRunnable latest)
         {
             this.stats.itemSubmitted();
-            synchronized (this)
-            {
-                this.latestTask = latest;
-            }
+            this.latestTask.set(latest);
         }
 
         @Override
@@ -228,6 +219,11 @@ final class TaskQueue
         {
             return "CoalescingTasks [" + this.context + "]";
         }
+    }
+
+    enum QChangeTypeEnum
+    {
+        NONE, CONTEXT, RUNNABLE
     }
 
     final Queue<Runnable> queue = CollectionUtils.newDeque();
@@ -241,21 +237,19 @@ final class TaskQueue
 
     final SingleThreadReusableObjectPool<SequentialTasks> sequentialTasksPool;
     final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;
-    long sequentialTaskCreateCount;
-    long coalescingTaskCreateCount;
     final String name;
 
     TaskQueue(String name)
     {
         this.name = name;
         this.sequentialTasksPool =
-            new SingleThreadReusableObjectPool<>("sequential-" + name, () -> new SequentialTasks(), (instance) -> {
+            new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new, (instance) -> {
                 instance.context = null;
                 instance.stats = null;
                 instance.active = false;
             }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
         this.coalescingTasksPool =
-            new SingleThreadReusableObjectPool<>("coalescing-" + name, () -> new CoalescingTasks(), (instance) -> {
+            new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new, (instance) -> {
                 instance.context = null;
                 instance.stats = null;
                 instance.active = false;
@@ -270,8 +264,9 @@ final class TaskQueue
      * Add the runnable to the queue, ordering it as appropriate for any annotation present on the
      * runnable.
      */
-    void offer_callWhilstHoldingLock(Runnable runnable)
+    QChangeTypeEnum offer_callWhilstHoldingLock(Runnable runnable)
     {
+        QChangeTypeEnum qChange = QChangeTypeEnum.NONE;
         if (runnable instanceof ISequentialRunnable)
         {
             final ISequentialRunnable sequentialRunnable = (ISequentialRunnable) runnable;
@@ -303,6 +298,7 @@ final class TaskQueue
             if (sequentialTasks.activate())
             {
                 this.queue.offer(sequentialTasks);
+                qChange = QChangeTypeEnum.CONTEXT;
             }
         }
         else
@@ -338,14 +334,16 @@ final class TaskQueue
                 if (coalescingTasks.activate())
                 {
                     this.queue.offer(coalescingTasks);
+                    qChange = QChangeTypeEnum.CONTEXT;
                 }
             }
             else
             {
                 this.queue.offer(runnable);
-                return;
+                qChange = QChangeTypeEnum.RUNNABLE;
             }
         }
+        return qChange;
     }
 
     /**
@@ -363,16 +361,9 @@ final class TaskQueue
     {
         HashMap<Object, TaskStatistics> stats =
             new HashMap<>(this.sequentialTaskStatsPerContext.size());
-        Map.Entry<Object, TaskStatistics> entry = null;
-        Object key = null;
-        TaskStatistics value = null;
-        for (Iterator<Map.Entry<Object, TaskStatistics>> it =
-            this.sequentialTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<Object, TaskStatistics> entry : this.sequentialTaskStatsPerContext.entrySet())
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            stats.put(key, value.intervalFinished());
+            stats.put(entry.getKey(), entry.getValue().intervalFinished());
         }
         return stats;
     }
@@ -384,16 +375,9 @@ final class TaskQueue
     {
         HashMap<Object, TaskStatistics> stats =
             new HashMap<>(this.coalescingTaskStatsPerContext.size());
-        Map.Entry<Object, TaskStatistics> entry = null;
-        Object key = null;
-        TaskStatistics value = null;
-        for (Iterator<Map.Entry<Object, TaskStatistics>> it =
-            this.coalescingTaskStatsPerContext.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<Object, TaskStatistics> entry : this.coalescingTaskStatsPerContext.entrySet())
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            stats.put(key, value.intervalFinished());
+            stats.put(entry.getKey(), entry.getValue().intervalFinished());
         }
         return stats;
     }

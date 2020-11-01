@@ -18,7 +18,6 @@ package com.fimtra.util;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -41,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class ThreadUtils
 {
-    final static ScheduledExecutorService UTILS_EXECUTOR = ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+    public static final ScheduledExecutorService UTILS_EXECUTOR = ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
    
     /**
      * Logs the exception generated in the run method of a delegate runnable.
@@ -89,13 +88,10 @@ public abstract class ThreadUtils
         {
             name = "Unknown";
             final Map<Thread, StackTraceElement[]> allStackTraces = Thread.getAllStackTraces();
-            Map.Entry<Thread, StackTraceElement[]> entry = null;
-            Thread key = null;
-            StackTraceElement[] value = null;
-            for (Iterator<Map.Entry<Thread, StackTraceElement[]>> it =
-                allStackTraces.entrySet().iterator(); it.hasNext();)
+            Thread key;
+            StackTraceElement[] value;
+            for (Map.Entry<Thread, StackTraceElement[]> entry : allStackTraces.entrySet())
             {
-                entry = it.next();
                 key = entry.getKey();
                 value = entry.getValue();
                 if ("main".equals(key.getName()))
@@ -111,14 +107,8 @@ public abstract class ThreadUtils
         
         if (Thread.getDefaultUncaughtExceptionHandler() == null)
         {
-            Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler()
-            {
-                @Override
-                public void uncaughtException(Thread t, Throwable e)
-                {
-                    Log.log(ThreadUtils.class, "Uncaught throwable: ", e);
-                }
-            });
+            Thread.setDefaultUncaughtExceptionHandler(
+                    (t, e) -> Log.log(ThreadUtils.class, "Uncaught throwable: ", e));
         }
     }
 
@@ -130,7 +120,7 @@ public abstract class ThreadUtils
     /**
      * Get the simple class name of the main method used to start the entire VM
      */
-    public static final String getMainMethodClassSimpleName()
+    public static String getMainMethodClassSimpleName()
     {
         return MAIN_METHOD_CLASSNAME;
     }
@@ -138,7 +128,7 @@ public abstract class ThreadUtils
     /**
      * Get the class name of the direct class calling this method.
      */
-    public static final String getDirectCallingClass()
+    public static String getDirectCallingClass()
     {
         return new Exception().getStackTrace()[1].getClassName();
     }
@@ -146,7 +136,7 @@ public abstract class ThreadUtils
     /**
      * Get the simple name of the direct class calling this method.
      */
-    public static final String getDirectCallingClassSimpleName()
+    public static String getDirectCallingClassSimpleName()
     {
         final String className = new Exception().getStackTrace()[1].getClassName();
         return className.substring(className.lastIndexOf(".") + 1);
@@ -156,7 +146,7 @@ public abstract class ThreadUtils
      * Get the class name of the indirect class calling this method - the class calling the class
      * calling this method
      */
-    public static final String getIndirectCallingClass()
+    public static String getIndirectCallingClass()
     {
         return new Exception().getStackTrace()[2].getClassName();
     }
@@ -165,7 +155,7 @@ public abstract class ThreadUtils
      * Get the simple name of the indirect class calling this method - the class calling the class
      * calling this method
      */
-    public static final String getIndirectCallingClassSimpleName()
+    public static String getIndirectCallingClassSimpleName()
     {
         final String className = new Exception().getStackTrace()[2].getClassName();
         return className.substring(className.lastIndexOf(".") + 1);
@@ -182,7 +172,7 @@ public abstract class ThreadUtils
      *            the thread name for each thread created by the returned factory
      * @return a {@link ThreadFactory} instance that creates named daemon threads
      */
-    public static final ThreadFactory newDaemonThreadFactory(final String threadName)
+    public static ThreadFactory newDaemonThreadFactory(final String threadName)
     {
         return new ThreadFactory()
         {
@@ -201,7 +191,7 @@ public abstract class ThreadUtils
     /**
      * Gets a single thread executor service that uses a {@link Thread} with name threadName.
      */
-    public static final ExecutorService newSingleThreadExecutorService(String threadName)
+    public static ExecutorService newSingleThreadExecutorService(String threadName)
     {
         return Executors.newSingleThreadExecutor(newDaemonThreadFactory(threadName));
     }
@@ -214,7 +204,7 @@ public abstract class ThreadUtils
      * 
      * @see Executors#newScheduledThreadPool(int, ThreadFactory)
      */
-    public static final ScheduledExecutorService newScheduledExecutorService(final String threadName, final int threadCount)
+    public static ScheduledExecutorService newScheduledExecutorService(final String threadName, final int threadCount)
     {
         return new ScheduledExecutorService()
         {
@@ -336,34 +326,29 @@ public abstract class ThreadUtils
     /**
      * Gets a cached thread pool executor that uses a {@link Thread} with name threadName.
      */
-    public static final Executor newCachedThreadPoolExecutor(String threadName)
+    public static Executor newCachedThreadPoolExecutor(String threadName)
     {
         return Executors.newCachedThreadPool(newDaemonThreadFactory(threadName));
     }
 
-    public static final Thread newThread(final Runnable target, String threadName)
+    public static Thread newThread(final Runnable target, String threadName)
     {
-        Thread thread = new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        Thread thread = new Thread(() -> {
+            Log.log(ThreadUtils.class, "Starting");
+            try
             {
-                Log.log(ThreadUtils.class, "Starting");
-                try
-                {
-                    target.run();
-                }
-                finally
-                {
-                    Log.log(ThreadUtils.class, "Terminating");
-                }
+                target.run();
+            }
+            finally
+            {
+                Log.log(ThreadUtils.class, "Terminating");
             }
         });
         thread.setName(threadName);
         return thread;
     }
 
-    public static final Thread newDaemonThread(final Runnable target, String threadName)
+    public static Thread newDaemonThread(final Runnable target, String threadName)
     {
         Thread thread = newThread(target, threadName);
         thread.setDaemon(true);
@@ -377,7 +362,7 @@ public abstract class ThreadUtils
      * @param millis
      *            the milliseconds to pause
      */
-    public static final void sleep(int millis)
+    public static void sleep(int millis)
     {
         try
         {
@@ -393,7 +378,7 @@ public abstract class ThreadUtils
      * Like {@link #newScheduledExecutorService(String, int)} but the
      * {@link ScheduledExecutorService} cannot be shutdown
      */
-    public static final ScheduledExecutorService newPermanentScheduledExecutorService(final String threadName,
+    public static ScheduledExecutorService newPermanentScheduledExecutorService(final String threadName,
         final int threadCount)
     {
         return new ScheduledExecutorService()
@@ -459,7 +444,7 @@ public abstract class ThreadUtils
             }
 
             @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException
+            public boolean awaitTermination(long timeout, TimeUnit unit)
             {
                 Log.log(this, ObjectUtils.safeToString(this), " is a 'permanent' service and will not terminate");
                 return false;

@@ -161,6 +161,7 @@ public class ThimbleExecutorTest
     @After
     public void tearDown() throws Exception
     {
+        this.candidate.destroy();
     }
 
     @Test
@@ -315,5 +316,34 @@ public class ThimbleExecutorTest
         assertTrue(Arrays.binarySearch(this.candidate.tids, 100) < 0);
         assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
         assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
+    }
+
+    @Test
+    public void testAllCoreThreadsBlocked() throws InterruptedException
+    {
+        Runnable blockedTask = () -> {
+            synchronized("")
+            {
+                try
+                {
+                    "".wait(10000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        };
+        CountDownLatch latch = new CountDownLatch(2);
+        Runnable trigger = () -> latch.countDown();
+        for(int i=0; i < SIZE; i++)
+        {
+            candidate.execute(blockedTask);
+        }
+        Thread.sleep(1000);
+        candidate.execute(trigger);
+        candidate.execute(trigger);
+
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
     }
 }
