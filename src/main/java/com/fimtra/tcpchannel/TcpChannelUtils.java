@@ -121,6 +121,16 @@ public abstract class TcpChannelUtils
     }
 
     /**
+     * Handles socket write operations for {@link TcpChannel} instances.
+     */
+    static final SelectorProcessor WRITER = new SelectorProcessor("tcp-channel-writer", SelectionKey.OP_WRITE);
+
+    static SelectorProcessor nextWriter()
+    {
+        return WRITER;
+    }
+
+    /**
      * Handles all socket accept operations for all {@link TcpServer} instances
      */
     final static SelectorProcessor ACCEPT_PROCESSOR =

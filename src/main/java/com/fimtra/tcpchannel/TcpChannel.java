@@ -208,6 +208,7 @@ public class TcpChannel implements ITransportChannel
                     TcpChannelProperties.Values.WRITER_THREAD_COUNT);
 
     final SelectorProcessor reader;
+    final SelectorProcessor writer;
     boolean rxData;
     final IReceiver receiver;
     final ByteBuffer rxByteBuffer;
@@ -335,6 +336,7 @@ public class TcpChannel implements ITransportChannel
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.reader = TcpChannelUtils.nextReader();
+        this.writer = TcpChannelUtils.nextWriter();
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
         this.endPointSocketDescription = serverHost + ":" + serverPort;
         this.socketChannel = TcpChannelUtils.createAndConnectNonBlockingSocketChannel(serverHost, serverPort);
@@ -358,6 +360,7 @@ public class TcpChannel implements ITransportChannel
         this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);
         this.receiver = receiver;
         this.reader = TcpChannelUtils.nextReader();
+        this.writer = TcpChannelUtils.nextWriter();
         this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);
         final Socket socket = this.socketChannel.socket();
         this.endPointSocketDescription = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
@@ -381,6 +384,20 @@ public class TcpChannel implements ITransportChannel
         }
 
         TcpChannelUtils.setOptions(this.socketChannel);
+
+        try
+        {
+            this.writer.register(this.socketChannel, () -> TX_FRAME_PROCESSOR.execute(this.socketWriteTask));
+
+            this.writerKey = this.writer.getKeyFor(this.socketChannel);
+            SelectorProcessor.resetInterest(this.writerKey);
+        }
+        catch (Exception e)
+        {
+            String message = this + " could not register for write operations";
+            Log.log(this, message, e);
+            throw new ConnectException(message);
+        }
 
         try
         {
@@ -439,7 +456,7 @@ public class TcpChannel implements ITransportChannel
                         throw new ClosedChannelException();
                     case IDLE:
                         this.state = StateEnum.SENDING;
-                        TX_FRAME_PROCESSOR.execute(this.socketWriteTask);
+                        this.writer.setInterest(this.writerKey);
                 }
             }
 
@@ -631,15 +648,20 @@ public class TcpChannel implements ITransportChannel
             final TxByteArrayFragment data;
             synchronized (this.lock)
             {
-                if (this.txFrames[this.sendingQueue].size() == 0)
+                if (this.state != StateEnum.DESTROYED)
                 {
-                    if (this.state != StateEnum.DESTROYED)
+                    if (this.txFrames[this.sendingQueue].size() == 0)
                     {
+
                         // swap txFrames
                         final int temp = this.sendingQueue;
                         this.sendingQueue = this.pendingQueue;
                         this.pendingQueue = temp;
                     }
+                }
+                else
+                {
+                    return;
                 }
                 if ((data = this.txFrames[this.sendingQueue].poll()) == null)
                 {
@@ -709,6 +731,7 @@ public class TcpChannel implements ITransportChannel
             if (this.socketChannel != null)
             {
                 TcpChannelUtils.closeChannel(this.socketChannel);
+                this.writer.cancel(this.socketChannel);
                 this.reader.cancel(this.socketChannel);
             }
 

@@ -243,4 +243,9 @@ final class SelectorProcessor implements Runnable
         keyFor.interestOps(this.selectorProcessorOperation);
         this.selector.wakeup();
     }
+
+    SelectionKey getKeyFor(SelectableChannel channel)
+    {
+        return channel.keyFor(this.selector);
+    }
 }
