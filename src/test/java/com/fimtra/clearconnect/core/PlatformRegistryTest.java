@@ -25,6 +25,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.util.DeadlockDetector;
+import com.fimtra.util.Log;
+import com.fimtra.util.SystemUtils;
+import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -104,8 +108,27 @@ public class PlatformRegistryTest
         try
         {
             assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
+            Log.log(this, ">>> Destroying registry");
             this.candidate.destroy();
-            assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
+            Log.log(this, ">>> Destroyed registry");
+
+            Thread.sleep(1000);
+            if(disconnectedLatch.get().getCount() != 0)
+            {
+                final DeadlockDetector.ThreadInfoWrapper[] deadlocks = new DeadlockDetector().findDeadlocks();
+                if (deadlocks != null)
+                {
+                    final StringBuilder sb = new StringBuilder(1024);
+                    sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
+                    for (int i = 0; i < deadlocks.length; i++)
+                    {
+                        sb.append(deadlocks[i].toString());
+                    }
+                    Log.log(ThreadUtils.class, sb.toString());
+                }
+
+            }
+            assertTrue("getCount: " + disconnectedLatch.get().getCount(), disconnectedLatch.get().await(5, TimeUnit.SECONDS));
 
             connectedLatch.set(new CountDownLatch(MAX));
 
