@@ -45,8 +45,9 @@ public final class TextValue extends AbstractValue
     };
 
     static final String NULL = "null";
+    static final String EMPTY = "";
 
-    private String value;
+    private final String value;
 
     /**
      * Static short-hand constructor for a {@link TextValue}.
@@ -121,7 +122,14 @@ public final class TextValue extends AbstractValue
         {
             throw new IllegalArgumentException("null values are not allowed");
         }
-        this.value = (NULL.equals(value) ? NULL : value);
+        if (value.length() == 0)
+        {
+            this.value = EMPTY;
+        }
+        else
+        {
+            this.value = NULL.equals(value) ? NULL : value;
+        }
     }
 
     @Override
@@ -133,7 +141,7 @@ public final class TextValue extends AbstractValue
     @Override
     public long longValue()
     {
-        return (this.value == NULL || this.value == "") ? 0 : Long.valueOf(this.value).longValue();
+        return (this.value == NULL || this.value == EMPTY) ? 0 : Long.valueOf(this.value).longValue();
     }
 
     @Override
@@ -141,7 +149,7 @@ public final class TextValue extends AbstractValue
     {
         try
         {
-            return (this.value == NULL || this.value == "") ? Double.NaN : Double.valueOf(this.value).doubleValue();
+            return (this.value == NULL || this.value == EMPTY) ? Double.NaN : Double.valueOf(this.value).doubleValue();
         }
         catch (NumberFormatException e)
         {

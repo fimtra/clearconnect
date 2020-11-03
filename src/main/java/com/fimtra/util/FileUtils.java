@@ -305,24 +305,12 @@ public abstract class FileUtils
 
     private static void fastCopyFile(final File sourceFile, final File targetFile) throws IOException
     {
-        FileChannel sourceChannel = null;
-        FileChannel destinationChannel = null;
-        FileInputStream fileInputStream = null;
-        FileOutputStream fileOutputStream = null;
-        try
+        try (FileInputStream fileInputStream = new FileInputStream(sourceFile);
+             FileChannel sourceChannel = fileInputStream.getChannel();
+             FileOutputStream fileOutputStream = new FileOutputStream(targetFile);
+             FileChannel destinationChannel = fileOutputStream.getChannel())
         {
-            fileInputStream = new FileInputStream(sourceFile);
-            sourceChannel = fileInputStream.getChannel();
-            fileOutputStream = new FileOutputStream(targetFile);
-            destinationChannel = fileOutputStream.getChannel();
             sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);
-        }
-        finally
-        {
-            FileUtils.safeClose(fileInputStream);
-            FileUtils.safeClose(fileOutputStream);
-            FileUtils.safeClose(sourceChannel);
-            FileUtils.safeClose(destinationChannel);
         }
     }
 
@@ -362,8 +350,7 @@ public abstract class FileUtils
         yyyyMMddHHmmssSSS = yyyyMMddHHmmssSSS.replace(":", "");
         yyyyMMddHHmmssSSS = yyyyMMddHHmmssSSS.replace("-", "_");
         yyyyMMddHHmmssSSS = yyyyMMddHHmmssSSS.substring(0, 15);
-        final File file = new File(fileDirectory, filePrefix + "_" + yyyyMMddHHmmssSSS + ".log");
-        return file;
+        return new File(fileDirectory, filePrefix + "_" + yyyyMMddHHmmssSSS + ".log");
     }
 
     /**
@@ -456,10 +443,8 @@ public abstract class FileUtils
      */
     public static void writeInputStreamToFile(InputStream in, File file) throws IOException
     {
-        OutputStream out = null;
-        try
+        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(file)))
         {
-            out = new BufferedOutputStream(new FileOutputStream(file));
             final byte[] chunk = new byte[1024];
             int len;
             while ((len = in.read(chunk, 0, 1024)) > -1)
@@ -467,10 +452,6 @@ public abstract class FileUtils
                 out.write(chunk, 0, len);
             }
             out.flush();
-        }
-        finally
-        {
-            safeClose(out);
         }
     }
 
