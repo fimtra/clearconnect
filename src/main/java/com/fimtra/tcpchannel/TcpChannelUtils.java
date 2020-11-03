@@ -113,11 +113,24 @@ public abstract class TcpChannelUtils
     /**
      * Handles socket read operations for {@link TcpChannel} instances.
      */
-    static final SelectorProcessor READER = new SelectorProcessor("tcp-channel-reader", SelectionKey.OP_READ);
-
-    static SelectorProcessor nextReader()
+    static final SelectorProcessor[] READER;
+    private static int currentReader = 0;
+    static
     {
-        return READER;
+        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
+        for (int i = 0; i < READER.length; i++)
+        {
+            READER[i] = new SelectorProcessor("tcp-channel-reader-" + i, SelectionKey.OP_READ);
+        }
+    }
+
+    static synchronized SelectorProcessor nextReader()
+    {
+        if (currentReader == READER.length)
+        {
+            currentReader = 0;
+        }
+        return READER[currentReader++];
     }
 
     /**

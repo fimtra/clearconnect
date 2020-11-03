@@ -67,6 +67,7 @@ import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.tcpchannel.TcpChannelProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
 import com.fimtra.util.LazyObject.IDestructor;
@@ -147,6 +148,7 @@ public class PlatformUtils
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
         sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT);
+        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
         Log.banner(PlatformUtils.class, sb.toString());
 
         String versionNumber = "?.?.?";

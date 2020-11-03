@@ -61,6 +61,8 @@ public class RecordTest
     private static final IValue V1 = new DoubleValue(1);
     private static final IValue V2 = new DoubleValue(2);
     private final static IValue V5 = new DoubleValue(5);
+    public static final int PERF_TIME_LIMIT_NANOS = 250_000_000;
+    public static final int PERF_TEST_SIZE = 100000;
 
     Record candidate;
 
@@ -205,7 +207,7 @@ public class RecordTest
     {
         Set<String> keys = new HashSet<>();
         final Map<String, IValue> subMap = candidate.getOrCreateSubMap("testSubMapKeySetPerformance");
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < PERF_TEST_SIZE; i++)
         {
             final String k = "" + i;
             final TextValue v = TextValue.valueOf(k);
@@ -218,7 +220,7 @@ public class RecordTest
 
         System.err.println("took " + t + "ns");
         assertEquals(0, keys.size());
-        assertTrue("took " + t + "ns", t < 100_000_000);
+        assertTrue("took " + t + "ns", t < PERF_TIME_LIMIT_NANOS);
     }
 
     @Test
@@ -227,7 +229,7 @@ public class RecordTest
     {
         Collection<IValue> values = new HashSet<>();
         final Map<String, IValue> subMap = candidate.getOrCreateSubMap("testSubMapKeySetPerformance");
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < PERF_TEST_SIZE; i++)
         {
             final String k = "" + i;
             final TextValue v = TextValue.valueOf(k);
@@ -240,14 +242,14 @@ public class RecordTest
 
         System.err.println("took " + t + "ns");
         assertEquals(0, values.size());
-        assertTrue("took " + t + "ns", t < 100_000_000);
+        assertTrue("took " + t + "ns", t < PERF_TIME_LIMIT_NANOS);
     }
 
     @Test
     public void testKeySetPerformance() throws InterruptedException
     {
         Set<String> keys = new HashSet<>();
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < PERF_TEST_SIZE; i++)
         {
             final String k = "" + i;
             this.candidate.put(k, k);
@@ -259,14 +261,14 @@ public class RecordTest
 
         System.err.println("took " + t + "ns");
         assertEquals(0, keys.size());
-        assertTrue("took " + t + "ns", t < 100_000_000);
+        assertTrue("took " + t + "ns", t < PERF_TIME_LIMIT_NANOS);
     }
 
     @Test
     @Ignore("This test takes ~90 seconds")
     public void testEntrySetPerformance() throws InterruptedException
     {
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < PERF_TEST_SIZE; i++)
         {
             final String k = "" + i;
             final TextValue v = TextValue.valueOf(k);
@@ -280,7 +282,7 @@ public class RecordTest
 
         System.err.println("took " + t + "ns");
         assertEquals(0, entrySet.size());
-        assertTrue("took " + t + "ns", t < 100_000_000);
+        assertTrue("took " + t + "ns", t < PERF_TIME_LIMIT_NANOS);
     }
 
     @Test
@@ -288,7 +290,7 @@ public class RecordTest
     public void testValuesPerformance() throws InterruptedException
     {
         Collection<IValue> values = new HashSet<>();
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < PERF_TEST_SIZE; i++)
         {
             final String k = "" + i;
             final TextValue v = TextValue.valueOf(k);

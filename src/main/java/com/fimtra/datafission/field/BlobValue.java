@@ -44,7 +44,7 @@ public final class BlobValue extends AbstractValue
     {
         try
         {
-            return (T) SerializationUtils.fromByteArray(value.getBytes());
+            return SerializationUtils.fromByteArray(value.getBytes());
         }
         catch (Exception e)
         {
@@ -134,7 +134,7 @@ public final class BlobValue extends AbstractValue
         }
     }
 
-    private static final byte decodeHex(char c)
+    private static byte decodeHex(char c)
     {
         switch(c)
         {
@@ -207,7 +207,7 @@ public final class BlobValue extends AbstractValue
      */
     public static byte[] get(IValue target, byte[] defaultValue)
     {
-        return target == null || !(target instanceof BlobValue) ? defaultValue : target.byteValue();
+        return (target instanceof BlobValue) ? target.byteValue() : defaultValue;
     }
 
     byte[] value;
@@ -311,11 +311,10 @@ public final class BlobValue extends AbstractValue
             throw new IllegalStateException("BlobValue text length should be divisible by 2");
         }
         this.value = new byte[len / 2];
-        final char[] hexStream = chars;
         int j = 0;
         for (int i = start; i < len;)
         {
-            this.value[j++] = (byte) ((byte) (decodeHex(hexStream[i++]) << 4) | decodeHex(hexStream[i++]));
+            this.value[j++] = (byte) ((byte) (decodeHex(chars[i++]) << 4) | decodeHex(chars[i++]));
         }
     }
 

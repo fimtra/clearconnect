@@ -29,7 +29,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.Deque;
@@ -136,9 +135,7 @@ public class TcpChannel implements ITransportChannel
      */
     private static final class RxFrameResolver implements ISequentialRunnable
     {
-        /**
-         * direct byte buffer to optimise reading
-         */
+        /** direct byte buffer to optimise reading */
         final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
         long socketRead;
         TcpChannel channel;
@@ -152,30 +149,7 @@ public class TcpChannel implements ITransportChannel
         {
             try
             {
-                final long start = System.nanoTime();
-                final int readCount = this.channel.socketChannel.read(this.buffer);
-                switch(readCount)
-                {
-                    case -1:
-                        this.channel.destroy("End-of-stream reached");
-                        return;
-                    case 0:
-                        return;
-                    default:
-                        this.channel.rxData = true;
-                }
-
-                this.socketRead = System.nanoTime() - start;
-
                 this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
-            }
-            catch (IOException e)
-            {
-                this.channel.destroy("Could not read from socket (" + e.toString() + ")");
-            }
-            catch (BufferOverflowException e)
-            {
-                this.channel.destroy("Buffer overflow during frame decode", e);
             }
             finally
             {
@@ -248,7 +222,6 @@ public class TcpChannel implements ITransportChannel
      */
     volatile StateEnum state = StateEnum.IDLE;
 
-    SelectionKey writerKey;
     final QueueThresholdMonitor sendQueueMonitor;
 
     final ICoalescingRunnable socketWriteTask = new ICoalescingRunnable()
@@ -380,11 +353,19 @@ public class TcpChannel implements ITransportChannel
                     e1);
         }
 
-        TcpChannelUtils.setOptions(this.socketChannel);
-
         try
         {
-            this.reader.register(this.socketChannel, this::readFrames);
+            this.reader.register(this.socketChannel, () -> {
+                try
+                {
+                    readFrames();
+                }
+                catch (BufferOverflowException e)
+                {
+                    TcpChannel.this.destroy("Buffer overflow during frame decode", e);
+                    throw e;
+                }
+            });
         }
         catch (Exception e)
         {
@@ -478,9 +459,33 @@ public class TcpChannel implements ITransportChannel
 
     void readFrames()
     {
-        final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
-        frameResolver.channel = this;
-        RX_FRAME_PROCESSOR.execute(frameResolver);
+        try
+        {
+            final long start = System.nanoTime();
+
+            final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
+            frameResolver.channel = this;
+
+            final int readCount = this.socketChannel.read(frameResolver.buffer);
+            switch(readCount)
+            {
+                case -1:
+                    destroy("End-of-stream reached");
+                    return;
+                case 0:
+                    return;
+                default :
+                    this.rxData = true;
+            }
+
+            frameResolver.socketRead = System.nanoTime() - start;
+
+            RX_FRAME_PROCESSOR.execute(frameResolver);
+        }
+        catch (IOException e)
+        {
+            destroy("Could not read from socket (" + e.toString() + ")");
+        }
     }
 
     void resolveFrameFromBuffer(long socketRead, ByteBuffer buffer)

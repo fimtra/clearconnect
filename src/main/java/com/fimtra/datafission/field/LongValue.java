@@ -71,10 +71,10 @@ public final class LongValue extends AbstractValue
      */
     public static long get(IValue target, long defaultValue)
     {
-        return target == null || !(target instanceof LongValue) ? defaultValue : target.longValue();
+        return (target instanceof LongValue) ? target.longValue() : defaultValue;
     }
 
-    private long value;
+    private final long value;
 
     /** Initialises to represent 0. */
     LongValue()
