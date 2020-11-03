@@ -21,11 +21,10 @@ import static org.junit.Assert.fail;
 import java.util.Arrays;
 import java.util.Random;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.core.Context;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ObjectSerializer}

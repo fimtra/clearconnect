@@ -21,10 +21,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
+import com.fimtra.datafission.IValue.TypeEnum;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IValue.TypeEnum;
 
 /**
  * Tests for the {@link BlobValue}

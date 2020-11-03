@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
-import com.fimtra.datafission.core.AtomicChange;
 import com.fimtra.util.Log;
 
 /**

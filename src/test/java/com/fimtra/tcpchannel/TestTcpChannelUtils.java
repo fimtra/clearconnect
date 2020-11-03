@@ -23,12 +23,11 @@ import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.util.ByteBufferUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
-import com.fimtra.util.ByteBufferUtils;
 
 /**
  * Tests for the {@link TcpChannelUtils}

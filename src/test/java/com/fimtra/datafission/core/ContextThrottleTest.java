@@ -23,10 +23,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 
 /**
  * Tests for the {@link ContextThrottle}

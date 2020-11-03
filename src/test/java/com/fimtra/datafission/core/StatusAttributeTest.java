@@ -21,11 +21,9 @@ import static org.junit.Assert.assertNull;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Test;
-
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
+import org.junit.Test;
 
 /**
  * Tests for the {@link IStatusAttribute.Utils}

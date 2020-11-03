@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
-import com.fimtra.tcpchannel.TcpServer;
 
 /**
  * Runs a server that echos text input from a telnet session.

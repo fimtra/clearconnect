@@ -22,8 +22,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,7 +33,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -50,13 +49,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
-import org.mockito.Mockito;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
@@ -84,6 +76,12 @@ import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+import org.mockito.Mockito;
 
 /**
  * Tests the {@link ProxyContext} and {@link Publisher}
@@ -2259,8 +2257,8 @@ public class ProxyContextTest
 
         this.candidate.addSessionListener(listener);
 
-        verify(listener, timeout(5000)).onSessionClosed(eq(sessionContextName), anyString());
-        verify(listener, never()).onSessionOpen(eq(sessionContextName), anyString());
+        verify(listener, timeout(5000)).onSessionClosed(eq(sessionContextName), any());
+        verify(listener, never()).onSessionOpen(eq(sessionContextName), any());
     }
 
     @Test

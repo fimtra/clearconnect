@@ -19,8 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.clearconnect.PlatformServiceAccess;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;

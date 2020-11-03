@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.core.CipherProtocolCodec;
 import com.fimtra.datafission.core.CipherProtocolCodecTest;
-import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromProxy;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromPublisher;
 import com.fimtra.util.SerializationUtils;
 

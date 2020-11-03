@@ -16,8 +16,6 @@
  */
 package com.fimtra.clearconnect;
 
-import com.fimtra.clearconnect.IPlatformServiceProxy;
-import com.fimtra.clearconnect.PlatformServiceAccess;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;

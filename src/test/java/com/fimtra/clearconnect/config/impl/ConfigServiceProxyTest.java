@@ -8,16 +8,14 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.config.IConfigManager;
-
-import static org.mockito.Mockito.mock;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 public class ConfigServiceProxyTest {
 

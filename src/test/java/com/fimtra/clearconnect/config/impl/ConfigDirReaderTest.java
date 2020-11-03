@@ -16,7 +16,7 @@
 package com.fimtra.clearconnect.config.impl;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,9 +28,6 @@ import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.clearconnect.config.impl.ConfigDirReader;
-import com.fimtra.datafission.core.ContextUtils;
 
 /**
  * @author Paul Mackinlay

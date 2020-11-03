@@ -20,15 +20,14 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.core.PlatformRegistryAgent;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ShadowKernel}

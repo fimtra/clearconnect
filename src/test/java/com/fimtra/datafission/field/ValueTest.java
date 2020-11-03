@@ -22,11 +22,10 @@ import static org.junit.Assert.assertTrue;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import com.fimtra.datafission.IValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IValue;
 
 /**
  * Tests for the {@link IValue} implementations.

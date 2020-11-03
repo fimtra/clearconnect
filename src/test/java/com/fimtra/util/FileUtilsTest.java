@@ -15,6 +15,14 @@
  */
 package com.fimtra.util;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -23,19 +31,9 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.UUID;
 
+import com.fimtra.util.FileUtils.ExtensionFileFilter;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.util.FileUtils.ExtensionFileFilter;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * @author Paul Mackinlay

@@ -15,23 +15,20 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.clearconnect.RedundancyModeEnum;
-import com.fimtra.clearconnect.config.ConfigProperties;
-import com.fimtra.clearconnect.config.IConfig;
-import com.fimtra.clearconnect.config.impl.ConfigUtils;
-import com.fimtra.datafission.field.LongValue;
-import com.fimtra.datafission.field.TextValue;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.fimtra.clearconnect.RedundancyModeEnum;
+import com.fimtra.clearconnect.config.ConfigProperties;
+import com.fimtra.clearconnect.config.IConfig;
+import com.fimtra.datafission.field.LongValue;
+import com.fimtra.datafission.field.TextValue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay

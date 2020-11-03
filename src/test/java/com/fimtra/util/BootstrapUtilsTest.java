@@ -15,16 +15,15 @@
  */
 package com.fimtra.util;
 
-import java.util.Properties;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import org.junit.Test;
+import java.util.Properties;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay

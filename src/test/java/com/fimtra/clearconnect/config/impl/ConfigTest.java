@@ -15,34 +15,30 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.config.ConfigServiceProperties;
 import com.fimtra.clearconnect.config.IConfig.IConfigChangeListener;
-import com.fimtra.clearconnect.config.impl.Config;
 import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChange;
 import com.fimtra.datafission.field.TextValue;
-
-import static org.mockito.Matchers.eq;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests {@link Config}

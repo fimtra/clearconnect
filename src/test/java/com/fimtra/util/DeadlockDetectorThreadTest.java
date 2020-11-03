@@ -16,14 +16,12 @@
 package com.fimtra.util;
 
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.junit.Test;
-import org.mockito.Matchers;
-import org.mockito.Mockito;
 
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
+import org.junit.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 
 /**
  * Tests for the {@link DeadlockDetector#newDeadlockDetectorThread} method. We need a separate test
@@ -63,6 +61,6 @@ public class DeadlockDetectorThreadTest
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
         DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
-        Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(Matchers.any(ThreadInfoWrapper[].class));
+        Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(ArgumentMatchers.any(ThreadInfoWrapper[].class));
     }
 }

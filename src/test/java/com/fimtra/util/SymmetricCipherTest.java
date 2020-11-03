@@ -15,11 +15,10 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 

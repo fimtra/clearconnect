@@ -24,22 +24,19 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
+import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.datafission.core.AtomicChange;
-import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.RpcInstance.Remote;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link RpcInstance}

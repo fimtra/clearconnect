@@ -29,8 +29,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.tcpchannel.SelectorProcessor;
-
 /**
  * Tests for the {@link SelectorProcessor}
  * 

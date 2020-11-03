@@ -15,17 +15,15 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import static org.mockito.Matchers.any;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.datafission.IRpcInstance;
-
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+
+import com.fimtra.clearconnect.IPlatformServiceInstance;
+import com.fimtra.datafission.IRpcInstance;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay

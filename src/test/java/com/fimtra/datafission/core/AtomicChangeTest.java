@@ -26,12 +26,11 @@ import static org.mockito.Mockito.mock;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.field.DoubleValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.field.DoubleValue;
 
 /**
  * Tests for the {@link AtomicChange}

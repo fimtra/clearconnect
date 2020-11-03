@@ -15,7 +15,6 @@
  */
 package com.fimtra.clearconnect;
 
-import com.fimtra.clearconnect.PlatformKernel;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 
 /**

@@ -25,13 +25,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.Test;
-
 import com.fimtra.tcpchannel.ByteArrayFragment.ByteArrayFragmentUtils;
 import com.fimtra.tcpchannel.ByteArrayFragment.IncorrectSequenceException;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.RawByteHeaderByteArrayFragmentResolver;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.UTF8HeaderByteArrayFragmentResolver;
 import com.fimtra.util.ByteBufferUtils;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ByteArrayFragment}

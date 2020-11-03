@@ -26,15 +26,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.core.ImmutableRecord;
-import com.fimtra.datafission.core.Record;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ImmutableRecord}

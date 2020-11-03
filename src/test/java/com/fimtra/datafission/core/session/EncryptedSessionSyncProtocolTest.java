@@ -19,8 +19,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,16 +28,15 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
-
 import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromProxy;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromPublisher;
 import com.fimtra.util.SerializationUtils;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
 
 /**
  * Tests for the {@link EncryptedSessionSyncProtocol}

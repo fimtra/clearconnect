@@ -21,17 +21,13 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.channel.ChannelUtils;
-import com.fimtra.channel.ChannelWatchdog;
-import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.tcpchannel.TestTcpServer.EchoReceiver;
 import com.fimtra.tcpchannel.TestTcpServer.NoopReceiver;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ChannelWatchdog}

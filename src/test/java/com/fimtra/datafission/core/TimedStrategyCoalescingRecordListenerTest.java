@@ -15,31 +15,13 @@
  */
 package com.fimtra.datafission.core;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
+import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.core.CoalescingRecordListener.TimedCoalescingStrategy;
+import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordListener;
-import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.CoalescingRecordListener;
-import com.fimtra.datafission.core.CoalescingRecordListener.TimedCoalescingStrategy;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.field.DoubleValue;
-import com.fimtra.datafission.field.LongValue;
-import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ThimbleExecutor;
-import com.fimtra.util.TestUtils;
-import com.fimtra.util.TestUtils.EventChecker;
-import com.fimtra.util.ThreadUtils;
 
 /**
  * Tests for the {@link CoalescingRecordListener} using the {@link TimedCoalescingStrategy}

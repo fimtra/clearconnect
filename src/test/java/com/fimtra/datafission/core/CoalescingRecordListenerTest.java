@@ -22,19 +22,18 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
-import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link CoalescingRecordListener}

@@ -22,7 +22,6 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,18 +30,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.TextValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.core.Record;
-import com.fimtra.datafission.core.SubMap;
-import com.fimtra.datafission.field.DoubleValue;
 
 /**
  * Test cases for the record

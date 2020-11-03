@@ -8,14 +8,13 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
+import static org.mockito.Mockito.mock;
+
 import java.io.File;
 
+import com.fimtra.clearconnect.config.ConfigServiceProperties;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.clearconnect.config.ConfigServiceProperties;
-
-import static org.mockito.Mockito.mock;
 
 public class ConfigPersistFactoryTest {
 

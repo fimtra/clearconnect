@@ -15,15 +15,13 @@
  */
 package com.fimtra.clearconnect.rpc;
 
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertTrue;
 
-import com.fimtra.clearconnect.rpc.RpcGetJvmStatsHandler;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
-
-import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay

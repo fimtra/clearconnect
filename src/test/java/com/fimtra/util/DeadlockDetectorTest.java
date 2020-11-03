@@ -23,9 +23,8 @@ import java.util.Arrays;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
-
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
+import org.junit.Test;
 
 /**
  * Tests for the {@link DeadlockDetector}

@@ -27,10 +27,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
-
 /**
  * Tests for the {@link ThimbleExecutor}
  * 

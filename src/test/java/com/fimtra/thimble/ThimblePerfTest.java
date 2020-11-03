@@ -29,10 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
-
 /**
  * Simple performance test for the {@link ThimbleExecutor}
  * 

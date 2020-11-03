@@ -15,18 +15,17 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import java.util.Arrays;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.clearconnect.IPlatformServiceInstance;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+
+import com.fimtra.clearconnect.IPlatformServiceInstance;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay
