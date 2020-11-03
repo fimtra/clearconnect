@@ -31,7 +31,7 @@ public abstract class TcpChannelProperties
      * 
      * @author Ramon Servadei
      */
-    public static interface Names
+    public interface Names
     {
         String BASE = "tcpChannel.";
         /**
@@ -194,7 +194,7 @@ public abstract class TcpChannelProperties
      * 
      * @author Ramon Servadei
      */
-    public static interface Values
+    public interface Values
     {
         /**
          * The frame encoding, default is TERMINATOR_BASED.
@@ -220,12 +220,12 @@ public abstract class TcpChannelProperties
         int TX_SEND_SIZE = Integer.parseInt(System.getProperty(Names.PROPERTY_NAME_TX_BUFFER_SIZE, "1024"));
 
         /**
-         * The default server socket re-use address value, default is <code>false</code>.
+         * The default server socket re-use address value, default is <code>true</code>.
          * 
          * @see Names#SERVER_SOCKET_REUSE_ADDR
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
-                Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "false")).booleanValue();
+                Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "true")).booleanValue();
         
         /**
          * The default for server connection logging, default is <code>true</code>.

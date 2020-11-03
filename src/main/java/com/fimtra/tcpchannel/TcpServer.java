@@ -81,35 +81,26 @@ public class TcpServer implements IEndPointService
                 @Override
                 public void run()
                 {
-                    try
+                    try (PrintWriter pw = new PrintWriter(new FileWriter(this.serverConnectionsFile)))
                     {
-                        this.serverConnectionsFile.createNewFile();
-                        PrintWriter pw = null;
-                        try
+                        pw.println("HOST IP, CONNECTION COUNT, BLOCKED, BLACKLISTED");
+                        final List<String> sortedIps = new LinkedList<>(CONNECTING_HOSTS.keySet());
+                        for (String IP : sortedIps)
                         {
-                            pw = new PrintWriter(new FileWriter(this.serverConnectionsFile));
-                            pw.println("HOST IP, CONNECTION COUNT, BLOCKED, BLACKLISTED");
-                            final List<String> sortedIps = new LinkedList<>(CONNECTING_HOSTS.keySet());
-                            for (String IP : sortedIps)
-                            {
-                                pw.print(IP);
-                                pw.print(", ");
-                                pw.print(CONNECTING_HOSTS.get(IP));
-                                pw.print(", ");
-                                pw.print(Boolean.TRUE.equals(BLOCKED_HOSTS.get(IP)) ? "BLOCKED" : "");
-                                pw.print(", ");
-                                pw.println(Boolean.TRUE.equals(BLACKLISTED_HOSTS.get(IP)) ? "BLACKLISTED" : "");
-                            }
-                        }
-                        finally
-                        {
-                            FileUtils.safeClose(pw);
+                            pw.print(IP);
+                            pw.print(", ");
+                            pw.print(CONNECTING_HOSTS.get(IP));
+                            pw.print(", ");
+                            pw.print(Boolean.TRUE.equals(BLOCKED_HOSTS.get(IP)) ? "BLOCKED" : "");
+                            pw.print(", ");
+                            pw.println(Boolean.TRUE.equals(BLACKLISTED_HOSTS.get(IP)) ? "BLACKLISTED" : "");
                         }
                     }
                     catch (IOException e)
                     {
                         throw new RuntimeException(
-                            "Could not create " + ObjectUtils.safeToString(this.serverConnectionsFile), e);
+                                "Could not create " + ObjectUtils.safeToString(this.serverConnectionsFile),
+                                e);
                     }
                 }
             };
@@ -191,17 +182,17 @@ public class TcpServer implements IEndPointService
         try
         {
             final String whitelistAcl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_ACL, ".*");
-            final String whiteblackAcl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL);
+            final String blacklistAcl = System.getProperty(TcpChannelProperties.Names.PROPERTY_NAME_SERVER_BLACKLIST_ACL);
             this.whitelistAclPatterns =
                     Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(whitelistAcl, ";")));
             this.blacklistAclPatterns =
-                Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(whiteblackAcl, ";")));
+                Collections.unmodifiableSet(constructPatterns(CollectionUtils.newSetFromString(blacklistAcl, ";")));
             Log.log(this, "WHITELIST ACL is: ", this.whitelistAclPatterns.toString());
             Log.log(this, "BLACKLIST ACL is: ", this.blacklistAclPatterns.toString());
             this.serverSocketChannel = ServerSocketChannel.open();
             this.serverSocketChannel.configureBlocking(false);
 
-            this.serverSocketChannel.socket().setReuseAddress(reuseAddress);
+            this.serverSocketChannel.socket().setReuseAddress(port == 0 ? false : reuseAddress);
             this.serverSocketChannel.socket().setReceiveBufferSize(serverRxBufferSize);
 
             TcpChannelUtils.bind(this.serverSocketChannel.socket(), address, port);
@@ -270,7 +261,7 @@ public class TcpServer implements IEndPointService
                                     }
                                 }
                             }
-                            if (!whitelisted || blacklisted)
+                            if (!whitelisted)
                             {
                                 Log.log(TcpServer.this, "*** ACCESS VIOLATION *** IP address ", hostAddress,
                                     (!blacklisted ? " does not match any ACL pattern" : " is blacklisted"));
@@ -405,45 +396,17 @@ public class TcpServer implements IEndPointService
         this.clients.clear();
 
         // kick off a thread to try a connection to ensure no connection exists
-        try
-        {
-            new Thread(new Runnable()
+        new Thread(() -> {
+            try (Socket ignored = new Socket(TcpServer.this.localSocketAddress.getAddress(),
+                    TcpServer.this.localSocketAddress.getPort()))
             {
-                @Override
-                public void run()
-                {
-                    Socket socket = null;
-                    try
-                    {
-                        socket = new Socket(TcpServer.this.localSocketAddress.getAddress(),
-                            TcpServer.this.localSocketAddress.getPort());
-                    }
-                    catch (Exception e)
-                    {
-                        // don't care
-                    }
-                    finally
-                    {
-                        if (socket != null)
-                        {
-                            try
-                            {
-                                socket.close();
-                            }
-                            catch (IOException e)
-                            {
-                                // don't care
-                            }
-                        }
-                    }
-                }
-            }, "socket-destroy-" + this.localSocketAddress.getAddress() + ":"
+            }
+            catch (Exception e)
+            {
+                // don't care
+            }
+        }, "socket-destroy-" + this.localSocketAddress.getAddress() + ":"
                 + this.localSocketAddress.getPort()).start();
-        }
-        catch (Exception e)
-        {
-            // do we care about this...
-        }
     }
 
     @Override
