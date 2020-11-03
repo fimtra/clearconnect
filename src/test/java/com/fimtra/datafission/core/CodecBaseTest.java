@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNotNull;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 
@@ -382,12 +383,12 @@ public abstract class CodecBaseTest
         assertEquals(atomicChange.getSubMapKeys(), changeFromRxData.getSubMapKeys());
         for (String smk : atomicChange.getSubMapKeys())
         {
-            assertEquals(atomicChange.getSubMapAtomicChange(smk).getPutEntries(),
-                changeFromRxData.getSubMapAtomicChange(smk).getPutEntries());
-            assertEquals(atomicChange.getSubMapAtomicChange(smk).getOverwrittenEntries(),
-                changeFromRxData.getSubMapAtomicChange(smk).getOverwrittenEntries());
-            assertEquals(atomicChange.getSubMapAtomicChange(smk).getRemovedEntries().keySet(),
-                changeFromRxData.getSubMapAtomicChange(smk).getRemovedEntries().keySet());
+            assertEquals(new HashMap(atomicChange.getSubMapAtomicChange(smk).getPutEntries()),
+                new HashMap(changeFromRxData.getSubMapAtomicChange(smk).getPutEntries()));
+            assertEquals(new HashMap(atomicChange.getSubMapAtomicChange(smk).getOverwrittenEntries()),
+                new HashMap(changeFromRxData.getSubMapAtomicChange(smk).getOverwrittenEntries()));
+            assertEquals(new HashSet(atomicChange.getSubMapAtomicChange(smk).getRemovedEntries().keySet()),
+                new HashSet(changeFromRxData.getSubMapAtomicChange(smk).getRemovedEntries().keySet()));
         }
     }
 }
