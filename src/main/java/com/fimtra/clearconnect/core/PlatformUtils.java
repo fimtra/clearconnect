@@ -147,8 +147,7 @@ public class PlatformUtils
 
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
-        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT);
-        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
+        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT);
         Log.banner(PlatformUtils.class, sb.toString());
 
         String versionNumber = "?.?.?";

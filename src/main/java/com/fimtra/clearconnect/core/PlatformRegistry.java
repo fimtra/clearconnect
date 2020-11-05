@@ -423,7 +423,7 @@ public final class PlatformRegistry
         final Map<String, IValue> registryServiceSubMap = this.serviceStats.getOrCreateSubMap(SERVICE_NAME);
         registryServiceSubMap.put(IServiceRecordFields.SERVICE_INSTANCE_COUNT, LongValue.valueOf(1));
 
-        Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
+        Log.banner(this, "Constructed " + ObjectUtils.safeToString(this));
     }
 
     long nextSequence()
