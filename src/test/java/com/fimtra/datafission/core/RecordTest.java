@@ -56,7 +56,7 @@ public class RecordTest
     private static final IValue V1 = new DoubleValue(1);
     private static final IValue V2 = new DoubleValue(2);
     private final static IValue V5 = new DoubleValue(5);
-    public static final int PERF_TIME_LIMIT_NANOS = 250_000_000;
+    public static final int PERF_TIME_LIMIT_NANOS = 1_000_000_000;
     public static final int PERF_TEST_SIZE = 100000;
 
     Record candidate;

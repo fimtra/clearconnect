@@ -49,6 +49,6 @@ public class ClassUtilsTest {
 	public void shouldFindMoreLinesThanAllowedKeys() {
 		String info = ClassUtils.getManifestInfo(ClassUtils.class);
 		String[] lines = info.split(SystemUtils.lineSeparator());
-		assertTrue(lines.length > ClassUtils.fimtraVersionKeys.size());
+		assertTrue(lines.length >= ClassUtils.fimtraVersionKeys.size());
 	}
 }

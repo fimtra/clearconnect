@@ -538,6 +538,7 @@ public class PlatformTest
     {
         final String SERVICE1 = logStart();
         createAgent();
+        createAgent008();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
             WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
@@ -556,7 +557,8 @@ public class PlatformTest
             }
         }, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
-        final IPlatformServiceProxy proxy = this.agent.getPlatformServiceProxy(SERVICE1);
+        this.agent008.waitForPlatformService(SERVICE1);
+        final IPlatformServiceProxy proxy = this.agent008.getPlatformServiceProxy(SERVICE1);
 
         IServiceConnectionStatusListener listener = mock(IServiceConnectionStatusListener.class);
         proxy.addServiceConnectionStatusListener(listener);
