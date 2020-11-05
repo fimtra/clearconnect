@@ -24,7 +24,7 @@ import com.fimtra.util.ThreadUtils;
  */
 public class ContextExecutorFactory
 {
-    public static final boolean POOL_ACTIVE = !Boolean.getBoolean("ContextExecutorFactory.poolActive");
+    public static final boolean POOL_ACTIVE = !Boolean.getBoolean("ContextExecutorFactory.poolInactive");
 
     private static class POOL_HOLDER
     {
