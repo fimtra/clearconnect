@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +43,7 @@ import com.fimtra.util.CharSubArrayKeyedPool;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringAppender;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
@@ -247,6 +247,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     final static ThreadLocal<DecodingBuffers> DECODING_BUFFERS = ThreadLocal.withInitial(() -> {
+        ThreadUtils.registerThreadLocalCleanup(StringProtocolCodec.DECODING_BUFFERS::remove);
+
         final DecodingBuffers instance = new DecodingBuffers();
         instance.tempArr = new char[50];
         instance.bijTokenOffset = new int[1][10];
@@ -409,6 +411,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     final static ThreadLocal<EncodingBuffers> ENCODING_BUFFERS = ThreadLocal.withInitial(() -> {
+        ThreadUtils.registerThreadLocalCleanup(StringProtocolCodec.ENCODING_BUFFERS::remove);
+
         final EncodingBuffers instance = new EncodingBuffers();
         instance.sb = new StringAppender(1000);
         instance.charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);

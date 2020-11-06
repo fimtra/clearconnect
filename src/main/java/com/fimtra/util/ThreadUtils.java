@@ -15,6 +15,7 @@
  */
 package com.fimtra.util;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -39,15 +40,35 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class ThreadUtils
 {
+    private static final String PREFIX = System.getProperty("threadUtils.prefix", "clearconnect-");
+
+    static final Thread.UncaughtExceptionHandler UNCAUGHT_EXCEPTION_HANDLER =
+            new Thread.UncaughtExceptionHandler()
+            {
+                @Override
+                public void uncaughtException(Thread t, Throwable e)
+                {
+                    Log.log(this, "Thread: " + t.getName(), e);
+                }
+            };
+
     static final ScheduledExecutorService UTILS_EXECUTOR =
             ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+
+    static final Map<Thread, List<Runnable>> THREAD_LOCAL_CLEANUP =
+            Collections.synchronizedMap(CollectionUtils.newMap());
+
+    public static void registerThreadLocalCleanup(Runnable threadLocalCleanup)
+    {
+        THREAD_LOCAL_CLEANUP.computeIfAbsent(Thread.currentThread(), r -> new ArrayList<>()).add(
+                threadLocalCleanup);
+    }
 
     /**
      * Logs the exception generated in the run method of a delegate runnable.
      *
      * @author Ramon Servadei
      */
-    // todo pool version to reduce object churn..again...
     public static final class ExceptionLoggingRunnable implements Runnable
     {
         private final Runnable command;
@@ -345,9 +366,27 @@ public abstract class ThreadUtils
             finally
             {
                 Log.log(ThreadUtils.class, "Terminating");
+                final List<Runnable> cleanupTasks = THREAD_LOCAL_CLEANUP.remove(Thread.currentThread());
+                if (cleanupTasks != null)
+                {
+                    Log.log(ThreadUtils.class,
+                            "Clearing threadlocals: " + ObjectUtils.safeToString(cleanupTasks));
+                    for (Runnable cleanupTask : cleanupTasks)
+                    {
+                        try
+                        {
+                            cleanupTask.run();
+                        }
+                        catch (Exception e)
+                        {
+                            Log.log(cleanupTask, "Error in " + ObjectUtils.safeToString(cleanupTask), e);
+                        }
+                    }
+                }
             }
         });
-        thread.setName(threadName);
+        thread.setName(PREFIX + threadName);
+        thread.setUncaughtExceptionHandler(UNCAUGHT_EXCEPTION_HANDLER);
         return thread;
     }
 
