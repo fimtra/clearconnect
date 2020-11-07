@@ -143,13 +143,6 @@ public final class ProxyContext implements IObserverContext
     public static boolean logVerboseSubscribes =
         Boolean.getBoolean("logVerboseSubscribes." + ProxyContext.class.getCanonicalName());
 
-    /**
-     * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
-     * tasks
-     */
-    private final static ScheduledExecutorService RECONNECT_TASKS =
-            ThreadUtils.newPermanentScheduledExecutorService("fission-reconnect", 1);
-
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";
     /** Signals that a subscription is not OK (failed due to permissions or already subscribed) */
@@ -299,8 +292,8 @@ public final class ProxyContext implements IObserverContext
         }
     }
 
-    static String[] getEligibleRecords(SubscriptionManager<String, IRecordListener> subscriptionManager, int count,
-        String... recordNames)
+    static String[] getEligibleRecords(SubscriptionManager<String, IRecordListener> subscriptionManager,
+            String... recordNames)
     {
         final List<String> records = new ArrayList<>(recordNames.length);
         for (String recordName : recordNames)
@@ -308,7 +301,7 @@ public final class ProxyContext implements IObserverContext
             if (!ContextUtils.isSystemRecordName(recordName) && !RECORD_CONNECTION_STATUS_NAME.equals(
                     recordName))
             {
-                if (subscriptionManager.getSubscribersFor(recordName).length == count)
+                if (subscriptionManager.getSubscribersFor(recordName).length == 0)
                 {
                     records.add(substituteRemoteNameWithLocalName(recordName));
                 }
@@ -443,7 +436,7 @@ public final class ProxyContext implements IObserverContext
                         }
                         catch (Exception e)
                         {
-                            channel.destroy("Could not intialise session", e);
+                            channel.destroy("Could not initialise session", e);
                         }
                     }
 
@@ -1116,7 +1109,8 @@ public final class ProxyContext implements IObserverContext
         {
             // find records that have 0 observers - these are the ones that will need a subscription
             // message sent to the remote
-            final String[] recordsToSubscribeFor = getEligibleRecords(this.context.recordObservers, 0, recordNames);
+            final String[] recordsToSubscribeFor = getEligibleRecords(this.context.recordObservers,
+                    recordNames);
 
             // always observe the record even if we did not send the subscribe message - it may be a
             // local system record that was being subscribed for or a second listener added to the
@@ -1165,7 +1159,7 @@ public final class ProxyContext implements IObserverContext
         {
             this.context.removeObserver(observer, recordNames);
 
-            final String[] recordsToUnsubscribe = getEligibleRecords(this.context.recordObservers, 0, recordNames);
+            final String[] recordsToUnsubscribe = getEligibleRecords(this.context.recordObservers, recordNames);
             if (recordsToUnsubscribe.length > 0)
             {
                 // only send an unsubscribe if connected
@@ -1598,7 +1592,7 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
                 Long.toString(this.reconnectPeriodMillis), "ms ");
 
-            this.reconnectTask = RECONNECT_TASKS.schedule(
+            this.reconnectTask = ThreadUtils.UTILS_EXECUTOR.schedule(
                     () -> ContextUtils.CORE_EXECUTOR.execute(new ICoalescingRunnable()
                     {
                         @Override
