@@ -664,8 +664,6 @@ final class EventHandler
     private static final boolean SERVICES_LOG_DISABLED = Boolean.getBoolean("platform.servicesLogDisabled");
     private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null :
             RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
-    private static final Executor SERVICES_LOG_EXECUTOR =
-            SERVICES_LOG_DISABLED ? null : ThreadUtils.newSingleThreadExecutorService("services-log");
     private static final FastDateFormat fdf = new FastDateFormat();
 
     private static void banner(EventHandler eventHandler, final String message)
@@ -680,7 +678,7 @@ final class EventHandler
             }
 
             final long now = System.currentTimeMillis();
-            SERVICES_LOG_EXECUTOR.execute(() -> {
+            ThreadUtils.UTILS_EXECUTOR.execute(() -> {
                 try
                 {
                     SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(

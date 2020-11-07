@@ -52,7 +52,7 @@ public abstract class ThreadUtils
                 }
             };
 
-    static final ScheduledExecutorService UTILS_EXECUTOR =
+    public static final ScheduledExecutorService UTILS_EXECUTOR =
             ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
 
     static final Map<Thread, List<Runnable>> THREAD_LOCAL_CLEANUP =

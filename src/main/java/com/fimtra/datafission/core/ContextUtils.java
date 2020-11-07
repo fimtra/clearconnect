@@ -192,12 +192,6 @@ public final class ContextUtils
     final static IContextExecutor RPC_EXECUTOR =
             ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
 
-    /**
-     * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.
-     */
-    final static ScheduledExecutorService UTILITY_SCHEDULER =
-            ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
-
     final static RollingFileAppender qStatsLog = DataFissionProperties.Values.ENABLE_Q_STATS_LOGGING ?
             RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) :
             null;
@@ -217,7 +211,7 @@ public final class ContextUtils
 
     static
     {
-        UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
+        ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(new Runnable()
         {
             // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();

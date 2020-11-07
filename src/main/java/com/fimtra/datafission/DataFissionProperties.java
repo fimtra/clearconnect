@@ -15,8 +15,6 @@
  */
 package com.fimtra.datafission;
 
-import java.util.concurrent.ConcurrentHashMap;
-
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ProxyContext;
@@ -409,7 +407,8 @@ public abstract class DataFissionProperties
         int DELTA_COUNT_LOG_THRESHOLD = Integer.parseInt(System.getProperty(Names.DELTA_COUNT_LOG_THRESHOLD, "6"));
 
         /**
-         * The delay, in micro seconds, between handling subsequent subscribe messages.
+         * The delay, in micro seconds, between handling subsequent subscribe messages during resyncing
+         * (there can be 1000s of subscriptions in a resync).
          * <p>
          * Default is 0 (no delay).
          * 
