@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
@@ -57,6 +58,7 @@ import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
+import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
@@ -302,7 +304,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final IContextExecutor rpcExecutor;
     final IContextExecutor coreExecutor;
     final IContextExecutor systemExecutor;
-    final ScheduledExecutorService utilityExecutor;
+    final LazyObject<ScheduledExecutorService> utilityExecutor;
     final Object recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
     /**
@@ -357,7 +359,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
         this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
-        this.utilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
+        this.utilityExecutor = utilityExecutor == null ?
+                new LazyObject<>(() -> ThreadUtils.newScheduledExecutorService(name + "-utility", 1),
+                        ExecutorService::shutdown) : new LazyObject<>(() -> utilityExecutor, (s) -> {
+        });
         this.recordCreateLock = new Object();
         this.recordObservers = new SubscriptionManager<>(IRecordListener.class);
         this.recordsToRemoveFromSystemRecords = new HashSet<>();
@@ -408,10 +413,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         try
         {
-            if (ContextUtils.UTILITY_SCHEDULER != this.utilityExecutor)
-            {
-                this.utilityExecutor.shutdown();
-            }
+            this.utilityExecutor.destroy();
             if (ContextUtils.CORE_EXECUTOR != this.coreExecutor)
             {
                 this.coreExecutor.destroy();
@@ -1114,7 +1116,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {
-        return this.utilityExecutor;
+        return this.utilityExecutor.get();
     }
 
     @Override
