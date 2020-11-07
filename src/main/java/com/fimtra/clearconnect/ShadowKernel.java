@@ -106,7 +106,7 @@ public class ShadowKernel
         this.primaryRegistryEndPoint = primaryRegistryEndPoint;
         this.shadowRegistryEndPoint = shadowRegistryEndPoint;
 
-        this.startStopService = ThreadUtils.newSingleThreadExecutorService("start-stop-service");
+        this.startStopService = ThreadUtils.newSingleThreadExecutorService("shadow-kernel-start-stop-service");
 
         startShadowRegistry();
 
