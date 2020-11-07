@@ -52,6 +52,12 @@ public abstract class UtilProperties
         String ARCHIVE_DIR = BASE + "archiveDir";
 
         /**
+         * The system property key that defines the polling period for log flushing.<br>
+         * E.g. <code>-Dutil.logFlushPeriodMillis=250</code>
+         */
+        String LOG_FLUSH_PERIOD_MILLIS = BASE + "logFlushPeriodMillis";
+
+        /**
          * The system property name to define if log messages are written to std.err (in addition to
          * the log file). <br>
          * <b>This is done using a dedicated executor so should not block application performance.</b><br>
@@ -148,6 +154,14 @@ public abstract class UtilProperties
          * @see Names#ARCHIVE_DIR
          */
         String ARCHIVE_DIR = System.getProperty(UtilProperties.Names.ARCHIVE_DIR, LOG_DIR + "/archive");
+
+        /**
+         * Determines the polling period for log flushing. Default is <code>250</code>
+         *
+         * @see Names#LOG_FLUSH_PERIOD_MILLIS
+         */
+        int LOG_FLUSH_PERIOD_MILLIS =
+                Integer.parseInt(System.getProperty(Names.LOG_FLUSH_PERIOD_MILLIS, "250"));
 
         /**
          * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is <code>50</code>
