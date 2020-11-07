@@ -85,7 +85,7 @@ public class CoalescingRecordListener implements IRecordListener
      * 
      * @author Ramon Servadei
      */
-    public static interface ICoalescingStrategy
+    public interface ICoalescingStrategy
     {
 
         /**
@@ -93,7 +93,7 @@ public class CoalescingRecordListener implements IRecordListener
          * 
          * @param name
          *            the record name that has had a coalescable event
-         * @param coalescingRecordListener
+         * @param coalescingListener
          *            reference to the coalescing listener that holds pending updates for the record
          */
         void handle(String name, CoalescingRecordListener coalescingListener);

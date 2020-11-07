@@ -134,26 +134,9 @@ public class Publisher
      *
      * @see ISystemRecordNames
      */
+    // todo make lazy
     static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
             ThreadUtils.newPermanentScheduledExecutorService("system-record-publisher", 1);
-
-    /**
-     * Single-thread executor for handling inbound subscriptions to throttle handling. This prevents
-     * flooding the network with images from a batch subscribe.
-     */
-    static final ScheduledExecutorService SUBSCRIBE_THROTTLE =
-            ThreadUtils.newPermanentScheduledExecutorService("subscribe-throttle", 1);
-
-    /**
-     * Marks a runnable as a subscribe task and thus a pause is made by the subscribe throttle after
-     * sending
-     *
-     * @author Ramon Servadei
-     */
-    private interface ISubscribeTask extends Runnable
-    {
-
-    }
 
     final Object lock;
     final AtomicLong subscribeCounter = new AtomicLong();
@@ -861,10 +844,6 @@ public class Publisher
     long messagesPublished;
     long bytesPublished;
 
-    final List<Runnable> subscribeTasks;
-    final Runnable throttleTask;
-    volatile boolean throttleRunning;
-
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
      * {@link ProxyContext} objects.
@@ -904,35 +883,6 @@ public class Publisher
                 new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
         this.connectionsRecord =
                 Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
-
-        this.subscribeTasks = new LinkedList<>();
-        this.throttleTask = () -> {
-            this.throttleRunning = false;
-
-            Runnable task = null;
-            int size;
-            do
-            {
-                synchronized (this.subscribeTasks)
-                {
-                    size = this.subscribeTasks.size();
-                    if (size > 0)
-                    {
-                        task = this.subscribeTasks.remove(0);
-                    }
-                    size--;
-                }
-                if (task != null)
-                {
-                    task.run();
-                }
-                if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
-                {
-                    LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
-                }
-            }
-            while (size > 0);
-        };
 
         this.mainCodec = codec;
         this.server =
@@ -1223,14 +1173,26 @@ public class Publisher
                         Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
-        synchronized (this.subscribeTasks)
+        this.context.executeSequentialCoreTask(new ISequentialRunnable()
         {
-            for (final String name : recordNames)
+            @Override
+            public Object context()
             {
-                this.subscribeTasks.add((ISubscribeTask) () -> proxyContextPublisher.resync(name));
+                return Publisher.this;
             }
-        }
-        triggerThrottle();
+
+            @Override
+            public void run()
+            {
+                recordNames.forEach(n -> {
+                    proxyContextPublisher.resync(n);
+                    if (DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
+                    {
+                        LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
+                    }
+                });
+            }
+        });
     }
 
     void subscribe(final List<String> recordNames, final ITransportChannel client)
@@ -1362,15 +1324,6 @@ public class Publisher
     public TransportTechnologyEnum getTransportTechnology()
     {
         return this.transportTechnology;
-    }
-
-    private void triggerThrottle()
-    {
-        if (!this.throttleRunning)
-        {
-            this.throttleRunning = true;
-            SUBSCRIBE_THROTTLE.execute(this.throttleTask);
-        }
     }
 
     public void disconnectClients(String reason, Function<String, Boolean> connectionIdentityCheck)
