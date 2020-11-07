@@ -868,15 +868,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
 
-            try
-            {
-                this.agentExecutor.shutdownNow();
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not shutdown executor", e);
-            }
-
             this.registryConnectionMonitor.destroy();
 
             try
@@ -943,6 +934,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             catch (Exception e)
             {
                 Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
+            }
+
+            try
+            {
+                this.agentExecutor.shutdownNow();
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not shutdown executor", e);
             }
         }
         finally
@@ -1204,21 +1204,25 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     private void reRegisterServiceIfConnectedToRegistry(String serviceInstanceId)
     {
-        if (this.registryConnectionState.get() == CONNECTED)
+        if (this.localPlatformServiceInstances.get(serviceInstanceId) != null)
         {
-            this.agentExecutor.execute(() -> {
-                final PlatformServiceInstance serviceInstance =
-                        this.localPlatformServiceInstances.get(serviceInstanceId);
-                if (serviceInstance != null)
-                {
-                    Log.log(this, "Re-registering ", serviceInstanceId);
-                    registerServiceWithRetry(serviceInstance, null);
-                }
-            });
-        }
-        else
-        {
-            Log.log(this, "Not connected to registry, won't re-register ", serviceInstanceId);
+            if (this.registryConnectionState.get() == CONNECTED)
+            {
+                this.agentExecutor.execute(() -> {
+                    // check again incase its removed
+                    final PlatformServiceInstance serviceInstance =
+                            this.localPlatformServiceInstances.get(serviceInstanceId);
+                    if (serviceInstance != null)
+                    {
+                        Log.log(this, "Re-registering ", serviceInstanceId);
+                        registerServiceWithRetry(serviceInstance, null);
+                    }
+                });
+            }
+            else
+            {
+                Log.log(this, "Not connected to registry, won't re-register ", serviceInstanceId);
+            }
         }
     }
     
