@@ -550,7 +550,7 @@ public class Publisher
             {
                 this.statsUpdateTask.cancel(false);
             }
-            this.statsUpdateTask = Publisher.this.context.getUtilityExecutor().schedule(new Runnable()
+            this.statsUpdateTask = ThreadUtils.UTILS_EXECUTOR.schedule(new Runnable()
             {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
@@ -624,7 +624,7 @@ public class Publisher
                     if (ProxyContextPublisher.this.active)
                     {
                         ProxyContextPublisher.this.statsUpdateTask =
-                                Publisher.this.context.getUtilityExecutor().schedule(this,
+                                ThreadUtils.UTILS_EXECUTOR.schedule(this,
                                         Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2,
                                         TimeUnit.MILLISECONDS);
                     }
@@ -794,7 +794,7 @@ public class Publisher
             {
                 // log first 200 bytes that are sent
                 Log.log(ProxyContextPublisher.this, "(->) ",
-                        new String(toSend, 0, (toSend.length < 200 ? toSend.length : 200)),
+                        new String(toSend, 0, (Math.min(toSend.length, 200))),
                         (toSend.length < 200 ? "" : "...(truncated)"));
             }
             return this.channel.send(this.codec.finalEncode(toSend));
@@ -879,8 +879,7 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new Object();
-        this.proxyContextPublishers =
-                new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
+        this.proxyContextPublishers = new ConcurrentHashMap<>();
         this.connectionsRecord =
                 Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
@@ -1066,38 +1065,40 @@ public class Publisher
         {
             this.contextConnectionsRecordPublishTask.cancel(false);
         }
+        final Runnable contextConnectionsPublishTask = new Runnable()
+        {
+            CountDownLatch publishAtomicChange = new CountDownLatch(0);
+
+            @Override
+            public void run()
+            {
+                if (this.publishAtomicChange.getCount() == 0)
+                {
+                    synchronized (Publisher.this.proxyContextPublishers)
+                    {
+                        // check each connection is still active - remove if not
+                        final Set<String> connectionIds =
+                                new HashSet<>(Publisher.this.connectionsRecord.getSubMapKeys());
+                        final Set<ITransportChannel> channels =
+                                Publisher.this.proxyContextPublishers.keySet();
+                        for (ITransportChannel channel : channels)
+                        {
+                            connectionIds.remove(getTransmissionStatisticsFieldName(channel));
+                        }
+                        for (String connectionId : connectionIds)
+                        {
+                            Publisher.this.connectionsRecord.removeSubMap(connectionId);
+                        }
+                    }
+
+                    this.publishAtomicChange = Publisher.this.context.publishAtomicChange(
+                            ISystemRecordNames.CONTEXT_CONNECTIONS);
+                }
+            }
+        };
         this.contextConnectionsRecordPublishTask =
-                this.context.getUtilityExecutor().scheduleWithFixedDelay(new Runnable()
-                                                                         {
-                                                                             CountDownLatch publishAtomicChange = new CountDownLatch(0);
-
-                                                                             @Override
-                                                                             public void run()
-                                                                             {
-                                                                                 if (this.publishAtomicChange.getCount() == 0)
-                                                                                 {
-                                                                                     synchronized (Publisher.this.proxyContextPublishers)
-                                                                                     {
-                                                                                         // check each connection is still active - remove if not
-                                                                                         final Set<String> connectionIds =
-                                                                                                 new HashSet<>(Publisher.this.connectionsRecord.getSubMapKeys());
-                                                                                         final Set<ITransportChannel> channels =
-                                                                                                 Publisher.this.proxyContextPublishers.keySet();
-                                                                                         for (ITransportChannel channel : channels)
-                                                                                         {
-                                                                                             connectionIds.remove(getTransmissionStatisticsFieldName(channel));
-                                                                                         }
-                                                                                         for (String connectionId : connectionIds)
-                                                                                         {
-                                                                                             Publisher.this.connectionsRecord.removeSubMap(connectionId);
-                                                                                         }
-                                                                                     }
-
-                                                                                     this.publishAtomicChange = Publisher.this.context.publishAtomicChange(
-                                                                                             ISystemRecordNames.CONTEXT_CONNECTIONS);
-                                                                                 }
-                                                                             }
-                                                                         }, this.contextConnectionsRecordPublishPeriodMillis,
+                ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(contextConnectionsPublishTask,
+                        this.contextConnectionsRecordPublishPeriodMillis,
                         this.contextConnectionsRecordPublishPeriodMillis, TimeUnit.MILLISECONDS);
 
         // reschedule the stats update tasks at the new period

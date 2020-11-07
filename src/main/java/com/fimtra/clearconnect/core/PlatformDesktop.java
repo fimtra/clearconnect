@@ -73,6 +73,7 @@ import com.fimtra.datafission.ui.RowOrientedRecordTable;
 import com.fimtra.datafission.ui.RowOrientedRecordTableModel;
 import com.fimtra.lf.FimtraTableHeaderUI;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ThreadUtils;
@@ -424,11 +425,27 @@ public class PlatformDesktop
                     PlatformMetaDataViewEnum.recordSubscriptionViews.remove(this.metaDataViewKey);
                 }
 
-                this.context.getUtilityExecutor().execute(() -> {
-                    this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
-                    this.context.removeObserver(this.model, this.subscribedRecords.toArray(new String[0]));
-                    this.model.removeRecordRemovedListener(this.context);
-                    PlatformMetaDataViewEnum.deregister(this.context, this.model);
+                this.context.executeSequentialCoreTask(new ISequentialRunnable()
+                {
+                    @Override
+                    public Object context()
+                    {
+                        return RecordSubscriptionView.this;
+                    }
+
+                    @Override
+                    public void run()
+                    {
+                        RecordSubscriptionView.this.context.removeObserver(
+                                RecordSubscriptionView.this.statusObserver,
+                                ISystemRecordNames.CONTEXT_STATUS);
+                        RecordSubscriptionView.this.context.removeObserver(RecordSubscriptionView.this.model,
+                                RecordSubscriptionView.this.subscribedRecords.toArray(new String[0]));
+                        RecordSubscriptionView.this.model.removeRecordRemovedListener(
+                                RecordSubscriptionView.this.context);
+                        PlatformMetaDataViewEnum.deregister(RecordSubscriptionView.this.context,
+                                RecordSubscriptionView.this.model);
+                    }
                 });
             }
         }
@@ -650,10 +667,22 @@ public class PlatformDesktop
             this.metaDataViewType.deregister(this.model);
             this.table.setComponentPopupMenu(null);
 
-            this.context.getUtilityExecutor().execute(() -> {
-                this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
-                this.model.removeRecordRemovedListener(this.context);
-                PlatformMetaDataViewEnum.deregister(this.context, this.model);
+            this.context.executeSequentialCoreTask(new ISequentialRunnable()
+            {
+                @Override
+                public Object context()
+                {
+                    return MetaDataView.this;
+                }
+
+                @Override
+                public void run()
+                {
+                    MetaDataView.this.context.removeObserver(MetaDataView.this.statusObserver,
+                            ISystemRecordNames.CONTEXT_STATUS);
+                    MetaDataView.this.model.removeRecordRemovedListener(MetaDataView.this.context);
+                    PlatformMetaDataViewEnum.deregister(MetaDataView.this.context, MetaDataView.this.model);
+                }
             });
         }
 

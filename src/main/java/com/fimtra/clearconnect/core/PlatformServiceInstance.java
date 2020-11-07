@@ -59,6 +59,7 @@ import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
@@ -149,7 +150,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
 
         // update service stats periodically
-        this.statsUpdateTask = this.context.getUtilityExecutor().scheduleWithFixedDelay(
+        this.statsUpdateTask = ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(
             new Runnable()
         {
             long lastMessagesPublished = 0;
@@ -169,11 +170,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 }
 
                 final long nanoTime = System.nanoTime();
-                // can be null on the first call
-                final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                    : PlatformServiceInstance.this.publisher.getMessagesPublished();
-                final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                    : PlatformServiceInstance.this.publisher.getBytesPublished();
+                final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
+                final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
 
                 final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
                 final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
@@ -482,19 +480,30 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void addFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(() -> {
-            PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
-            if (PlatformServiceInstance.this.isFtMasterInstance != null)
+        this.context.executeSequentialCoreTask(new ISequentialRunnable()
+        {
+            @Override
+            public Object context()
             {
-                if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
+                return PlatformServiceInstance.this;
+            }
+
+            @Override
+            public void run()
+            {
+                PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
+                if (PlatformServiceInstance.this.isFtMasterInstance != null)
                 {
-                    ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
-                        PlatformServiceInstance.this.serviceMember);
-                }
-                else
-                {
-                    ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
-                        PlatformServiceInstance.this.serviceMember);
+                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
+                    {
+                        ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
+                                PlatformServiceInstance.this.serviceMember);
+                    }
+                    else
+                    {
+                        ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
+                                PlatformServiceInstance.this.serviceMember);
+                    }
                 }
             }
         });
@@ -503,8 +512,20 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void removeFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(
-                () -> PlatformServiceInstance.this.ftStatusListeners.remove(ftStatusListener));
+        this.context.executeSequentialCoreTask(new ISequentialRunnable()
+        {
+            @Override
+            public Object context()
+            {
+                return PlatformServiceInstance.this;
+            }
+
+            @Override
+            public void run()
+            {
+                PlatformServiceInstance.this.ftStatusListeners.remove(ftStatusListener);
+            }
+        });
     }
 
     @Override
@@ -542,7 +563,20 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.context.getUtilityExecutor().execute(() -> doSetFtState(isMaster));
+            this.context.executeSequentialCoreTask(new ISequentialRunnable()
+            {
+                @Override
+                public Object context()
+                {
+                    return PlatformServiceInstance.this;
+                }
+
+                @Override
+                public void run()
+                {
+                    doSetFtState(isMaster);
+                }
+            });
         }
     }
 
