@@ -33,6 +33,7 @@ import java.util.Map;
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.TransportTechnologyEnum;
+import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 
@@ -113,24 +114,33 @@ public abstract class TcpChannelUtils
     /**
      * Handles socket read operations for {@link TcpChannel} instances.
      */
-    static final SelectorProcessor[] READER;
-    private static int currentReader = 0;
-    static
-    {
-        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
-        for (int i = 0; i < READER.length; i++)
-        {
-            READER[i] = new SelectorProcessor("tcp-channel-reader-" + i, SelectionKey.OP_READ);
-        }
-    }
+    static final SelectorProcessor[]  READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
+    private static int currentReader = -1;
 
     static synchronized SelectorProcessor nextReader()
     {
-        if (currentReader == READER.length)
+        if (++currentReader == READER.length)
         {
             currentReader = 0;
         }
-        return READER[currentReader++];
+        SelectorProcessor reader = READER[currentReader];
+        if (reader == null)
+        {
+            reader = new SelectorProcessor("tcp-channel-reader-" + currentReader, SelectionKey.OP_READ);
+            READER[currentReader] = reader;
+        }
+        return reader;
+    }
+
+    static synchronized void freeReader(SelectorProcessor reader)
+    {
+        for (int i = 0; i < READER.length; i++)
+        {
+            if (reader == READER[i])
+            {
+                currentReader = i - 1;
+            }
+        }
     }
 
     /**

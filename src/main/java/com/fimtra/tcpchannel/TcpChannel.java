@@ -717,6 +717,8 @@ public class TcpChannel implements ITransportChannel
                 this.reader.cancel(this.socketChannel);
             }
 
+            TcpChannelUtils.freeReader(this.reader);
+
             this.receiver.onChannelClosed(this);
         }
         catch (Exception e1)

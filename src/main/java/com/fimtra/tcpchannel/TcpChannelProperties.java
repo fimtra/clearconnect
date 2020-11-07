@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,18 +17,19 @@ package com.fimtra.tcpchannel;
 
 import java.net.Socket;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 
 /**
  * Defines the properties and property keys used by TcpChannel
- * 
+ *
  * @author Ramon Servadei
  */
 public abstract class TcpChannelProperties
 {
     /**
      * The names of the properties
-     * 
+     *
      * @author Ramon Servadei
      */
     public interface Names
@@ -79,7 +80,7 @@ public abstract class TcpChannelProperties
         /**
          * The system property name to define whether TCP server sockets can re-use an address.<br>
          * E.g. <code>-DtcpChannel.serverSocketReuseAddr=true</code>
-         * 
+         *
          * @see Socket#setReuseAddress(boolean)
          */
         String SERVER_SOCKET_REUSE_ADDR = BASE + "serverSocketReuseAddr";
@@ -121,7 +122,7 @@ public abstract class TcpChannelProperties
          * Use a value of 0 to mean no send queue threshold is in use.
          * <p>
          * E.g. <code>-DtcpChannel.sendQueueThreshold=10000</code>
-         * 
+         *
          * @see #SEND_QUEUE_THRESHOLD_BREACH_MILLIS
          */
         String SEND_QUEUE_THRESHOLD = BASE + "sendQueueThreshold";
@@ -131,12 +132,11 @@ public abstract class TcpChannelProperties
          * threshold to be breached before destroying the socket.
          * <p>
          * E.g. <code>-DtcpChannel.sendQueueThresholdBreachMillis=30000</code>
-         * 
+         *
          * @see #SEND_QUEUE_THRESHOLD
          */
-        String SEND_QUEUE_THRESHOLD_BREACH_MILLIS =
-            BASE + "sendQueueThresholdBreachMillis";
-        
+        String SEND_QUEUE_THRESHOLD_BREACH_MILLIS = BASE + "sendQueueThresholdBreachMillis";
+
         /**
          * The system property name to define the number of threads to use for TCP socket reading.
          * <p>
@@ -149,7 +149,7 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.writerThreadCount=4</code>
          */
         String WRITER_THREAD_COUNT = BASE + "writerThreadCount";
-        
+
         /**
          * The system property name to define the maximum size of the pool to hold re-usable tx
          * fragment objects.
@@ -157,7 +157,7 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.txFragmentPoolMaxSize=1000</code>
          */
         String TX_FRAGMENT_POOL_MAX_SIZE = BASE + "txFragmentPoolMaxSize";
-        
+
         /**
          * The system property name to define the maximum size of the pool to hold re-usable rx
          * fragment objects.
@@ -165,7 +165,7 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.rxFragmentPoolMaxSize=32</code>
          */
         String RX_FRAGMENT_POOL_MAX_SIZE = BASE + "rxFragmentPoolMaxSize";
-        
+
         /**
          * The system property name to define the maximum size of the pool to hold re-usable frame
          * resolver objects.
@@ -173,14 +173,14 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.rxFrameResolverPoolMaxSize=1000</code>
          */
         String RX_FRAME_RESOLVER_POOL_MAX_SIZE = BASE + "rxFrameResolverPoolMaxSize";
-        
+
         /**
          * The system property name to define the range start for ephemeral ports.
          * <p>
          * E.g. <code>-DtcpChannel.ephemeralPortRangeStart=22222</code>
          */
         String EPHEMERAL_PORT_RANGE_START = BASE + "ephemeralPortRangeStart";
-        
+
         /**
          * The system property name to define the range end for ephemeral ports.
          * <p>
@@ -191,56 +191,57 @@ public abstract class TcpChannelProperties
 
     /**
      * The values of the properties described in {@link Names}
-     * 
+     *
      * @author Ramon Servadei
      */
     public interface Values
     {
         /**
          * The frame encoding, default is TERMINATOR_BASED.
-         * 
+         *
          * @see Names#PROPERTY_NAME_FRAME_ENCODING
          */
-        TcpChannel.FrameEncodingFormatEnum FRAME_ENCODING =
-            TcpChannel.FrameEncodingFormatEnum.valueOf(System.getProperty(Names.PROPERTY_NAME_FRAME_ENCODING,
-                TcpChannel.FrameEncodingFormatEnum.TERMINATOR_BASED.toString()));
+        TcpChannel.FrameEncodingFormatEnum FRAME_ENCODING = TcpChannel.FrameEncodingFormatEnum.valueOf(
+                System.getProperty(Names.PROPERTY_NAME_FRAME_ENCODING,
+                        TcpChannel.FrameEncodingFormatEnum.TERMINATOR_BASED.toString()));
 
         /**
          * The receive buffer size, default is 65k.
-         * 
+         *
          * @see Names#PROPERTY_NAME_RX_BUFFER_SIZE
          */
-        int RX_BUFFER_SIZE = Integer.parseInt(System.getProperty(Names.PROPERTY_NAME_RX_BUFFER_SIZE, "65535"));
+        int RX_BUFFER_SIZE =
+                Integer.parseInt(System.getProperty(Names.PROPERTY_NAME_RX_BUFFER_SIZE, "65535"));
 
         /**
          * The send buffer size, default is 1k.
-         * 
+         *
          * @see Names#PROPERTY_NAME_TX_BUFFER_SIZE
          */
         int TX_SEND_SIZE = Integer.parseInt(System.getProperty(Names.PROPERTY_NAME_TX_BUFFER_SIZE, "1024"));
 
         /**
          * The default server socket re-use address value, default is <code>true</code>.
-         * 
+         *
          * @see Names#SERVER_SOCKET_REUSE_ADDR
          */
         boolean SERVER_SOCKET_REUSE_ADDR =
                 Boolean.valueOf(System.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, "true")).booleanValue();
-        
+
         /**
          * The default for server connection logging, default is <code>true</code>.
-         * 
+         *
          * @see Names#SERVER_CONNECTION_LOGGING
          */
         boolean SERVER_CONNECTION_LOGGING =
-            Boolean.valueOf(System.getProperty(Names.SERVER_CONNECTION_LOGGING, "true")).booleanValue();
+                Boolean.valueOf(System.getProperty(Names.SERVER_CONNECTION_LOGGING, "true")).booleanValue();
 
         /**
          * The threshold value for logging when RX frame handling is slow, in nanos. This is
          * important to identify potential performance problems for TCP RX handling.
          * <p>
          * Default is: 10000000 (10ms)
-         * 
+         *
          * @see Names#SLOW_RX_FRAME_THRESHOLD_NANOS
          */
         long SLOW_RX_FRAME_THRESHOLD_NANOS =
@@ -251,11 +252,11 @@ public abstract class TcpChannelProperties
          * important to identify potential performance problems for TCP TX handling.
          * <p>
          * Default is: 10000000 (10ms)
-         * 
+         *
          * @see Names#SLOW_TX_FRAME_THRESHOLD_NANOS
          */
         long SLOW_TX_FRAME_THRESHOLD_NANOS =
-            Long.parseLong(System.getProperty(Names.SLOW_TX_FRAME_THRESHOLD_NANOS, "10000000"));
+                Long.parseLong(System.getProperty(Names.SLOW_TX_FRAME_THRESHOLD_NANOS, "10000000"));
 
         /**
          * The value for the minimum alive time, in milliseconds, for a socket before it is
@@ -265,7 +266,7 @@ public abstract class TcpChannelProperties
          * Default is: 100
          */
         long SLS_MIN_SOCKET_ALIVE_TIME_MILLIS =
-            Long.parseLong(System.getProperty(Names.SLS_MIN_SOCKET_ALIVE_TIME_MILLIS, "100"));
+                Long.parseLong(System.getProperty(Names.SLS_MIN_SOCKET_ALIVE_TIME_MILLIS, "100"));
 
         /**
          * The blacklist timeout, in milliseconds, for an IP after it has exceeded the number of
@@ -273,7 +274,8 @@ public abstract class TcpChannelProperties
          * <p>
          * Default is: 300000 (5 minutes)
          */
-        int SLS_BLACKLIST_TIME_MILLIS = Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "300000"));
+        int SLS_BLACKLIST_TIME_MILLIS =
+                Integer.parseInt(System.getProperty(Names.SLS_BLACKLIST_TIME_MILLIS, "300000"));
 
         /**
          * The maximum short-lived sockets from an IP before it is blacklisted.
@@ -281,7 +283,7 @@ public abstract class TcpChannelProperties
          * Default is: 3
          */
         int SLS_MAX_SHORT_LIVED_SOCKET_TRIES =
-            Integer.parseInt(System.getProperty(Names.SLS_MAX_SHORT_LIVED_SOCKET_TRIES, "3"));
+                Integer.parseInt(System.getProperty(Names.SLS_MAX_SHORT_LIVED_SOCKET_TRIES, "3"));
 
         /**
          * The size of the TX queue that causes the socket to be destroyed from the sender side
@@ -299,56 +301,63 @@ public abstract class TcpChannelProperties
          * Default is 10000 (10 secs)
          */
         long SEND_QUEUE_THRESHOLD_BREACH_MILLIS =
-            Long.parseLong(System.getProperty(Names.SEND_QUEUE_THRESHOLD_BREACH_MILLIS, "10000"));
- 
+                Long.parseLong(System.getProperty(Names.SEND_QUEUE_THRESHOLD_BREACH_MILLIS, "10000"));
+
         /**
          * The number of threads to use for TCP socket reading.
          * <p>
-         * Default is: 4
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
          */
-        int READER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.READER_THREAD_COUNT, "4"));
+        int READER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.READER_THREAD_COUNT,
+                "" + DataFissionProperties.Values.CORE_THREAD_COUNT));
 
         /**
          * The number of threads to use for TCP socket writing.
          * <p>
-         * Default is: 4
+         * Default is:  {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
          */
-        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT, "4"));
-        
+        int WRITER_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.WRITER_THREAD_COUNT,
+                "" + DataFissionProperties.Values.CORE_THREAD_COUNT));
+
         /**
          * The maximum size of the pool to hold re-usable tx fragment objects.
          * <p>
          * Default is: 1000
          */
-        int TX_FRAGMENT_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.TX_FRAGMENT_POOL_MAX_SIZE, "1000"));
-        
+        int TX_FRAGMENT_POOL_MAX_SIZE =
+                Integer.parseInt(System.getProperty(Names.TX_FRAGMENT_POOL_MAX_SIZE, "1000"));
+
         /**
          * The maximum size of the pool to hold re-usable rx fragment objects.
          * <p>
          * Default is: 1000
          */
-        int RX_FRAGMENT_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAGMENT_POOL_MAX_SIZE, "1000"));
-        
+        int RX_FRAGMENT_POOL_MAX_SIZE =
+                Integer.parseInt(System.getProperty(Names.RX_FRAGMENT_POOL_MAX_SIZE, "1000"));
+
         /**
          * The maximum size of the pool to hold re-usable rx frame resolver objects.
          * <p>
          * Default is: 1000
          */
-        int RX_FRAME_RESOLVER_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
+        int RX_FRAME_RESOLVER_POOL_MAX_SIZE =
+                Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
 
         /**
          * The system property name to define the range start for ephemeral ports.
          * <p>
          * Default is: -1 (no range)
          */
-        int EPHEMERAL_PORT_RANGE_START = Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_START, "-1"));
-        
+        int EPHEMERAL_PORT_RANGE_START =
+                Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_START, "-1"));
+
         /**
          * The system property name to define the range end for ephemeral ports.
          * <p>
          * Default is: -1 (no range)
          */
-        int EPHEMERAL_PORT_RANGE_END = Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_END, "-1"));
+        int EPHEMERAL_PORT_RANGE_END =
+                Integer.parseInt(System.getProperty(Names.EPHEMERAL_PORT_RANGE_END, "-1"));
     }
 
     private TcpChannelProperties()
