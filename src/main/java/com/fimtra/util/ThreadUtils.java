@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,7 +50,22 @@ public abstract class ThreadUtils
                 @Override
                 public void uncaughtException(Thread t, Throwable e)
                 {
-                    Log.log(this, "Thread: " + t.getName(), e);
+                    try
+                    {
+                        Log.log(this, "Thread: " + t.getName(), e);
+                    }
+                    catch (Throwable problem)
+                    {
+                        final StringWriter stringWriter = new StringWriter(1024);
+                        try (final PrintWriter pw = new PrintWriter(stringWriter);)
+                        {
+                            pw.println("Could not log uncaught exception in thread: " + t.getName());
+                            e.printStackTrace(pw);
+                            pw.print("Exception that occurred when trying to log this: ");
+                            problem.printStackTrace(pw);
+                        }
+                        System.err.println(stringWriter.toString());
+                    }
                 }
             };
 

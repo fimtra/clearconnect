@@ -238,12 +238,13 @@ public abstract class Log
     public static void log(Object source, String message, Throwable t)
     {
         final StringWriter stringWriter = new StringWriter(1024);
-        final PrintWriter pw = new PrintWriter(stringWriter);
-        pw.println();
-        t.printStackTrace(pw);
-        final LogMessage logMessage =
-                new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
-        log(logMessage);
+        try (final PrintWriter pw = new PrintWriter(stringWriter);)
+        {
+            pw.println();
+            t.printStackTrace(pw);
+            final LogMessage logMessage = new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
+            log(logMessage);
+        }
     }
 
     private static void log(final LogMessage message)
