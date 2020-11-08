@@ -55,7 +55,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         final File file = FileUtils.createLogFile_yyyyMMddHHmmss(directory, filePrefix);
         try
         {
-            return new RollingFileAppender(file, 1024 * 1024);
+            return new RollingFileAppender(file, UtilProperties.Values.LOG_FILE_ROLL_SIZE_KB * 1024);
         }
         catch (IOException e)
         {

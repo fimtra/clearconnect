@@ -58,6 +58,12 @@ public abstract class UtilProperties
         String LOG_FLUSH_PERIOD_MILLIS = BASE + "logFlushPeriodMillis";
 
         /**
+         * The system property key that defines the log file limit before it is rolled.<br>
+         * E.g. <code>-Dutil.logFileRoleSizeKb=4096</code>
+         */
+        String LOG_FILE_ROLL_SIZE_KB = BASE + "logFileRoleSizeKb";
+
+        /**
          * The system property name to define if log messages are written to std.err (in addition to
          * the log file). <br>
          * <b>This is done using a dedicated executor so should not block application performance.</b><br>
@@ -162,6 +168,14 @@ public abstract class UtilProperties
          */
         int LOG_FLUSH_PERIOD_MILLIS =
                 Integer.parseInt(System.getProperty(Names.LOG_FLUSH_PERIOD_MILLIS, "250"));
+
+        /**
+         * The size limit when a log file is rolled to a new one. Default is 4096<br>
+         *
+         * @see Names#LOG_FILE_ROLL_SIZE_KB
+         */
+        int LOG_FILE_ROLL_SIZE_KB =
+                Integer.parseInt(System.getProperty(Names.LOG_FILE_ROLL_SIZE_KB, "4096"));
 
         /**
          * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is <code>50</code>
