@@ -274,7 +274,7 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.eventHandler.monitoredServiceInstances);
         checkZeroSize(this.candidate.eventHandler.pendingMasterInstancePerFtService);
         checkZeroSize(this.candidate.eventHandler.confirmedMasterInstancePerFtService);
-        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices); // todo failing here
+        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
         checkZeroSize(this.candidate.eventHandler.connectionMonitors);
 
         // need to wait for connections to be destroyed?
