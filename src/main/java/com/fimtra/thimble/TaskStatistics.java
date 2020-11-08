@@ -34,6 +34,9 @@ import com.fimtra.util.AtomicOp;
  */
 public final class TaskStatistics
 {
+    private final Runnable itemSubmittedTask = () -> this.currentSubmitted++;
+    private final Runnable itemExecutedTask = () -> this.currentExecuted++;
+
     private final Object context;
     private long currentSubmitted, currentExecuted;
     private long intervalSubmitted, intervalExecuted;
@@ -87,12 +90,12 @@ public final class TaskStatistics
 
     void itemSubmitted()
     {
-        this.atomicOp.execute(() -> this.currentSubmitted++);
+        this.atomicOp.execute(this.itemSubmittedTask);
     }
 
     void itemExecuted()
     {
-        this.atomicOp.execute(() -> this.currentExecuted++);
+        this.atomicOp.execute(this.itemExecutedTask);
     }
 
     /**
