@@ -373,21 +373,25 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
             setupRuntimeAttributePublishing();
 
-            // (re)publish any service instances managed by this agent
-            PlatformServiceInstance platformServiceInstance;
-            for (final Iterator<Map.Entry<String, PlatformServiceInstance>> it =
-                 this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext(); )
-            {
-                platformServiceInstance = it.next().getValue();
-                Log.log(this, "Preparing to register ", ObjectUtils.safeToString(platformServiceInstance));
-                registerServiceWithRetry(platformServiceInstance, it::remove);
-            }
-
             startRegistryConnectionMonitor();
         }
         finally
         {
             this.createLock.unlock();
+        }
+
+        // This must happen OUTSIDE the create lock else the lock is held whilst waiting for results
+        // of RPC registration which can block the registry trying to call the ftServiceInstanceStatus RPC
+        // on the service (presumably the thread handling the registry connect was also the context for
+        // handling RPC discovery from the registry)
+
+        // (re)publish any service instances managed by this agent
+        for (final Iterator<Map.Entry<String, PlatformServiceInstance>> it =
+             this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext(); )
+        {
+            PlatformServiceInstance platformServiceInstance = it.next().getValue();
+            Log.log(this, "Preparing to register ", ObjectUtils.safeToString(platformServiceInstance));
+            registerServiceWithRetry(platformServiceInstance, it::remove);
         }
     }
 
@@ -868,6 +872,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
 
+            try
+            {
+                this.registryProxy.destroy();
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
+            }
+
+            this.registryConnectionState.set(DISCONNECTED);
+
             this.registryConnectionMonitor.destroy();
 
             try
@@ -925,15 +940,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 {
                     Log.log(this, "Could not destroy " + ObjectUtils.safeToString(service), e);
                 }
-            }
-
-            try
-            {
-                this.registryProxy.destroy();
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
             }
 
             try
@@ -1248,7 +1254,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (Exception e)
             {
-                Log.log(this, " (" + Integer.toString(tries) + "/" + Integer.toString(maxTries)
+                Log.log(this, " (" + tries + "/" + maxTries
                         + ") Failed attempt registering " + ObjectUtils.safeToString(platformServiceInstance)
                         + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"), e);
             }
