@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,37 +36,34 @@ import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
- * A ThimbleExecutor is a multi-thread {@link Executor} implementation that supports sequential and
- * coalescing tasks.
+ * A ThimbleExecutor is a multi-thread {@link Executor} implementation that supports sequential and coalescing
+ * tasks.
  * <p>
- * The executor has a thread pool that expands as tasks are needed.
- * Threads that are idle in the pool stay alive for 10 seconds, this idle time adapts to the use of
- * the pool. There will be at least 1 thread running to receive tasks at the expected
- * interval based on the longest gap between tasks submitted.
+ * The executor has a thread pool that expands as tasks are needed. A core number is kept alive. Extra threads
+ * that are idle in the pool stay alive for 10 seconds, this idle time adapts to the use of the pool. The idle
+ * gap will expand if tasks are submitted after the idle period.
  * <p>
- * The idle gap will expand if tasks are submitted after the idle period.
+ * Every 500ms (configurable, see {@link #STALL_PERIOD_CHECK}) all threads are checked for "stalled" status
+ * (i.e. not RUNNING and the queue is increasing). In this state, a new thread is added.
  * <p>
- * New threads are created if the thread count is less than the "core" size OR if all threads are not in a
- * RUNNING state (e.g. blocked). 500ms after a task is submitted, the threads are checked, if all are not
- * RUNNING, a thread is added (which will run this task).
- * <p>
- * Sequential tasks are guaranteed to run in order, sequentially (but may run in different threads).
+ * Sequential tasks are guaranteed to run in order and sequentially (but may run in different threads).
  * Coalescing tasks are tasks where only the latest submitted task needs to be executed (effectively
  * overwriting previously submitted tasks).
  * <p>
  * <b>Sequential and coalescing tasks are mutually exclusive.</b>
  * <p>
- * As an example, if 50,000 sequential tasks for the same context are submitted, then we can expect
- * that the ThimbleExecutor will run all 50,000 tasks in submission order and sequentially. If
- * 50,000 coalescing tasks for the same context are submitted then, depending on performance, we can
- * expect that the ThimbleExecutor will run perhaps only 20,000.
+ * As an example, if 50,000 sequential tasks for the same context are submitted, then we can expect that the
+ * ThimbleExecutor will run all 50,000 tasks in submission order and sequentially. If 50,000 coalescing tasks
+ * for the same context are submitted then, depending on performance, we can expect that the ThimbleExecutor
+ * will run perhaps only 500 (depends on how fast the processing of 1 occurrence of the task is, the faster
+ * its processed, the more occurrences will be processed, but its hard to really beat coalescing like this!).
+ * </p>
  * <p>
- * Statistics for the number of submitted and executed sequential and coalescing tasks can be
- * obtained via the {@link #getSequentialTaskStatistics()} and
- * {@link #getCoalescingTaskStatistics()} methods. The statistics are recomputed on each successive
- * call to these methods. It is up to user code to call these methods periodically. Statistics for
- * the number of submitted and executed tasks (regardless of type) can be obtained via the
- * {@link #getExecutorStatistics()} method.
+ * Statistics for the number of submitted and executed sequential and coalescing tasks can be obtained via the
+ * {@link #getSequentialTaskStatistics()} and {@link #getCoalescingTaskStatistics()} methods. The statistics
+ * are recomputed on each successive call to these methods. It is up to user code to call these methods
+ * periodically. Statistics for the number of submitted and executed tasks (regardless of type) can be
+ * obtained via the {@link #getExecutorStatistics()} method.
  *
  * @author Ramon Servadei
  * @see ISequentialRunnable
@@ -80,15 +76,44 @@ public final class ThimbleExecutor implements IContextExecutor
         return Collections.unmodifiableSet(EXECUTORS);
     }
 
-    static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
-    static final long IDLE_PERIOD_NANOS =
-            Long.parseLong(System.getProperty("thimble.idlePeriodMillis", "10000")) * 1_000_000;
-    static final ScheduledExecutorService ANTI_STALL =
+    private static final Set<ThimbleExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
+
+    private static final Runnable NOOP = () -> {
+    };
+    private static final long IDLE_PERIOD_MILLIS =
+            Long.parseLong(System.getProperty("thimble.idlePeriodMillis", "10000"));
+    private static final int MAX_THREADS = Integer.parseInt(
+            System.getProperty("thimble.maxThreads", "" + Runtime.getRuntime().availableProcessors() * 10));
+
+    private static final int STALL_PERIOD_CHECK =
+            Integer.parseInt(System.getProperty("thimble.stallCheckMillis", "500"));
+    private static final ScheduledExecutorService ANTI_STALL =
             ThreadUtils.newPermanentScheduledExecutorService("anti-stall", 1);
 
+    private static void checkInstances()
+    {
+        try
+        {
+            synchronized (EXECUTORS)
+            {
+                EXECUTORS.forEach(ThimbleExecutor::check);
+            }
+        }
+        catch (Exception e)
+        {
+            Log.log(ThimbleExecutor.class, "Could not trigger stall check");
+        }
+    }
+
+    static
+    {
+        ANTI_STALL.scheduleWithFixedDelay(ThimbleExecutor::checkInstances, STALL_PERIOD_CHECK,
+                STALL_PERIOD_CHECK, TimeUnit.MILLISECONDS);
+    }
+
     /**
-     * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue}
-     * and executing them.
+     * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue} and
+     * executing them.
      *
      * @author Ramon Servadei
      */
@@ -97,14 +122,15 @@ public final class ThimbleExecutor implements IContextExecutor
         final Thread workerThread;
         final Object lock;
         final Integer number;
+        final boolean isCore;
 
-        Runnable task;
+        volatile Runnable task;
         boolean active = true;
-        boolean idle = true;
 
-        TaskRunner(final String name, Integer number)
+        TaskRunner(final String name, Integer number, boolean isCore)
         {
             super();
+            this.isCore = isCore;
             this.number = number;
             this.lock = new Object();
             this.workerThread = ThreadUtils.newDaemonThread(this, name);
@@ -156,22 +182,16 @@ public final class ThimbleExecutor implements IContextExecutor
                 }
                 else
                 {
-                    boolean destroy = false;
+                    long waitTimeNanos = 0;
                     synchronized (this.lock)
                     {
                         if (this.task == null)
                         {
                             try
                             {
-                                final long pauseMillis =
-                                        (long) (ThimbleExecutor.this.idlePeriodNanos * 0.000001d);
-                                final long now = System.nanoTime();
-                                this.lock.wait(pauseMillis);
-
-                                destroy = this.task == null
-                                        // check for "spurious" waking up - check within a factor of 10,
-                                        // so 0.1ms (hence multiply by 100,000, not 1,000,000)
-                                        && System.nanoTime() - now >= pauseMillis * 100_000;
+                                waitTimeNanos = System.nanoTime();
+                                this.lock.wait(this.isCore ? 0 : ThimbleExecutor.this.idlePeriodMillis);
+                                waitTimeNanos = System.nanoTime() - waitTimeNanos;
                             }
                             catch (InterruptedException e)
                             {
@@ -180,17 +200,18 @@ public final class ThimbleExecutor implements IContextExecutor
                         }
                     }
 
-                    if (destroy)
+                    if (toRun == null &&
+                            // check for "spurious" waking up - check within a factor of 10,
+                            // so 0.1ms (hence multiply by 100,000, not 1,000,000)
+                            waitTimeNanos >= ThimbleExecutor.this.idlePeriodMillis * 100_000)
                     {
                         synchronized (ThimbleExecutor.this.taskQueue.lock)
                         {
-                            if (this.idle && ThimbleExecutor.this.taskRunners.size() > 1)
+                            // we could have had a task assigned so check before final destroy
+                            if (this.task == null
+                                    && ThimbleExecutor.this.taskRunners.size() > ThimbleExecutor.this.size)
                             {
-                                destroy();
-                            }
-                            else
-                            {
-                                this.idle = true;
+                                destroy_callWhilstHoldingLock();
                             }
                         }
                     }
@@ -198,16 +219,15 @@ public final class ThimbleExecutor implements IContextExecutor
             }
         }
 
-        void execute(Runnable task)
+        void execute()
         {
             synchronized (this.lock)
             {
-                this.task = task;
                 this.lock.notify();
             }
         }
 
-        void destroy()
+        void destroy_callWhilstHoldingLock()
         {
             this.active = false;
             ThimbleExecutor.this.taskRunnersRef.remove(this);
@@ -215,7 +235,7 @@ public final class ThimbleExecutor implements IContextExecutor
             ThimbleExecutor.this.freeNumbers.push(this.number);
             Collections.sort(ThimbleExecutor.this.freeNumbers);
             // trigger to wake up and stop
-            execute(null);
+            execute();
             removeThreadId(this.workerThread.getId());
         }
     }
@@ -228,10 +248,9 @@ public final class ThimbleExecutor implements IContextExecutor
     final LowGcLinkedList<Integer> freeNumbers;
     private final AtomicInteger threadCounter;
     TaskStatistics stats;
-    long idlePeriodNanos = IDLE_PERIOD_NANOS;
+    long idlePeriodNanos = IDLE_PERIOD_MILLIS * 1_000_000;
+    volatile long idlePeriodMillis = IDLE_PERIOD_MILLIS;
     long lastExecuteTimeNanos = System.nanoTime();
-    Future<?> pendingStallCheck;
-    long lastTriggerRequestTime;
 
     volatile long[] tids = new long[0];
 
@@ -266,9 +285,7 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     /**
-     * Construct the {@link ThimbleExecutor} with a specific thread pool size.
-     *
-     * @param size the internal thread pool size. The thread pool does not shrink or grow.
+     * @see #ThimbleExecutor(String, int)
      */
     public ThimbleExecutor(int size)
     {
@@ -276,11 +293,10 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     /**
-     * Construct the {@link ThimbleExecutor} with a specific thread pool size and name for the
-     * threads.
+     * Construct the {@link ThimbleExecutor} with a thread pool minimum size and name for the threads.
      *
      * @param name the name to use for each thread in the thread pool
-     * @param size the internal thread pool size. The thread pool does not shrink or grow.
+     * @param size the internal core thread pool minimum thread size.
      */
     public ThimbleExecutor(String name, int size)
     {
@@ -301,14 +317,10 @@ public final class ThimbleExecutor implements IContextExecutor
         return "ThimbleExecutor[" + this.name + ":" + this.size + "]";
     }
 
-    long lastCreateTimestampNanos = 0;
-
     @Override
     public void execute(Runnable command)
     {
-        Runnable task = null;
-        TaskRunner runner = null;
-
+        TaskRunner runner;
         final long now = System.nanoTime();
 
         synchronized (this.taskQueue.lock)
@@ -316,9 +328,11 @@ public final class ThimbleExecutor implements IContextExecutor
             final long timeSinceLastExecute = now - this.lastExecuteTimeNanos;
             if (timeSinceLastExecute > this.idlePeriodNanos)
             {
+                final long previousIdlePeriodMillis = this.idlePeriodMillis;
                 this.idlePeriodNanos = (long) (timeSinceLastExecute * 1.5);
-                Log.log(this, this.name + " idle period is now " + (long) (this.idlePeriodNanos * 0.000001d)
-                        + "ms");
+                this.idlePeriodMillis = (long) (this.idlePeriodNanos * 0.000001d);
+                Log.log(this, this.name + " idle period extended from " + previousIdlePeriodMillis + "ms to "
+                        + this.idlePeriodMillis + "ms");
             }
             this.lastExecuteTimeNanos = now;
 
@@ -329,98 +343,84 @@ public final class ThimbleExecutor implements IContextExecutor
             {
                 if (this.taskRunners.size() == 0)
                 {
-                    if (this.taskRunnersRef.size() < this.size || allRunnersStalled())
-                    {
-                        addTaskRunner();
-                    }
-                    else
-                    {
-                        // all runners being used - they will auto-drain the taskQueue
-                        triggerStalledRunnersCheck();
-                        return;
-                    }
+                    check();
+                    // all runners being used - they will auto-drain the taskQueue
+                    return;
                 }
 
                 runner = this.taskRunners.poll();
-                if (runner != null)
-                {
-                    task = this.taskQueue.poll_callWhilstHoldingLock();
-                    runner.idle = false;
-                }
+                runner.task = this.taskQueue.poll_callWhilstHoldingLock();
+            }
+            else
+            {
+                // no taskQueue change (it was a change for a running coalescing/sequential context)
+                // let the runners auto-drain the taskQueue
+                return;
             }
         }
 
         // do the runner execute outside of the task queue lock
-        if (runner != null)
-        {
-            runner.execute(task);
-        }
+        runner.execute();
     }
 
-    private void triggerStalledRunnersCheck()
+    private void check()
     {
-        if (this.pendingStallCheck == null)
+        try
         {
-            this.pendingStallCheck = ANTI_STALL.schedule(() -> {
-                synchronized (this.taskQueue.lock)
+            synchronized (this.taskQueue.lock)
+            {
+                if (!this.taskQueue.isNotDraining_callWhilstHoldingLock())
                 {
-                    this.pendingStallCheck = null;
-                    if (allRunnersStalled())
+                    // if draining, check runners are not all blocked
+                    for (TaskRunner taskRunner : this.taskRunnersRef)
                     {
-                        addTaskRunner();
-                        // dummy task to trigger q draining
-                        execute(() -> {
-                        });
-                    }
-                    else
-                    {
-                        // this covers situations where multiple tasks are submitted within a 500ms window,
-                        // this ensures we always do a check at most 500ms after the last submitted task
-                        // (the other checks within the 500ms are coalesced into 1)
-                        if (System.nanoTime() - this.lastTriggerRequestTime < 500_000_000)
+                        if (taskRunner.task == null
+                                || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
                         {
-                            triggerStalledRunnersCheck();
+                            return;
                         }
                     }
                 }
-            }, 500_000_000, TimeUnit.NANOSECONDS);
-        }
-        this.lastTriggerRequestTime = System.nanoTime();
-    }
 
-    private boolean allRunnersStalled()
-    {
-        for (TaskRunner taskRunner : this.taskRunnersRef)
-        {
-            if (taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
-            {
-                return false;
+                addTaskRunner_callWhilstHoldingLock();
             }
         }
-        return true;
+        catch (Exception e)
+        {
+            Log.log(this, "Could not check " + this.toString(), e);
+        }
     }
 
-    private void addTaskRunner()
+    private void addTaskRunner_callWhilstHoldingLock()
     {
+        // todo check we don't create 1000's of threads
+        final int size = this.taskRunnersRef.size();
+        if (size > MAX_THREADS)
+        {
+            Log.log(this, this.toString() + " maximum thread count exceeded: " + size + "/" + MAX_THREADS);
+            //            System.err.println(this.toString() + " maximum thread count exceeded: " + size + "/" + MAX_THREADS);
+        }
+
         TaskRunner runner;
         Integer number;
         if ((number = this.freeNumbers.poll()) == null)
         {
             number = Integer.valueOf(this.threadCounter.getAndIncrement());
         }
-        runner = new TaskRunner(this.name + "-" + number, number);
+        runner = new TaskRunner(this.name + "-" + number, number, number < this.size);
         this.taskRunnersRef.add(runner);
         this.taskRunners.offerFirst(runner);
-        this.lastCreateTimestampNanos = System.nanoTime();
+        // dummy task to trigger queue draining
+        execute(NOOP);
     }
 
     /**
-     * Get the statistics for the sequential tasks submitted to this {@link ThimbleExecutor}. The
-     * statistics are updated on each successive call to this method (this defines the time interval
-     * for the statistics).
+     * Get the statistics for the sequential tasks submitted to this {@link ThimbleExecutor}. The statistics
+     * are updated on each successive call to this method (this defines the time interval for the
+     * statistics).
      *
-     * @return a Map holding all sequential task context statistics. The statistics objects will be
-     * updated on each successive call to this method.
+     * @return a Map holding all sequential task context statistics. The statistics objects will be updated on
+     * each successive call to this method.
      */
     @Override
     public Map<Object, TaskStatistics> getSequentialTaskStatistics()
@@ -429,12 +429,12 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     /**
-     * Get the statistics for the coalescing tasks submitted to this {@link ThimbleExecutor}. The
-     * statistics are updated on each successive call to this method (this defines the time interval
-     * for the statistics).
+     * Get the statistics for the coalescing tasks submitted to this {@link ThimbleExecutor}. The statistics
+     * are updated on each successive call to this method (this defines the time interval for the
+     * statistics).
      *
-     * @return a Map holding all coalescing task context statistics. The statistics objects will be
-     * updated on each successive call to this method.
+     * @return a Map holding all coalescing task context statistics. The statistics objects will be updated on
+     * each successive call to this method.
      */
     @Override
     public Map<Object, TaskStatistics> getCoalescingTaskStatistics()
@@ -458,7 +458,7 @@ public final class ThimbleExecutor implements IContextExecutor
         {
             for (TaskRunner taskRunner : new ArrayList<>(this.taskRunnersRef))
             {
-                taskRunner.destroy();
+                taskRunner.destroy_callWhilstHoldingLock();
             }
             while (this.taskQueue.poll_callWhilstHoldingLock() != null)
             {
@@ -469,8 +469,8 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     /**
-     * @return the name of the {@link ThimbleExecutor} (this is also what each internal thread name
-     * begins with)
+     * @return the name of the {@link ThimbleExecutor} (this is also what each internal thread name begins
+     * with)
      */
     @Override
     public String getName()

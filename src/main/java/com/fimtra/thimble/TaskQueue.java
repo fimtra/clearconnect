@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,19 +39,19 @@ import com.fimtra.util.SingleThreadReusableObjectPool;
  * contract of sequentially executing tasks.
  * <p>
  * <b>This is thread safe.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 final class TaskQueue
 {
     /** By default, the queue tracks task statistics at a queue level, not at a per-context level */
     private final static boolean GENERATE_STATISTICS_PER_CONTEXT =
-        Boolean.getBoolean("thimble.generateStatisticsPerContext");
+            Boolean.getBoolean("thimble.generateStatisticsPerContext");
 
     private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
-        Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
+            Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
-        Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
+            Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
 
     interface InternalTaskQueue<T> extends Runnable
     {
@@ -63,7 +63,7 @@ final class TaskQueue
     /**
      * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to
      * {@link #run()} will dequeue the next runnable from an internal list and execute it.
-     * 
+     *
      * @author Ramon Servadei
      */
     final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
@@ -157,7 +157,7 @@ final class TaskQueue
     /**
      * Holds all {@link ICoalescingRunnable} objects for the same execution context. Each call to
      * {@link #run()} will execute the latest {@link ICoalescingRunnable} for the context.
-     * 
+     *
      * @author Ramon Servadei
      */
     final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
@@ -239,21 +239,28 @@ final class TaskQueue
     final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;
     final String name;
 
+    /**
+     * Tracks the last not-draining threshold size breach
+     */
+    int lastTriggerSize;
+
     TaskQueue(String name)
     {
         this.name = name;
         this.sequentialTasksPool =
-            new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new, (instance) -> {
-                instance.context = null;
-                instance.stats = null;
-                instance.active = false;
-            }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
+                new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new,
+                        (instance) -> {
+                            instance.context = null;
+                            instance.stats = null;
+                            instance.active = false;
+                        }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
         this.coalescingTasksPool =
-            new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new, (instance) -> {
-                instance.context = null;
-                instance.stats = null;
-                instance.active = false;
-            }, COALESCING_TASKS_MAX_POOL_SIZE);
+                new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new,
+                        (instance) -> {
+                            instance.context = null;
+                            instance.stats = null;
+                            instance.active = false;
+                        }, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
         this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
         this.allSequentialStats = new TaskStatistics("Sequential" + IContextExecutor.QUEUE_LEVEL_STATS);
@@ -355,12 +362,28 @@ final class TaskQueue
     }
 
     /**
+     * @return true if the queue is > 0 and has increased or remained constant since the last call
+     */
+    boolean isNotDraining_callWhilstHoldingLock()
+    {
+        final int currentSize = this.queue.size() + this.coalescingTasksPerContext.size()
+                + this.sequentialTasksPerContext.size();
+        try
+        {
+            return currentSize != 0 && currentSize >= this.lastTriggerSize;
+        }
+        finally
+        {
+            this.lastTriggerSize = currentSize;
+        }
+    }
+
+    /**
      * @return a copy of the internal statistics per sequential task context
      */
     Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats =
-            new HashMap<>(this.sequentialTaskStatsPerContext.size());
+        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.sequentialTaskStatsPerContext.size());
         for (Map.Entry<Object, TaskStatistics> entry : this.sequentialTaskStatsPerContext.entrySet())
         {
             stats.put(entry.getKey(), entry.getValue().intervalFinished());
@@ -373,8 +396,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats =
-            new HashMap<>(this.coalescingTaskStatsPerContext.size());
+        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.coalescingTaskStatsPerContext.size());
         for (Map.Entry<Object, TaskStatistics> entry : this.coalescingTaskStatsPerContext.entrySet())
         {
             stats.put(entry.getKey(), entry.getValue().intervalFinished());

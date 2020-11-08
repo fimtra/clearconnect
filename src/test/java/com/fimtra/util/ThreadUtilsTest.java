@@ -45,6 +45,8 @@ public class ThreadUtilsTest
     @Test
     public void test_registerThreadLocalCleanup() throws InterruptedException
     {
+        int sizeAtStart = ThreadUtils.THREAD_LOCAL_CLEANUP.size();
+
         final CountDownLatch latch = new CountDownLatch(1);
         ThreadLocal<String> tl = ThreadLocal.withInitial(() -> {
             ThreadUtils.registerThreadLocalCleanup(latch::countDown);
@@ -56,7 +58,7 @@ public class ThreadUtilsTest
         t.join();
 
         assertTrue(latch.await(1, TimeUnit.SECONDS));
-        assertEquals(0, ThreadUtils.THREAD_LOCAL_CLEANUP.size());
+        assertEquals(sizeAtStart, ThreadUtils.THREAD_LOCAL_CLEANUP.size());
     }
 
     @Test
