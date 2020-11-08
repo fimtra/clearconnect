@@ -211,7 +211,7 @@ public class ContextTest
         assertTrue("Got: " + result, result.get(name));
         assertFalse("Got: " + result, result.get(name2));
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
-        assertEquals(this.candidate.getRecord(name), observer.images.get(0));
+        assertEquals(this.candidate.getRecord(name), observer.first.get());
 
         Mockito.verify(filter).accept(eq(permissionToken), eq(name));
         Mockito.verify(filter).accept(eq(permissionToken), eq(name2));
@@ -240,7 +240,7 @@ public class ContextTest
         expectedImage.put(K1, V1);
         expectedImage.put(K2, V2);
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
-        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals(expectedImage, observer.first.get());
         assertEquals(2, observer.changes.get(0).getPutEntries().size());
         assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
@@ -266,13 +266,13 @@ public class ContextTest
         Map<String, IValue> putEntries = new HashMap<String, IValue>();
         putEntries.put(K1, V1n);
         putEntries.put(K5, V5);
-        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals(expectedImage, observer.first.get());
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
         
-        assertEquals(expectedImage, observer2.images.get(0));
+        assertEquals(expectedImage, observer2.first.get());
         assertEquals("changes: " + observer2.changes, 1, observer2.changes.size());
         assertEquals(new HashMap<String, IValue>(instance), observer2.changes.get(0).getPutEntries());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
@@ -301,7 +301,7 @@ public class ContextTest
         expectedImage.put(K1, V1);
         expectedImage.put(K2, V2);
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
-        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals(expectedImage, observer.first.get());
         assertEquals(2, observer.changes.get(0).getPutEntries().size());
         assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
@@ -326,7 +326,7 @@ public class ContextTest
         Map<String, IValue> putEntries = new HashMap<String, IValue>();
         putEntries.put(K1, V1n);
         putEntries.put(K5, V5);
-        assertEquals(expectedImage, observer.images.get(0));
+        assertEquals(expectedImage, observer.first.get());
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
@@ -353,14 +353,14 @@ public class ContextTest
 
         final int size = observer.changes.size();
         assertEquals("Got: " + observer.changes, 1, size);
-        assertEquals(expectedMap, observer.images.get(0));
+        assertEquals(expectedMap, observer.first.get());
         assertEquals(2, observer.changes.get(0).getPutEntries().size());
         assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
 
         final int size2 = observer2.changes.size();
         assertEquals("Got: " + observer.changes, 1, size2);
-        assertEquals(expectedMap, observer2.images.get(0));
+        assertEquals(expectedMap, observer2.first.get());
         assertEquals(2, observer2.changes.get(0).getPutEntries().size());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
@@ -377,7 +377,7 @@ public class ContextTest
         assertTrue(latch.await(1, TimeUnit.SECONDS));
 
         assertEquals(1, size);
-        assertEquals(expectedMap, observer.images.get(0));
+        assertEquals(expectedMap, observer.first.get());
         Map<String, IValue> expectedPuts = new HashMap<String, IValue>();
         expectedPuts.put(K2, V2p);
         assertEquals(expectedPuts, observer.changes.get(0).getPutEntries());
@@ -385,7 +385,7 @@ public class ContextTest
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
 
         assertEquals(1, size2);
-        assertEquals(expectedMap, observer2.images.get(0));
+        assertEquals(expectedMap, observer2.first.get());
         assertEquals(expectedPuts, observer2.changes.get(0).getPutEntries());
         assertEquals(1, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());

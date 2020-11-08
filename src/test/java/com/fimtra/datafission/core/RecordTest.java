@@ -833,8 +833,7 @@ public class RecordTest
 
         verifyImageSizes(2, 1);
 
-        this.listener.changes.clear();
-        this.listener.images.clear();
+        this.listener.reset();
 
         // put a duplicate
         subMap.put(K1, V5);

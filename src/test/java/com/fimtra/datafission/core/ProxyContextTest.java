@@ -571,7 +571,7 @@ public class ProxyContextTest
         assertTrue(recordSubscribedLatch.await(timeout, TimeUnit.SECONDS));
 
         this.context.publishAtomicChange(recordName);
-        assertTrue("Got: " + listener.images, listener.latch.await(timeout, TimeUnit.SECONDS));
+        assertTrue("Got: " + listener.current, listener.latch.await(timeout, TimeUnit.SECONDS));
         assertEquals("Got:" + listener.getLatestImage(), 1, listener.getLatestImage().size());
 
         // remove the field
@@ -1365,10 +1365,10 @@ public class ProxyContextTest
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
         assertTrue(recordsDisconnected.await(timeout, TimeUnit.SECONDS));
 
-        int size = contextStatusObserver.images.size();
-        IRecord last = contextStatusObserver.images.get(size - 1);
-        IRecord lastButOne = contextStatusObserver.images.get(size - 2);
-        String message = "Got: " + contextStatusObserver.images;
+        int size = contextStatusObserver.changeTicks.get();
+        IRecord last = contextStatusObserver.current.get();
+        IRecord lastButOne = contextStatusObserver.previous.get();
+        String message = "Got: " + contextStatusObserver.current;
         Connection lastStatus = IStatusAttribute.Utils.getStatus(Connection.class, last);
         Connection lastButOneStatus = IStatusAttribute.Utils.getStatus(Connection.class, lastButOne);
         if (Connection.RECONNECTING.equals(lastStatus))
@@ -1420,10 +1420,10 @@ public class ProxyContextTest
 
         assertTrue("Triggered " + (UPDATE_COUNT - observer.latch.getCount()) + " times",
             observer.latch.await(timeout, TimeUnit.SECONDS));
-        final int size = observer.images.size();
-        assertEquals("Got: " + observer.images, UPDATE_COUNT, size);
+        final int size = observer.changeTicks.get();
+        assertEquals("Got: " + observer.current, UPDATE_COUNT, size);
         int max = UPDATE_COUNT - 1;
-        Map<String, IValue> image = observer.images.get(max);
+        Map<String, IValue> image = observer.current.get();
         assertEquals("Image: " + image, text + max, image.get(key).textValue());
     }
 
