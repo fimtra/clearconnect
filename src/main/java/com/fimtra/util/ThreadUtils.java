@@ -57,7 +57,7 @@ public abstract class ThreadUtils
                     catch (Throwable problem)
                     {
                         final StringWriter stringWriter = new StringWriter(1024);
-                        try (final PrintWriter pw = new PrintWriter(stringWriter);)
+                        try (final PrintWriter pw = new PrintWriter(stringWriter))
                         {
                             pw.println("Could not log uncaught exception in thread: " + t.getName());
                             e.printStackTrace(pw);
