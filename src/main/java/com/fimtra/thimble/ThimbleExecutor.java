@@ -141,17 +141,19 @@ public final class ThimbleExecutor implements IContextExecutor
         @Override
         public void run()
         {
+            Runnable toRun = null;
             while (this.active)
             {
-                if (this.task != null)
+                // note: toRun could be set to a value after a previous run
+                if (toRun != null || (toRun = this.task) != null)
                 {
                     try
                     {
-                        this.task.run();
+                        toRun.run();
                     }
                     catch (Throwable e)
                     {
-                        Log.log(this, "Could not execute " + ObjectUtils.safeToString(this.task), e);
+                        Log.log(this, "Could not execute " + ObjectUtils.safeToString(toRun), e);
                     }
                     finally
                     {
@@ -159,19 +161,19 @@ public final class ThimbleExecutor implements IContextExecutor
                         {
                             try
                             {
-                                if (this.task instanceof TaskQueue.InternalTaskQueue<?>)
+                                if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
                                 {
-                                    ((TaskQueue.InternalTaskQueue<?>) this.task).onTaskFinished();
+                                    ((TaskQueue.InternalTaskQueue<?>) toRun).onTaskFinished();
                                 }
                             }
                             finally
                             {
-                                this.task = null;
+                                toRun = ThimbleExecutor.this.taskQueue.poll_callWhilstHoldingLock();
+                                this.task = toRun;
 
                                 ThimbleExecutor.this.stats.itemExecuted();
 
-                                this.task = ThimbleExecutor.this.taskQueue.poll_callWhilstHoldingLock();
-                                if (this.task == null)
+                                if (toRun == null)
                                 {
                                     // no more tasks so place back into the runners list
                                     ThimbleExecutor.this.taskRunners.offerFirst(TaskRunner.this);
@@ -198,6 +200,7 @@ public final class ThimbleExecutor implements IContextExecutor
                                 // don't care
                             }
                         }
+                        toRun = this.task;
                     }
 
                     if (toRun == null &&
