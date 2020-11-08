@@ -19,16 +19,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.EventListenerUtils;
+import com.fimtra.clearconnect.event.IFtStatusListener;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
@@ -36,9 +39,11 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
+import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -72,14 +77,17 @@ public class PlatformRegistryTest
     @Test
     public void testMultipleConnectionsRestart() throws IOException, InterruptedException
     {
-        final int MAX = 100;
+        final int MAX = 150;
         final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<CountDownLatch>();
         connectedLatch.set(new CountDownLatch(MAX));
         final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<CountDownLatch>();
         disconnectedLatch.set(new CountDownLatch(MAX));
+        final String serviceFamily = "testMultipleConnectionsRestart";
         PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
+        System.err.println("Constructing "+ MAX + " agents with 1 service each...");
         for (int i = 0; i < MAX; i++)
         {
+            long time = System.nanoTime();
             final String suffix = i + "-" + System.nanoTime();
             agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
             agents[i].setRegistryReconnectPeriodMillis(500);
@@ -98,12 +106,48 @@ public class PlatformRegistryTest
                         connectedLatch.get().countDown();
                     }
                 }));
+            System.err.println(i + "(" + ((System.nanoTime() - time) / 1_000_000) + "ms)...");
+
         }
+
+        // create a service too (async)
+        Arrays.stream(agents).forEach((a) ->{
+            ThreadUtils.newThread(() ->{
+                assertTrue(
+                        a.createPlatformServiceInstance(serviceFamily, "instance-" + a.getAgentName(),
+                                TcpChannelUtils.LOCALHOST_IP, WireProtocolEnum.GZIP,
+                                RedundancyModeEnum.FAULT_TOLERANT));
+            }, "service-create-" + a.getAgentName()).start();
+        });
+
         try
         {
-            assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
+            System.err.println("Waiting for all agents to be connected...");
+            final int timeout = 60;
+            assertTrue(connectedLatch.get().await(timeout, TimeUnit.SECONDS));
+
+            System.err.println("Waiting for all services to be registered...");
+            // check registration of services
+            final AtomicReference<CountDownLatch> servicesLatch = new AtomicReference<CountDownLatch>();
+            listenForServices(MAX, serviceFamily, servicesLatch);
+            assertTrue("Only got: " + (MAX - servicesLatch.get().getCount()),
+                    servicesLatch.get().await(timeout, TimeUnit.SECONDS));
+
+            int STABILISE_PAUSE = 1000;
+            System.err.println("Sleeping " + STABILISE_PAUSE + "ms before destroying registry...");
+            Log.banner(this,"SLEEPING " + STABILISE_PAUSE + "ms BEFORE DESTROYING REGISTRY");
+            Thread.sleep(STABILISE_PAUSE);
+            System.err.println("continuing...");
+
+            Log.banner(this,"DESTROYING REGISTRY...");
             this.candidate.destroy();
-            assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
+            Log.banner(this,"DESTROYED REGISTRY...");
+            assertTrue(disconnectedLatch.get().await(timeout, TimeUnit.SECONDS));
+
+            System.err.println("Sleeping " + STABILISE_PAUSE + "ms before re-creating registry...");
+            Log.banner(this,"SLEEPING " + STABILISE_PAUSE + "ms BEFORE RE-CREATING REGISTRY");
+            Thread.sleep(STABILISE_PAUSE);
+            System.err.println("continuing...");
 
             connectedLatch.set(new CountDownLatch(MAX));
 
@@ -123,17 +167,39 @@ public class PlatformRegistryTest
                 }
             }
 
-            final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
-            assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
+            listenForServices(MAX, serviceFamily, servicesLatch);
 
+            System.err.println("Waiting for all agents to re-connect...");
+            assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()),
+                    connectedLatch.get().await(timeout, TimeUnit.SECONDS));
+
+            System.err.println("Waiting for all services to be re-registered...");
+            assertTrue("Only got: " + (MAX - servicesLatch.get().getCount()),
+                    servicesLatch.get().await(timeout, TimeUnit.SECONDS));
         }
         finally
         {
+            Log.banner(this,"SHUTTING DOWN AGENTS");
             for (PlatformRegistryAgent agent : agents)
             {
                 agent.destroy();
             }
         }
+    }
+
+    private void listenForServices(int MAX, String serviceFamily,
+            AtomicReference<CountDownLatch> servicesLatch)
+    {
+        servicesLatch.set(new CountDownLatch(1));
+        candidate.context.addObserver((image, atomicChange) -> {
+            if (image.getSubMapKeys().contains(serviceFamily))
+            {
+                if (image.getOrCreateSubMap(serviceFamily).values().size() == MAX)
+                {
+                    servicesLatch.get().countDown();
+                }
+            }
+        }, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
     }
 
     @Test
@@ -208,7 +274,7 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.eventHandler.monitoredServiceInstances);
         checkZeroSize(this.candidate.eventHandler.pendingMasterInstancePerFtService);
         checkZeroSize(this.candidate.eventHandler.confirmedMasterInstancePerFtService);
-        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
+        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices); // todo failing here
         checkZeroSize(this.candidate.eventHandler.connectionMonitors);
 
         // need to wait for connections to be destroyed?

@@ -116,7 +116,10 @@ public class CoalescingRecordListenerTest
         });
 
         // verify coalescing worked - we should not get 99 updates!
-        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 70);
+        final int size = observer.changes.size();
+        final int limit = 90;
+        System.err.println("testSimpleCoalescing checking " + size + " < " + limit);
+        assertTrue("Got: " + size, size < limit);
         assertEquals(instance, observer.getLatestImage());
     }
 
@@ -198,6 +201,9 @@ public class CoalescingRecordListenerTest
             }
         });
 
-        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 200);
+        final int size = observer.changes.size();
+        final int limit = 250;
+        System.err.println("testHeavyLoadCoalescing_100000_updates checking " + size + " < " + limit);
+        assertTrue("Got: " + observer.changes.size(), size < limit);
     }
 }
