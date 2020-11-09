@@ -28,7 +28,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -128,16 +127,6 @@ public class Publisher
                 !ISystemRecordNames.CONTEXT_STATUS.equals(name);
     }
 
-    /**
-     * A single-threaded executor that is used exclusively for coalescing and publishing system
-     * record updates.
-     *
-     * @see ISystemRecordNames
-     */
-    // todo make lazy
-    static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
-            ThreadUtils.newPermanentScheduledExecutorService("system-record-publisher", 1);
-
     final Object lock;
     final AtomicLong subscribeCounter = new AtomicLong();
 
@@ -181,17 +170,21 @@ public class Publisher
             {
                 this.systemRecordSequences.put(systemRecord, new AtomicLong());
                 this.systemRecordPublishers.put(systemRecord,
-                        new CoalescingRecordListener(SYSTEM_RECORD_PUBLISHER,
+                        new CoalescingRecordListener(ThreadUtils.UTILS_EXECUTOR,
                                 DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS,
-                                (imageValidInCallingThreadOnly, atomicChange) -> {
-                                    final AtomicLong currentSequence =
-                                            ProxyContextMultiplexer.this.systemRecordSequences.get(
-                                                    atomicChange.getName());
-                                    atomicChange.setSequence(currentSequence.getAndIncrement());
-
-                                    handleRecordChange(atomicChange);
-                                }, CachePolicyEnum.NO_IMAGE_NEEDED));
+                                (image, atomicChange) -> handleTimedSystemRecordChange(atomicChange),
+                                ContextUtils.CORE_EXECUTOR, getCoalescingContext(systemRecord),
+                                CachePolicyEnum.NO_IMAGE_NEEDED));
             }
+        }
+
+        void handleTimedSystemRecordChange(IRecordChange atomicChange)
+        {
+            final AtomicLong currentSequence =
+                    ProxyContextMultiplexer.this.systemRecordSequences.get(
+                            atomicChange.getName());
+            atomicChange.setSequence(currentSequence.getAndIncrement());
+            handleRecordChange(atomicChange);
         }
 
         @Override
@@ -445,12 +438,21 @@ public class Publisher
                 final AtomicChange change = new AtomicChange(record);
                 if (isSystemRecordUpdateCoalesced(record.getName()))
                 {
-                    SYSTEM_RECORD_PUBLISHER.execute(() -> {
-                        // NOTE: sequences increment-then-get, hence
-                        // to send the previous image, we need to
-                        // subtract 1
-                        change.setSequence(this.systemRecordSequences.get(recordNameToRepublish).get() - 1);
-                        publishImageOnSubscribe(publisher, change);
+                    ContextUtils.CORE_EXECUTOR.execute(new ISequentialRunnable() {
+                        @Override
+                        public Object context()
+                        {
+                            return getCoalescingContext(record.getName());
+                        }
+
+                        @Override
+                        public void run()
+                        {
+                            // NOTE: sequences increment-then-get, hence to send the previous image, we need to subtract 1
+                            change.setSequence(ProxyContextMultiplexer.this.systemRecordSequences.get(
+                                    recordNameToRepublish).get() - 1);
+                            publishImageOnSubscribe(publisher, change);
+                        }
                     });
                 }
                 else
@@ -478,6 +480,11 @@ public class Publisher
         }
     }
 
+    String getCoalescingContext(String systemRecord)
+    {
+        return Publisher.this + "-" + systemRecord;
+    }
+
     /**
      * This is the actual publisher object that publishes record changes to a single
      * {@link ProxyContext}.
@@ -501,8 +508,8 @@ public class Publisher
          */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
-        volatile long messagesPublished;
-        volatile long bytesPublished;
+        final AtomicLong messagesPublished = new AtomicLong();
+        final AtomicLong bytesPublished = new AtomicLong();
         String identity;
         volatile boolean active;
         boolean codecSyncExpected;
@@ -578,8 +585,8 @@ public class Publisher
                     }
 
                     final long nanoTime = System.nanoTime();
-                    final long l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
-                    final long l_bytesPublished = ProxyContextPublisher.this.bytesPublished;
+                    final long l_messagesPublished = ProxyContextPublisher.this.messagesPublished.get();
+                    final long l_bytesPublished = ProxyContextPublisher.this.bytesPublished.get();
 
                     final long intervalMessagesPublished = l_messagesPublished - this.lastMessagesPublished;
                     final long intervalBytesPublished = l_bytesPublished - this.lastBytesPublished;
@@ -602,13 +609,11 @@ public class Publisher
                         submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC, DoubleValue.valueOf(
                                 (((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
                         submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE, LongValue.valueOf(
-                                ProxyContextPublisher.this.messagesPublished == 0 ? 0 :
-                                        ProxyContextPublisher.this.bytesPublished
-                                                / ProxyContextPublisher.this.messagesPublished));
+                                l_messagesPublished == 0 ? 0 : l_bytesPublished / l_messagesPublished));
                         submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
-                                LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
-                        submapConnections.put(IContextConnectionsRecordFields.KB_COUNT, LongValue.valueOf(
-                                (long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
+                                LongValue.valueOf(l_messagesPublished));
+                        submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
+                                LongValue.valueOf((long) (l_bytesPublished * inverse_1K)));
                         submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
                                 LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
                         submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
@@ -638,8 +643,8 @@ public class Publisher
             {
                 send(txMessage);
             }
-            this.bytesPublished += txMessage.length;
-            this.messagesPublished++;
+            this.bytesPublished.addAndGet(txMessage.length);
+            this.messagesPublished.incrementAndGet();
 
             // peek at the size before attempting the synchronize block
             if (logVerboseSubscribes && this.firstPublishPending.size() > 0)
@@ -1241,7 +1246,7 @@ public class Publisher
                 Log.log(Publisher.this, "(->) subscribe #", subscribeKey, " complete ",
                         Integer.toString(ackSubscribes.size()), ":", Integer.toString(nokSubscribes.size()));
                 sendAck(ackSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
-                sendNok(nokSubscribes, client, proxyContextPublisher, ProxyContext.SUBSCRIBE);
+                sendNok(nokSubscribes, client, proxyContextPublisher);
             }
         };
 
@@ -1256,9 +1261,10 @@ public class Publisher
     }
 
     void sendNok(List<String> recordNames, ITransportChannel client,
-            ProxyContextPublisher proxyContextPublisher, String responseAction)
+            ProxyContextPublisher proxyContextPublisher)
     {
-        sendSubscribeResult(ProxyContext.NOK, recordNames, client, proxyContextPublisher, responseAction);
+        sendSubscribeResult(ProxyContext.NOK, recordNames, client, proxyContextPublisher,
+                ProxyContext.SUBSCRIBE);
     }
 
     private void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,

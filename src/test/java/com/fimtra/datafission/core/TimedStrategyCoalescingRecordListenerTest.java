@@ -52,7 +52,7 @@ public class TimedStrategyCoalescingRecordListenerTest extends CoalescingRecordL
     @Override
     protected IRecordListener wrap(TestCachingAtomicChangeObserver observer)
     {
-        return new CoalescingRecordListener(this.executor, 250, observer);
+        return new CoalescingRecordListener(this.executor, 250, observer, ContextUtils.CORE_EXECUTOR, this);
     }
 
 }
