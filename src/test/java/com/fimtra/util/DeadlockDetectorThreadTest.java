@@ -19,18 +19,30 @@ import java.util.concurrent.Future;
 
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
+import org.junit.After;
 import org.junit.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 /**
- * Tests for the {@link DeadlockDetector#newDeadlockDetectorThread} method. We need a separate test
+ * Tests for the {@link DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)} method. We need a separate test
  * because there are deadlocked threads left over from the {@link DeadlockDetectorTest}!
  * 
  * @author Ramon Servadei
  */
 public class DeadlockDetectorThreadTest
 {
+    Future<?> future;
+
+    @After
+    public void tearDown() throws Exception
+    {
+        if(future != null)
+        {
+            future.cancel(false);
+        }
+    }
+
     @Test
     public void testStartAndStopNewDeadlockDetectorThread() throws InterruptedException
     {
@@ -40,9 +52,9 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        final Future<?> flag = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
+        future = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
-        flag.cancel(false);
+        future.cancel(false);
         Thread.sleep(200);
 
         DeadlockDetectorTest.createDeadlock();
@@ -59,7 +71,7 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
+        future = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
         Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(ArgumentMatchers.any(ThreadInfoWrapper[].class));
     }

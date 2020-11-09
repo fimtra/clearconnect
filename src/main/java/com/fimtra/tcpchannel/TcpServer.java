@@ -104,7 +104,7 @@ public class TcpServer implements IEndPointService
                     }
                 }
             };
-            ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(connectionDumpTask, 1, 1, TimeUnit.MINUTES);
+            ThreadUtils.scheduleAtFixedRate(TcpServer.class, connectionDumpTask, 1, 1, TimeUnit.MINUTES);
         }
     }
 

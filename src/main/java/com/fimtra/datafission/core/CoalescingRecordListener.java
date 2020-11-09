@@ -35,6 +35,7 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * Provides coalescing behaviour for record updates to solve fast-producer scenarios.
@@ -95,8 +96,7 @@ public class CoalescingRecordListener implements IRecordListener {
      *
      * @author Ramon Servadei
      */
-    public interface ICoalescingStrategy
-    {
+    public interface ICoalescingStrategy {
 
         /**
          * Handle the update to the record
@@ -115,15 +115,12 @@ public class CoalescingRecordListener implements IRecordListener {
      * @author Ramon Servadei
      */
     public static class TimedCoalescingStrategy extends ContextCoalescingStrategy {
-        final ScheduledExecutorService service;
         final long periodMillis;
         final Set<String> pending;
 
-        TimedCoalescingStrategy(ScheduledExecutorService service, long periodMillis,
-                IContextExecutor executor, Object coalescingContext)
+        TimedCoalescingStrategy(long periodMillis, IContextExecutor executor, Object coalescingContext)
         {
             super(executor, coalescingContext);
-            this.service = service;
             this.periodMillis = periodMillis;
             this.pending = new HashSet<>();
         }
@@ -135,7 +132,7 @@ public class CoalescingRecordListener implements IRecordListener {
             {
                 if (this.pending.add(name))
                 {
-                    this.service.schedule(() -> {
+                    ThreadUtils.schedule(this, () -> {
                         synchronized (this.pending)
                         {
                             this.pending.remove(name);
@@ -279,6 +276,18 @@ public class CoalescingRecordListener implements IRecordListener {
 
     /**
      * Construct a "context-based" coalescing record listener instance with a cache policy of {@link
+     * CachePolicyEnum#KEEP_IMAGE_ON_COALESCE} and default coalescing components.
+     *
+     * @param delegate the delegate record listener that will be notified using the executor
+     */
+    public CoalescingRecordListener(IRecordListener delegate)
+    {
+        this(getDefaultCoalescingExecutor(), delegate, getDefaultCoalescingContext(),
+                CachePolicyEnum.KEEP_IMAGE_ON_COALESCE);
+    }
+
+    /**
+     * Construct a "context-based" coalescing record listener instance with a cache policy of {@link
      * CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}
      *
      * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
@@ -313,55 +322,48 @@ public class CoalescingRecordListener implements IRecordListener {
      * Construct a "time-based" coalescing record listener instance with a cache policy of {@link
      * CachePolicyEnum#KEEP_IMAGE_ON_COALESCE} using default coalescing components.
      *
-     * @param scheduler    the executor to use for the timed coalescing
      * @param periodMillis the coalescing period
      * @param delegate     the delegate record listener that will be notified using the executor
      */
-    public CoalescingRecordListener(ScheduledExecutorService scheduler, long periodMillis,
-            IRecordListener delegate)
+    public CoalescingRecordListener(long periodMillis, IRecordListener delegate)
     {
-        this(scheduler, periodMillis, delegate, getDefaultCoalescingExecutor(),
-                getDefaultCoalescingContext());
+        this(periodMillis, delegate, getDefaultCoalescingExecutor(), getDefaultCoalescingContext());
     }
 
     /**
      * Construct a "time-based" coalescing record listener instance with a cache policy of {@link
      * CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}
      *
-     * @param scheduler          the executor to use for the timed coalescing
      * @param periodMillis       the coalescing period
      * @param delegate           the delegate record listener that will be notified using the executor
      * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
-     * @param coalescingContext  the context to coalesce on - this can be the record name but for multi-source
-     *                           updates, the context should identify the source and record name
+     * @param coalescingContext  the context to coalesce on - this can be the record name but for
+     *                           multi-source
      */
-    public CoalescingRecordListener(ScheduledExecutorService scheduler, long periodMillis,
-            IRecordListener delegate, IContextExecutor coalescingExecutor, Object coalescingContext)
+    public CoalescingRecordListener(long periodMillis, IRecordListener delegate,
+            IContextExecutor coalescingExecutor, Object coalescingContext)
     {
-        this(scheduler, periodMillis, delegate, coalescingExecutor, coalescingContext,
+        this(periodMillis, delegate, coalescingExecutor, coalescingContext,
                 CachePolicyEnum.KEEP_IMAGE_ON_COALESCE);
     }
 
     /**
      * Construct a "time-based" coalescing record listener instance using default coalescing components.
      *
-     * @param scheduler    the executor to use for the timed coalescing
      * @param periodMillis the coalescing period
      * @param delegate     the delegate record listener that will be notified using the executor
      * @param cachePolicy  the cache policy, see {@link CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}, {@link
      *                     CachePolicyEnum#REMOVE_IMAGE_ON_COALESCE} and {@link CachePolicyEnum#NO_IMAGE_NEEDED}
      */
-    public CoalescingRecordListener(ScheduledExecutorService scheduler, long periodMillis,
-            IRecordListener delegate, CachePolicyEnum cachePolicy)
+    public CoalescingRecordListener(long periodMillis, IRecordListener delegate, CachePolicyEnum cachePolicy)
     {
-        this(scheduler, periodMillis, delegate, getDefaultCoalescingExecutor(), getDefaultCoalescingContext(),
+        this(periodMillis, delegate, getDefaultCoalescingExecutor(), getDefaultCoalescingContext(),
                 CachePolicyEnum.KEEP_IMAGE_ON_COALESCE);
     }
 
     /**
      * Construct a "time-based" coalescing record listener instance.
      *
-     * @param scheduler          the executor to use for the timed coalescing
      * @param periodMillis       the coalescing period
      * @param delegate           the delegate record listener that will be notified using the executor
      * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
@@ -371,12 +373,10 @@ public class CoalescingRecordListener implements IRecordListener {
      *                           CachePolicyEnum#REMOVE_IMAGE_ON_COALESCE} and {@link
      *                           CachePolicyEnum#NO_IMAGE_NEEDED}
      */
-    public CoalescingRecordListener(ScheduledExecutorService scheduler, long periodMillis,
-            IRecordListener delegate, IContextExecutor coalescingExecutor, Object coalescingContext,
-            CachePolicyEnum cachePolicy)
+    public CoalescingRecordListener(long periodMillis, IRecordListener delegate,
+            IContextExecutor coalescingExecutor, Object coalescingContext, CachePolicyEnum cachePolicy)
     {
-        this(delegate,
-                new TimedCoalescingStrategy(scheduler, periodMillis, coalescingExecutor, coalescingContext),
+        this(delegate, new TimedCoalescingStrategy(periodMillis, coalescingExecutor, coalescingContext),
                 cachePolicy);
     }
 

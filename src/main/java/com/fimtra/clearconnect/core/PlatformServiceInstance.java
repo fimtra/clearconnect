@@ -150,9 +150,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
 
         // update service stats periodically
-        this.statsUpdateTask = ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(
-            new Runnable()
-        {
+        this.statsUpdateTask = ThreadUtils.scheduleWithFixedDelay(this, new Runnable() {
             long lastMessagesPublished = 0;
             long lastBytesPublished = 0;
             long lastTimeNanos;

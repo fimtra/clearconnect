@@ -153,7 +153,7 @@ public final class DeadlockDetector
                 }
             }
         };
-        return ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(task, checkPeriodMillis, checkPeriodMillis,
+        return ThreadUtils.scheduleWithFixedDelay(DeadlockDetector.class, task, checkPeriodMillis, checkPeriodMillis,
                 TimeUnit.MILLISECONDS);
     }
 

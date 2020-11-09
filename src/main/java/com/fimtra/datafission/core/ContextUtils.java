@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -211,8 +210,7 @@ public final class ContextUtils
 
     static
     {
-        ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(new Runnable()
-        {
+        ThreadUtils.scheduleWithFixedDelay(ContextUtils.class, new Runnable() {
             // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();
             long gcTimeLastPeriod;
@@ -390,7 +388,6 @@ public final class ContextUtils
      */
     public static long[] getCoreStats()
     {
-        // todo should this be the summary across all thimble executors?
         final TaskStatistics stats = coreStats.get(IContextExecutor.QUEUE_LEVEL_STATS);
         final long totalSubmitted = stats.getTotalSubmitted();
         final long totalExecuted = stats.getTotalExecuted();

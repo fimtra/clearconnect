@@ -22,16 +22,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
@@ -65,19 +62,6 @@ public final class ChannelWatchdog implements Runnable
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
     final Map<ITransportChannel, Long> channelsHeartbeatArrivalTime;
     final Object lock;
-
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory()
-    {
-        private final AtomicInteger threadNumber = new AtomicInteger();
-
-        @Override
-        public Thread newThread(Runnable r)
-        {
-            Thread t = new Thread(r, "channel-watchdog-" + this.threadNumber.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        }
-    });
 
     private ScheduledFuture<?> current;
 
@@ -139,7 +123,7 @@ public final class ChannelWatchdog implements Runnable
             this.heartbeatPeriodMillis = periodMillis;
             this.lateHeartbeatLimit = this.heartbeatPeriodMillis + HB_TOLERANCE_MILLIS;
             this.missedHeartbeatCount = missedHeartbeats;
-            this.current = this.executor.scheduleWithFixedDelay(this, this.heartbeatPeriodMillis,
+            this.current = ThreadUtils.scheduleWithFixedDelay(this, this, this.heartbeatPeriodMillis,
                 this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
             Log.log(this, "Heartbeat period is ", Integer.toString(this.heartbeatPeriodMillis),
                 "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
@@ -158,7 +142,7 @@ public final class ChannelWatchdog implements Runnable
             copy.add(channel);
             this.channels = copy;
         }
-        this.executor.execute(() -> channel.send(ChannelUtils.HEARTBEAT_SIGNAL));
+        ThreadUtils.schedule(this, () -> channel.send(ChannelUtils.HEARTBEAT_SIGNAL), 0, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -262,7 +246,7 @@ public final class ChannelWatchdog implements Runnable
         // grab the previous time now, excludes latency in the executor 
         final Long previous = this.channelsHeartbeatArrivalTime.put(channel, Long.valueOf(timeIn));
 
-        this.executor.execute(() -> {
+        ThreadUtils.schedule(this, () -> {
             if (!this.channels.contains(channel))
             {
                 this.channelsHeartbeatArrivalTime.remove(channel);
@@ -281,7 +265,7 @@ public final class ChannelWatchdog implements Runnable
                     checkHeartbeatRecovered(channel);
                 }
             }
-        });
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     void checkHeartbeatRecovered(ITransportChannel channel)

@@ -456,7 +456,6 @@ public final class ProxyContext implements IObserverContext
             // there is no alternative - a local flag is not an option - setting it
             // during onChannelConnected is not guaranteed to work as that can happen on
             // a different thread
-            // todo is this pattern still needed?
             if (this.proxyContext.channelToken == this.receiverToken)
             {
                 this.proxyContext.executeSequentialCoreTask(RX_FRAME_HANDLER_POOL.get().initialise(data, source, this));
@@ -894,7 +893,7 @@ public final class ProxyContext implements IObserverContext
         this.actionSubscribeFutures = new ConcurrentHashMap<>();
         this.actionSubscribeResults = new ConcurrentHashMap<>();
         this.actionResponseLatches = new ConcurrentHashMap<>();
-        // todo why 0
+        // a receiver has no need for setting maxChangePerPart - only used for sending
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<>();
@@ -1590,11 +1589,10 @@ public final class ProxyContext implements IObserverContext
             }
 
             Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
-                Long.toString(this.reconnectPeriodMillis), "ms ");
+                    Long.toString(this.reconnectPeriodMillis), "ms ");
 
-            this.reconnectTask = ThreadUtils.UTILS_EXECUTOR.schedule(
-                    () -> ContextUtils.CORE_EXECUTOR.execute(new ICoalescingRunnable()
-                    {
+            this.reconnectTask = ThreadUtils.schedule(this,
+                    () -> ContextUtils.CORE_EXECUTOR.execute(new ICoalescingRunnable() {
                         @Override
                         public Object context()
                         {

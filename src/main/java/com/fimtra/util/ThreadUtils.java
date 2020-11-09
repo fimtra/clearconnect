@@ -35,18 +35,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.thimble.ISequentialRunnable;
+
 /**
  * Provides utilities for working with threads
  *
  * @author Ramon Servadei
  */
-public abstract class ThreadUtils
-{
+public abstract class ThreadUtils {
     private static final String PREFIX = System.getProperty("threadUtils.prefix", "clearconnect-");
 
     static final Thread.UncaughtExceptionHandler UNCAUGHT_EXCEPTION_HANDLER =
-            new Thread.UncaughtExceptionHandler()
-            {
+            new Thread.UncaughtExceptionHandler() {
                 @Override
                 public void uncaughtException(Thread t, Throwable e)
                 {
@@ -69,8 +71,73 @@ public abstract class ThreadUtils
                 }
             };
 
-    public static final ScheduledExecutorService UTILS_EXECUTOR =
-            ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+    private static final ScheduledExecutorService SCHEDULER =
+            ThreadUtils.newPermanentScheduledExecutorService("util-scheduler", 1);
+    private static final IContextExecutor UTILS_EXECUTOR = ContextExecutorFactory.create("util-executor", 1);
+
+    /**
+     * Execute the command with the context using the internal {@link IContextExecutor} at a time in the
+     * future. This has the same semantics as {@link ScheduledExecutorService#schedule(Runnable, long,
+     * TimeUnit)}
+     *
+     * @param context the context when running the command
+     * @param command the command
+     */
+    public static ScheduledFuture<?> schedule(Object context, Runnable command, long delay, TimeUnit unit)
+    {
+        if (delay == 0)
+        {
+            executeInContext(command, context).run();
+            return null;
+        }
+        return SCHEDULER.schedule(executeInContext(command, context), delay, unit);
+    }
+
+    /**
+     * Execute the command with the context using the internal {@link IContextExecutor} at repeated intervals.
+     * This has the same semantics as {@link ScheduledExecutorService#scheduleWithFixedDelay(Runnable, long,
+     * long, TimeUnit)}
+     *
+     * @param context the context when running the command
+     * @param command the command
+     */
+    public static ScheduledFuture<?> scheduleWithFixedDelay(Object context, Runnable command,
+            long initialDelay, long delay, TimeUnit unit)
+    {
+        return SCHEDULER.scheduleWithFixedDelay(executeInContext(command, context), initialDelay, delay,
+                unit);
+    }
+
+    /**
+     * Execute the command with the context using the internal {@link IContextExecutor} at repeated intervals.
+     * This has the same semantics as {@link ScheduledExecutorService#scheduleAtFixedRate(Runnable, long,
+     * long, TimeUnit)}
+     *
+     * @param context the context when running the command
+     * @param command the command
+     */
+    public static ScheduledFuture<?> scheduleAtFixedRate(Object context, Runnable command, long initialDelay,
+            long delay, TimeUnit unit)
+    {
+        return SCHEDULER.scheduleAtFixedRate(executeInContext(command, context), initialDelay, delay, unit);
+    }
+
+    private static Runnable executeInContext(Runnable r, Object context)
+    {
+        return () -> UTILS_EXECUTOR.execute(new ISequentialRunnable() {
+            @Override
+            public Object context()
+            {
+                return context == null ? r : context;
+            }
+
+            @Override
+            public void run()
+            {
+                r.run();
+            }
+        });
+    }
 
     static final Map<Thread, List<Runnable>> THREAD_LOCAL_CLEANUP =
             Collections.synchronizedMap(CollectionUtils.newMap());
@@ -86,8 +153,7 @@ public abstract class ThreadUtils
      *
      * @author Ramon Servadei
      */
-    public static final class ExceptionLoggingRunnable implements Runnable
-    {
+    public static final class ExceptionLoggingRunnable implements Runnable {
         private final Runnable command;
 
         public ExceptionLoggingRunnable(Runnable command)
@@ -182,8 +248,8 @@ public abstract class ThreadUtils
     }
 
     /**
-     * Get the class name of the indirect class calling this method - the class calling the class
-     * calling this method
+     * Get the class name of the indirect class calling this method - the class calling the class calling this
+     * method
      */
     public static String getIndirectCallingClass()
     {
@@ -191,8 +257,8 @@ public abstract class ThreadUtils
     }
 
     /**
-     * Get the simple name of the indirect class calling this method - the class calling the class
-     * calling this method
+     * Get the simple name of the indirect class calling this method - the class calling the class calling
+     * this method
      */
     public static String getIndirectCallingClassSimpleName()
     {
@@ -201,9 +267,8 @@ public abstract class ThreadUtils
     }
 
     /**
-     * Creates a {@link ThreadFactory} instance that will create daemon threads that use the
-     * provided name as the thread name. Each created thread has an incrementing number appended to
-     * the name.
+     * Creates a {@link ThreadFactory} instance that will create daemon threads that use the provided name as
+     * the thread name. Each created thread has an incrementing number appended to the name.
      * <p>
      * <b>The created threads are NOT started by the factory</b>
      *
@@ -212,8 +277,7 @@ public abstract class ThreadUtils
      */
     public static ThreadFactory newDaemonThreadFactory(final String threadName)
     {
-        return new ThreadFactory()
-        {
+        return new ThreadFactory() {
             private final AtomicInteger threadNumber = new AtomicInteger();
 
             @Override
@@ -245,8 +309,7 @@ public abstract class ThreadUtils
     public static ScheduledExecutorService newScheduledExecutorService(final String threadName,
             final int threadCount)
     {
-        return new ScheduledExecutorService()
-        {
+        return new ScheduledExecutorService() {
             final ScheduledExecutorService newScheduledThreadPool =
                     Executors.newScheduledThreadPool(threadCount, newDaemonThreadFactory(threadName));
 
@@ -415,8 +478,8 @@ public abstract class ThreadUtils
     }
 
     /**
-     * Pause the current thread for the specified millis by calling {@link Thread#sleep(long)}. This
-     * is a convenience method that does not throw any exception.
+     * Pause the current thread for the specified millis by calling {@link Thread#sleep(long)}. This is a
+     * convenience method that does not throw any exception.
      *
      * @param millis the milliseconds to pause
      */
@@ -433,14 +496,13 @@ public abstract class ThreadUtils
     }
 
     /**
-     * Like {@link #newScheduledExecutorService(String, int)} but the
-     * {@link ScheduledExecutorService} cannot be shutdown
+     * Like {@link #newScheduledExecutorService(String, int)} but the {@link ScheduledExecutorService} cannot
+     * be shutdown
      */
     public static ScheduledExecutorService newPermanentScheduledExecutorService(final String threadName,
             final int threadCount)
     {
-        return new ScheduledExecutorService()
-        {
+        return new ScheduledExecutorService() {
             private final ScheduledExecutorService delegate =
                     newScheduledExecutorService(threadName, threadCount);
             private final String name = threadName;

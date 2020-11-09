@@ -182,7 +182,7 @@ public final class PlatformRegistry
         String SYSTEM_LOAD = "SystemLoad";
         String RUNTIME = "Runtime";
         String USER = "User";
-        String EPS = "EPM";
+        String EPS = "EPS";
         String UPTIME_SECS = "Uptime";
     }
 
@@ -678,7 +678,7 @@ final class EventHandler
             }
 
             final long now = System.currentTimeMillis();
-            ThreadUtils.UTILS_EXECUTOR.execute(() -> {
+            ThreadUtils.schedule(PlatformRegistry.class, () -> {
                 try
                 {
                     SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(
@@ -689,7 +689,7 @@ final class EventHandler
                 {
                     Log.log(EventHandler.class, "Could not log service message", e);
                 }
-            });
+            }, 0, TimeUnit.MILLISECONDS);
         }
         catch (Exception e)
         {
@@ -736,7 +736,6 @@ final class EventHandler
     final PlatformRegistry registry;
     final AtomicInteger eventCount;
     final Set<String> pendingPublish;
-    final ScheduledExecutorService publishExecutor;
     final Executor ioExecutor;
     /**
      * Tracks services that are pending registration completion
@@ -776,8 +775,6 @@ final class EventHandler
 
         this.pendingPublish = new HashSet<>();
         this.eventCount = new AtomicInteger(0);
-        this.publishExecutor =
-                ThreadUtils.newScheduledExecutorService("publish-executor", 1);
         this.ioExecutor = ContextExecutorFactory.create("io-executor");
     }
 
@@ -815,7 +812,6 @@ final class EventHandler
 
     void destroy()
     {
-        this.publishExecutor.shutdown();
         PlatformServiceConnectionMonitor monitor = null;
         for (RegistrationToken registrationToken : this.connectionMonitors.keySet())
         {
@@ -1725,7 +1721,7 @@ final class EventHandler
             {
                 if (this.pendingPublish.add(record.getName()))
                 {
-                    this.publishExecutor.schedule(() -> {
+                    ThreadUtils.schedule(this, () -> {
                         synchronized (this.pendingPublish)
                         {
                             this.pendingPublish.remove(record.getName());

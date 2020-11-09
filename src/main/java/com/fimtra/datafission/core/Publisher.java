@@ -169,12 +169,11 @@ public class Publisher
             for (String systemRecord : ContextUtils.SYSTEM_RECORDS)
             {
                 this.systemRecordSequences.put(systemRecord, new AtomicLong());
-                this.systemRecordPublishers.put(systemRecord,
-                        new CoalescingRecordListener(ThreadUtils.UTILS_EXECUTOR,
-                                DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS,
-                                (image, atomicChange) -> handleTimedSystemRecordChange(atomicChange),
-                                ContextUtils.CORE_EXECUTOR, getCoalescingContext(systemRecord),
-                                CachePolicyEnum.NO_IMAGE_NEEDED));
+                this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(
+                        DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS,
+                        (image, atomicChange) -> handleTimedSystemRecordChange(atomicChange),
+                        ContextUtils.CORE_EXECUTOR, getCoalescingContext(systemRecord),
+                        CachePolicyEnum.NO_IMAGE_NEEDED));
             }
         }
 
@@ -557,8 +556,7 @@ public class Publisher
             {
                 this.statsUpdateTask.cancel(false);
             }
-            this.statsUpdateTask = ThreadUtils.UTILS_EXECUTOR.schedule(new Runnable()
-            {
+            this.statsUpdateTask = ThreadUtils.schedule(this, new Runnable() {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
                 long lastTimeNanos;
@@ -628,10 +626,9 @@ public class Publisher
 
                     if (ProxyContextPublisher.this.active)
                     {
-                        ProxyContextPublisher.this.statsUpdateTask =
-                                ThreadUtils.UTILS_EXECUTOR.schedule(this,
-                                        Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2,
-                                        TimeUnit.MILLISECONDS);
+                        ProxyContextPublisher.this.statsUpdateTask = ThreadUtils.schedule(this, this,
+                                Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2,
+                                TimeUnit.MILLISECONDS);
                     }
                 }
             }, Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2, TimeUnit.MILLISECONDS);
@@ -1102,7 +1099,7 @@ public class Publisher
             }
         };
         this.contextConnectionsRecordPublishTask =
-                ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(contextConnectionsPublishTask,
+                ThreadUtils.scheduleWithFixedDelay(this, contextConnectionsPublishTask,
                         this.contextConnectionsRecordPublishPeriodMillis,
                         this.contextConnectionsRecordPublishPeriodMillis, TimeUnit.MILLISECONDS);
 

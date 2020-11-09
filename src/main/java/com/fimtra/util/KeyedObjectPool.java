@@ -35,7 +35,7 @@ public class KeyedObjectPool<K, T>
 
     static
     {
-        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(() -> {
+        ThreadUtils.scheduleAtFixedRate(KeyedObjectPool.class, () -> {
 
             synchronized (pools)
             {

@@ -268,6 +268,11 @@ final class AtomicChangeTeleporter
     final AtomicReference<String> nameRef = new AtomicReference<>();
     final AtomicInteger part = new AtomicInteger(Integer.MAX_VALUE);
 
+    /**
+     * Construct the teleporter with the limit for the maximum number of changes (keys) it can send per part.
+     *
+     * @param maxChangesPerPart only required if the teleporter is used for sending
+     */
     AtomicChangeTeleporter(int maxChangesPerPart)
     {
         this.maxChangesPerPart = maxChangesPerPart;
