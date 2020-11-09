@@ -215,8 +215,7 @@ public class FastDateFormatTest
 
         for (int i = 0; i < testCount; i++)
         {
-            date = new Date(calTime + i);
-            this.candidate.yyyyMMddHHmmssSSS(date.getTime());
+            this.candidate.yyyyMMddHHmmssSSS(calTime + i);
         }
         long fdfTime = System.currentTimeMillis() - now;
         now = System.currentTimeMillis();
