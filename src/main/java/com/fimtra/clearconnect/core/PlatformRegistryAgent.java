@@ -1109,7 +1109,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         final Runnable dynamicStatsTask = new Runnable()
         {
             final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
-            long executedFromLastPeriod;
             IRpcInstance rpc;
 
             @Override
@@ -1136,11 +1135,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     final double inverseLoggingPeriodSecs =
                             1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                     final long qTotalExecuted = stats[2];
-                    final long eventsPerSec = (long) ((qTotalExecuted - this.executedFromLastPeriod)
-                            * inverseLoggingPeriodSecs);
+                    final long eventsPerSec = (long) ((qTotalExecuted) * inverseLoggingPeriodSecs);
                     final long uptime =
                             (System.currentTimeMillis() - PlatformRegistryAgent.this.startTime) / 1000;
-                    this.executedFromLastPeriod = qTotalExecuted;
                     try
                     {
                         this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),

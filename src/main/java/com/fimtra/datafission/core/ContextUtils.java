@@ -206,7 +206,7 @@ public final class ContextUtils
         return gcDutyCycle;
     }
 
-    static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
+    static final AtomicReference<long[]> coreStats = new AtomicReference<>(new long[] { 0, 0, 0 });
 
     static
     {
@@ -244,7 +244,7 @@ public final class ContextUtils
                     sb.append(yyyyMMddHHmmssSSS);
                 }
                 // thimble executor Qs
-                long qOverflow = 0, qSubmitted = 0;
+                long qOverflow = 0, qSubmitted = 0, qExecuted = 0;
                 TaskStatistics stats;
                 long overflow;
                 for (ThimbleExecutor thimbleExecutor : executors)
@@ -255,6 +255,7 @@ public final class ContextUtils
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
+                    qExecuted += stats.getIntervalExecuted();
 
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                             thimbleExecutor.getSequentialTaskStatistics();
@@ -262,10 +263,8 @@ public final class ContextUtils
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
-                    if (thimbleExecutor == CORE_EXECUTOR)
-                    {
-                        coreStats = sequentialTaskStatistics;
-                    }
+                    qExecuted += stats.getIntervalExecuted();
+
 
                     if (qStatsLog != null)
                     {
@@ -275,6 +274,8 @@ public final class ContextUtils
                                 getStats(sequentialTaskStatistics));
                     }
                 }
+
+                coreStats.set(new long[] { qOverflow, qSubmitted, qExecuted });
 
                 if (qStatsLog != null)
                 {
@@ -383,15 +384,12 @@ public final class ContextUtils
     static final char PROTOCOL_PREFIX = '_';
 
     /**
-     * @return a long[] for the sequential tasks statistics, format {queue-overflow,
+     * @return a long[] for the sequential and coalescing tasks statistics, format {queue-overflow,
      * queue-total-submitted, queue-total-executed}
      */
     public static long[] getCoreStats()
     {
-        final TaskStatistics stats = coreStats.get(IContextExecutor.QUEUE_LEVEL_STATS);
-        final long totalSubmitted = stats.getTotalSubmitted();
-        final long totalExecuted = stats.getTotalExecuted();
-        return new long[] { (totalSubmitted - totalExecuted), totalSubmitted, totalExecuted };
+        return coreStats.get();
     }
 
     /**
