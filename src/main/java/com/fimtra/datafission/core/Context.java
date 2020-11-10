@@ -94,7 +94,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * <li>notify initial image
      * </ul>
      */
-    public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
+    public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
 
     static final AtomicInteger eventCount = new AtomicInteger();
 

@@ -31,7 +31,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -661,7 +660,7 @@ final class EventHandler
     private static final String SLOW = "*** SLOW EVENT HANDLING *** ";
     private static final int SLOW_EVENT_MILLIS = 200;
 
-    private static final boolean SERVICES_LOG_DISABLED = Boolean.getBoolean("platform.servicesLogDisabled");
+    private static final boolean SERVICES_LOG_DISABLED = SystemUtils.getProperty("platform.servicesLogDisabled", false);
     private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null :
             RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
     private static final FastDateFormat fdf = new FastDateFormat();

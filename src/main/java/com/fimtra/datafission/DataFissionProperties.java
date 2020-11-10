@@ -453,7 +453,7 @@ public abstract class DataFissionProperties {
          *
          * @see Names#ENABLE_THREAD_DEADLOCK_CHECK
          */
-        boolean ENABLE_THREAD_DEADLOCK_CHECK = Boolean.getBoolean(Names.ENABLE_THREAD_DEADLOCK_CHECK);
+        boolean ENABLE_THREAD_DEADLOCK_CHECK = SystemUtils.getProperty(Names.ENABLE_THREAD_DEADLOCK_CHECK, false);
 
         /**
          * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if {@link
@@ -472,7 +472,7 @@ public abstract class DataFissionProperties {
          * <p>
          * Default is false
          */
-        boolean ENABLE_Q_STATS_LOGGING = Boolean.getBoolean(Names.ENABLE_Q_STATS_LOGGING);
+        boolean ENABLE_Q_STATS_LOGGING = SystemUtils.getProperty(Names.ENABLE_Q_STATS_LOGGING, false);
 
         /**
          * Defines the transformation string for encrypted sessions.

@@ -39,6 +39,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.SerializationUtils;
+import com.fimtra.util.SystemUtils;
 
 /**
  * The standard implementation of an {@link IRpcInstance}
@@ -61,7 +62,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     /**
      * Controls verbose logging of RPC responses
      */
-    public static boolean logVerbose = Boolean.getBoolean("logVerbose." + RpcInstance.class.getCanonicalName());
+    public static boolean logVerbose = SystemUtils.getProperty("logVerbose." + RpcInstance.class.getCanonicalName(), false);
 
     private static final Set<String> EXCLUDED_RPC_NAMES = new HashSet<>();
     static

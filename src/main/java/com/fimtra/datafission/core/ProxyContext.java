@@ -73,6 +73,7 @@ import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -123,7 +124,7 @@ public final class ProxyContext implements IObserverContext
      * <li>RPC call responses
      * </ul>
      */
-    public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
+    public static boolean log = SystemUtils.getProperty("log." + ProxyContext.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -131,7 +132,7 @@ public final class ProxyContext implements IObserverContext
      * <li>Inbound messages
      * </ul>
      */
-    public static boolean logRx = Boolean.getBoolean("logRx." + ProxyContext.class.getCanonicalName());
+    public static boolean logRx = SystemUtils.getProperty("logRx." + ProxyContext.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -141,7 +142,7 @@ public final class ProxyContext implements IObserverContext
      * <ul>
      */
     public static boolean logVerboseSubscribes =
-        Boolean.getBoolean("logVerboseSubscribes." + ProxyContext.class.getCanonicalName());
+        SystemUtils.getProperty("logVerboseSubscribes." + ProxyContext.class.getCanonicalName(), false);
 
     /** Acknowledges the successful completion of a subscription */
     static final String ACK = ContextUtils.PROTOCOL_PREFIX + "ACK_";

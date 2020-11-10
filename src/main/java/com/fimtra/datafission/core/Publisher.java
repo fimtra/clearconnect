@@ -58,6 +58,7 @@ import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -89,13 +90,13 @@ public class Publisher
      * This can be useful to improve performance for situations where there is high-throughput of
      * record creates
      */
-    public static boolean log = Boolean.getBoolean("log." + Publisher.class.getCanonicalName());
+    public static boolean log = SystemUtils.getProperty("log." + Publisher.class.getCanonicalName(), false);
 
     /**
      * Controls logging of outbound traffic. Only the first 200 bytes per message are logged.
      */
     public static boolean logTx =
-            Boolean.getBoolean("logTx." + ProxyContextPublisher.class.getCanonicalName());
+            SystemUtils.getProperty("logTx." + ProxyContextPublisher.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -105,7 +106,7 @@ public class Publisher
      * <ul>
      */
     public static boolean logVerboseSubscribes =
-            Boolean.getBoolean("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName());
+            SystemUtils.getProperty("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName(), false);
 
     static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong();
     static final AtomicLong BYTES_PUBLISHED = new AtomicLong();
