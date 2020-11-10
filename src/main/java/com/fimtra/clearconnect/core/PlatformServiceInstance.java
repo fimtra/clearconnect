@@ -25,6 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.TransportTechnologyEnum;
@@ -100,7 +101,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     static final String RPC_FT_SERVICE_STATUS = "ftServiceInstanceStatus";
 
     boolean active;
-    final long startTimeMillis;
     final Context context;
     Boolean isFtMasterInstance;
     final String platformName;
@@ -124,8 +124,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
         TransportTechnologyEnum transportTechnology)
     {
-        this.startTimeMillis = System.currentTimeMillis();
-
         this.platformName = platformName;
         this.serviceFamily = serviceFamily;
         this.serviceMember = serviceMember;
@@ -150,62 +148,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
 
         // update service stats periodically
-        this.statsUpdateTask = ThreadUtils.scheduleWithFixedDelay(this, new Runnable() {
-            long lastMessagesPublished = 0;
-            long lastBytesPublished = 0;
-            long lastTimeNanos;
-
-            @Override
-            public void run()
-            {
-                IRecord subscriptions =
-                    PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-
-                int subscriptionCount = 0;
-                for (Map.Entry<String, IValue> stringIValueEntry : subscriptions.entrySet())
-                {
-                    subscriptionCount += stringIValueEntry.getValue().longValue();
-                }
-
-                final long nanoTime = System.nanoTime();
-                final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
-                final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
-
-                final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
-                final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
-
-                this.lastMessagesPublished = messagesPublished;
-                this.lastBytesPublished = bytesPublished;
-
-                final double perSec = 1000000000d / (nanoTime - this.lastTimeNanos);
-                this.lastTimeNanos = nanoTime;
-                final double inverse_1K = 1 / 1024d;
-
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
-                    DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_PER_SEC,
-                    DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
-                    // use the period stats for calculating the average message size
-                    LongValue.valueOf(
-                        msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
-                    LongValue.valueOf(subscriptionCount));
-                PlatformServiceInstance.this.stats.put(
-                    IServiceStatsRecordFields.UPTIME,
-                    LongValue.valueOf((long) ((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) * 0.001d)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
-                    LongValue.valueOf(messagesPublished));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
-                    LongValue.valueOf((long) (bytesPublished * inverse_1K)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RECORD_COUNT,
-                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
-                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
-
-                PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
-            }
-        }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+        this.statsUpdateTask = setupStatsUpdateTask(this.context, this.publisher, this.stats);
 
         this.recordAvailableNotifyingCache =
             PlatformUtils.createRecordAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RECORDS, this);
@@ -230,6 +173,72 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         this.endPointAddress = new EndPointAddress(host, this.publisher.getEndPointAddress().getPort());
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
+    }
+
+    static ScheduledFuture<?> setupStatsUpdateTask(final Context context, final Publisher publisher,
+            final IRecord stats)
+    {
+        return ThreadUtils.scheduleWithFixedDelay(context, new Runnable() {
+            final AtomicLong lastMessagesPublished = new AtomicLong();
+            final AtomicLong lastBytesPublished = new AtomicLong();
+            final AtomicLong lastTimeNanos = new AtomicLong();
+            final long startTimeMillis = System.currentTimeMillis();
+
+            @Override
+            public void run()
+            {
+                publishServiceStats(context, publisher, stats, this.startTimeMillis,
+                        this.lastMessagesPublished, this.lastBytesPublished, this.lastTimeNanos,
+                        context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size(),
+                        context.getRecord(ISystemRecordNames.CONTEXT_RPCS).size());
+            }
+        }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+    }
+
+    private static void publishServiceStats(Context l_context, Publisher l_publisher, IRecord statsRecord,
+            long startTimeMillis, AtomicLong l_lastMessagesPublished, AtomicLong l_lastBytesPublished,
+            AtomicLong l_lastTimeNanos, int l_recordCount, int l_rpcCount)
+    {
+        IRecord subscriptions = l_context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+
+        int subscriptionCount = 0;
+        for (Map.Entry<String, IValue> stringIValueEntry : subscriptions.entrySet())
+        {
+            subscriptionCount += stringIValueEntry.getValue().longValue();
+        }
+
+        final long nanoTime = System.nanoTime();
+        final long messagesPublished = l_publisher.getMessagesPublished();
+        final long bytesPublished = l_publisher.getBytesPublished();
+
+        final long msgsPublishedInPeriod = messagesPublished - l_lastMessagesPublished.get();
+        final long bytesPublishedInPeriod = bytesPublished - l_lastBytesPublished.get();
+
+        l_lastMessagesPublished.set(messagesPublished);
+        l_lastBytesPublished.set(bytesPublished);
+
+        final double perSec = 1000000000d / (nanoTime - l_lastTimeNanos.get());
+        l_lastTimeNanos.set(nanoTime);
+        final double inverse_1K = 1 / 1024d;
+
+        statsRecord.put(IServiceStatsRecordFields.MSGS_PER_SEC,
+                DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
+        statsRecord.put(IServiceStatsRecordFields.KB_PER_SEC,
+                DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
+        statsRecord.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
+                // use the period stats for calculating the average message size
+                LongValue.valueOf(
+                        msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
+        statsRecord.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT, LongValue.valueOf(subscriptionCount));
+        statsRecord.put(IServiceStatsRecordFields.UPTIME,
+                LongValue.valueOf((long) ((System.currentTimeMillis() - startTimeMillis) * 0.001d)));
+        statsRecord.put(IServiceStatsRecordFields.MESSAGE_COUNT, LongValue.valueOf(messagesPublished));
+        statsRecord.put(IServiceStatsRecordFields.KB_COUNT,
+                LongValue.valueOf((long) (bytesPublished * inverse_1K)));
+
+        statsRecord.put(IServiceStatsRecordFields.RECORD_COUNT, LongValue.valueOf(l_recordCount));
+        statsRecord.put(IServiceStatsRecordFields.RPC_COUNT, LongValue.valueOf(l_rpcCount));
+        l_context.publishAtomicChange(statsRecord);
     }
 
     @Override

@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -316,6 +317,8 @@ public final class PlatformRegistry
     final EventHandler eventHandler;
     final AtomicLong serviceSequence;
     final AtomicLong registrationTokenCounter;
+    final ScheduledFuture<?> statsUpdateTask;
+    final IRecord stats;
 
     /**
      * Construct the platform registry using the default platform registry port.
@@ -380,6 +383,18 @@ public final class PlatformRegistry
         this.services.put(SERVICE_NAME, RedundancyModeEnum.FAULT_TOLERANT.toString());
         this.serviceInstancesPerServiceFamily.getOrCreateSubMap(SERVICE_NAME).put(platformName,
                 LongValue.valueOf(nextSequence()));
+
+        // setup creating the service stats record for the registry!
+        this.stats = this.context.getOrCreateRecord(PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
+        this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
+        this.statsUpdateTask =
+                PlatformServiceInstance.setupStatsUpdateTask(this.context, this.publisher, this.stats);
+        // now register to update the services records
+        this.context.addObserver((imageCopy, atomicChange) -> this.eventHandler.execute(
+                "handle service stats record change: " + SERVICE_NAME, SERVICE_NAME,
+                () -> this.eventHandler.updateServiceStats(SERVICE_NAME,
+                        PlatformUtils.composePlatformServiceInstanceID(SERVICE_NAME, platformName),
+                        imageCopy)), PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
 
         this.context.publishAtomicChange(this.services);
 
@@ -601,6 +616,7 @@ public final class PlatformRegistry
     public void destroy()
     {
         Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+        this.statsUpdateTask.cancel(false);
         this.publisher.destroy();
         this.context.destroy();
 
@@ -1772,69 +1788,74 @@ final class EventHandler
         }
         else
         {
-            final Map<String, IValue> statsForService =
-                    this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
-            statsForService.putAll(imageCopy);
+            updateServiceStats(serviceFamily, serviceInstanceId, imageCopy);
+        }
+    }
 
-            // compute the service-level stats
-            if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
+    void updateServiceStats(String serviceFamily, String serviceInstanceId, IRecord imageCopy)
+    {
+        final Map<String, IValue> statsForService =
+                this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
+        statsForService.putAll(imageCopy);
+
+        // compute the service-level stats
+        if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
+        {
+            final Set<String> members = this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(
+                    serviceFamily).keySet();
+            final Set<String> availableInstances = this.registry.serviceInstanceStats.getSubMapKeys();
+
+            long kbCount = 0;
+            long kbPerSec = 0;
+            long msgCount = 0;
+            long msgsPerSec = 0;
+            long subscriptionCount = 0;
+            long txQSize = 0;
+            long rpcCount = 0;
+            long recordCount = 0;
+            long serviceInstanceCount = 0;
+            String instanceId;
+            Map<String, IValue> instanceStats;
+            for (String member : members)
             {
-                final Set<String> members = this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(
-                        serviceFamily).keySet();
-                final Set<String> availableInstances = this.registry.serviceInstanceStats.getSubMapKeys();
-
-                long kbCount = 0;
-                long kbPerSec = 0;
-                long msgCount = 0;
-                long msgsPerSec = 0;
-                long subscriptionCount = 0;
-                long txQSize = 0;
-                long rpcCount = 0;
-                long recordCount = 0;
-                long serviceInstanceCount = 0;
-                String instanceId;
-                Map<String, IValue> instanceStats;
-                for (String member : members)
+                instanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, member);
+                if (availableInstances.contains(instanceId))
                 {
-                    instanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, member);
-                    if (availableInstances.contains(instanceId))
-                    {
-                        instanceStats = this.registry.serviceInstanceStats.getOrCreateSubMap(instanceId);
-                        serviceInstanceCount++;
-                        kbCount += getLong(instanceStats.get(IServiceRecordFields.KB_COUNT));
-                        kbPerSec += getLong(instanceStats.get(IServiceRecordFields.KB_PER_SEC));
-                        msgCount += getLong(instanceStats.get(IServiceRecordFields.MESSAGE_COUNT));
-                        msgsPerSec += getLong(instanceStats.get(IServiceRecordFields.MSGS_PER_SEC));
-                        subscriptionCount +=
-                                getLong(instanceStats.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
-                        txQSize += getLong(instanceStats.get(IServiceRecordFields.TX_QUEUE_SIZE));
+                    instanceStats = this.registry.serviceInstanceStats.getOrCreateSubMap(instanceId);
+                    serviceInstanceCount++;
+                    kbCount += getLong(instanceStats.get(IServiceRecordFields.KB_COUNT));
+                    kbPerSec += getLong(instanceStats.get(IServiceRecordFields.KB_PER_SEC));
+                    msgCount += getLong(instanceStats.get(IServiceRecordFields.MESSAGE_COUNT));
+                    msgsPerSec += getLong(instanceStats.get(IServiceRecordFields.MSGS_PER_SEC));
+                    subscriptionCount +=
+                            getLong(instanceStats.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
+                    txQSize += getLong(instanceStats.get(IServiceRecordFields.TX_QUEUE_SIZE));
 
-                        // we assume services are equal so do not double-count records and rpcs
-                        rpcCount = getLong(instanceStats.get(IServiceRecordFields.RPC_COUNT));
-                        recordCount = getLong(instanceStats.get(IServiceRecordFields.RECORD_COUNT));
-                    }
-                }
-                synchronized (this.registry.serviceStats.getWriteLock())
-                {
-                    final Map<String, IValue> familyStats =
-                            this.registry.serviceStats.getOrCreateSubMap(serviceFamily);
-                    familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbCount));
-                    familyStats.put(IServiceRecordFields.KB_PER_SEC, LongValue.valueOf(kbPerSec));
-                    familyStats.put(IServiceRecordFields.MESSAGE_COUNT, LongValue.valueOf(msgCount));
-                    familyStats.put(IServiceRecordFields.MSGS_PER_SEC, LongValue.valueOf(msgsPerSec));
-                    familyStats.put(IServiceRecordFields.SUBSCRIPTION_COUNT,
-                            LongValue.valueOf(subscriptionCount));
-                    familyStats.put(IServiceRecordFields.TX_QUEUE_SIZE, LongValue.valueOf(txQSize));
-                    familyStats.put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
-                            LongValue.valueOf(serviceInstanceCount));
-                    familyStats.put(IServiceRecordFields.RPC_COUNT, LongValue.valueOf(rpcCount));
-                    familyStats.put(IServiceRecordFields.RECORD_COUNT, LongValue.valueOf(recordCount));
+                    // we assume services are equal so do not double-count records and rpcs
+                    rpcCount = getLong(instanceStats.get(IServiceRecordFields.RPC_COUNT));
+                    recordCount = getLong(instanceStats.get(IServiceRecordFields.RECORD_COUNT));
                 }
             }
-
-            publishTimed(this.registry.serviceInstanceStats);
-            publishTimed(this.registry.serviceStats);
+            synchronized (this.registry.serviceStats.getWriteLock())
+            {
+                final Map<String, IValue> familyStats =
+                        this.registry.serviceStats.getOrCreateSubMap(serviceFamily);
+                familyStats.put(IServiceRecordFields.KB_COUNT, LongValue.valueOf(kbCount));
+                familyStats.put(IServiceRecordFields.KB_PER_SEC, LongValue.valueOf(kbPerSec));
+                familyStats.put(IServiceRecordFields.MESSAGE_COUNT, LongValue.valueOf(msgCount));
+                familyStats.put(IServiceRecordFields.MSGS_PER_SEC, LongValue.valueOf(msgsPerSec));
+                familyStats.put(IServiceRecordFields.SUBSCRIPTION_COUNT,
+                        LongValue.valueOf(subscriptionCount));
+                familyStats.put(IServiceRecordFields.TX_QUEUE_SIZE, LongValue.valueOf(txQSize));
+                familyStats.put(IServiceRecordFields.SERVICE_INSTANCE_COUNT,
+                        LongValue.valueOf(serviceInstanceCount));
+                familyStats.put(IServiceRecordFields.RPC_COUNT, LongValue.valueOf(rpcCount));
+                familyStats.put(IServiceRecordFields.RECORD_COUNT, LongValue.valueOf(recordCount));
+            }
         }
+
+        publishTimed(this.registry.serviceInstanceStats);
+        publishTimed(this.registry.serviceStats);
     }
 
     private void logExceptionAndDeregister_familyScope(final RegistrationToken registrationToken,

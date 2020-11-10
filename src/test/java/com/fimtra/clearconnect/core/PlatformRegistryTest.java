@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.channel.TransportTechnologyEnum;
@@ -111,12 +112,16 @@ public class PlatformRegistryTest
         }
 
         // create a service too (async)
-        Arrays.stream(agents).forEach((a) ->{
-            ThreadUtils.newThread(() ->{
-                assertTrue(
+        AtomicInteger serviceCounter = new AtomicInteger();
+        Arrays.stream(agents).forEach((a) -> {
+            ThreadUtils.newThread(() -> {
+                final boolean platformServiceInstance =
                         a.createPlatformServiceInstance(serviceFamily, "instance-" + a.getAgentName(),
                                 TcpChannelUtils.LOCALHOST_IP, WireProtocolEnum.GZIP,
-                                RedundancyModeEnum.FAULT_TOLERANT));
+                                RedundancyModeEnum.FAULT_TOLERANT);
+                System.err.println(serviceCounter.incrementAndGet() + "/" + MAX + " service registered="
+                        + platformServiceInstance);
+                assertTrue(platformServiceInstance);
             }, "service-create-" + a.getAgentName()).start();
         });
 
@@ -268,7 +273,8 @@ public class PlatformRegistryTest
 
         // the platform registry adds itself as a service instance
         checkSize(0, 1, this.candidate.serviceInstancesPerServiceFamily);
-        checkZeroSize(this.candidate.serviceInstanceStats);
+        // the registry exists in the service instance stats
+        checkSize(0, 1, this.candidate.serviceInstanceStats);
         // the platform registry adds itself as a service
         checkSize(1, 0, this.candidate.services);
         checkZeroSize(this.candidate.eventHandler.monitoredServiceInstances);
