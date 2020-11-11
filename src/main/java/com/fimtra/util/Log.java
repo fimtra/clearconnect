@@ -23,6 +23,7 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -45,12 +46,19 @@ public abstract class Log
     private static final String DELIM = "|";
     private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
-            ThreadUtils.newScheduledExecutorService("log-file-appender", 1);
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "log-file-appender");
+                t.setDaemon(true);
+                return t;
+            });
     private static final Object lock = new Object();
     private static final Object qLock = new Object();
     private static final LazyObject<ExecutorService> CONSOLE_WRITER_EXECUTOR =
-            new LazyObject<>(() -> ThreadUtils.newSingleThreadExecutorService("console-writer"),
-                    ExecutorService::shutdown);
+            new LazyObject<>(() -> Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "console-writer");
+                t.setDaemon(true);
+                return t;
+            }), ExecutorService::shutdown);
     private static PrintStream consoleStream = System.err;
 
     static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ArrayDeque<>();
@@ -194,7 +202,7 @@ public abstract class Log
         }));
 
         // use a thread to perform archiving/purging to prevent startup delays
-        ThreadUtils.newThread(() -> {
+        new Thread(() -> {
             if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
             {
                 FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
