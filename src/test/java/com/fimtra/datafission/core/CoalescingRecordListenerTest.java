@@ -31,6 +31,7 @@ import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
+import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,6 +63,13 @@ public class CoalescingRecordListenerTest
     {
         this.executor = ContextExecutorFactory.create("CoalescingRecordListenerTest", 1);
         this.candidate = new Context("testContext");
+        for (int i = 0; i < 10; i++)
+        {
+            this.executor.execute(() -> {
+                ThreadUtils.sleep(50);
+                System.err.println(Thread.currentThread() + " warm-up");
+            });
+        }
     }
 
     @After

@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2015 Ramon Servadei, Fimtra
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -51,14 +51,14 @@ import org.junit.Test;
 
 /**
  * Tests for the {@link PlatformRegistry}
- * 
+ *
  * @author Ramon Servadei
  */
-public class PlatformRegistryTest
-{
+public class PlatformRegistryTest {
     PlatformRegistry candidate;
     static int regPort = 21212;
     static int port = regPort + 1;
+    private int LOG_COUNT = 50;
 
     @Before
     public void setup()
@@ -85,29 +85,32 @@ public class PlatformRegistryTest
         disconnectedLatch.set(new CountDownLatch(MAX));
         final String serviceFamily = "testMultipleConnectionsRestart";
         PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
-        System.err.println("Constructing "+ MAX + " agents with 1 service each...");
+        System.err.println("Constructing " + MAX + " agents with 1 service each...");
         for (int i = 0; i < MAX; i++)
         {
             long time = System.nanoTime();
             final String suffix = i + "-" + System.nanoTime();
-            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i] =
+                    new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
             agents[i].setRegistryReconnectPeriodMillis(500);
             agents[i].addRegistryAvailableListener(
-                EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
-                {
-                    @Override
-                    public void onRegistryDisconnected()
-                    {
-                        disconnectedLatch.get().countDown();
-                    }
+                    EventListenerUtils.synchronizedListener(new IRegistryAvailableListener() {
+                        @Override
+                        public void onRegistryDisconnected()
+                        {
+                            disconnectedLatch.get().countDown();
+                        }
 
-                    @Override
-                    public void onRegistryConnected()
-                    {
-                        connectedLatch.get().countDown();
-                    }
-                }));
-            System.err.println(i + "(" + ((System.nanoTime() - time) / 1_000_000) + "ms)...");
+                        @Override
+                        public void onRegistryConnected()
+                        {
+                            connectedLatch.get().countDown();
+                        }
+                    }));
+            if (i % LOG_COUNT == 0)
+            {
+                System.err.println(i + "(" + ((System.nanoTime() - time) / 1_000_000) + "ms)...");
+            }
 
         }
 
@@ -119,8 +122,11 @@ public class PlatformRegistryTest
                         a.createPlatformServiceInstance(serviceFamily, "instance-" + a.getAgentName(),
                                 TcpChannelUtils.LOCALHOST_IP, WireProtocolEnum.GZIP,
                                 RedundancyModeEnum.FAULT_TOLERANT);
-                System.err.println(serviceCounter.incrementAndGet() + "/" + MAX + " service registered="
-                        + platformServiceInstance);
+                final int i = serviceCounter.incrementAndGet();
+                if (i % LOG_COUNT == 0)
+                {
+                    System.err.println(i + "/" + MAX + " service registered=" + platformServiceInstance);
+                }
                 assertTrue(platformServiceInstance);
             }, "service-create-" + a.getAgentName()).start();
         });
@@ -140,17 +146,17 @@ public class PlatformRegistryTest
 
             int STABILISE_PAUSE = 1000;
             System.err.println("Sleeping " + STABILISE_PAUSE + "ms before destroying registry...");
-            Log.banner(this,"SLEEPING " + STABILISE_PAUSE + "ms BEFORE DESTROYING REGISTRY");
+            Log.banner(this, "SLEEPING " + STABILISE_PAUSE + "ms BEFORE DESTROYING REGISTRY");
             Thread.sleep(STABILISE_PAUSE);
             System.err.println("continuing...");
 
-            Log.banner(this,"DESTROYING REGISTRY...");
+            Log.banner(this, "DESTROYING REGISTRY...");
             this.candidate.destroy();
-            Log.banner(this,"DESTROYED REGISTRY...");
+            Log.banner(this, "DESTROYED REGISTRY...");
             assertTrue(disconnectedLatch.get().await(timeout, TimeUnit.SECONDS));
 
             System.err.println("Sleeping " + STABILISE_PAUSE + "ms before re-creating registry...");
-            Log.banner(this,"SLEEPING " + STABILISE_PAUSE + "ms BEFORE RE-CREATING REGISTRY");
+            Log.banner(this, "SLEEPING " + STABILISE_PAUSE + "ms BEFORE RE-CREATING REGISTRY");
             Thread.sleep(STABILISE_PAUSE);
             System.err.println("continuing...");
 
@@ -163,7 +169,8 @@ public class PlatformRegistryTest
                 try
                 {
                     this.candidate =
-                        new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+                            new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP,
+                                    regPort);
                 }
                 catch (Exception e)
                 {
@@ -184,7 +191,8 @@ public class PlatformRegistryTest
         }
         finally
         {
-            Log.banner(this,"SHUTTING DOWN AGENTS");
+            System.err.println("SHUTTING DOWN AGENTS");
+            Log.banner(this, "SHUTTING DOWN AGENTS");
             for (PlatformRegistryAgent agent : agents)
             {
                 agent.destroy();
@@ -199,7 +207,12 @@ public class PlatformRegistryTest
         candidate.context.addObserver((image, atomicChange) -> {
             if (image.getSubMapKeys().contains(serviceFamily))
             {
-                if (image.getOrCreateSubMap(serviceFamily).values().size() == MAX)
+                final int count = image.getOrCreateSubMap(serviceFamily).values().size();
+                if (count % LOG_COUNT == 0)
+                {
+                    System.err.println("Service count=" + count);
+                }
+                if (count == MAX)
                 {
                     servicesLatch.get().countDown();
                 }
@@ -217,22 +230,22 @@ public class PlatformRegistryTest
         for (int i = 0; i < MAX; i++)
         {
             final String suffix = i + "-" + System.nanoTime();
-            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i] =
+                    new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
 
-            agents[i].createPlatformServiceInstance("Test-FTservice", suffix, TcpChannelUtils.LOCALHOST_IP, port++,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice" , suffix));
+            agents[i].createPlatformServiceInstance("Test-FTservice", suffix, TcpChannelUtils.LOCALHOST_IP,
+                    port++, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice", suffix));
 
             // create a load balanced service
-            agents[i].createPlatformServiceInstance("Test-LBservice", suffix, TcpChannelUtils.LOCALHOST_IP, port++,
-                WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice" , suffix));
+            agents[i].createPlatformServiceInstance("Test-LBservice", suffix, TcpChannelUtils.LOCALHOST_IP,
+                    port++, WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED);
+            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice", suffix));
         }
 
         final CountDownLatch allConnections = new CountDownLatch(1);
         final CountDownLatch noConnections = new CountDownLatch(1);
-        this.candidate.context.addObserver(new IRecordListener()
-        {
+        this.candidate.context.addObserver(new IRecordListener() {
             boolean connected;
 
             @Override
@@ -290,17 +303,18 @@ public class PlatformRegistryTest
     void publishRecordAndRpc(final String suffix, final IPlatformServiceInstance service)
     {
         ((PlatformServiceInstance) service).publisher.publishContextConnectionsRecordAtPeriod(100);
-        final IRecord record = service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
+        final IRecord record =
+                service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
         record.put("field", System.currentTimeMillis());
         service.publishRecord(record);
-        service.publishRPC(new RpcInstance(TypeEnum.DOUBLE, "rpc-" + System.currentTimeMillis() + "-" + suffix));
+        service.publishRPC(
+                new RpcInstance(TypeEnum.DOUBLE, "rpc-" + System.currentTimeMillis() + "-" + suffix));
     }
 
     private static void checkSize(final int expectedRecordFieldCount, final int expectedSubMapSize,
-        final IRecord record) throws EventFailedException, InterruptedException
+            final IRecord record) throws EventFailedException, InterruptedException
     {
-        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
-        {
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason() {
             @Override
             public Object got()
             {
@@ -320,8 +334,7 @@ public class PlatformRegistryTest
             }
         }, 10000);
 
-        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
-        {
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason() {
             @Override
             public Object got()
             {

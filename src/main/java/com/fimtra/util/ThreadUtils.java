@@ -73,7 +73,10 @@ public abstract class ThreadUtils {
 
     private static final ScheduledExecutorService SCHEDULER =
             ThreadUtils.newPermanentScheduledExecutorService("util-scheduler", 1);
-    private static final IContextExecutor UTILS_EXECUTOR = ContextExecutorFactory.create("util-executor", 1);
+    // this must be lazy to avoid class <init> problems
+    private static final LazyObject<IContextExecutor> UTILS_EXECUTOR =
+            new LazyObject<>(() -> ContextExecutorFactory.create("util-executor", 1), (c) -> {
+            });
 
     /**
      * Execute the command with the context using the internal {@link IContextExecutor} at a time in the
@@ -124,7 +127,7 @@ public abstract class ThreadUtils {
 
     private static Runnable executeInContext(Runnable r, Object context)
     {
-        return () -> UTILS_EXECUTOR.execute(new ISequentialRunnable() {
+        return () -> UTILS_EXECUTOR.get().execute(new ISequentialRunnable() {
             @Override
             public Object context()
             {
