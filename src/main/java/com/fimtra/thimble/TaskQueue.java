@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.SingleThreadReusableObjectPool;
+import com.fimtra.util.SystemUtils;
 
 /**
  * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted via the
@@ -47,12 +48,12 @@ final class TaskQueue {
      * By default, the queue tracks task statistics at a queue level, not at a per-context level
      */
     private final static boolean GENERATE_STATISTICS_PER_CONTEXT =
-            Boolean.getBoolean("thimble.generateStatisticsPerContext");
+            SystemUtils.getProperty("thimble.generateStatisticsPerContext", false);
 
     private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
-            Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
+            SystemUtils.getPropertyAsInt("thimble.sequentialTasksMaxPoolSize", 1000);
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
-            Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
+            SystemUtils.getPropertyAsInt("thimble.coalescingTasksMaxPoolSize", 1000);
 
     interface InternalTaskQueue<T> extends Runnable {
         void offer(T t);

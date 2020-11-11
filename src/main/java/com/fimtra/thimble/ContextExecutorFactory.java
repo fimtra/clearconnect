@@ -15,6 +15,10 @@
  */
 package com.fimtra.thimble;
 
+import java.util.Map;
+
+import com.fimtra.util.Log;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -28,13 +32,67 @@ public class ContextExecutorFactory {
      * Defines if the pooled version is active - all calls to {@link #create(String, int)} will return the
      * pool not a unique instance.
      */
-    public static final boolean POOL_ACTIVE = !Boolean.getBoolean("ContextExecutorFactory.poolInactive");
+    public static final boolean POOL_ACTIVE =
+            SystemUtils.getProperty("ContextExecutorFactory.poolActive", true);
 
     private static final int CORE_SIZE =
-            Integer.parseInt(System.getProperty("ContextExecutorFactory.coreSize", "1"));
+            SystemUtils.getPropertyAsInt("ContextExecutorFactory.coreSize", 1);
 
     private static class POOL_HOLDER {
-        static final ThimbleExecutor POOL = new ThimbleExecutor("thimble", CORE_SIZE);
+        // return an un-destroyable version
+        static final IContextExecutor POOL = new IContextExecutor() {
+
+            final ThimbleExecutor delegate = new ThimbleExecutor("core", CORE_SIZE);
+
+            @Override
+            public boolean isExecutorThread(long id)
+            {
+                return this.delegate.isExecutorThread(id);
+            }
+
+            @Override
+            public String toString()
+            {
+                return this.delegate.toString();
+            }
+
+            @Override
+            public void execute(Runnable command)
+            {
+                this.delegate.execute(command);
+            }
+
+            @Override
+            public Map<Object, TaskStatistics> getSequentialTaskStatistics()
+            {
+                return this.delegate.getSequentialTaskStatistics();
+            }
+
+            @Override
+            public Map<Object, TaskStatistics> getCoalescingTaskStatistics()
+            {
+                return this.delegate.getCoalescingTaskStatistics();
+            }
+
+            @Override
+            public TaskStatistics getExecutorStatistics()
+            {
+                return this.delegate.getExecutorStatistics();
+            }
+
+            @Override
+            public void destroy()
+            {
+                // cannot destroy
+                Log.log(this.delegate, "Cannot destroy " + this);
+            }
+
+            @Override
+            public String getName()
+            {
+                return this.delegate.getName();
+            }
+        };
     }
 
     /**

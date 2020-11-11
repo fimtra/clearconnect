@@ -336,10 +336,9 @@ public class ThimbleExecutorTest
         {
             candidate.execute(blockedTask);
         }
-        Thread.sleep(1000);
         candidate.execute(trigger);
         candidate.execute(trigger);
 
-        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
     }
 }

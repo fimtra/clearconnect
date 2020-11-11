@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,6 +34,7 @@ import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -69,8 +71,7 @@ import com.fimtra.util.ThreadUtils;
  * @see ISequentialRunnable
  * @see ICoalescingRunnable
  */
-public final class ThimbleExecutor implements IContextExecutor
-{
+public final class ThimbleExecutor implements IContextExecutor {
     public static Set<ThimbleExecutor> getExecutors()
     {
         return Collections.unmodifiableSet(EXECUTORS);
@@ -81,12 +82,13 @@ public final class ThimbleExecutor implements IContextExecutor
     private static final Runnable NOOP = () -> {
     };
     private static final long IDLE_PERIOD_MILLIS =
-            Long.parseLong(System.getProperty("thimble.idlePeriodMillis", "10000"));
-    private static final int MAX_THREADS = Integer.parseInt(
-            System.getProperty("thimble.maxThreads", "" + Runtime.getRuntime().availableProcessors() * 10));
-
-    private static final int STALL_PERIOD_CHECK =
-            Integer.parseInt(System.getProperty("thimble.stallCheckMillis", "500"));
+            SystemUtils.getPropertyAsLong("thimble.idlePeriodMillis", 10_000);
+    private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("thimble.maxThreads",
+            Runtime.getRuntime().availableProcessors() * 10);
+    private static final long PENDING_STALL_CHECK_MILLIS =
+            SystemUtils.getPropertyAsLong("thimble.pendingStallCheckMillis", 50);
+    private static final long STALL_PERIOD_CHECK =
+            SystemUtils.getPropertyAsLong("thimble.stallCheckMillis", 500);
     private static final ScheduledExecutorService ANTI_STALL =
             ThreadUtils.newPermanentScheduledExecutorService("anti-stall", 1);
 
@@ -117,8 +119,7 @@ public final class ThimbleExecutor implements IContextExecutor
      *
      * @author Ramon Servadei
      */
-    final class TaskRunner implements Runnable
-    {
+    final class TaskRunner implements Runnable {
         final Thread workerThread;
         final Object lock;
         final Integer number;
@@ -254,6 +255,7 @@ public final class ThimbleExecutor implements IContextExecutor
     long idlePeriodNanos = IDLE_PERIOD_MILLIS * 1_000_000;
     volatile long idlePeriodMillis = IDLE_PERIOD_MILLIS;
     long lastExecuteTimeNanos = System.nanoTime();
+    ScheduledFuture<?> stallCheckPending;
 
     volatile long[] tids = new long[0];
 
@@ -312,12 +314,15 @@ public final class ThimbleExecutor implements IContextExecutor
         this.taskQueue = new TaskQueue(this.name);
         this.taskRunnersRef = new LinkedList<>();
         EXECUTORS.add(this);
+
+        this.stallCheckPending = ANTI_STALL.schedule(this::check, PENDING_STALL_CHECK_MILLIS,
+                TimeUnit.MILLISECONDS);
     }
 
     @Override
     public String toString()
     {
-        return "ThimbleExecutor[" + this.name + ":" + this.size + "]";
+        return "ThimbleExecutor[" + this.name + ":" + this.taskRunnersRef.size() + "]";
     }
 
     @Override
@@ -346,7 +351,17 @@ public final class ThimbleExecutor implements IContextExecutor
             {
                 if (this.taskRunners.size() == 0)
                 {
-                    check();
+                    if (this.taskRunnersRef.size() < this.size)
+                    {
+                        addTaskRunner_callWhilstHoldingLock();
+                    }
+                    else if (this.stallCheckPending.isDone())
+                    {
+                        // trigger a check
+                        this.stallCheckPending = ANTI_STALL.schedule(this::check, PENDING_STALL_CHECK_MILLIS,
+                                TimeUnit.MILLISECONDS);
+                    }
+
                     // all runners being used - they will auto-drain the taskQueue
                     return;
                 }
@@ -374,18 +389,25 @@ public final class ThimbleExecutor implements IContextExecutor
             {
                 if (!this.taskQueue.isNotDraining_callWhilstHoldingLock())
                 {
-                    // if draining, check runners are not all blocked
+                    // if draining (or 0!), check runners are not all blocked
                     for (TaskRunner taskRunner : this.taskRunnersRef)
                     {
                         if (taskRunner.task == null
                                 || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
                         {
+                            // at least one runner idle or running
                             return;
                         }
                     }
                 }
 
-                addTaskRunner_callWhilstHoldingLock();
+                // add a runner per outstanding task if under MAX_THREADS, else 1
+                final int burst = Math.max(1,
+                        Math.min(MAX_THREADS - this.taskRunnersRef.size(), this.taskQueue.lastTriggerSize));
+                for (int i = 0; i < burst; i++)
+                {
+                    addTaskRunner_callWhilstHoldingLock();
+                }
             }
         }
         catch (Exception e)
@@ -396,12 +418,10 @@ public final class ThimbleExecutor implements IContextExecutor
 
     private void addTaskRunner_callWhilstHoldingLock()
     {
-        // todo check we don't create 1000's of threads
         final int size = this.taskRunnersRef.size();
         if (size > MAX_THREADS)
         {
             Log.log(this, this.toString() + " maximum thread count exceeded: " + size + "/" + MAX_THREADS);
-            //            System.err.println(this.toString() + " maximum thread count exceeded: " + size + "/" + MAX_THREADS);
         }
 
         TaskRunner runner;
