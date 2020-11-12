@@ -238,7 +238,7 @@ public abstract class Log
     public static void log(Object source, String message, Throwable t)
     {
         final StringWriter stringWriter = new StringWriter(1024);
-        try (final PrintWriter pw = new PrintWriter(stringWriter);)
+        try (final PrintWriter pw = new PrintWriter(stringWriter))
         {
             pw.println();
             t.printStackTrace(pw);
