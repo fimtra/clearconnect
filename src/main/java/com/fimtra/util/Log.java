@@ -45,11 +45,11 @@ public abstract class Log
     private static final String DELIM = "|";
     private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
-            ThreadUtils.newScheduledExecutorService("log-file-appender", 1);
+            ThreadUtils.newPermanentScheduledExecutorService("log-file-appender", 1);
     private static final Object lock = new Object();
     private static final Object qLock = new Object();
     private static final LazyObject<ExecutorService> CONSOLE_WRITER_EXECUTOR =
-            new LazyObject<>(() -> ThreadUtils.newSingleThreadExecutorService("console-writer"),
+            new LazyObject<>(() -> ThreadUtils.newPermanentScheduledExecutorService("console-writer", 1),
                     ExecutorService::shutdown);
     private static PrintStream consoleStream = System.err;
 
