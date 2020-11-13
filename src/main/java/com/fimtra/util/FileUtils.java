@@ -473,12 +473,8 @@ public abstract class FileUtils
         @Override
         public boolean accept(File file)
         {
-            if (file.isFile() && file.lastModified() < System.currentTimeMillis() - this.timeUnit.toMillis(
-                    this.olderThan))
-            {
-                return true;
-            }
-            return false;
+            return file.isFile() && file.lastModified() < System.currentTimeMillis() - this.timeUnit.toMillis(
+                    this.olderThan);
         }
     }
 

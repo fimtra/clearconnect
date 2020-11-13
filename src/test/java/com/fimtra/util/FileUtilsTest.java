@@ -138,14 +138,9 @@ public class FileUtilsTest {
 
 	@Test
 	public void shouldFindOldFiles() throws URISyntaxException {
-		File sourceFile = new File(this.getClass().getClassLoader().getResource(logFileName).toURI());
-		File dir = sourceFile.getParentFile();
-		File subDir = new File(dir, "subDir");
-		subDir.deleteOnExit();
-		assertTrue(subDir.mkdir());
+		File dir = new File("./..");
 
 		File[] files = FileUtils.findFiles(dir, 1);
-		// this test relies on other test output
 		assertTrue(files.length > 0);
 
 		files = FileUtils.findFiles(dir, Long.MAX_VALUE);

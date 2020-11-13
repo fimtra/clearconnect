@@ -101,7 +101,8 @@ public class CoalescingRecordListenerTest
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
         assertEquals(instance, observer.getLatestImage());
 
-        for (int i = 0; i < 100; i++)
+        final int MAX = 10000;
+        for (int i = 0; i < MAX; i++)
         {
             instance.put(K1, i);
             submap.put(K2, LongValue.valueOf(i));
@@ -119,13 +120,13 @@ public class CoalescingRecordListenerTest
             @Override
             public Object expect()
             {
-                return 99l;
+                return (long) (MAX - 1);
             }
         });
 
         // verify coalescing worked - we should not get 99 updates!
         final int size = observer.changes.size();
-        final int limit = 90;
+        final int limit = (int) (MAX * 0.95);
         System.err.println("testSimpleCoalescing checking " + size + " < " + limit);
         assertTrue("Got: " + size, size < limit);
         assertEquals(instance, observer.getLatestImage());
