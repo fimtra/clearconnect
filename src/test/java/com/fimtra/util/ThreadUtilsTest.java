@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
+import sun.reflect.Reflection;
 
 /**
  * Tests for {@link ThreadUtils}

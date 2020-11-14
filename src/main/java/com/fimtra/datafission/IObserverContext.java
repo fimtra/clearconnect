@@ -25,7 +25,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.core.IStatusAttribute;
-import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.executors.ISequentialRunnable;
 
 /**
  * An observer context is used to locate already existing records and to register

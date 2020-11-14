@@ -28,7 +28,7 @@ import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
-import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.executors.ISequentialRunnable;
 
 /**
  * A platform service instance provides the capability to construct records and RPCs. The platform

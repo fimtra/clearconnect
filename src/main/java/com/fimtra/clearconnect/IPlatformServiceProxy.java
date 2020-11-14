@@ -19,8 +19,8 @@ import com.fimtra.clearconnect.core.PlatformRegistry;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
-import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.tcpchannel.TcpChannel;
 
 /**

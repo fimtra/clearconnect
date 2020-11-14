@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright 2020 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.fimtra.thimble;
+package com.fimtra.executors;
 
 import java.util.Map;
 
 /**
  * A task that is run in order, sequentially for a context. The context groups sequential tasks.
  * <p>
- * If many tasks with the same context are submitted to a {@link ThimbleExecutor}, the tasks will
+ * If many tasks with the same context are submitted to a {@link IContextExecutor}, the tasks will
  * run in submission order, sequentially for the task context. Executions of a sequential task may
  * occur in different threads.
  * <p>
@@ -28,9 +28,7 @@ import java.util.Map;
  * tasks executing in parallel but for different contexts.
  * 
  * @author Ramon Servadei
- * @deprecated See {@link com.fimtra.executors.ContextExecutorFactory}
  */
-@Deprecated
 public interface ISequentialRunnable extends Runnable
 {
     /**

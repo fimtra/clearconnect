@@ -1,6 +1,5 @@
-package com.fimtra.thimble;
+package com.fimtra.executors.gatling;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -8,7 +7,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Tests for the {@link TaskQueue}
+ * Tests for the {@link com.fimtra.executors.gatling.TaskQueue}
  *
  * @author ramon
  */

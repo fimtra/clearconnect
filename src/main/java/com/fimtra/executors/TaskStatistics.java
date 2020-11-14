@@ -1,22 +1,21 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright 2020 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.fimtra.thimble;
+package com.fimtra.executors;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import com.fimtra.util.AtomicOp;
 
 /**
  * Tracks statistics for tasks . The statistics are gathered in intervals. An interval is the time
@@ -32,43 +31,54 @@ import java.util.concurrent.locks.ReentrantLock;
  * </ul>
  * 
  * @author Ramon Servadei
- * @deprecated See {@link com.fimtra.executors.ContextExecutorFactory}
  */
-@Deprecated
-public final class TaskStatistics
-{
+public final class TaskStatistics implements ITaskStatistics {
+    private final Runnable itemSubmittedTask = () -> this.currentSubmitted++;
+    private final Runnable itemExecutedTask = () -> this.currentExecuted++;
+
     private final Object context;
     private long currentSubmitted, currentExecuted;
     private long intervalSubmitted, intervalExecuted;
     private long totalSubmitted, totalExecuted;
-    private final Lock lock = new ReentrantLock();
+    private final AtomicOp atomicOp;
 
-    TaskStatistics(Object context)
+    public TaskStatistics(Object context)
+    {
+        this(context, new AtomicOp());
+    }
+
+    public TaskStatistics(Object context, AtomicOp lock)
     {
         super();
         this.context = context;
+        this.atomicOp = lock;
     }
 
+    @Override
     public Object getContext()
     {
         return this.context;
     }
 
+    @Override
     public long getIntervalSubmitted()
     {
         return this.intervalSubmitted;
     }
 
+    @Override
     public long getIntervalExecuted()
     {
         return this.intervalExecuted;
     }
 
+    @Override
     public long getTotalSubmitted()
     {
         return this.totalSubmitted;
     }
 
+    @Override
     public long getTotalExecuted()
     {
         return this.totalExecuted;
@@ -82,30 +92,14 @@ public final class TaskStatistics
             + ", totalExecuted=" + this.totalExecuted + "]";
     }
 
-    void itemSubmitted()
+    public void itemSubmitted()
     {
-        this.lock.lock();
-        try
-        {
-            this.currentSubmitted++;
-        }
-        finally
-        {
-            this.lock.unlock();
-        }
+        this.atomicOp.execute(this.itemSubmittedTask);
     }
 
-    void itemExecuted()
+    public void itemExecuted()
     {
-        this.lock.lock();
-        try
-        {
-            this.currentExecuted++;
-        }
-        finally
-        {
-            this.lock.unlock();
-        }
+        this.atomicOp.execute(this.itemExecutedTask);
     }
 
     /**
@@ -113,11 +107,11 @@ public final class TaskStatistics
      * 
      * @return a snapshot of the current statistics
      */
-    TaskStatistics intervalFinished()
+    public TaskStatistics intervalFinished()
     {
-        this.lock.lock();
-        try
-        {
+        final TaskStatistics snapshot = new TaskStatistics(this.context, new AtomicOp());
+
+        this.atomicOp.execute(() -> {
             this.intervalSubmitted = this.currentSubmitted;
             this.currentSubmitted = 0;
             this.intervalExecuted = this.currentExecuted;
@@ -125,17 +119,13 @@ public final class TaskStatistics
             this.totalSubmitted += this.intervalSubmitted;
             this.totalExecuted += this.intervalExecuted;
 
-            final TaskStatistics snapshot = new TaskStatistics(this.context);
             snapshot.intervalExecuted = this.intervalExecuted;
             snapshot.intervalSubmitted = this.intervalSubmitted;
             snapshot.totalSubmitted = this.totalSubmitted;
             snapshot.totalExecuted = this.totalExecuted;
-            return snapshot;
-        }
-        finally
-        {
-            this.lock.unlock();
-        }
+        });
+
+        return snapshot;
     }
 
 }

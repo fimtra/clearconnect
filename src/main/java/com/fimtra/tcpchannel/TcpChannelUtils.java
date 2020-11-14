@@ -33,7 +33,6 @@ import java.util.Map;
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.TransportTechnologyEnum;
-import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 

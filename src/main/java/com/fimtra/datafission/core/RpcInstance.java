@@ -36,7 +36,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.SerializationUtils;
 import com.fimtra.util.SystemUtils;

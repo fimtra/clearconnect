@@ -58,8 +58,8 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.session.ISessionAttributesProvider;
 import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.core.session.SessionContexts;
-import com.fimtra.thimble.ContextExecutorFactory;
-import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.IContextExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.is;
 

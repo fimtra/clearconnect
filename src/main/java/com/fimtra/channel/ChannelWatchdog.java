@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,32 +25,32 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SystemUtils;
-import com.fimtra.util.ThreadUtils;
 
 /**
- * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
- * is done by periodically sending a heartbeat message to each channel it knows about and listening
- * for heartbeats received on each channel.
+ * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This is done
+ * by periodically sending a heartbeat message to each channel it knows about and listening for heartbeats
+ * received on each channel.
  * <p>
- * The watchdog can be configured to allow a specified number of missed heartbeats before closing a
- * channel.
+ * The watchdog can be configured to allow a specified number of missed heartbeats before closing a channel.
  * <p>
  * Can be configured with the following system properties:
- * 
+ *
  * <pre>
  * -DChannelWatchdog.periodMillis={period in milliseconds for heartbeats}
  * -DChannelWatchdog.missedHbCount={missed heartbeats}
  * </pre>
- * 
+ *
  * @author Ramon Servadei
  */
-public final class ChannelWatchdog implements Runnable
-{
-    /** The tolerance to allow before logging if a received heartbeat is too early or too late. */
+public final class ChannelWatchdog implements Runnable {
+    /**
+     * The tolerance to allow before logging if a received heartbeat is too early or too late.
+     */
     static final long HB_TOLERANCE_MILLIS =
             SystemUtils.getPropertyAsLong("channelWatchdog.hbToleranceMillis", 1000);
 
@@ -58,7 +58,9 @@ public final class ChannelWatchdog implements Runnable
     long lateHeartbeatLimit;
     int missedHeartbeatCount;
     volatile Set<ITransportChannel> channels;
-    /** Tracks channels that receive a HB */
+    /**
+     * Tracks channels that receive a HB
+     */
     final Set<ITransportChannel> channelsReceivingHeartbeat;
     final Map<ITransportChannel, Integer> channelsMissingHeartbeat;
     final Map<ITransportChannel, Long> channelsHeartbeatArrivalTime;
@@ -90,9 +92,8 @@ public final class ChannelWatchdog implements Runnable
 
     /**
      * Configure the watchdog period. This also defines 3 allowed missed heartbeats.
-     * 
-     * @param periodMillis
-     *            the period to scan for heartbeats and to send heartbeats down each channel
+     *
+     * @param periodMillis the period to scan for heartbeats and to send heartbeats down each channel
      * @see #configure(int, int)
      */
     public void configure(int periodMillis)
@@ -102,11 +103,9 @@ public final class ChannelWatchdog implements Runnable
 
     /**
      * Configure the watchdog period and heartbeat
-     * 
-     * @param periodMillis
-     *            the period to scan for heartbeats and to send heartbeats down each channel
-     * @param missedHeartbeats
-     *            the number of allowed missed heartbeats for a channel
+     *
+     * @param periodMillis     the period to scan for heartbeats and to send heartbeats down each channel
+     * @param missedHeartbeats the number of allowed missed heartbeats for a channel
      */
     public void configure(int periodMillis, int missedHeartbeats)
     {
@@ -124,16 +123,16 @@ public final class ChannelWatchdog implements Runnable
             this.heartbeatPeriodMillis = periodMillis;
             this.lateHeartbeatLimit = this.heartbeatPeriodMillis + HB_TOLERANCE_MILLIS;
             this.missedHeartbeatCount = missedHeartbeats;
-            this.current = ThreadUtils.scheduleWithFixedDelay(this, this, this.heartbeatPeriodMillis,
-                this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
+            this.current = ContextExecutorFactory.get(ChannelWatchdog.class).scheduleWithFixedDelay(this,
+                    this.heartbeatPeriodMillis, this.heartbeatPeriodMillis, TimeUnit.MILLISECONDS);
             Log.log(this, "Heartbeat period is ", Integer.toString(this.heartbeatPeriodMillis),
-                "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
+                    "ms, missed heartbeat count is ", Integer.toString(this.missedHeartbeatCount));
         }
     }
 
     /**
-     * Add the channel to be monitored by this watchdog. This immediately sends a heartbeat down
-     * this channel.
+     * Add the channel to be monitored by this watchdog. This immediately sends a heartbeat down this
+     * channel.
      */
     public void addChannel(final ITransportChannel channel)
     {
@@ -143,7 +142,8 @@ public final class ChannelWatchdog implements Runnable
             copy.add(channel);
             this.channels = copy;
         }
-        ThreadUtils.schedule(this, () -> channel.send(ChannelUtils.HEARTBEAT_SIGNAL), 0, TimeUnit.MILLISECONDS);
+        ContextExecutorFactory.get(ChannelWatchdog.class).schedule(
+                () -> channel.send(ChannelUtils.HEARTBEAT_SIGNAL), 0, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -184,7 +184,8 @@ public final class ChannelWatchdog implements Runnable
                         if (missedCount != null && missedCount.intValue() >= this.missedHeartbeatCount)
                         {
                             channel.destroy(
-                                "Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount + " heartbeats");
+                                    "Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount
+                                            + " heartbeats");
                             stopMonitoring(channel);
                         }
 
@@ -203,8 +204,8 @@ public final class ChannelWatchdog implements Runnable
                             if (count.intValue() > 1)
                             {
                                 Log.log(this, "Missed heartbeat ", count.toString(), "/",
-                                    Integer.toString(this.missedHeartbeatCount), " from ",
-                                    ObjectUtils.safeToString(channel));
+                                        Integer.toString(this.missedHeartbeatCount), " from ",
+                                        ObjectUtils.safeToString(channel));
                             }
                             this.channelsMissingHeartbeat.put(channel, count);
                         }
@@ -221,8 +222,7 @@ public final class ChannelWatchdog implements Runnable
     }
 
     /**
-     * @param channel
-     *            the channel to stop monitoring
+     * @param channel the channel to stop monitoring
      */
     private void stopMonitoring(ITransportChannel channel)
     {
@@ -247,7 +247,7 @@ public final class ChannelWatchdog implements Runnable
         // grab the previous time now, excludes latency in the executor 
         final Long previous = this.channelsHeartbeatArrivalTime.put(channel, Long.valueOf(timeIn));
 
-        ThreadUtils.schedule(this, () -> {
+        ContextExecutorFactory.get(ChannelWatchdog.class).execute(() -> {
             if (!this.channels.contains(channel))
             {
                 this.channelsHeartbeatArrivalTime.remove(channel);
@@ -266,7 +266,7 @@ public final class ChannelWatchdog implements Runnable
                     checkHeartbeatRecovered(channel);
                 }
             }
-        }, 0, TimeUnit.MILLISECONDS);
+        });
     }
 
     void checkHeartbeatRecovered(ITransportChannel channel)
@@ -282,9 +282,8 @@ public final class ChannelWatchdog implements Runnable
     }
 
     /**
-     * @return a {@link List} of {@link Pair} objects of
-     *         {@link Integer}={@link ITransportChannel#getTxQueueSize()} and
-     *         {@link String}={@link ITransportChannel#getDescription()}
+     * @return a {@link List} of {@link Pair} objects of {@link Integer}={@link
+     * ITransportChannel#getTxQueueSize()} and {@link String}={@link ITransportChannel#getDescription()}
      */
     public List<Pair<Integer, String>> getChannelStats()
     {

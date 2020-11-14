@@ -71,8 +71,8 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.executors.IContextExecutor;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -542,7 +542,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host,
             int port, WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode,
-            ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor,
+            IContextExecutor coreExecutor, IContextExecutor rpcExecutor,
             ScheduledExecutorService utilityExecutor, TransportTechnologyEnum transportTechnology)
     {
         this.createLock.lock();

@@ -53,34 +53,31 @@ import com.fimtra.datafission.core.CoalescingRecordListener.CachePolicyEnum;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
-import com.fimtra.util.ThreadUtils;
 
 /**
- * A publisher is actually a manager object for multiple {@link ProxyContextPublisher} objects.
- * There is one ProxyContextPublisher per {@link ProxyContext} that is connected. Each
- * ProxyContextPublisher is attached any number of record objects and publishes the changes to the
- * proxy context. The proxy context requests the records that should be observed by the publisher
- * for changes.
+ * A publisher is actually a manager object for multiple {@link ProxyContextPublisher} objects. There is one
+ * ProxyContextPublisher per {@link ProxyContext} that is connected. Each ProxyContextPublisher is attached
+ * any number of record objects and publishes the changes to the proxy context. The proxy context requests the
+ * records that should be observed by the publisher for changes.
  * <p>
- * For efficiency, each ProxyContextPublisher actually submits its record subscriptions to a
- * {@link ProxyContextMultiplexer}. The multiplexer receives the record changes, converts them into
- * the wire-format and notifies the ProxyContextPublishers with the data packet to send. The
- * prevents redundant codec calls to transform the same record update into a wire-format when the
- * same record is published to multiple proxies.
+ * For efficiency, each ProxyContextPublisher actually submits its record subscriptions to a {@link
+ * ProxyContextMultiplexer}. The multiplexer receives the record changes, converts them into the wire-format
+ * and notifies the ProxyContextPublishers with the data packet to send. The prevents redundant codec calls to
+ * transform the same record update into a wire-format when the same record is published to multiple proxies.
  * <p>
  * The publisher opens up a single TCP server socket that the proxy contexts connect to.
  *
  * @author Ramon Servadei
  */
 @SuppressWarnings("rawtypes")
-public class Publisher
-{
+public class Publisher {
     /**
      * Controls logging of:
      * <ul>
@@ -106,14 +103,15 @@ public class Publisher
      * <ul>
      */
     public static boolean logVerboseSubscribes =
-            SystemUtils.getProperty("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName(), false);
+            SystemUtils.getProperty("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName(),
+                    false);
 
     static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong();
     static final AtomicLong BYTES_PUBLISHED = new AtomicLong();
 
     /**
-     * @return the field name for the transmission statistics for a connection to a single
-     * {@link ProxyContext}
+     * @return the field name for the transmission statistics for a connection to a single {@link
+     * ProxyContext}
      */
     static String getTransmissionStatisticsFieldName(ITransportChannel channel)
     {
@@ -132,23 +130,21 @@ public class Publisher
     final AtomicLong subscribeCounter = new AtomicLong();
 
     /**
-     * This converts each record's atomic change into the <code>byte[]</code> to transmit and
-     * notifies the relevant {@link ProxyContextPublisher} objects that have subscribed for the
-     * record.
+     * This converts each record's atomic change into the <code>byte[]</code> to transmit and notifies the
+     * relevant {@link ProxyContextPublisher} objects that have subscribed for the record.
      * <p>
-     * This prevents the same atomic change being converted to a <code>byte[]</code> multiple times
-     * to send to multiple proxy contexts.
+     * This prevents the same atomic change being converted to a <code>byte[]</code> multiple times to send to
+     * multiple proxy contexts.
      *
      * @author Ramon Servadei
      */
-    private final class ProxyContextMultiplexer implements IRecordListener
-    {
+    private final class ProxyContextMultiplexer implements IRecordListener {
         final IEndPointService service;
         final AtomicChangeTeleporter teleporter;
         final SubscriptionManager<String, ProxyContextPublisher> subscribers;
         /**
-         * A {@link CoalescingRecordListener} per system record to ensure more efficient remote
-         * transmission when a context has many single record creates/subscribes etc.
+         * A {@link CoalescingRecordListener} per system record to ensure more efficient remote transmission
+         * when a context has many single record creates/subscribes etc.
          */
         final Map<String, CoalescingRecordListener> systemRecordPublishers;
         /**
@@ -181,8 +177,7 @@ public class Publisher
         void handleTimedSystemRecordChange(IRecordChange atomicChange)
         {
             final AtomicLong currentSequence =
-                    ProxyContextMultiplexer.this.systemRecordSequences.get(
-                            atomicChange.getName());
+                    ProxyContextMultiplexer.this.systemRecordSequences.get(atomicChange.getName());
             atomicChange.setSequence(currentSequence.getAndIncrement());
             handleRecordChange(atomicChange);
         }
@@ -362,8 +357,7 @@ public class Publisher
                         {
                             // we must send an initial image to the new client if it is
                             // not the first one to register
-                            Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-                            {
+                            Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                                 @Override
                                 public void run()
                                 {
@@ -486,15 +480,13 @@ public class Publisher
     }
 
     /**
-     * This is the actual publisher object that publishes record changes to a single
-     * {@link ProxyContext}.
+     * This is the actual publisher object that publishes record changes to a single {@link ProxyContext}.
      * <p>
      * A scheduled task runs periodically to update the publishing statistics of this.
      *
      * @author Ramon Servadei
      */
-    private final class ProxyContextPublisher implements ITransportChannel
-    {
+    private final class ProxyContextPublisher implements ITransportChannel {
         final ITransportChannel channel;
         final Set<String> subscriptions = Collections.synchronizedSet(new HashSet<>());
         // note: unsynchronized
@@ -502,9 +494,9 @@ public class Publisher
         final Set<String> firstPublishDone = Collections.synchronizedSet(new HashSet<>());
         final long start;
         /**
-         * NOTE: this is only used for handling subscribe and RPC commands. The
-         * {@link ProxyContextMultiplexer}'s codec performs the wire-formatting for atomic changes
-         * that are sent to this publisher's {@link #publish(byte[], boolean, String)} method.
+         * NOTE: this is only used for handling subscribe and RPC commands. The {@link
+         * ProxyContextMultiplexer}'s codec performs the wire-formatting for atomic changes that are sent to
+         * this publisher's {@link #publish(byte[], boolean, String)} method.
          */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
@@ -557,7 +549,7 @@ public class Publisher
             {
                 this.statsUpdateTask.cancel(false);
             }
-            this.statsUpdateTask = ThreadUtils.schedule(this, new Runnable() {
+            this.statsUpdateTask = ContextExecutorFactory.get(Publisher.this).schedule(new Runnable() {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
                 long lastTimeNanos;
@@ -627,9 +619,10 @@ public class Publisher
 
                     if (ProxyContextPublisher.this.active)
                     {
-                        ProxyContextPublisher.this.statsUpdateTask = ThreadUtils.schedule(this, this,
-                                Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2,
-                                TimeUnit.MILLISECONDS);
+                        ProxyContextPublisher.this.statsUpdateTask =
+                                ContextExecutorFactory.get(Publisher.this).schedule(this,
+                                        Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2,
+                                        TimeUnit.MILLISECONDS);
                     }
                 }
             }, Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2, TimeUnit.MILLISECONDS);
@@ -724,8 +717,7 @@ public class Publisher
         {
             try
             {
-                Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-                {
+                Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                     @Override
                     public void run()
                     {
@@ -848,8 +840,8 @@ public class Publisher
     long bytesPublished;
 
     /**
-     * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
-     * {@link ProxyContext} objects.
+     * Constructs the publisher and creates an {@link IEndPointService} to accept connections from {@link
+     * ProxyContext} objects.
      * <p>
      * This uses the transport technology defined by the system property <code>-Dtransport</code>
      *
@@ -865,12 +857,12 @@ public class Publisher
     }
 
     /**
-     * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
-     * {@link ProxyContext} objects. This constructor provides the {@link TransportTechnologyEnum}
-     * to use.
+     * Constructs the publisher and creates an {@link IEndPointService} to accept connections from {@link
+     * ProxyContext} objects. This constructor provides the {@link TransportTechnologyEnum} to use.
      *
      * @param context             the context the publisher is for
-     * @param codec               the codec to use for sending/receiving messages from the {@link ProxyContext}
+     * @param codec               the codec to use for sending/receiving messages from the {@link
+     *                            ProxyContext}
      * @param node                the node for the {@link EndPointAddress} of this publisher
      * @param port                the port for the {@link EndPointAddress} of this publisher
      * @param transportTechnology the enum expressing the transport technology to use
@@ -889,13 +881,11 @@ public class Publisher
         this.mainCodec = codec;
         this.server =
                 transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
-                        new EndPointAddress(node, port)).buildService(new IReceiver()
-                {
+                        new EndPointAddress(node, port)).buildService(new IReceiver() {
                     @Override
                     public void onChannelConnected(final ITransportChannel channel)
                     {
-                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-                        {
+                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                             @Override
                             public void run()
                             {
@@ -921,8 +911,7 @@ public class Publisher
                     @Override
                     public void onDataReceived(final ByteBuffer data, final ITransportChannel source)
                     {
-                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-                        {
+                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                             @SuppressWarnings("unchecked")
                             @Override
                             public void run()
@@ -1020,8 +1009,7 @@ public class Publisher
                     @Override
                     public void onChannelClosed(final ITransportChannel channel)
                     {
-                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable()
-                        {
+                        Publisher.this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                             @Override
                             public void run()
                             {
@@ -1057,8 +1045,7 @@ public class Publisher
     }
 
     /**
-     * Publish the {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record at the given period in
-     * milliseconds
+     * Publish the {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record at the given period in milliseconds
      */
     public synchronized void publishContextConnectionsRecordAtPeriod(
             long contextConnectionsRecordPublishPeriodMillis)
@@ -1068,8 +1055,7 @@ public class Publisher
         {
             this.contextConnectionsRecordPublishTask.cancel(false);
         }
-        final Runnable contextConnectionsPublishTask = new Runnable()
-        {
+        final Runnable contextConnectionsPublishTask = new Runnable() {
             CountDownLatch publishAtomicChange = new CountDownLatch(0);
 
             @Override
@@ -1100,7 +1086,7 @@ public class Publisher
             }
         };
         this.contextConnectionsRecordPublishTask =
-                ThreadUtils.scheduleWithFixedDelay(this, contextConnectionsPublishTask,
+                ContextExecutorFactory.get(Publisher.this).scheduleWithFixedDelay(contextConnectionsPublishTask,
                         this.contextConnectionsRecordPublishPeriodMillis,
                         this.contextConnectionsRecordPublishPeriodMillis, TimeUnit.MILLISECONDS);
 
@@ -1121,6 +1107,7 @@ public class Publisher
 
     public void destroy()
     {
+        ContextExecutorFactory.remove(Publisher.this);
         for (ProxyContextPublisher proxyContextPublisher : this.proxyContextPublishers.values())
         {
             proxyContextPublisher.destroy();
@@ -1143,8 +1130,7 @@ public class Publisher
      */
     void rpc(final Object data, final ITransportChannel client)
     {
-        this.context.executeRpcTask(new ISequentialRunnable()
-        {
+        this.context.executeRpcTask(new ISequentialRunnable() {
             @Override
             public void run()
             {
@@ -1177,8 +1163,7 @@ public class Publisher
                         Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
-        this.context.executeSequentialCoreTask(new ISequentialRunnable()
-        {
+        this.context.executeSequentialCoreTask(new ISequentialRunnable() {
             @Override
             public Object context()
             {

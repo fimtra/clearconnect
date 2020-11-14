@@ -67,10 +67,10 @@ import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ContextExecutorFactory;
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.ICoalescingRunnable;
+import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -81,15 +81,15 @@ import com.fimtra.util.UtilProperties;
 import com.fimtra.util.is;
 
 /**
- * A service that maintains a registry of all other services in the platform. This should only be
- * accessed via a {@link PlatformRegistryAgent}.
+ * A service that maintains a registry of all other services in the platform. This should only be accessed via
+ * a {@link PlatformRegistryAgent}.
  * <p>
- * The registry maintains a proxy to every service that is registered with it - this allows the
- * registry to keep a live view of what services are available.
+ * The registry maintains a proxy to every service that is registered with it - this allows the registry to
+ * keep a live view of what services are available.
  * <p>
- * All information in the registry is maintained in internal "registry records" that are published
- * at timed intervals when there is a change. The timed publishing is an efficiency feature to group
- * as many changes to each record together in a single update message.
+ * All information in the registry is maintained in internal "registry records" that are published at timed
+ * intervals when there is a change. The timed publishing is an efficiency feature to group as many changes to
+ * each record together in a single update message.
  * <p>
  * The registry service uses a GZIP wire-protocol
  *
@@ -97,8 +97,7 @@ import com.fimtra.util.is;
  * @author Paul Mackinlay
  * @see IPlatformRegistryAgent
  */
-public final class PlatformRegistry
-{
+public final class PlatformRegistry {
     static final String GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE = "getServiceInfoForService";
     static final String GET_HEARTBEAT_CONFIG = "getHeartbeatConfig";
     static final String GET_PLATFORM_NAME = "getPlatformName";
@@ -112,9 +111,8 @@ public final class PlatformRegistry
      *
      * @param args - the parameters used to start the {@link PlatformRegistry}.
      *             <p>
-     *             arg[0] is the platform name (mandatory)<br>
-     *             arg[1] is the host (mandatory)<br>
-     *             arg[2] is the port (optional)<br>
+     *             arg[0] is the platform name (mandatory)<br> arg[1] is the host (mandatory)<br> arg[2] is
+     *             the port (optional)<br>
      */
     @SuppressWarnings("unused")
     public static void main(String[] args)
@@ -151,13 +149,12 @@ public final class PlatformRegistry
     static final StringProtocolCodec CODEC = new GZipProtocolCodec();
 
     /**
-     * Describes the structure of a service info record and provides the prefix for the canonical
-     * name of all service info records
+     * Describes the structure of a service info record and provides the prefix for the canonical name of all
+     * service info records
      *
      * @author Ramon Servadei
      */
-    interface ServiceInfoRecordFields
-    {
+    interface ServiceInfoRecordFields {
         String PORT_FIELD = "PORT";
         String HOST_NAME_FIELD = "HOST_NAME";
         String WIRE_PROTOCOL_FIELD = "WIRE_PROTOCOL";
@@ -169,8 +166,7 @@ public final class PlatformRegistry
         String SERVICE_INFO_RECORD_NAME_PREFIX = "ServiceInfo:";
     }
 
-    interface IRuntimeStatusRecordFields
-    {
+    interface IRuntimeStatusRecordFields {
         String RUNTIME_NAME = "Agent";
         String RUNTIME_HOST = "Host";
         String Q_OVERFLOW = "QOverflow";
@@ -186,8 +182,7 @@ public final class PlatformRegistry
         String UPTIME_SECS = "Uptime";
     }
 
-    interface IPlatformSummaryRecordFields
-    {
+    interface IPlatformSummaryRecordFields {
         String VERSION = "Version";
         String NODES = "Nodes";
         String SERVICES = "Services";
@@ -196,8 +191,7 @@ public final class PlatformRegistry
         String AGENTS = "Agents";
     }
 
-    interface IServiceRecordFields
-    {
+    interface IServiceRecordFields {
         String RECORD_COUNT = "RecordCount";
         String RPC_COUNT = "RpcCount";
         String SERVICE_INSTANCE_COUNT = "ServiceInstancesCount";
@@ -216,15 +210,14 @@ public final class PlatformRegistry
      *
      * @author Ramon Servadei
      */
-    interface IRegistryRecordNames
-    {
+    interface IRegistryRecordNames {
         /**
          * <pre>
          * key: serviceFamily, value: redundancy mode of the service (string value of {@link RedundancyModeEnum})
          * </pre>
          * <p>
-         * Agents subscribe for this to have a live view of the services that exist, each service
-         * identified by its service family name
+         * Agents subscribe for this to have a live view of the services that exist, each service identified
+         * by its service family name
          *
          * @see IServiceRecordFields
          */
@@ -404,8 +397,7 @@ public final class PlatformRegistry
 
         // handle real-time updates for the platform summary
         final IRecordListener platformSummaryListener =
-                (imageCopy, atomicChange) -> this.coalescingExecutor.execute(new ICoalescingRunnable()
-                {
+                (imageCopy, atomicChange) -> this.coalescingExecutor.execute(new ICoalescingRunnable() {
                     @Override
                     public void run()
                     {
@@ -635,10 +627,11 @@ public final class PlatformRegistry
     }
 
     /**
-     * Set the period to wait before attempting to reconnect to a lost service after the TCP
-     * connection has been unexpectedly broken
+     * Set the period to wait before attempting to reconnect to a lost service after the TCP connection has
+     * been unexpectedly broken
      *
-     * @param reconnectPeriodMillis the period in milliseconds to wait before trying a reconnect to a lost service
+     * @param reconnectPeriodMillis the period in milliseconds to wait before trying a reconnect to a lost
+     *                              service
      */
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
     {
@@ -655,8 +648,8 @@ public final class PlatformRegistry
 /**
  * Encapsulates handling of events for the registry.
  * <p>
- * Events handling is split between record processing and IO processing, this is to ensure record
- * processing is not blocked by IO operations.
+ * Events handling is split between record processing and IO processing, this is to ensure record processing
+ * is not blocked by IO operations.
  * <p>
  * E.g. service registration (the most complex event handling) occurs as follows:
  *
@@ -670,13 +663,13 @@ public final class PlatformRegistry
  * @author Ramon Servadei
  */
 @SuppressWarnings("synthetic-access")
-final class EventHandler
-{
+final class EventHandler {
     private static final String RUNTIME_STATUS = "runtimeStatus";
     private static final String SLOW = "*** SLOW EVENT HANDLING *** ";
     private static final int SLOW_EVENT_MILLIS = 200;
 
-    private static final boolean SERVICES_LOG_DISABLED = SystemUtils.getProperty("platform.servicesLogDisabled", false);
+    private static final boolean SERVICES_LOG_DISABLED =
+            SystemUtils.getProperty("platform.servicesLogDisabled", false);
     private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null :
             RollingFileAppender.createStandardRollingFileAppender("services", UtilProperties.Values.LOG_DIR);
     private static final FastDateFormat fdf = new FastDateFormat();
@@ -693,7 +686,7 @@ final class EventHandler
             }
 
             final long now = System.currentTimeMillis();
-            ThreadUtils.schedule(PlatformRegistry.class, () -> {
+            ContextExecutorFactory.get(PlatformRegistry.class).execute(() -> {
                 try
                 {
                     SERVICES_LOG.append(fdf.yyyyMMddHHmmssSSS(now)).append("|").append(message).append(
@@ -704,7 +697,7 @@ final class EventHandler
                 {
                     Log.log(EventHandler.class, "Could not log service message", e);
                 }
-            }, 0, TimeUnit.MILLISECONDS);
+            });
         }
         catch (Exception e)
         {
@@ -712,8 +705,7 @@ final class EventHandler
         }
     }
 
-    private static final class DescriptiveRunnable implements ISequentialRunnable
-    {
+    private static final class DescriptiveRunnable implements ISequentialRunnable {
         final String description;
         final Object context;
         final Runnable r;
@@ -759,8 +751,8 @@ final class EventHandler
      */
     final ConcurrentMap<String, IValue> pendingPlatformServices;
     /**
-     * Key=service instance ID, Value=Registration token; tracks pending service instances to
-     * prevent duplicates
+     * Key=service instance ID, Value=Registration token; tracks pending service instances to prevent
+     * duplicates
      */
     final ConcurrentMap<String, RegistrationToken> registrationTokenPerInstance;
     /**
@@ -1265,7 +1257,8 @@ final class EventHandler
      * Checks that the parameters are valid for registering a new service.
      *
      * @throws AlreadyRegisteredException if the service is already registered
-     * @throws IllegalStateException      if the registration parameters clash with any in-flight registration
+     * @throws IllegalStateException      if the registration parameters clash with any in-flight
+     *                                    registration
      */
     @SuppressWarnings("unused")
     private void registerStep1_checkRegistrationDetailsForServiceInstance(
@@ -1363,8 +1356,7 @@ final class EventHandler
             final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
             final RedundancyModeEnum redundancyModeEnum, final ProxyContext serviceProxy)
     {
-        return new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId)
-        {
+        return new PlatformServiceConnectionMonitor(serviceProxy, serviceInstanceId) {
             private void run()
             {
                 try
@@ -1589,8 +1581,8 @@ final class EventHandler
     }
 
     /**
-     * @return a future with the instance ID that is the confirmed master. The {@link Future#get()}
-     * may throw an exception which indicates the master instance selection failed.
+     * @return a future with the instance ID that is the confirmed master. The {@link Future#get()} may throw
+     * an exception which indicates the master instance selection failed.
      */
     private Future<String> verifyNewMasterInstance(final RegistrationToken registrationToken,
             final String serviceFamily, final String activeServiceInstanceId)
@@ -1717,8 +1709,8 @@ final class EventHandler
     }
 
     /**
-     * Publishes the record at a point in time in the future (in seconds). If there is a pending
-     * publish for the record then the current call will do nothing and use the pending publish.
+     * Publishes the record at a point in time in the future (in seconds). If there is a pending publish for
+     * the record then the current call will do nothing and use the pending publish.
      */
     private void publishTimed(final IRecord record)
     {
@@ -1736,7 +1728,7 @@ final class EventHandler
             {
                 if (this.pendingPublish.add(record.getName()))
                 {
-                    ThreadUtils.schedule(this, () -> {
+                    ContextExecutorFactory.get(PlatformRegistry.class).schedule(() -> {
                         synchronized (this.pendingPublish)
                         {
                             this.pendingPublish.remove(record.getName());
@@ -1801,8 +1793,8 @@ final class EventHandler
         // compute the service-level stats
         if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
         {
-            final Set<String> members = this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(
-                    serviceFamily).keySet();
+            final Set<String> members =
+                    this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily).keySet();
             final Set<String> availableInstances = this.registry.serviceInstanceStats.getSubMapKeys();
 
             long kbCount = 0;
@@ -1827,8 +1819,7 @@ final class EventHandler
                     kbPerSec += getLong(instanceStats.get(IServiceRecordFields.KB_PER_SEC));
                     msgCount += getLong(instanceStats.get(IServiceRecordFields.MESSAGE_COUNT));
                     msgsPerSec += getLong(instanceStats.get(IServiceRecordFields.MSGS_PER_SEC));
-                    subscriptionCount +=
-                            getLong(instanceStats.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
+                    subscriptionCount += getLong(instanceStats.get(IServiceRecordFields.SUBSCRIPTION_COUNT));
                     txQSize += getLong(instanceStats.get(IServiceRecordFields.TX_QUEUE_SIZE));
 
                     // we assume services are equal so do not double-count records and rpcs
@@ -1881,8 +1872,7 @@ final class EventHandler
  *
  * @author Ramon Servadei
  */
-final class AlreadyRegisteredException extends RuntimeException
-{
+final class AlreadyRegisteredException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     final String serviceInstanceId;
@@ -1910,8 +1900,7 @@ final class AlreadyRegisteredException extends RuntimeException
  *
  * @author Ramon Servadei
  */
-final class RegistrationToken implements Serializable
-{
+final class RegistrationToken implements Serializable {
     private static final long serialVersionUID = 1L;
     final Serializable token;
     final String serviceInstanceId;

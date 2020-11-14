@@ -1,22 +1,25 @@
 /*
- * Copyright (c) 2019 Ramon Servadei
- *  
+ * Copyright 2020 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.fimtra.thimble;
+package com.fimtra.executors;
 
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+
+import com.sun.xml.internal.ws.client.sei.SEIStub;
 
 /**
  * An IContextExecutor is a multi-thread {@link Executor} implementation that supports
@@ -48,12 +51,12 @@ import java.util.concurrent.Executor;
  * @see ICoalescingRunnable
  * @author Ramon Servadei
  */
-public interface IContextExecutor extends Executor
+public interface IContextExecutor extends ScheduledExecutorService
 {
     String QUEUE_LEVEL_STATS = "QueueLevelStats";
     
     boolean isExecutorThread(long id);
-    
+
     /**
      * @return the name of the {@link IContextExecutor}
      */
@@ -67,7 +70,7 @@ public interface IContextExecutor extends Executor
      * @return a Map holding all sequential task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
-    Map<Object, TaskStatistics> getSequentialTaskStatistics();
+    Map<Object, ITaskStatistics> getSequentialTaskStatistics();
 
     /**
      * Get the statistics for the coalescing tasks submitted to this {@link IContextExecutor}. The
@@ -77,12 +80,12 @@ public interface IContextExecutor extends Executor
      * @return a Map holding all coalescing task context statistics. The statistics objects will be
      *         updated on each successive call to this method.
      */
-    Map<Object, TaskStatistics> getCoalescingTaskStatistics();
+    Map<Object, ITaskStatistics> getCoalescingTaskStatistics();
 
     /**
      * @return the statistics for all tasks submitted to this {@link IContextExecutor}.
      */
-    TaskStatistics getExecutorStatistics();
+    ITaskStatistics getExecutorStatistics();
 
     void destroy();
 }

@@ -32,7 +32,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.util.LazyObject.IDestructor;
 
 /**

@@ -35,10 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.fimtra.thimble.ContextExecutorFactory;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ISequentialRunnable;
-
 /**
  * Provides utilities for working with threads
  *
@@ -70,77 +66,6 @@ public abstract class ThreadUtils {
                     }
                 }
             };
-
-    private static final ScheduledExecutorService SCHEDULER =
-            ThreadUtils.newPermanentScheduledExecutorService("util-scheduler", 1);
-    // this must be lazy to avoid class <init> problems
-    private static final LazyObject<IContextExecutor> UTILS_EXECUTOR =
-            new LazyObject<>(() -> ContextExecutorFactory.create("util-executor", 1), (c) -> {
-            });
-
-    /**
-     * Execute the command with the context using the internal {@link IContextExecutor} at a time in the
-     * future. This has the same semantics as {@link ScheduledExecutorService#schedule(Runnable, long,
-     * TimeUnit)}
-     *
-     * @param context the context when running the command
-     * @param command the command
-     */
-    public static ScheduledFuture<?> schedule(Object context, Runnable command, long delay, TimeUnit unit)
-    {
-        if (delay == 0)
-        {
-            executeInContext(command, context).run();
-            return null;
-        }
-        return SCHEDULER.schedule(executeInContext(command, context), delay, unit);
-    }
-
-    /**
-     * Execute the command with the context using the internal {@link IContextExecutor} at repeated intervals.
-     * This has the same semantics as {@link ScheduledExecutorService#scheduleWithFixedDelay(Runnable, long,
-     * long, TimeUnit)}
-     *
-     * @param context the context when running the command
-     * @param command the command
-     */
-    public static ScheduledFuture<?> scheduleWithFixedDelay(Object context, Runnable command,
-            long initialDelay, long delay, TimeUnit unit)
-    {
-        return SCHEDULER.scheduleWithFixedDelay(executeInContext(command, context), initialDelay, delay,
-                unit);
-    }
-
-    /**
-     * Execute the command with the context using the internal {@link IContextExecutor} at repeated intervals.
-     * This has the same semantics as {@link ScheduledExecutorService#scheduleAtFixedRate(Runnable, long,
-     * long, TimeUnit)}
-     *
-     * @param context the context when running the command
-     * @param command the command
-     */
-    public static ScheduledFuture<?> scheduleAtFixedRate(Object context, Runnable command, long initialDelay,
-            long delay, TimeUnit unit)
-    {
-        return SCHEDULER.scheduleAtFixedRate(executeInContext(command, context), initialDelay, delay, unit);
-    }
-
-    private static Runnable executeInContext(Runnable r, Object context)
-    {
-        return () -> UTILS_EXECUTOR.get().execute(new ISequentialRunnable() {
-            @Override
-            public Object context()
-            {
-                return context == null ? r : context;
-            }
-
-            @Override
-            public void run()
-            {
-                r.run();
-            }
-        });
-    }
 
     static final Map<Thread, List<Runnable>> THREAD_LOCAL_CLEANUP =
             Collections.synchronizedMap(CollectionUtils.newMap());

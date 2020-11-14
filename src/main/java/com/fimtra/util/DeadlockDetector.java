@@ -30,37 +30,37 @@ import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.fimtra.executors.ContextExecutorFactory;
+
 /**
  * Uses a {@link ThreadMXBean} to detect deadlocks.
  * <p>
- * Use {@link #newDeadlockDetectorTask(long, DeadlockObserver, boolean)} to create a
- * task to check for deadlocks.
+ * Use {@link #newDeadlockDetectorTask(long, DeadlockObserver, boolean)} to create a task to check for
+ * deadlocks.
  * <p>
  * Also dumps all threads to a file.
  *
  * @author Ramon Servadei
  */
-public final class DeadlockDetector
-{
+public final class DeadlockDetector {
     /**
-     * An observer that receives events when threads are deadlocked. Registered via
-     * {@link DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)}
+     * An observer that receives events when threads are deadlocked. Registered via {@link
+     * DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)}
      *
      * @author Ramon Servadei
      */
-    public static interface DeadlockObserver
-    {
+    public static interface DeadlockObserver {
         void onDeadlockFound(ThreadInfoWrapper[] deadlocks);
     }
 
     /**
-     * Start a task that checks for deadlocks at the specified period. Deadlocks are written to
-     * System.err first then passed to the deadlockObserver for handling.
+     * Start a task that checks for deadlocks at the specified period. Deadlocks are written to System.err
+     * first then passed to the deadlockObserver for handling.
      * <p>
-     * This task will also dump the current active threads to a file. The file is either static or
-     * rolling.
+     * This task will also dump the current active threads to a file. The file is either static or rolling.
      *
-     * @param rollingThreaddumpFile <code>true</code> to dump threads to a rolling log file, <code>false</code> for a
+     * @param rollingThreaddumpFile <code>true</code> to dump threads to a rolling log file,
+     *                              <code>false</code> for a
      *                              static file
      * @return an Future that can terminate the task
      */
@@ -91,8 +91,7 @@ public final class DeadlockDetector
             staticFile = null;
         }
 
-        final Runnable task = new Runnable()
-        {
+        final Runnable task = new Runnable() {
             final DeadlockDetector deadlockDetector = new DeadlockDetector();
 
             @Override
@@ -153,20 +152,19 @@ public final class DeadlockDetector
                 }
             }
         };
-        return ThreadUtils.scheduleWithFixedDelay(DeadlockDetector.class, task, checkPeriodMillis, checkPeriodMillis,
-                TimeUnit.MILLISECONDS);
+        return ContextExecutorFactory.get(DeadlockDetector.class).scheduleWithFixedDelay(task,
+                checkPeriodMillis, checkPeriodMillis, TimeUnit.MILLISECONDS);
     }
 
     final ThreadMXBean threadMxBean;
 
     /**
-     * A wrapper for the {@link ThreadInfo} class and provides a {@link #toString()} that produces
-     * the full stack trace for the thread.
+     * A wrapper for the {@link ThreadInfo} class and provides a {@link #toString()} that produces the full
+     * stack trace for the thread.
      *
      * @author Ramon Servadei
      */
-    public static final class ThreadInfoWrapper
-    {
+    public static final class ThreadInfoWrapper {
         private final ThreadInfo delegate;
 
         ThreadInfoWrapper(ThreadInfo delegate)

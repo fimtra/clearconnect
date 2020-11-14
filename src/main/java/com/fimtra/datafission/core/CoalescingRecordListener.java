@@ -27,15 +27,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import com.fimtra.clearconnect.core.PlatformRegistry;
+import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ThimbleExecutor;
-import com.fimtra.util.ThreadUtils;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.ICoalescingRunnable;
+import com.fimtra.executors.IContextExecutor;
 
 /**
  * Provides coalescing behaviour for record updates to solve fast-producer scenarios.
@@ -47,7 +48,7 @@ import com.fimtra.util.ThreadUtils;
  * For situations where the data changes are coalescable (combinable) this is used as the listener in a call
  * to {@link IObserverContext#addObserver(IRecordListener, String...)} and will coalesce all record updates
  * (based on the record name) and notify its delegate listener with an aggregated {@link AtomicChange} from
- * all received changes up until the member {@link ThimbleExecutor} executes.
+ * all received changes up until the member {@link IContextExecutor} executes.
  * <p>
  * The listener has a "cache policy" that defines how to manage images (see {@link CachePolicyEnum} ). If the
  * policy specifies an image is needed then the listener needs to keep a cache of record image 'snapshots'.
@@ -62,17 +63,17 @@ import com.fimtra.util.ThreadUtils;
  * Depending on the constructor, the coalescing strategy will either be:
  * <ul>
  * <li>Context-based: coalescing will happen as quickly as possible based on the "context" of the
- * update. The delegate listener will receive updates as fast as the {@link ThimbleExecutor} can
+ * update. The delegate listener will receive updates as fast as the {@link IContextExecutor} can
  * process coalescing of pending updates.
  * <li>Time-based: coalescing of updates will happen at a guaranteed rate for all updates to each
  * record.
  * </ul>
  * <p>
  * A note about context-based coalescing: be careful when attaching a context-based coalescing
- * listener, that shares its {@link ThimbleExecutor} with other coalescing listeners, to multiple
+ * listener, that shares its {@link IContextExecutor} with other coalescing listeners, to multiple
  * {@link IObserverContext}s. In these cases, the coalescing context used to construct the listener
  * must express the combination of {observer-context,record} otherwise unexpected coalescing from
- * the other IObserverContexts can occur (this is due to the single {@link ThimbleExecutor} used to
+ * the other IObserverContexts can occur (this is due to the single {@link IContextExecutor} used to
  * coalesce all the records based on their "context").
  *
  * @author Ramon Servadei
@@ -132,7 +133,7 @@ public class CoalescingRecordListener implements IRecordListener {
             {
                 if (this.pending.add(name))
                 {
-                    ThreadUtils.schedule(this, () -> {
+                    ContextExecutorFactory.get(TimedCoalescingStrategy.class).schedule(() -> {
                         synchronized (this.pending)
                         {
                             this.pending.remove(name);
@@ -290,7 +291,7 @@ public class CoalescingRecordListener implements IRecordListener {
      * Construct a "context-based" coalescing record listener instance with a cache policy of {@link
      * CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}
      *
-     * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
+     * @param coalescingExecutor the {@link IContextExecutor} to use to coalesce updates
      * @param delegate           the delegate record listener that will be notified using the executor
      * @param coalescingContext  the context to coalesce on - this can be the record name but for multi-source
      *                           updates, the context should identify the source and record name
@@ -304,7 +305,7 @@ public class CoalescingRecordListener implements IRecordListener {
     /**
      * Construct a "context-based" coalescing record listener.
      *
-     * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
+     * @param coalescingExecutor the {@link IContextExecutor} to use to coalesce updates
      * @param delegate           the delegate record listener that will be notified using the executor
      * @param coalescingContext  the context to coalesce on - this can be the record name but for multi-source
      *                           updates, the context should identify the source and record name
@@ -336,7 +337,7 @@ public class CoalescingRecordListener implements IRecordListener {
      *
      * @param periodMillis       the coalescing period
      * @param delegate           the delegate record listener that will be notified using the executor
-     * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
+     * @param coalescingExecutor the {@link IContextExecutor} to use to coalesce updates
      * @param coalescingContext  the context to coalesce on - this can be the record name but for
      *                           multi-source
      */
@@ -366,7 +367,7 @@ public class CoalescingRecordListener implements IRecordListener {
      *
      * @param periodMillis       the coalescing period
      * @param delegate           the delegate record listener that will be notified using the executor
-     * @param coalescingExecutor the {@link ThimbleExecutor} to use to coalesce updates
+     * @param coalescingExecutor the {@link IContextExecutor} to use to coalesce updates
      * @param coalescingContext  the context to coalesce on - this can be the record name but for multi-source
      *                           updates, the context should identify the source and record name
      * @param cachePolicy        the cache policy, see {@link CachePolicyEnum#KEEP_IMAGE_ON_COALESCE}, {@link

@@ -50,10 +50,9 @@ import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.ICoalescingRunnable;
+import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
@@ -348,7 +347,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      *            the utility {@link ScheduledExecutorService}, if <code>null</code> the default
      *            utility executor is used
      */
-    public Context(String name, ThimbleExecutor eventExecutor, ThimbleExecutor rpcExecutor,
+    public Context(String name, IContextExecutor eventExecutor, IContextExecutor rpcExecutor,
         ScheduledExecutorService utilityExecutor)
     {
         super();

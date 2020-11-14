@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
-import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.is;
 
 /**

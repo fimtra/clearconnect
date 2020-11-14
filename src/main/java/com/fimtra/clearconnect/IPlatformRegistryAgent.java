@@ -26,7 +26,7 @@ import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.IContextExecutor;
 
 /**
  * A platform registry agent (the 'agent') is the API entry into the ClearConnect platform. At the
@@ -43,13 +43,13 @@ import com.fimtra.thimble.ThimbleExecutor;
  * Applications can listen for newly created services via the
  * {@link #addServiceAvailableListener(IServiceAvailableListener)} method and obtain remote access
  * to these via the {@link IPlatformServiceProxy} interface. Applications can create services via
- * the {@link #createPlatformServiceInstance(String, WireProtocolEnum, String, int, String)} method
- * and use the {@link IPlatformServiceInstance} by obtaining it via the
+ * the {@link #createPlatformServiceInstance(String, String, String, WireProtocolEnum, RedundancyModeEnum)}
+ * method and use the {@link IPlatformServiceInstance} by obtaining it via the
  * {@link #getPlatformServiceInstance(String, String)} method.
  * <p>
  * Service names are unique across the platform. For a discussion on the fault-tolerance and
  * load-balancing service modes, refer to the {@link IPlatformServiceInstance} documentation.
- * 
+ *
  * @see IPlatformServiceInstance
  * @see IPlatformServiceProxy
  * @author Ramon Servadei
@@ -190,7 +190,7 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      RedundancyModeEnum, IContextExecutor, IContextExecutor, ScheduledExecutorService,
      *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
@@ -205,7 +205,7 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      RedundancyModeEnum, IContextExecutor, IContextExecutor, ScheduledExecutorService,
      *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
@@ -220,7 +220,7 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      RedundancyModeEnum, IContextExecutor, IContextExecutor, ScheduledExecutorService,
      *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName,
@@ -235,7 +235,7 @@ public interface IPlatformRegistryAgent
      * the given platform service.
      * 
      * @see #createPlatformServiceInstance(String, String, String, int, WireProtocolEnum,
-     *      RedundancyModeEnum, ThimbleExecutor, ThimbleExecutor, ScheduledExecutorService,
+     *      RedundancyModeEnum, IContextExecutor, IContextExecutor, ScheduledExecutorService,
      *      TransportTechnologyEnum)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String hostName, int port,
@@ -254,7 +254,7 @@ public interface IPlatformRegistryAgent
      *            the name of the platform service this platform service instance supports
      * @param serviceMember
      *            the name of this platform service member in the platform service family
-     * @param hostName
+     * @param host
      *            the hostname the platform service instance will use for its TCP socket
      * @param port
      *            the TCP port for the platform service instance
@@ -279,8 +279,8 @@ public interface IPlatformRegistryAgent
      *         otherwise (the platform service instance ID might be non-unique or may already exist)
      */
     boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host, int port,
-        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, ThimbleExecutor coreExecutor,
-        ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
+        WireProtocolEnum wireProtocol, RedundancyModeEnum redundacyMode, IContextExecutor coreExecutor,
+            IContextExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
         TransportTechnologyEnum transportTechnology);
 
     /**

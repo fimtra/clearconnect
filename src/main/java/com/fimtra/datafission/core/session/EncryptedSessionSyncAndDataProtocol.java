@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core.session;
 
 import java.nio.ByteBuffer;
-
 import javax.crypto.SecretKey;
 
 import com.fimtra.datafission.DataFissionProperties.Values;

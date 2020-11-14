@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
+import com.fimtra.executors.ContextExecutorFactory;
+
 /**
  * A pool of re-usable objects that assumes its only accessed by a single thread.
  * <p>
@@ -31,8 +33,7 @@ import java.util.concurrent.TimeUnit;
  * @param <T>
  * @author Ramon Servadei
  */
-public final class SingleThreadReusableObjectPool<T> extends AbstractReusableObjectPool<T>
-{
+public final class SingleThreadReusableObjectPool<T> extends AbstractReusableObjectPool<T> {
     public SingleThreadReusableObjectPool(String name, IReusableObjectBuilder<T> builder,
             IReusableObjectFinalizer<T> finalizer, int maxSize)
     {
@@ -63,13 +64,12 @@ public final class SingleThreadReusableObjectPool<T> extends AbstractReusableObj
  *
  * @author Ramon Servadei
  */
-abstract class AbstractReusableObjectPool<T>
-{
+abstract class AbstractReusableObjectPool<T> {
     final static List<WeakReference<AbstractReusableObjectPool<?>>> pools = new LowGcLinkedList<>();
 
     static
     {
-        ThreadUtils.scheduleAtFixedRate(AbstractReusableObjectPool.class, () -> {
+        ContextExecutorFactory.get(AbstractReusableObjectPool.class).scheduleAtFixedRate(() -> {
             final TreeMap<String, AbstractReusableObjectPool<?>> ordered = new TreeMap<>();
             synchronized (pools)
             {

@@ -21,7 +21,7 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.IContextExecutor;
 import com.fimtra.util.SystemUtils;
 
 /**
@@ -39,7 +39,7 @@ public abstract class DataFissionProperties {
         String BASE = "dataFission.";
 
         /**
-         * The system property name to define the number of threads used in the core {@link ThimbleExecutor}
+         * The system property name to define the number of threads used in the core {@link IContextExecutor}
          * used by all DataFission {@link Context} instances in the runtime.
          * <br>
          * E.g. <code>-DdataFission.coreThreadCount=8</code>
@@ -47,7 +47,7 @@ public abstract class DataFissionProperties {
         String CORE_THREAD_COUNT = BASE + "coreThreadCount";
 
         /**
-         * The system property name to define the number of threads used in the {@link ThimbleExecutor} for
+         * The system property name to define the number of threads used in the {@link IContextExecutor} for
          * RPCs used by all DataFission {@link Context} instances in the runtime.<br> E.g.
          * <code>-DdataFission.rpcThreadCount=4</code>
          */
@@ -226,7 +226,7 @@ public abstract class DataFissionProperties {
      */
     public interface Values {
         /**
-         * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission {@link
+         * The number of threads used in the core {@link IContextExecutor} used by all DataFission {@link
          * Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:
@@ -244,7 +244,7 @@ public abstract class DataFissionProperties {
                                 Runtime.getRuntime().availableProcessors() / 2 : 16)));
 
         /**
-         * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all DataFission {@link
+         * The number of threads used in the {@link IContextExecutor} for RPCs used by all DataFission {@link
          * Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:

@@ -52,10 +52,9 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.BlobValue;
-import com.fimtra.thimble.ContextExecutorFactory;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.TaskStatistics;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.ITaskStatistics;
 import com.fimtra.util.CharBufferUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
@@ -67,7 +66,6 @@ import com.fimtra.util.RollingFileAppender;
 import com.fimtra.util.StringAppender;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
-import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.UtilProperties;
 import com.fimtra.util.is;
 
@@ -76,20 +74,18 @@ import com.fimtra.util.is;
  *
  * @author Ramon Servadei, Paul Mackinlay
  */
-public final class ContextUtils
-{
+public final class ContextUtils {
 
     /**
-     * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register
-     * an inner listener to any new records in the context.
+     * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register an inner
+     * listener to any new records in the context.
      * <p>
-     * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code
-     * no longer requires the manager.
+     * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code no longer
+     * requires the manager.
      *
      * @author Ramon Servadei
      */
-    public static final class AllRecordsRegistrationManager implements IRecordListener
-    {
+    public static final class AllRecordsRegistrationManager implements IRecordListener {
         final IRecordListener allRecordsListener;
         final IObserverContext context;
         final Set<String> subscribed = new HashSet<>();
@@ -169,8 +165,7 @@ public final class ContextUtils
     }
 
     /**
-     * This is the default shared {@link ThimbleExecutor} used for <b>system record</b> event
-     * handling.
+     * This is the default shared {@link IContextExecutor} used for <b>system record</b> event handling.
      *
      * @see #SYSTEM_RECORDS
      */
@@ -178,15 +173,15 @@ public final class ContextUtils
             ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
 
     /**
-     * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
+     * This is the default shared {@link IContextExecutor} that can be used by all contexts.
      */
     final static IContextExecutor CORE_EXECUTOR =
             ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
-     * This is dedicated to handle RPC results. If RPC results are handled by the
-     * {@link #CORE_EXECUTOR}, a timeout could occur if the result is placed onto the same queue of
-     * the thread that is waiting for the result!
+     * This is dedicated to handle RPC results. If RPC results are handled by the {@link #CORE_EXECUTOR}, a
+     * timeout could occur if the result is placed onto the same queue of the thread that is waiting for the
+     * result!
      */
     final static IContextExecutor RPC_EXECUTOR =
             ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
@@ -210,7 +205,7 @@ public final class ContextUtils
 
     static
     {
-        ThreadUtils.scheduleWithFixedDelay(ContextUtils.class, new Runnable() {
+        ContextExecutorFactory.get(ContextUtils.class).scheduleWithFixedDelay(new Runnable() {
             // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();
             long gcTimeLastPeriod;
@@ -234,7 +229,7 @@ public final class ContextUtils
             @Override
             public void run()
             {
-                final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
+                final Set<IContextExecutor> executors = ContextExecutorFactory.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
 
@@ -245,32 +240,31 @@ public final class ContextUtils
                 }
                 // thimble executor Qs
                 long qOverflow = 0, qSubmitted = 0, qExecuted = 0;
-                TaskStatistics stats;
+                ITaskStatistics stats;
                 long overflow;
-                for (ThimbleExecutor thimbleExecutor : executors)
+                for (IContextExecutor executor : executors)
                 {
-                    final Map<Object, TaskStatistics> coalescingTaskStatistics =
-                            thimbleExecutor.getCoalescingTaskStatistics();
+                    final Map<Object, ITaskStatistics> coalescingTaskStatistics =
+                            executor.getCoalescingTaskStatistics();
                     stats = coalescingTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
                     qExecuted += stats.getIntervalExecuted();
 
-                    final Map<Object, TaskStatistics> sequentialTaskStatistics =
-                            thimbleExecutor.getSequentialTaskStatistics();
+                    final Map<Object, ITaskStatistics> sequentialTaskStatistics =
+                            executor.getSequentialTaskStatistics();
                     stats = sequentialTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
                     qExecuted += stats.getIntervalExecuted();
 
-
                     if (qStatsLog != null)
                     {
-                        sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
+                        sb.append(", ").append(executor.getName()).append(" coalescing Q, ").append(
                                 getStats(coalescingTaskStatistics));
-                        sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
+                        sb.append(", ").append(executor.getName()).append(" sequential Q, ").append(
                                 getStats(sequentialTaskStatistics));
                     }
                 }
@@ -359,9 +353,9 @@ public final class ContextUtils
                 }
             }
 
-            final String getStats(Map<Object, TaskStatistics> taskStatisticsMap)
+            final String getStats(Map<Object, ITaskStatistics> taskStatisticsMap)
             {
-                final TaskStatistics stats = taskStatisticsMap.get(IContextExecutor.QUEUE_LEVEL_STATS);
+                final ITaskStatistics stats = taskStatisticsMap.get(IContextExecutor.QUEUE_LEVEL_STATS);
                 final StringBuilder sb = new StringBuilder(50);
 
                 long overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
@@ -393,13 +387,12 @@ public final class ContextUtils
     }
 
     /**
-     * Serialise the state of a context to the directory. Each record in the context is serialized
-     * into a distinct file in the directory called {record-name}.record. This does not serialize
-     * system records.
+     * Serialise the state of a context to the directory. Each record in the context is serialized into a
+     * distinct file in the directory called {record-name}.record. This does not serialize system records.
      * <p>
-     * This will create a backup of the current directory at the same level called
-     * {directory-name}-backup, then write the context records to a temp directory at the same level
-     * called {directory-name}-temp, then rename the temp directory to the directory argument.
+     * This will create a backup of the current directory at the same level called {directory-name}-backup,
+     * then write the context records to a temp directory at the same level called {directory-name}-temp, then
+     * rename the temp directory to the directory argument.
      * <p>
      * <b>This is a non-atomic operation.</b>
      *
@@ -430,8 +423,8 @@ public final class ContextUtils
     }
 
     /**
-     * Resolve a context's internal records by loading them from data files in directory. This does
-     * not resolve system records.
+     * Resolve a context's internal records by loading them from data files in directory. This does not
+     * resolve system records.
      * <p>
      * <b>NOTE:</b> records that currently exist in the context will have their state merged with
      * the data held in the record file that is loaded.
@@ -456,8 +449,8 @@ public final class ContextUtils
     }
 
     /**
-     * Convenience method to serialise a record to the directory. The record contents are serialised
-     * to a flat file {record-name}.record in the directory.
+     * Convenience method to serialise a record to the directory. The record contents are serialised to a flat
+     * file {record-name}.record in the directory.
      *
      * @param record    the record to serialise
      * @param directory the directory for the data file
@@ -481,8 +474,8 @@ public final class ContextUtils
     }
 
     /**
-     * Convenience method to resolve a record's internal data from a data file in directory. The
-     * record contents are serialised in a flat file {record-name}.record in the directory.
+     * Convenience method to resolve a record's internal data from a data file in directory. The record
+     * contents are serialised in a flat file {record-name}.record in the directory.
      *
      * @param record    the record to resolve
      * @param directory the directory for the data file
@@ -521,8 +514,8 @@ public final class ContextUtils
     }
 
     /**
-     * Convenience method to get the record name from a record file. This expects the file name to
-     * be in the format: {record name}.record
+     * Convenience method to get the record name from a record file. This expects the file name to be in the
+     * format: {record name}.record
      *
      * @param recordFile the record file
      * @return the record name of the file, <code>null</code> if not a record file
@@ -556,17 +549,18 @@ public final class ContextUtils
     }
 
     /**
-     * A utility to register a listener that will be registered against all (non-system) records in
-     * a context. This creates an adapter listener that is registered to the context's
-     * {@link ISystemRecordNames#CONTEXT_RECORDS} record; when new records are added the
-     * allRecordsListener is added as an observer to the new record. <b>When finished with this, the
-     * {@link AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a
-     * memory leak. </b>
+     * A utility to register a listener that will be registered against all (non-system) records in a context.
+     * This creates an adapter listener that is registered to the context's {@link
+     * ISystemRecordNames#CONTEXT_RECORDS} record; when new records are added the allRecordsListener is added
+     * as an observer to the new record. <b>When finished with this, the {@link
+     * AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a memory leak.
+     * </b>
      *
      * @param context            the context with the records that will be observed
-     * @param allRecordsListener the observer that will be attached to every (non-system) record in the context //
-     * @return the object that will automatically manage registering the allRecordsListener to any
-     * new records in the context.
+     * @param allRecordsListener the observer that will be attached to every (non-system) record in the
+     *                           context //
+     * @return the object that will automatically manage registering the allRecordsListener to any new records
+     * in the context.
      */
     public static AllRecordsRegistrationManager addAllRecordsListener(final IObserverContext context,
             final IRecordListener allRecordsListener)
@@ -688,8 +682,8 @@ public final class ContextUtils
     /**
      * Opposite of {@link #mergeMaps(Map, Map)}
      *
-     * @return first index is a Map&lt;String, IValue>, second index is a Map&lt;String,
-     * Map&lt;String, IValue>> ...
+     * @return first index is a Map&lt;String, IValue>, second index is a Map&lt;String, Map&lt;String,
+     * IValue>> ...
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static Map<?, ?>[] demergeMaps(final Map<String, IValue> mergedMap)
@@ -760,8 +754,8 @@ public final class ContextUtils
     }
 
     /**
-     * Get the string representation of the map, expressing {@link BlobValue} instances as their
-     * byte sizes rather than the literal translation of the blob's internal byte[]
+     * Get the string representation of the map, expressing {@link BlobValue} instances as their byte sizes
+     * rather than the literal translation of the blob's internal byte[]
      */
     public static String mapToString(Map<String, IValue> map)
     {
@@ -982,8 +976,8 @@ public final class ContextUtils
     }
 
     /**
-     * Utility to do a clean destroy by removing all records (listeners are notified) then
-     * destroying the context.
+     * Utility to do a clean destroy by removing all records (listeners are notified) then destroying the
+     * context.
      *
      * @param context the context to remove records from and then destroy
      * @see #removeRecords(Context)

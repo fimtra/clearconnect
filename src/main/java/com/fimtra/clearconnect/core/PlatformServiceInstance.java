@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei, Fimtra
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -55,37 +55,37 @@ import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
 /**
- * The standard platform service. By default all instances are fault-tolerant unless specified
- * otherwise via the secondary constructor.
- * 
+ * The standard platform service. By default all instances are fault-tolerant unless specified otherwise via
+ * the secondary constructor.
+ *
  * @author Ramon Servadei
  */
-final class PlatformServiceInstance implements IPlatformServiceInstance
-{
-    /** The name of the service stats record */
+final class PlatformServiceInstance implements IPlatformServiceInstance {
+    /**
+     * The name of the service stats record
+     */
     static final String SERVICE_STATS_RECORD_NAME = "Service Stats";
 
     /**
      * Defines the fields for the service stats record.
      * <p>
      * This is different to the statistics in the {@link IContextConnectionsRecordFields}. The
-     * context-connections-record shows statistics about the individual connection between a Context
-     * (service) and ProxyContext (service proxy). The service-stats-record shows the <b>overall</b>
-     * statistics for the service instance (Context).
-     * 
+     * context-connections-record shows statistics about the individual connection between a Context (service)
+     * and ProxyContext (service proxy). The service-stats-record shows the <b>overall</b> statistics for the
+     * service instance (Context).
+     *
      * @author Ramon Servadei
      */
-    interface IServiceStatsRecordFields
-    {
+    interface IServiceStatsRecordFields {
         String SUBSCRIPTION_COUNT = "Subscriptions";
         String MESSAGE_COUNT = "Msgs published";
         String AVG_MSG_SIZE = "Avg msg size (bytes)";
@@ -120,9 +120,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
     @SuppressWarnings({ "unchecked" })
     PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
-        WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode, String host, int port,
-        ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
-        TransportTechnologyEnum transportTechnology)
+            WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode, String host, int port,
+            IContextExecutor coreExecutor, IContextExecutor rpcExecutor,
+            ScheduledExecutorService utilityExecutor, TransportTechnologyEnum transportTechnology)
     {
         this.platformName = platformName;
         this.serviceFamily = serviceFamily;
@@ -139,10 +139,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             this.ftStatusListeners = Collections.EMPTY_LIST;
         }
         this.context =
-            new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), coreExecutor,
-                rpcExecutor, utilityExecutor);
+                new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember),
+                        coreExecutor, rpcExecutor, utilityExecutor);
 
-        this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
+        this.publisher =
+                new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
 
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
@@ -150,13 +151,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         // update service stats periodically
         this.statsUpdateTask = setupStatsUpdateTask(this.context, this.publisher, this.stats);
 
-        this.recordAvailableNotifyingCache =
-            PlatformUtils.createRecordAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RECORDS, this);
+        this.recordAvailableNotifyingCache = PlatformUtils.createRecordAvailableNotifyingCache(this.context,
+                ISystemRecordNames.CONTEXT_RECORDS, this);
         this.rpcAvailableNotifyingCache =
-            PlatformUtils.createRpcAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RPCS, this);
-        this.subscriptionNotifyingCache =
-            PlatformUtils.createSubscriptionNotifyingCache(this.context, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, this);
-        this.proxyConnectionListenerCache = PlatformUtils.createProxyConnectionNotifyingCache(this.context, this);
+                PlatformUtils.createRpcAvailableNotifyingCache(this.context, ISystemRecordNames.CONTEXT_RPCS,
+                        this);
+        this.subscriptionNotifyingCache = PlatformUtils.createSubscriptionNotifyingCache(this.context,
+                ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, this);
+        this.proxyConnectionListenerCache =
+                PlatformUtils.createProxyConnectionNotifyingCache(this.context, this);
         this.active = true;
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
@@ -178,21 +181,23 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     static ScheduledFuture<?> setupStatsUpdateTask(final Context context, final Publisher publisher,
             final IRecord stats)
     {
-        return ThreadUtils.scheduleWithFixedDelay(context, new Runnable() {
-            final AtomicLong lastMessagesPublished = new AtomicLong();
-            final AtomicLong lastBytesPublished = new AtomicLong();
-            final AtomicLong lastTimeNanos = new AtomicLong();
-            final long startTimeMillis = System.currentTimeMillis();
+        return ContextExecutorFactory.get(PlatformServiceInstance.class).scheduleWithFixedDelay(
+                new Runnable() {
+                    final AtomicLong lastMessagesPublished = new AtomicLong();
+                    final AtomicLong lastBytesPublished = new AtomicLong();
+                    final AtomicLong lastTimeNanos = new AtomicLong();
+                    final long startTimeMillis = System.currentTimeMillis();
 
-            @Override
-            public void run()
-            {
-                publishServiceStats(context, publisher, stats, this.startTimeMillis,
-                        this.lastMessagesPublished, this.lastBytesPublished, this.lastTimeNanos,
-                        context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size(),
-                        context.getRecord(ISystemRecordNames.CONTEXT_RPCS).size());
-            }
-        }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
+                    @Override
+                    public void run()
+                    {
+                        publishServiceStats(context, publisher, stats, this.startTimeMillis,
+                                this.lastMessagesPublished, this.lastBytesPublished, this.lastTimeNanos,
+                                context.getRecord(ISystemRecordNames.CONTEXT_RECORDS).size(),
+                                context.getRecord(ISystemRecordNames.CONTEXT_RPCS).size());
+                    }
+                }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS,
+                TimeUnit.SECONDS);
     }
 
     private static void publishServiceStats(Context l_context, Publisher l_publisher, IRecord statsRecord,
@@ -249,7 +254,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
     @Override
     public Future<Map<String, Boolean>> addRecordListener(String permissionToken, IRecordListener listener,
-        String... recordNames)
+            String... recordNames)
     {
         return this.context.addObserver(permissionToken, listener, recordNames);
     }
@@ -303,15 +308,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     }
 
     @Override
-    public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs) throws TimeOutException,
-        ExecutionException
+    public IValue executeRpc(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs)
+            throws TimeOutException, ExecutionException
     {
         return PlatformUtils.executeRpc(this, discoveryTimeoutMillis, rpcName, rpcArgs);
     }
 
     @Override
     public void executeRpcNoResponse(long discoveryTimeoutMillis, String rpcName, IValue... rpcArgs)
-        throws TimeOutException, ExecutionException
+            throws TimeOutException, ExecutionException
     {
         PlatformUtils.executeRpcNoResponse(this, discoveryTimeoutMillis, rpcName, rpcArgs);
     }
@@ -388,9 +393,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     }
 
     /**
-     * Destroy this component. This will close the TCP connection and release all resources used by
-     * the object. There is no specification for what callbacks will be invoked for any attached
-     * listeners.
+     * Destroy this component. This will close the TCP connection and release all resources used by the
+     * object. There is no specification for what callbacks will be invoked for any attached listeners.
      */
     public void destroy()
     {
@@ -439,7 +443,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     public String toString()
     {
         return "PlatformServiceInstance [platform{" + this.platformName + "} service{" + this.serviceFamily
-            + "} member{" + this.serviceMember + "}] " + getEndPointAddress();
+                + "} member{" + this.serviceMember + "}] " + getEndPointAddress();
     }
 
     @Override
@@ -487,8 +491,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void addFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.executeSequentialCoreTask(new ISequentialRunnable()
-        {
+        this.context.executeSequentialCoreTask(new ISequentialRunnable() {
             @Override
             public Object context()
             {
@@ -519,8 +522,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void removeFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.executeSequentialCoreTask(new ISequentialRunnable()
-        {
+        this.context.executeSequentialCoreTask(new ISequentialRunnable() {
             @Override
             public Object context()
             {
@@ -570,8 +572,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.context.executeSequentialCoreTask(new ISequentialRunnable()
-            {
+            this.context.executeSequentialCoreTask(new ISequentialRunnable() {
                 @Override
                 public Object context()
                 {
@@ -604,11 +605,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             {
                 // "->PlatformRegistry"
                 final String registryConnection =
-                    PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
-                
+                        PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
+
                 // disconnect all clients EXCEPT the registry connection
                 this.publisher.disconnectClients("No longer master instance",
-                    (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
+                        (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
             }
 
             for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)

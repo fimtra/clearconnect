@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,6 @@ package com.fimtra.thimble;
 
 import static org.junit.Assert.assertTrue;
 
-import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,9 +26,13 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.fimtra.thimble.ICoalescingRunnable;
+import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.thimble.ThimbleExecutor;
+
 /**
  * Tests for the {@link ThimbleExecutor}
- * 
+ *
  * @author Ramon Servadei
  */
 public class ThimbleExecutorTest
@@ -46,7 +49,7 @@ public class ThimbleExecutorTest
         private final CountDownLatch latch;
 
         CoalescingTestingRunnable(AtomicInteger current, int myCount, int maxCount, CountDownLatch latch,
-            AtomicInteger runCount)
+                AtomicInteger runCount)
         {
             this.current = current;
             this.myCount = myCount;
@@ -128,7 +131,7 @@ public class ThimbleExecutorTest
         public String toString()
         {
             return "SequenceTestingRunnable [counter=" + this.counter + ", expectedCount=" + this.expectedCount
-                + ", latch=" + this.latch + "]";
+                    + ", latch=" + this.latch + "]";
         }
     }
 
@@ -157,7 +160,6 @@ public class ThimbleExecutorTest
     @After
     public void tearDown() throws Exception
     {
-        this.candidate.destroy();
     }
 
     @Test
@@ -172,7 +174,7 @@ public class ThimbleExecutorTest
             this.candidate.execute(new SequentialTestingRunnable(counter, i, latch));
         }
         assertTrue("Not all sequential runnables were run, remaining is " + latch.getCount(),
-            latch.await(2, TimeUnit.SECONDS));
+                latch.await(2, TimeUnit.SECONDS));
     }
 
     @Test
@@ -207,9 +209,9 @@ public class ThimbleExecutorTest
             this.candidate.execute(new SequentialTestingRunnable(counter2, i, latch2, "SequentialTestingRunnable2"));
         }
         assertTrue("Not all sequential runnables were run, remaining is " + latch.getCount(),
-            latch.await(2, TimeUnit.SECONDS));
+                latch.await(2, TimeUnit.SECONDS));
         assertTrue("Not all sequential runnables were run (2), remaining is " + latch2.getCount(),
-            latch.await(2, TimeUnit.SECONDS));
+                latch.await(2, TimeUnit.SECONDS));
     }
 
     @Test
@@ -227,7 +229,7 @@ public class ThimbleExecutorTest
         {
             this.candidate.execute(new SequentialTestingRunnable(sequentialCounter, i, sequentialLatch));
             this.candidate.execute(new CoalescingTestingRunnable(coalescingCounter, i, maxCount, coalesingLatch,
-                runCount));
+                    runCount));
             for (int j = 0; j < SIZE; j++)
             {
                 this.candidate.execute(new Runnable()
@@ -238,19 +240,11 @@ public class ThimbleExecutorTest
                     }
                 });
             }
-            if ((i % 1000) == 0)
-            {
-                System.err.println(this.candidate.getCoalescingTaskStatistics());
-                System.err.println(this.candidate.getSequentialTaskStatistics());
-            }
         }
         assertTrue("Not all sequential runnables were run, remaining is " + sequentialLatch.getCount(),
-            sequentialLatch.await(2, TimeUnit.SECONDS));
+                sequentialLatch.await(2, TimeUnit.SECONDS));
         assertTrue("Not all coalescing runnables were run", coalesingLatch.await(2, TimeUnit.SECONDS));
         assertTrue(runCount.toString(), runCount.get() < count - 5);
-        System.err.println(this.candidate.getCoalescingTaskStatistics());
-        System.err.println(this.candidate.getSequentialTaskStatistics());
-        System.err.println(this.candidate.getExecutorStatistics());
     }
 
     @Test
@@ -275,70 +269,7 @@ public class ThimbleExecutorTest
             }
         }
         assertTrue("Not all sequential runnables were run, remaining is " + latch.getCount(),
-            latch.await(2, TimeUnit.SECONDS));
+                latch.await(2, TimeUnit.SECONDS));
     }
 
-    @Test
-    public void testAddRemoveThreadId()
-    {
-        System.err.println(Arrays.toString(this.candidate.tids));
-        
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
-        
-        this.candidate.addThreadId(2);
-        this.candidate.addThreadId(1);
-        this.candidate.addThreadId(100);
-        
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) > -1);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) > -1);
-        
-        this.candidate.removeThreadId(1);
-        
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) > -1);
-        
-        this.candidate.removeThreadId(2);
-        
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) > -1);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
-
-        this.candidate.removeThreadId(100);
-        
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 100) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 1) < 0);
-        assertTrue(Arrays.binarySearch(this.candidate.tids, 2) < 0);
-    }
-
-    @Test
-    public void testAllCoreThreadsBlocked() throws InterruptedException
-    {
-        Runnable blockedTask = () -> {
-            synchronized("")
-            {
-                try
-                {
-                    "".wait(10000);
-                }
-                catch (InterruptedException e)
-                {
-                    e.printStackTrace();
-                }
-            }
-        };
-        CountDownLatch latch = new CountDownLatch(2);
-        Runnable trigger = () -> latch.countDown();
-        for(int i=0; i < SIZE; i++)
-        {
-            candidate.execute(blockedTask);
-        }
-        candidate.execute(trigger);
-        candidate.execute(trigger);
-
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
-    }
 }
