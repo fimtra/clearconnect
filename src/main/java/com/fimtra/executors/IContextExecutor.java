@@ -19,8 +19,6 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.sun.xml.internal.ws.client.sei.SEIStub;
-
 /**
  * An IContextExecutor is a multi-thread {@link Executor} implementation that supports
  * sequential and coalescing tasks. The tasks submitted are bound to a context, which ensures
