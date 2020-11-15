@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -40,7 +39,6 @@ import com.fimtra.executors.ICoalescingRunnable;
 import com.fimtra.executors.IContextExecutor;
 import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.executors.ITaskStatistics;
-import com.fimtra.executors.TaskStatistics;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.LowGcLinkedList;
@@ -49,8 +47,9 @@ import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
- * A GatlingExecutor is a multi-thread {@link Executor} implementation that supports sequential and coalescing
- * tasks.
+ * A GatlingExecutor is an elastic multi-threaded {@link IContextExecutor} implementation.
+ *
+ * <h1>Execution</h1>
  * <p>
  * The executor has a thread pool that expands as tasks are needed. A core number is kept alive. Extra threads
  * that are idle in the pool stay alive for 10 seconds, this idle time adapts to the use of the pool. The idle
@@ -58,31 +57,19 @@ import com.fimtra.util.ThreadUtils;
  * <p>
  * Every 500ms (configurable, see {@link #STALL_PERIOD_CHECK}) all threads are checked for "stalled" status
  * (i.e. not RUNNING and the queue is increasing). In this state, a new thread is added.
+ *
+ * <h1>Scheduling</h1>
  * <p>
- * Sequential tasks are guaranteed to run in order and sequentially (but may run in different threads).
- * Coalescing tasks are tasks where only the latest submitted task needs to be executed (effectively
- * overwriting previously submitted tasks).
- * <p>
- * <b>Sequential and coalescing tasks are mutually exclusive.</b>
- * <p>
- * As an example, if 50,000 sequential tasks for the same context are submitted, then we can expect that the
- * GatlingExecutor will run all 50,000 tasks in submission order and sequentially. If 50,000 coalescing tasks
- * for the same context are submitted then, depending on performance, we can expect that the GatlingExecutor
- * will run perhaps only 500 (depends on how fast the processing of 1 occurrence of the task is, the faster
- * its processed, the more occurrences will be processed, but its hard to really beat coalescing like this!).
- * </p>
- * <p>
- * Statistics for the number of submitted and executed sequential and coalescing tasks can be obtained via the
- * {@link #getSequentialTaskStatistics()} and {@link #getCoalescingTaskStatistics()} methods. The statistics
- * are recomputed on each successive call to these methods. It is up to user code to call these methods
- * periodically. Statistics for the number of submitted and executed tasks (regardless of type) can be
- * obtained via the {@link #getExecutorStatistics()} method.
+ * Scheduling is implemented using a standard, single-threaded, {@link ScheduledExecutorService} which will
+ * wrap the Runnable/Callable as a sequential-runnable and execute internally. This will introduce some extra
+ * latency for when the task actually executes, but this is seen as negligible.
  *
  * @author Ramon Servadei
  * @see ISequentialRunnable
  * @see ICoalescingRunnable
  */
-public class GatlingExecutor implements IContextExecutor, ScheduledExecutorService {
+public class GatlingExecutor implements IContextExecutor {
+
     public static Set<? extends IContextExecutor> getExecutors()
     {
         return Collections.unmodifiableSet(EXECUTORS);
@@ -156,7 +143,7 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
         public void run()
         {
             Runnable toRun = null;
-            while (this.active && GatlingExecutor.this.active)
+            while (this.active)
             {
                 // note: toRun could be set to a value after a previous run
                 if (toRun != null || (toRun = this.task) != null)
@@ -184,8 +171,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
                             {
                                 toRun = GatlingExecutor.this.taskQueue.poll_callWhilstHoldingLock();
                                 this.task = toRun;
-
-                                GatlingExecutor.this.stats.itemExecuted();
 
                                 if (toRun == null)
                                 {
@@ -217,16 +202,16 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
                         toRun = this.task;
                     }
 
-                    if (toRun == null &&
+                    if (toRun == null && (!GatlingExecutor.this.active ||
                             // check for "spurious" waking up - check within a factor of 10,
                             // so 0.1ms (hence multiply by 100,000, not 1,000,000)
-                            waitTimeNanos >= GatlingExecutor.this.idlePeriodMillis * 100_000)
+                            waitTimeNanos >= GatlingExecutor.this.idlePeriodMillis * 100_000))
                     {
                         synchronized (GatlingExecutor.this.taskQueue.lock)
                         {
                             // we could have had a task assigned so check before final destroy
-                            if (this.task == null
-                                    && GatlingExecutor.this.taskRunners.size() > GatlingExecutor.this.size)
+                            if (this.task == null && (!GatlingExecutor.this.active
+                                    || GatlingExecutor.this.taskRunners.size() > GatlingExecutor.this.size))
                             {
                                 destroy_callWhilstHoldingLock();
                             }
@@ -265,7 +250,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
     private final int size;
     final LowGcLinkedList<Integer> freeNumbers;
     private final AtomicInteger threadCounter;
-    TaskStatistics stats;
     long idlePeriodNanos = IDLE_PERIOD_MILLIS * 1_000_000;
     volatile long idlePeriodMillis = IDLE_PERIOD_MILLIS;
     long lastExecuteTimeNanos = System.nanoTime();
@@ -304,7 +288,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
         return Arrays.binarySearch(this.tids, id) > -1;
     }
 
-
     /**
      * Construct the {@link GatlingExecutor} with a thread pool minimum size and name for the threads.
      *
@@ -331,7 +314,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
 
         this.threadCounter = new AtomicInteger(0);
         this.freeNumbers = new LowGcLinkedList<>();
-        this.stats = new TaskStatistics(this.name);
         this.taskRunners = CollectionUtils.newDeque();
         this.taskQueue = new TaskQueue(this.name);
         this.taskRunnersRef = new LinkedList<>();
@@ -381,7 +363,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
             this.lastExecuteTimeNanos = now;
 
             final TaskQueue.QChangeTypeEnum qChange = this.taskQueue.offer_callWhilstHoldingLock(command);
-            this.stats.itemSubmitted();
 
             if (qChange != TaskQueue.QChangeTypeEnum.NONE)
             {
@@ -436,14 +417,7 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
                         }
                     }
                 }
-
-                // add a runner per outstanding task if under MAX_THREADS, else 1
-                final int burst = Math.max(1,
-                        Math.min(MAX_THREADS - this.taskRunnersRef.size(), this.taskQueue.lastTriggerSize));
-                for (int i = 0; i < burst; i++)
-                {
-                    addTaskRunner_callWhilstHoldingLock();
-                }
+                addTaskRunner_callWhilstHoldingLock();
             }
         }
         catch (Exception e)
@@ -499,15 +473,6 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
     public Map<Object, ITaskStatistics> getCoalescingTaskStatistics()
     {
         return (Map<Object, ITaskStatistics>) this.taskQueue.getCoalescingTaskStatistics();
-    }
-
-    /**
-     * @return the statistics for all tasks submitted to this GatlingExecutor
-     */
-    @Override
-    public TaskStatistics getExecutorStatistics()
-    {
-        return this.stats.intervalFinished();
     }
 
     @Override
@@ -571,7 +536,8 @@ public class GatlingExecutor implements IContextExecutor, ScheduledExecutorServi
         {
             for (TaskRunner taskRunner : new ArrayList<>(this.taskRunnersRef))
             {
-                taskRunner.destroy_callWhilstHoldingLock();
+                // trigger so idle threads die out - task Q will be drained by live ones
+                taskRunner.execute();
             }
         }
         EXECUTORS.remove(this);

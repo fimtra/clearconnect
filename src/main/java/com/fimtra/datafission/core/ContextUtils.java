@@ -238,7 +238,7 @@ public final class ContextUtils {
                 {
                     sb.append(yyyyMMddHHmmssSSS);
                 }
-                // thimble executor Qs
+                // context executor Qs
                 long qOverflow = 0, qSubmitted = 0, qExecuted = 0;
                 ITaskStatistics stats;
                 long overflow;

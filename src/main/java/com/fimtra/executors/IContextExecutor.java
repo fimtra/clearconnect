@@ -16,43 +16,44 @@
 package com.fimtra.executors;
 
 import java.util.Map;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * An IContextExecutor is a multi-thread {@link Executor} implementation that supports
- * sequential and coalescing tasks. The tasks submitted are bound to a context, which ensures
- * in-order execution across multiple threads. There are 2 types of tasks: sequential and
- * coalescing:
- * <ul>
- * <li>Sequential tasks are guaranteed to run in order, sequentially (but may run in different
- * threads).
- * <li>Coalescing tasks are tasks where only the latest submitted task needs to be executed
- * (effectively overwriting previously submitted tasks).
- * </ul>
+ * An {@link ScheduledExecutorService} implementation that supports 3 types of tasks:
  * <p>
- * <b>Sequential and coalesing tasks are mutually exclusive.</b>
+ * - {@link Runnable} - these will be executed with no guarantee of ordering
  * <p>
- * As an example, if 50,000 sequential tasks for the same context are submitted, then we can expect
- * that the IContextExecutor will run all 50,000 tasks in submission order and sequentially. If
- * 50,000 coalescing tasks for the same context are submitted then, depending on performance, we can
- * expect that the IContextExecutor will run perhaps only 20,000.
+ * - {@link ICoalescingRunnable} - this is a context task which can replace any pending task with the same
+ * context if it has not executed yet. The coalescing-runnable feature allows for high through-put of task
+ * processing in situations where only the latest task for a context requires processing.
  * <p>
- * Statistics for the number of submitted and executed sequential and coalescing tasks can be
- * obtained via the {@link #getSequentialTaskStatistics()} and
- * {@link #getCoalescingTaskStatistics()} methods. The statistics are recomputed on each successive
- * call to these methods. It is up to user code to call these methods periodically. Statistics for
- * the number of submitted and executed tasks (regardless of type) can be obtained via the
- * {@link #getExecutorStatistics()} method.
- * 
+ * - {@link ISequentialRunnable} - this is a context task that will be executed sequentially and inorder of
+ * submission to the executor with respect to other tasks of the same context. The sequential-runnable feature
+ * allows the executor to behave as multiple single-threaded executors which traditionally would be needed to
+ * ensure ordered execution of tasks in a multi-thread system. This can reduce thread context switching
+ * compared to an executor-per-context approach which also translates to higher task throughput.
+ * <p>
+ * <b>Sequential and coalescing tasks are mutually exclusive.</b>
+ * <p>
+ * As an example, if 50,000 sequential tasks for the same context are submitted, then we can expect that the
+ * context-executor will run all 50,000 tasks in submission order and sequentially. If 50,000 coalescing tasks
+ * for the same context are submitted then, depending on performance, we can expect that the GatlingExecutor
+ * will run perhaps only 50 (depends on how fast the processing of 1 occurrence of the task is, the faster its
+ * processed, the more occurrences will be processed, but its hard to really beat coalescing like this!).
+ * <p>
+ * Statistics for the number of submitted and executed sequential and coalescing tasks can be obtained via the
+ * {@link #getSequentialTaskStatistics()} and {@link #getCoalescingTaskStatistics()} methods. The statistics
+ * are recomputed on each successive call to these methods. It is up to user code to call these methods
+ * periodically.
+ *
+ * @author Ramon Servadei
  * @see ISequentialRunnable
  * @see ICoalescingRunnable
- * @author Ramon Servadei
  */
-public interface IContextExecutor extends ScheduledExecutorService
-{
+public interface IContextExecutor extends ScheduledExecutorService {
+
     String QUEUE_LEVEL_STATS = "QueueLevelStats";
-    
+
     boolean isExecutorThread(long id);
 
     /**
@@ -61,29 +62,24 @@ public interface IContextExecutor extends ScheduledExecutorService
     String getName();
 
     /**
-     * Get the statistics for the sequential tasks submitted to this {@link IContextExecutor}. The
-     * statistics are updated on each successive call to this method (this defines the time interval
-     * for the statistics).
-     * 
-     * @return a Map holding all sequential task context statistics. The statistics objects will be
-     *         updated on each successive call to this method.
+     * Get the statistics for the sequential tasks submitted to this {@link IContextExecutor}. The statistics
+     * are updated on each successive call to this method (this defines the time interval for the
+     * statistics).
+     *
+     * @return a Map holding all sequential task context statistics. The statistics objects will be updated on
+     * each successive call to this method.
      */
     Map<Object, ITaskStatistics> getSequentialTaskStatistics();
 
     /**
-     * Get the statistics for the coalescing tasks submitted to this {@link IContextExecutor}. The
-     * statistics are updated on each successive call to this method (this defines the time interval
-     * for the statistics).
-     * 
-     * @return a Map holding all coalescing task context statistics. The statistics objects will be
-     *         updated on each successive call to this method.
+     * Get the statistics for the coalescing tasks submitted to this {@link IContextExecutor}. The statistics
+     * are updated on each successive call to this method (this defines the time interval for the
+     * statistics).
+     *
+     * @return a Map holding all coalescing task context statistics. The statistics objects will be updated on
+     * each successive call to this method.
      */
     Map<Object, ITaskStatistics> getCoalescingTaskStatistics();
-
-    /**
-     * @return the statistics for all tasks submitted to this {@link IContextExecutor}.
-     */
-    ITaskStatistics getExecutorStatistics();
 
     void destroy();
 }

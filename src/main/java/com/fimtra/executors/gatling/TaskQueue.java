@@ -341,8 +341,7 @@ final class TaskQueue {
      */
     boolean isNotDraining_callWhilstHoldingLock()
     {
-        final int currentSize = this.queue.size() + this.coalescingTasksPerContext.size()
-                + this.sequentialTasksPerContext.size();
+        final int currentSize = this.queue.size();
         try
         {
             return currentSize != 0 && currentSize >= this.lastTriggerSize;

@@ -20,13 +20,16 @@ import static org.junit.Assert.assertTrue;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.executors.ICoalescingRunnable;
+import com.fimtra.executors.IContextExecutor;
 import com.fimtra.executors.ISequentialRunnable;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +46,98 @@ public class GatlingPerfTest
     @Before
     public void setUp() throws Exception
     {
+    }
+
+    @Test
+    public void testSequentialPerformanceVsExecutors() throws InterruptedException
+    {
+        int LOOP_MAX = 100000;
+
+        int contextCount = 16;
+        AtomicReference<CountDownLatch> executorLatch = new AtomicReference<>();
+        AtomicReference<CountDownLatch> gatlingLatch = new AtomicReference<>();
+        AtomicLong[] executorCounters = new AtomicLong[contextCount];
+        AtomicLong[] gatlingCounters = new AtomicLong[contextCount];
+        Executor[] executors = new Executor[contextCount];
+        Runnable[] executorRunnables = new Runnable[contextCount];
+        ISequentialRunnable[] gatlingRunnables = new ISequentialRunnable[contextCount];
+        IContextExecutor gatling = new GatlingExecutor("test-vs-exec", 1);
+
+        for (int i = 0; i < contextCount; i++)
+        {
+            executorCounters[i] = new AtomicLong(0);
+            gatlingCounters[i] = new AtomicLong(0);
+            executors[i] = Executors.newSingleThreadExecutor();
+            int finalI = i;
+            executorRunnables[i] = () -> {
+                if(executorCounters[finalI].incrementAndGet() == LOOP_MAX)
+                {
+                    executorLatch.get().countDown();
+                }
+            };
+            gatlingRunnables[i] = new ISequentialRunnable(){
+
+                @Override
+                public void run()
+                {
+                    if(gatlingCounters[finalI].incrementAndGet() == LOOP_MAX)
+                    {
+                        gatlingLatch.get().countDown();
+                    }
+                }
+
+                @Override
+                public Object context()
+                {
+                    return finalI;
+                }
+            };
+        }
+
+        // run 50,000 for each context
+        runGatlingVsExecutor(LOOP_MAX, contextCount, executorLatch, gatlingLatch, executors,
+                executorRunnables, gatlingRunnables, gatling);
+//        for (int i = 0; i < contextCount; i++)
+//        {
+//            executorCounters[i] = new AtomicLong(0);
+//            gatlingCounters[i] = new AtomicLong(0);
+//        }
+//        runGatlingVsExecutor(LOOP_MAX, contextCount, executorLatch, gatlingLatch, executors,
+//                executorRunnables, gatlingRunnables, gatling);
+    }
+
+    private void runGatlingVsExecutor(int LOOP_MAX, int contextCount,
+            AtomicReference<CountDownLatch> executorLatch, AtomicReference<CountDownLatch> gatlingLatch,
+            Executor[] executors, Runnable[] executorRunnables, ISequentialRunnable[] gatlingRunnables,
+            IContextExecutor gatling) throws InterruptedException
+    {
+        executorLatch.set(new CountDownLatch(contextCount));
+        long executorTime = System.nanoTime();
+        for (int j = 0; j < LOOP_MAX; j++)
+        {
+            for (int i = 0; i < contextCount; i++)
+            {
+                executors[i].execute(executorRunnables[i]);
+            }
+        }
+        executorLatch.get().await();
+        executorTime = System.nanoTime() - executorTime;
+
+        gatlingLatch.set(new CountDownLatch(contextCount));
+        long gatlingTime = System.nanoTime();
+        for (int j = 0; j < LOOP_MAX; j++)
+        {
+            for (int i = 0; i < contextCount; i++)
+            {
+                gatling.execute(gatlingRunnables[i]);
+            }
+        }
+        gatlingLatch.get().await();
+        gatlingTime = System.nanoTime() - gatlingTime;
+
+        System.err.println("executorTime=" + executorTime / 1_000_000d);
+        System.err.println(" gatlingTime=" + gatlingTime / 1_000_000d);
+        assertTrue(executorTime > gatlingTime);
     }
 
     @Test
