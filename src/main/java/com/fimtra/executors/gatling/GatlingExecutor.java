@@ -582,7 +582,7 @@ public class GatlingExecutor implements IContextExecutor {
         }
 
         final long now = System.nanoTime();
-        final long end = now + unit.convert(timeout, TimeUnit.NANOSECONDS);
+        final long end = now + unit.toNanos(timeout);
         while (this.taskQueue.queue.size() != 0)
         {
             if (System.nanoTime() > end)

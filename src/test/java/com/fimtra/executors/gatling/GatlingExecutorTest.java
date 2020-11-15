@@ -34,6 +34,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 import com.fimtra.executors.ICoalescingRunnable;
 import com.fimtra.executors.ISequentialRunnable;
@@ -514,7 +515,12 @@ public class GatlingExecutorTest {
             this.candidate.execute(counter::getAndIncrement);
         }
         candidate.shutdown();
-        assertTrue(this.candidate.awaitTermination(1000, TimeUnit.MILLISECONDS));
+
+        final boolean done = this.candidate.awaitTermination(1000, TimeUnit.MILLISECONDS);
+        System.err.println("done=" + done + ", count=" + counter.get());
+        assertEquals("TaskQ size", 0, candidate.taskQueue.queue.size());
+        assertEquals("counter", 10000, counter.get());
+        assertTrue(done);
     }
 
     @Test
