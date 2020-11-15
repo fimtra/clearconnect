@@ -63,7 +63,10 @@ final class TaskQueue {
     interface InternalTaskQueue<T> extends Runnable {
         void offer(T t);
 
-        void onTaskFinished();
+        /**
+         * @return the next task to run
+         */
+        Runnable onTaskFinished();
     }
 
     /**
@@ -123,7 +126,7 @@ final class TaskQueue {
         }
 
         @Override
-        public void onTaskFinished()
+        public Runnable onTaskFinished()
         {
             this.stats.itemExecuted();
             if (this.size > 0)
@@ -135,6 +138,7 @@ final class TaskQueue {
                 TaskQueue.this.sequentialTasksPerContext.remove(this.context);
                 TaskQueue.this.sequentialTasksPool.offer(this);
             }
+            return TaskQueue.this.queue.poll();
         }
 
         // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
@@ -196,7 +200,7 @@ final class TaskQueue {
         }
 
         @Override
-        public void onTaskFinished()
+        public Runnable onTaskFinished()
         {
             this.stats.itemExecuted();
             if (this.latestTask.get() != null)
@@ -208,6 +212,7 @@ final class TaskQueue {
                 TaskQueue.this.coalescingTasksPerContext.remove(this.context);
                 TaskQueue.this.coalescingTasksPool.offer(this);
             }
+            return TaskQueue.this.queue.poll();
         }
 
         // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
@@ -242,11 +247,6 @@ final class TaskQueue {
     final SingleThreadReusableObjectPool<SequentialTasks> sequentialTasksPool;
     final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;
     final String name;
-
-    /**
-     * Tracks the last not-draining threshold size breach
-     */
-    int lastTriggerSize;
 
     TaskQueue(String name)
     {
@@ -334,22 +334,6 @@ final class TaskQueue {
     Runnable poll_callWhilstHoldingLock()
     {
         return this.queue.poll();
-    }
-
-    /**
-     * @return true if the queue is > 0 and has increased or remained constant since the last call
-     */
-    boolean isNotDraining_callWhilstHoldingLock()
-    {
-        final int currentSize = this.queue.size();
-        try
-        {
-            return currentSize != 0 && currentSize >= this.lastTriggerSize;
-        }
-        finally
-        {
-            this.lastTriggerSize = currentSize;
-        }
     }
 
     /**

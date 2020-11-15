@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -160,23 +161,19 @@ public class GatlingExecutor implements IContextExecutor {
                     {
                         synchronized (GatlingExecutor.this.taskQueue.lock)
                         {
-                            try
+                            if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
                             {
-                                if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
-                                {
-                                    ((TaskQueue.InternalTaskQueue<?>) toRun).onTaskFinished();
-                                }
+                                toRun = ((TaskQueue.InternalTaskQueue<?>) toRun).onTaskFinished();
                             }
-                            finally
+                            else
                             {
                                 toRun = GatlingExecutor.this.taskQueue.poll_callWhilstHoldingLock();
-                                this.task = toRun;
-
-                                if (toRun == null)
-                                {
-                                    // no more tasks so place back into the runners list
-                                    GatlingExecutor.this.taskRunners.offerFirst(TaskRunner.this);
-                                }
+                            }
+                            this.task = toRun;
+                            if (toRun == null)
+                            {
+                                // no more tasks so place back into the runners list
+                                GatlingExecutor.this.taskRunners.offerFirst(TaskRunner.this);
                             }
                         }
                     }
@@ -184,24 +181,26 @@ public class GatlingExecutor implements IContextExecutor {
                 else
                 {
                     long waitTimeNanos = 0;
-                    synchronized (this.lock)
+                    if (GatlingExecutor.this.active)
                     {
-                        if (this.task == null)
+                        synchronized (this.lock)
                         {
-                            try
+                            if (this.task == null)
                             {
-                                waitTimeNanos = System.nanoTime();
-                                this.lock.wait(this.isCore ? 0 : GatlingExecutor.this.idlePeriodMillis);
-                                waitTimeNanos = System.nanoTime() - waitTimeNanos;
+                                try
+                                {
+                                    waitTimeNanos = System.nanoTime();
+                                    this.lock.wait(this.isCore ? 0 : GatlingExecutor.this.idlePeriodMillis);
+                                    waitTimeNanos = System.nanoTime() - waitTimeNanos;
+                                }
+                                catch (InterruptedException e)
+                                {
+                                    // don't care
+                                }
                             }
-                            catch (InterruptedException e)
-                            {
-                                // don't care
-                            }
+                            toRun = this.task;
                         }
-                        toRun = this.task;
                     }
-
                     if (toRun == null && (!GatlingExecutor.this.active ||
                             // check for "spurious" waking up - check within a factor of 10,
                             // so 0.1ms (hence multiply by 100,000, not 1,000,000)
@@ -254,7 +253,7 @@ public class GatlingExecutor implements IContextExecutor {
     volatile long idlePeriodMillis = IDLE_PERIOD_MILLIS;
     long lastExecuteTimeNanos = System.nanoTime();
     ScheduledFuture<?> stallCheckPending;
-    boolean active = true;
+    volatile boolean active = true;
 
     volatile long[] tids = new long[0];
 
@@ -316,7 +315,7 @@ public class GatlingExecutor implements IContextExecutor {
         this.freeNumbers = new LowGcLinkedList<>();
         this.taskRunners = CollectionUtils.newDeque();
         this.taskQueue = new TaskQueue(this.name);
-        this.taskRunnersRef = new LinkedList<>();
+        this.taskRunnersRef = new CopyOnWriteArrayList<>();
 
         if (this.pool == null)
         {
@@ -402,23 +401,15 @@ public class GatlingExecutor implements IContextExecutor {
     {
         try
         {
-            synchronized (this.taskQueue.lock)
+            for (TaskRunner taskRunner : this.taskRunnersRef)
             {
-                if (!this.taskQueue.isNotDraining_callWhilstHoldingLock())
+                if (taskRunner.task == null || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
                 {
-                    // if draining (or 0!), check runners are not all blocked
-                    for (TaskRunner taskRunner : this.taskRunnersRef)
-                    {
-                        if (taskRunner.task == null
-                                || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
-                        {
-                            // at least one runner idle or running
-                            return;
-                        }
-                    }
+                    // at least one runner idle or running
+                    return;
                 }
-                addTaskRunner_callWhilstHoldingLock();
             }
+            addTaskRunner_callWhilstHoldingLock();
         }
         catch (Exception e)
         {
@@ -534,7 +525,7 @@ public class GatlingExecutor implements IContextExecutor {
         this.active = false;
         synchronized (this.taskQueue.lock)
         {
-            for (TaskRunner taskRunner : new ArrayList<>(this.taskRunnersRef))
+            for (TaskRunner taskRunner : this.taskRunnersRef)
             {
                 // trigger so idle threads die out - task Q will be drained by live ones
                 taskRunner.execute();
@@ -583,7 +574,7 @@ public class GatlingExecutor implements IContextExecutor {
 
         final long now = System.nanoTime();
         final long end = now + unit.toNanos(timeout);
-        while (this.taskQueue.queue.size() != 0)
+        while (this.taskQueue.queue.size() != 0 || this.taskRunnersRef.size() != 0)
         {
             if (System.nanoTime() > end)
             {
