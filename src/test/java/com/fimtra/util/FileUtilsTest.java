@@ -138,7 +138,7 @@ public class FileUtilsTest {
 
 	@Test
 	public void shouldFindOldFiles() throws URISyntaxException {
-		File dir = new File("./..");
+		File dir = new File(System.getProperty("user.home"));
 
 		File[] files = FileUtils.findFiles(dir, 1);
 		assertTrue(files.length > 0);
