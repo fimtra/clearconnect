@@ -152,7 +152,7 @@ public final class DeadlockDetector {
                 }
             }
         };
-        return ContextExecutorFactory.get(DeadlockDetector.class).scheduleWithFixedDelay(task,
+        return ThreadUtils.scheduleWithFixedDelay(task,
                 checkPeriodMillis, checkPeriodMillis, TimeUnit.MILLISECONDS);
     }
 

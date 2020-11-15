@@ -69,7 +69,7 @@ abstract class AbstractReusableObjectPool<T> {
 
     static
     {
-        ContextExecutorFactory.get(AbstractReusableObjectPool.class).scheduleAtFixedRate(() -> {
+        ThreadUtils.scheduleAtFixedRate(() -> {
             final TreeMap<String, AbstractReusableObjectPool<?>> ordered = new TreeMap<>();
             synchronized (pools)
             {

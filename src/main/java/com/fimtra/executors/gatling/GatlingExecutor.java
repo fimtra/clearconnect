@@ -90,7 +90,7 @@ public class GatlingExecutor implements IContextExecutor {
     private static final ScheduledExecutorService ANTI_STALL =
             ThreadUtils.newPermanentScheduledExecutorService("anti-stall", 1);
     private static final ScheduledExecutorService SCHEDULER =
-            ThreadUtils.newPermanentScheduledExecutorService("scheduler", 1);
+            ThreadUtils.newPermanentScheduledExecutorService("gatling-scheduler", 1);
 
     private static void checkInstances()
     {

@@ -22,8 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import com.fimtra.executors.ContextExecutorFactory;
-
 /**
  * A pool for holding canonical versions of objects held against a key.
  * <p>
@@ -36,8 +34,7 @@ public class KeyedObjectPool<K, T> {
 
     static
     {
-        ContextExecutorFactory.get(KeyedObjectPool.class).scheduleAtFixedRate(() -> {
-
+        ThreadUtils.scheduleAtFixedRate(() -> {
             synchronized (pools)
             {
                 for (Iterator<WeakReference<KeyedObjectPool<?, ?>>> iterator =

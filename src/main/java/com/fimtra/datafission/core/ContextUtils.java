@@ -66,6 +66,7 @@ import com.fimtra.util.RollingFileAppender;
 import com.fimtra.util.StringAppender;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
+import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.UtilProperties;
 import com.fimtra.util.is;
 
@@ -205,7 +206,7 @@ public final class ContextUtils {
 
     static
     {
-        ContextExecutorFactory.get(ContextUtils.class).scheduleWithFixedDelay(new Runnable() {
+        ThreadUtils.scheduleWithFixedDelay(new Runnable() {
             // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();
             long gcTimeLastPeriod;

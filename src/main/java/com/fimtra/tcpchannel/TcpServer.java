@@ -43,7 +43,6 @@ import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IEndPointService;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
-import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.FileUtils;
@@ -104,8 +103,7 @@ public class TcpServer implements IEndPointService {
                     }
                 }
             };
-            ContextExecutorFactory.get(TcpServer.class).scheduleAtFixedRate(connectionDumpTask, 1, 1,
-                    TimeUnit.MINUTES);
+            ThreadUtils.scheduleAtFixedRate(connectionDumpTask, 1, 1, TimeUnit.MINUTES);
         }
     }
 

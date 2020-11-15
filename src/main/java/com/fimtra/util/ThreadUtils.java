@@ -76,6 +76,21 @@ public abstract class ThreadUtils {
                 threadLocalCleanup);
     }
 
+    private static final ScheduledExecutorService SCHEDULER =
+            ThreadUtils.newPermanentScheduledExecutorService("threadutils-scheduler", 1);
+
+    public static ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
+            TimeUnit unit)
+    {
+        return SCHEDULER.scheduleWithFixedDelay(command, initialDelay, period, unit);
+    }
+
+    public static ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
+            TimeUnit unit)
+    {
+        return SCHEDULER.scheduleWithFixedDelay(command, initialDelay, delay, unit);
+    }
+
     /**
      * Logs the exception generated in the run method of a delegate runnable.
      *
