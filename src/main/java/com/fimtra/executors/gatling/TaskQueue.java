@@ -117,16 +117,22 @@ final class TaskQueue {
         Runnable onTaskFinished()
         {
             this.stats.itemExecuted();
+            final Runnable poll =
+                    TaskQueue.this.queue.size() == 0 && this.size > 0 ? this : TaskQueue.this.queue.poll();
             if (this.size > 0)
             {
-                TaskQueue.this.queue.offer(this);
+                if (poll != this)
+                {
+                    TaskQueue.this.queue.offer(this);
+                    TaskQueue.this.lock.notify();
+                }
             }
             else
             {
                 TaskQueue.this.sequentialTasksPerContext.remove(this.context);
                 TaskQueue.this.sequentialTasksPool.offer(this);
             }
-            return TaskQueue.this.queue.poll();
+            return poll;
         }
 
         // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
@@ -183,16 +189,23 @@ final class TaskQueue {
         Runnable onTaskFinished()
         {
             this.stats.itemExecuted();
-            if (this.latestTask.get() != null)
+            final ICoalescingRunnable next = this.latestTask.get();
+            final Runnable poll =
+                    TaskQueue.this.queue.size() == 0 && next != null ? this : TaskQueue.this.queue.poll();
+            if (next != null)
             {
-                TaskQueue.this.queue.offer(this);
+                if (poll != this)
+                {
+                    TaskQueue.this.queue.offer(this);
+                    TaskQueue.this.lock.notify();
+                }
             }
             else
             {
                 TaskQueue.this.coalescingTasksPerContext.remove(this.context);
                 TaskQueue.this.coalescingTasksPool.offer(this);
             }
-            return TaskQueue.this.queue.poll();
+            return poll;
         }
 
         // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
