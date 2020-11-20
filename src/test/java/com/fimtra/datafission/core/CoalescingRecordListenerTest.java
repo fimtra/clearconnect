@@ -29,6 +29,7 @@ import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.gatling.GatlingExecutor;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.ThreadUtils;
@@ -61,15 +62,9 @@ public class CoalescingRecordListenerTest
     @Before
     public void setUp() throws Exception
     {
-        this.executor = ContextExecutorFactory.create("CoalescingRecordListenerTest", 1);
+        // we need a min of 2 threads for coalescing testing, otherwise we get lock-step processing and no coalescing happens
+        this.executor = new GatlingExecutor("CoalescingRecordListenerTest", 2);
         this.candidate = new Context("testContext");
-        for (int i = 0; i < 10; i++)
-        {
-            this.executor.execute(() -> {
-                ThreadUtils.sleep(50);
-                System.err.println(Thread.currentThread() + " warm-up");
-            });
-        }
     }
 
     @After
