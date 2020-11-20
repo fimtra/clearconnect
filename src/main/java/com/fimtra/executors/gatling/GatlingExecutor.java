@@ -54,7 +54,7 @@ import com.fimtra.util.ThreadUtils;
  * The executor has a thread pool that expands as tasks are needed. A core number is kept alive. Extra threads
  * that are idle in the pool stay alive for 10 seconds (configurable).
  * <p>
- * Every 500ms (configurable, see {@link #LOADER_PERIOD}) all threads are checked for "stalled" status (i.e.
+ * Every 500ms (configurable, see {@link #CHECK_PERIOD}) all threads are checked for "stalled" status (i.e.
  * not RUNNING and the queue is increasing). In this state, a new thread is added.
  *
  * <h1>Scheduling</h1>
@@ -76,16 +76,14 @@ public class GatlingExecutor implements IContextExecutor {
 
     private static final Set<GatlingExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
 
-    private static final Runnable NOOP = () -> {
-    };
     private static final long IDLE_PERIOD_MILLIS =
             SystemUtils.getPropertyAsLong("gatling.idlePeriodMillis", 10_000);
-    private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("gatling.maxThreads",
-            Runtime.getRuntime().availableProcessors() * 10);
-    private static final long LOADER_PERIOD =
-            SystemUtils.getPropertyAsLong("gatling.loaderPeriodMillis", 200);
-    private static final ScheduledExecutorService LOADER =
-            ThreadUtils.newPermanentScheduledExecutorService("gatling-loader", 1);
+    private static final int BURST_THREAD_COUNT = SystemUtils.getPropertyAsInt("gatling.burstThreadCount",
+            Runtime.getRuntime().availableProcessors());
+    private static final long CHECK_PERIOD =
+            SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 200);
+    private static final ScheduledExecutorService CHECKER =
+            ThreadUtils.newPermanentScheduledExecutorService("gatling-checker", 1);
     private static final ScheduledExecutorService SCHEDULER =
             ThreadUtils.newPermanentScheduledExecutorService("gatling-scheduler", 1);
 
@@ -106,7 +104,7 @@ public class GatlingExecutor implements IContextExecutor {
 
     static
     {
-        LOADER.scheduleWithFixedDelay(GatlingExecutor::checkInstances, LOADER_PERIOD, LOADER_PERIOD,
+        CHECKER.scheduleWithFixedDelay(GatlingExecutor::checkInstances, CHECK_PERIOD, CHECK_PERIOD,
                 TimeUnit.MILLISECONDS);
     }
 
@@ -123,7 +121,7 @@ public class GatlingExecutor implements IContextExecutor {
         final boolean isCore;
 
         boolean active = true;
-        private final AtomicBoolean waiting = new AtomicBoolean();
+        private final AtomicBoolean ready = new AtomicBoolean();
 
         TaskRunner(final String name, Integer number, boolean isCore)
         {
@@ -139,11 +137,14 @@ public class GatlingExecutor implements IContextExecutor {
         @Override
         public void run()
         {
+            final TaskQueue taskQueue = GatlingExecutor.this.taskQueue;
             Runnable toRun = null;
             long waitTimeNanos = 0;
             while (this.active)
             {
-                synchronized (GatlingExecutor.this.taskQueue.lock)
+                // signal outside the lock
+                this.ready.set(true);
+                synchronized (taskQueue.lock)
                 {
                     if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
                     {
@@ -151,7 +152,7 @@ public class GatlingExecutor implements IContextExecutor {
                     }
                     else
                     {
-                        toRun = GatlingExecutor.this.taskQueue.poll_callWhilstHoldingLock();
+                        toRun = taskQueue.poll_callWhilstHoldingLock();
                     }
                     if (toRun == null)
                     {
@@ -160,11 +161,8 @@ public class GatlingExecutor implements IContextExecutor {
                             try
                             {
                                 waitTimeNanos = System.nanoTime();
-                                this.waiting.set(true);
-                                GatlingExecutor.this.taskQueue.lock.wait(
-                                        this.isCore ? 0 : IDLE_PERIOD_MILLIS);
-                                toRun = GatlingExecutor.this.taskQueue.queue.poll();
-                                this.waiting.set(false);
+                                taskQueue.lock.wait(this.isCore ? 0 : IDLE_PERIOD_MILLIS);
+                                toRun = taskQueue.queue.poll();
                                 waitTimeNanos = System.nanoTime() - waitTimeNanos;
                             }
                             catch (InterruptedException e)
@@ -177,6 +175,7 @@ public class GatlingExecutor implements IContextExecutor {
 
                 if (toRun != null)
                 {
+                    this.ready.set(false);
                     try
                     {
                         toRun.run();
@@ -188,7 +187,6 @@ public class GatlingExecutor implements IContextExecutor {
                 }
                 else
                 {
-
                     if (!GatlingExecutor.this.active || (!this.isCore
                             // check for "spurious" waking up - check within a factor of 10,
                             // so 0.1ms (hence multiply by 100,000, not 1,000,000)
@@ -215,6 +213,7 @@ public class GatlingExecutor implements IContextExecutor {
 
     volatile boolean active = true;
     volatile long[] tids = new long[0];
+    int lastCheckQSize = Integer.MAX_VALUE;
     final TaskQueue taskQueue;
     final List<TaskRunner> taskRunners;
     private final GatlingExecutor pool;
@@ -254,7 +253,11 @@ public class GatlingExecutor implements IContextExecutor {
 
         if (this.pool == null)
         {
-            addTaskRunner_callWhilstHoldingLock();
+            // create core threads
+            for (int i = 0; i < size; i++)
+            {
+                addTaskRunner_callWhilstHoldingLock();
+            }
             EXECUTORS.add(this);
         }
     }
@@ -498,22 +501,31 @@ public class GatlingExecutor implements IContextExecutor {
         {
             synchronized (this.taskRunners)
             {
+                final int qSize = this.taskQueue.queue.size();
+                try
                 {
                     for (TaskRunner taskRunner : this.taskRunners)
                     {
-                        if (taskRunner.waiting.get()
+                        if (taskRunner.ready.get()
                                 || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
                         {
-                            // at least one runner idle or running
+                            // at least one thread available
                             return;
                         }
                     }
+                    if (qSize >= this.lastCheckQSize)
+                    {
+                        final int burst = Math.min(BURST_THREAD_COUNT, qSize);
+                        System.err.println("burst=" + burst);
+                        for (int i = 0; i < burst; i++)
+                        {
+                            addTaskRunner_callWhilstHoldingLock();
+                        }
+                    }
                 }
-                final int burst = Math.min(MAX_THREADS,
-                        Math.max(MAX_THREADS - this.taskRunners.size(), this.taskQueue.queue.size()));
-                for (int i = 0; i < burst; i++)
+                finally
                 {
-                    addTaskRunner_callWhilstHoldingLock();
+                    this.lastCheckQSize = qSize;
                 }
             }
         }

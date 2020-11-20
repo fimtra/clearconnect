@@ -210,7 +210,7 @@ public class GatlingExecutorTest {
         {
             this.candidate.execute(new CoalescingTestingRunnable(current, i, maxCount, latch, runCount));
         }
-        assertTrue("Not all coalescing runnables were run", latch.await(2, TimeUnit.SECONDS));
+        assertTrue("Not all coalescing runnables were run, got up to " + current, latch.await(2, TimeUnit.SECONDS));
         assertTrue("got: " + runCount.get(), runCount.get() < count);
     }
 
@@ -238,7 +238,7 @@ public class GatlingExecutorTest {
     @Test
     public void testExecuteCoalescingAndSequential() throws InterruptedException
     {
-        final int count = 50000;
+        final int count = 50000 ;
         final AtomicInteger runCount = new AtomicInteger();
         final AtomicInteger sequentialCounter = new AtomicInteger();
         final CountDownLatch sequentialLatch = new CountDownLatch(count);
@@ -253,11 +253,8 @@ public class GatlingExecutorTest {
                     new CoalescingTestingRunnable(coalescingCounter, i, maxCount, coalesingLatch, runCount));
             for (int j = 0; j < SIZE; j++)
             {
-                this.candidate.execute(new Runnable() {
-                    @Override
-                    public void run()
-                    {
-                    }
+                int finalI = i;
+                this.candidate.execute(() -> {
                 });
             }
         }
@@ -524,9 +521,12 @@ public class GatlingExecutorTest {
     }
 
     @Test
-    public void test_isTerminated()
+    public void test_isTerminated() throws InterruptedException
     {
+        assertFalse(this.candidate.isTerminated());
         this.candidate.shutdown();
+        while(!this.candidate.isTerminated())
+            Thread.sleep(10);
         assertTrue(this.candidate.isTerminated());
     }
 }
