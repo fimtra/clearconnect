@@ -130,6 +130,15 @@ public abstract class CollectionUtils
     }
 
     /**
+     * @return a synchronized Deque implementation
+     * @see Values#USE_LOW_GC_LINKEDLIST
+     */
+    public static <T> Deque<T> newSynchronizedDeque()
+    {
+        return new SynchronizedDeque<T>(newDeque());
+    }
+
+    /**
      * @return an unmodifiable Set view of the comma separated items (each item is trimmed before
      * adding)
      * @deprecated Use {@link #newSetFromString(String, String)} instead
