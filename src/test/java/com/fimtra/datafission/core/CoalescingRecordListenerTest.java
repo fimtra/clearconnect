@@ -63,7 +63,8 @@ public class CoalescingRecordListenerTest
     public void setUp() throws Exception
     {
         // we need a min of 2 threads for coalescing testing, otherwise we get lock-step processing and no coalescing happens
-        this.executor = new GatlingExecutor("CoalescingRecordListenerTest", 2);
+        // note: the CC internals will used the pooled executor so we only need our test one to have 1 thread
+        this.executor = new GatlingExecutor("CoalescingRecordListenerTest", 1);
         this.candidate = new Context("testContext");
     }
 
