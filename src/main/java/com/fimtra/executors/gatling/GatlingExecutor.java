@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,7 +34,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
@@ -40,6 +41,7 @@ import com.fimtra.executors.ICoalescingRunnable;
 import com.fimtra.executors.IContextExecutor;
 import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.executors.ITaskStatistics;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
@@ -69,6 +71,8 @@ import com.fimtra.util.ThreadUtils;
  */
 public class GatlingExecutor implements IContextExecutor {
 
+    public static final Deque<Runnable> NOOP_INITIAL_TASKS = CollectionUtils.newDeque();
+
     public static Set<? extends IContextExecutor> getExecutors()
     {
         return Collections.unmodifiableSet(EXECUTORS);
@@ -76,12 +80,18 @@ public class GatlingExecutor implements IContextExecutor {
 
     private static final Set<GatlingExecutor> EXECUTORS = Collections.synchronizedSet(new LinkedHashSet<>());
 
-    private static final long IDLE_PERIOD_MILLIS =
-            SystemUtils.getPropertyAsLong("gatling.idlePeriodMillis", 10_000);
+    private static final long NON_CORE_LIVE_PERIOD_MILLIS =
+            SystemUtils.getPropertyAsLong("gatling.nonCoreLivePeriodMillis", 10_000);
+    private static final long NON_CORE_LIVE_PERIOD_NANOS = NON_CORE_LIVE_PERIOD_MILLIS * 1_000_000;
     private static final int BURST_THREAD_COUNT = SystemUtils.getPropertyAsInt("gatling.burstThreadCount",
-            Runtime.getRuntime().availableProcessors());
-    private static final long CHECK_PERIOD =
-            SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 200);
+            // need logic like CORE
+            // (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
+            //                        (Runtime.getRuntime().availableProcessors() < 32 ?
+            //                                Runtime.getRuntime().availableProcessors() / 2 : 16))
+            Runtime.getRuntime().availableProcessors() * 2);
+    private static final int TASK_TRANSFER_THRESHOLD =
+            SystemUtils.getPropertyAsInt("gatling.taskTransferThreshold", 2);
+    private static final long CHECK_PERIOD = SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 100);
     private static final ScheduledExecutorService CHECKER =
             ThreadUtils.newPermanentScheduledExecutorService("gatling-checker", 1);
     private static final ScheduledExecutorService SCHEDULER =
@@ -121,15 +131,22 @@ public class GatlingExecutor implements IContextExecutor {
         final boolean isCore;
 
         boolean active = true;
-        private final AtomicBoolean ready = new AtomicBoolean();
+        private boolean runningTask;
 
-        TaskRunner(final String name, Integer number, boolean isCore)
+        final Deque<Runnable> tasks = CollectionUtils.newSynchronizedDeque();
+
+        TaskRunner(final String name, Integer number, boolean isCore, Deque<Runnable> initialTasks)
         {
             super();
             this.isCore = isCore;
             this.number = number;
             this.lock = new Object();
             this.workerThread = ThreadUtils.newDaemonThread(this, name);
+
+            // setup initial state
+            this.runningTask = false;
+            this.tasks.addAll(initialTasks);
+
             this.workerThread.start();
             addThreadId(this.workerThread.getId());
         }
@@ -138,44 +155,13 @@ public class GatlingExecutor implements IContextExecutor {
         public void run()
         {
             final TaskQueue taskQueue = GatlingExecutor.this.taskQueue;
-            Runnable toRun = null;
-            long waitTimeNanos = 0;
+            Runnable toRun = this.tasks.poll();
+            long startTimeNanos = System.nanoTime();
             while (this.active)
             {
-                // signal outside the lock
-                this.ready.set(true);
-                synchronized (taskQueue.lock)
-                {
-                    if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
-                    {
-                        toRun = ((TaskQueue.InternalTaskQueue<?>) toRun).onTaskFinished();
-                    }
-                    else
-                    {
-                        toRun = taskQueue.poll_callWhilstHoldingLock();
-                    }
-                    if (toRun == null)
-                    {
-                        if (GatlingExecutor.this.active)
-                        {
-                            try
-                            {
-                                waitTimeNanos = System.nanoTime();
-                                taskQueue.lock.wait(this.isCore ? 0 : IDLE_PERIOD_MILLIS);
-                                toRun = taskQueue.queue.poll();
-                                waitTimeNanos = System.nanoTime() - waitTimeNanos;
-                            }
-                            catch (InterruptedException e)
-                            {
-                                // don't care ???
-                            }
-                        }
-                    }
-                }
-
                 if (toRun != null)
                 {
-                    this.ready.set(false);
+                    signalRunningTask(true);
                     try
                     {
                         toRun.run();
@@ -184,32 +170,124 @@ public class GatlingExecutor implements IContextExecutor {
                     {
                         Log.log(this, "Could not execute " + ObjectUtils.safeToString(toRun), e);
                     }
+                    signalRunningTask(false);
                 }
                 else
                 {
+                    signalRunningTask(false);
+
+                    // check for destroy
                     if (!GatlingExecutor.this.active || (!this.isCore
-                            // check for "spurious" waking up - check within a factor of 10,
-                            // so 0.1ms (hence multiply by 100,000, not 1,000,000)
-                            && waitTimeNanos >= IDLE_PERIOD_MILLIS * 100_000))
+                            && System.nanoTime() - startTimeNanos >= NON_CORE_LIVE_PERIOD_NANOS))
                     {
                         synchronized (GatlingExecutor.this.taskRunners)
                         {
-                            destroy_callWhilstHoldingLock();
+                            // must access inside taskRunners lock - see check()
+                            if (this.tasks.size() == 0)
+                            {
+                                this.active = false;
+                                GatlingExecutor.this.taskRunners.remove(this);
+                                GatlingExecutor.this.freeNumbers.push(this.number);
+                                Collections.sort(GatlingExecutor.this.freeNumbers);
+                                removeThreadId(this.workerThread.getId());
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                if (toRun instanceof TaskQueue.InternalTaskQueue<?>)
+                {
+                    toRun = ((TaskQueue.InternalTaskQueue<?>) toRun).onTaskFinished(this.tasks);
+                }
+                else
+                {
+                    toRun = null;
+                }
+
+                // do quick check to grab pending work from the task queue
+                if (GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.size() == 0
+                        && taskQueue.queue.size() > 0)
+                {
+                    final Runnable t;
+                    synchronized (taskQueue.lock)
+                    {
+                        t = taskQueue.poll_callWhilstHoldingLock();
+                    }
+                    if (t != null)
+                    {
+                        if (toRun == null)
+                        {
+                            toRun = t;
+                        }
+                        else
+                        {
+                            // swap round
+                            synchronized (this.tasks)
+                            {
+                                if (this.tasks.size() == 0)
+                                {
+                                    // if its zero size and toRun != null it means toRun is an InternalTaskQueue
+                                    // and has been run at least once already, swap round to be fair to the new task
+                                    this.tasks.addLast(toRun);
+                                    toRun = t;
+                                }
+                                else
+                                {
+                                    // todo is addFirst correct?
+                                    // add it in front of other tasks so it is executed next
+                                    this.tasks.addFirst(t);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // check our local queue
+                if (toRun == null)
+                {
+                    toRun = this.tasks.poll();
+                }
+
+                if (toRun == null)
+                {
+                    // todo this causes a lot of contention
+                    synchronized (taskQueue.lock)
+                    {
+                        toRun = taskQueue.poll_callWhilstHoldingLock();
+                        if (toRun == null)
+                        {
+                            if (GatlingExecutor.this.active)
+                            {
+                                try
+                                {
+                                    GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.add(this);
+                                    taskQueue.lock.wait(this.isCore ? 0 : NON_CORE_LIVE_PERIOD_MILLIS);
+                                }
+                                catch (InterruptedException e)
+                                {
+                                    // don't care ???
+                                }
+                                finally
+                                {
+                                    GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.remove(this);
+                                    toRun = taskQueue.queue.poll();
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        private void destroy_callWhilstHoldingLock()
+        private void signalRunningTask(boolean runningTask)
         {
-            this.active = false;
-            GatlingExecutor.this.taskRunners.remove(this);
-            GatlingExecutor.this.freeNumbers.push(this.number);
-            Collections.sort(GatlingExecutor.this.freeNumbers);
-            removeThreadId(this.workerThread.getId());
+            this.runningTask = runningTask;
         }
+
     }
+
+    final Set<TaskRunner> taskRunnersWaiting_accessWithQLock = new HashSet<>();
 
     volatile boolean active = true;
     volatile long[] tids = new long[0];
@@ -256,7 +334,7 @@ public class GatlingExecutor implements IContextExecutor {
             // create core threads
             for (int i = 0; i < size; i++)
             {
-                addTaskRunner_callWhilstHoldingLock();
+                addTaskRunner_callWhilstHoldingLock(NOOP_INITIAL_TASKS);
             }
             EXECUTORS.add(this);
         }
@@ -271,7 +349,8 @@ public class GatlingExecutor implements IContextExecutor {
     @Override
     public String toString()
     {
-        return "GatlingExecutor[" + this.name + ":" + this.taskRunners.size() + "]";
+        return "GatlingExecutor[" + this.name + ":" + (this.pool == null ? this.taskRunners.size() :
+                "pool=" + this.pool) + "]";
     }
 
     @Override
@@ -290,7 +369,7 @@ public class GatlingExecutor implements IContextExecutor {
 
         synchronized (this.taskQueue.lock)
         {
-            this.taskQueue.offer_callWhilstHoldingLock(command);
+            this.taskQueue.add_callWhilstHoldingLock(command);
         }
     }
 
@@ -501,31 +580,91 @@ public class GatlingExecutor implements IContextExecutor {
         {
             synchronized (this.taskRunners)
             {
-                final int qSize = this.taskQueue.queue.size();
-                try
+                final Deque<TaskRunner> runnersWithWork = CollectionUtils.newDeque();
+                final Deque<Deque<Runnable>> blockedTaskLists = CollectionUtils.newDeque();
+                for (TaskRunner taskRunner : this.taskRunners)
                 {
-                    for (TaskRunner taskRunner : this.taskRunners)
+                    synchronized (taskRunner.tasks)
                     {
-                        if (taskRunner.ready.get()
-                                || taskRunner.workerThread.getState() == Thread.State.RUNNABLE)
+                        if (taskRunner.runningTask
+                                && taskRunner.workerThread.getState() != Thread.State.RUNNABLE)
                         {
-                            // at least one thread available
-                            return;
+                            final Deque<Runnable> taskList = CollectionUtils.newDeque();
+                            // remove the tasks and place onto the blocked queue
+                            while (taskRunner.tasks.size() > 0)
+                            {
+                                taskList.add(taskRunner.tasks.poll());
+                            }
+                            blockedTaskLists.add(taskList);
                         }
-                    }
-                    if (qSize >= this.lastCheckQSize)
-                    {
-                        final int burst = Math.min(BURST_THREAD_COUNT, qSize);
-                        System.err.println("burst=" + burst);
-                        for (int i = 0; i < burst; i++)
+                        else if (taskRunner.tasks.size() > TASK_TRANSFER_THRESHOLD)
                         {
-                            addTaskRunner_callWhilstHoldingLock();
+                            runnersWithWork.add(taskRunner);
                         }
                     }
                 }
-                finally
+                // go through runners with work and transfer a task to free runner
+                synchronized (this.taskQueue.lock)
                 {
-                    this.lastCheckQSize = qSize;
+                    if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
+                    {
+                        for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
+                        {
+                            final TaskRunner runner = runnersWithWork.poll();
+                            if (runner != null)
+                            {
+                                // transfer a task
+                                taskRunner.tasks.add(runner.tasks.poll());
+                            }
+                        }
+                        this.taskQueue.lock.notifyAll();
+                    }
+                    else
+                    {
+                        System.err.println("CREATE + TRANSFER");
+                        // todo we need to be careful about this - can spawn many
+                        TaskRunner runner = runnersWithWork.poll();
+                        final Deque<Runnable> initialTasks = CollectionUtils.newDeque();
+                        if (runner != null)
+                        {
+                            // transfer a single task to the new runner
+                            initialTasks.add(runner.tasks.poll());
+                        }
+                        addTaskRunner_callWhilstHoldingLock(initialTasks);
+                    }
+                }
+
+                if (blockedTaskLists.size() > 0)
+                {
+                    // todo
+                    int initial = blockedTaskLists.size();
+
+                    // pass blocked lists to available runners
+                    synchronized (this.taskQueue.lock)
+                    {
+                        if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
+                        {
+                            for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
+                            {
+                                final Deque<Runnable> blocked = blockedTaskLists.poll();
+                                if (blocked != null)
+                                {
+                                    taskRunner.tasks.addAll(blocked);
+                                }
+                            }
+                            this.taskQueue.lock.notifyAll();
+                        }
+                    }
+                    if (blockedTaskLists.size() > 0)
+                    {
+                        System.err.println("Re-assigning " + blockedTaskLists.size() + "/" + initial);
+                        // create task runners for the remaining
+                        // todo need a burst count?
+                        for (Deque<Runnable> blockedTaskList : blockedTaskLists)
+                        {
+                            addTaskRunner_callWhilstHoldingLock(blockedTaskList);
+                        }
+                    }
                 }
             }
         }
@@ -535,14 +674,16 @@ public class GatlingExecutor implements IContextExecutor {
         }
     }
 
-    private void addTaskRunner_callWhilstHoldingLock()
+    private void addTaskRunner_callWhilstHoldingLock(Deque<Runnable> initialTasks)
     {
         Integer number;
         if ((number = this.freeNumbers.poll()) == null)
         {
             number = Integer.valueOf(this.threadCounter.getAndIncrement());
         }
-        this.taskRunners.add(new TaskRunner(this.name + "-" + number, number, number < this.size));
+        final boolean isCore = number < this.size;
+        this.taskRunners.add(new TaskRunner(this.name + (isCore ? "" : "-aux") + "-" + number, number, isCore,
+                initialTasks));
     }
 
     private Object getGeneralContext(Object command)

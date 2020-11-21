@@ -18,7 +18,6 @@ package com.fimtra.executors.gatling;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -35,8 +34,8 @@ import com.fimtra.util.SystemUtils;
 
 /**
  * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted via the
- * {@link #offer_callWhilstHoldingLock(Runnable)} method. The {@link #poll_callWhilstHoldingLock()} method
- * will return the most appropriate task.
+ * {@link #add_callWhilstHoldingLock(Runnable)} method. The {@link #poll_callWhilstHoldingLock()} method will
+ * return the most appropriate task.
  * <p>
  * Generally, runnables are returned from the queue in a FIFO manner. Runnables extending {@link
  * ISequentialRunnable} or {@link ICoalescingRunnable} will be returned from the queue in a manner that fits
@@ -57,20 +56,76 @@ final class TaskQueue {
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
             SystemUtils.getPropertyAsInt("gatling.coalescingTasksMaxPoolSize", 1000);
 
-    abstract static class InternalTaskQueue<T> implements Runnable {
+    abstract class InternalTaskQueue<T> implements Runnable {
         Object context;
         TaskStatistics stats;
         boolean active;
 
+        abstract void internalAdd(T latest);
+
+        /**
+         * @return true if the queue is not empty)
+         */
+        abstract boolean queueNotEmpty();
+
+        /**
+         * Cleanup resources
+         */
+        abstract void returnToPool();
+
         /**
          * @return <code>true</code> if it was activated, <code>false</code> if it is already active
          */
-        abstract boolean offer(T t);
+        final boolean add(T latest)
+        {
+            internalAdd(latest);
+            this.stats.itemSubmitted();
+
+            if (!this.active)
+            {
+                this.active = true;
+                TaskQueue.this.queue.add(this);
+                return true;
+            }
+            return false;
+        }
 
         /**
-         * @return the next task to run
+         * @return the next task to run or null
          */
-        abstract Runnable onTaskFinished();
+        @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+        final Runnable onTaskFinished(Deque<Runnable> tasks)
+        {
+            this.stats.itemExecuted();
+            if (queueNotEmpty())
+            {
+                synchronized (tasks)
+                {
+                    tasks.addLast(this);
+                    return tasks.poll();
+                }
+            }
+            else
+            {
+                synchronized (TaskQueue.this.lock)
+                {
+                    // check its not empty - repeat of the above but in the lock...
+                    if (queueNotEmpty())
+                    {
+                        synchronized (tasks)
+                        {
+                            tasks.addLast(this);
+                            return tasks.poll();
+                        }
+                    }
+                    else
+                    {
+                        returnToPool();
+                    }
+                }
+            }
+            return tasks.poll();
+        }
     }
 
     /**
@@ -91,21 +146,14 @@ final class TaskQueue {
         @Override
         public void run()
         {
-            ISequentialRunnable item = null;
-            try
+            final ISequentialRunnable item;
+            synchronized (this.sequentialTasks)
             {
-                synchronized (this.sequentialTasks)
+                item = this.sequentialTasks.pollFirst();
+                if (item != null)
                 {
-                    item = this.sequentialTasks.removeFirst();
-                    if (item != null)
-                    {
-                        this.size--;
-                    }
+                    this.size--;
                 }
-            }
-            catch (NoSuchElementException e)
-            {
-                // empty tasks
             }
             if (item != null)
             {
@@ -114,45 +162,27 @@ final class TaskQueue {
         }
 
         @Override
-        Runnable onTaskFinished()
+        boolean queueNotEmpty()
         {
-            this.stats.itemExecuted();
-            final Runnable poll =
-                    TaskQueue.this.queue.size() == 0 && this.size > 0 ? this : TaskQueue.this.queue.poll();
-            if (this.size > 0)
-            {
-                if (poll != this)
-                {
-                    TaskQueue.this.queue.offer(this);
-                    TaskQueue.this.lock.notify();
-                }
-            }
-            else
-            {
-                TaskQueue.this.sequentialTasksPerContext.remove(this.context);
-                TaskQueue.this.sequentialTasksPool.offer(this);
-            }
-            return poll;
+            return this.size > 0;
         }
 
-        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
         @Override
-        boolean offer(ISequentialRunnable latest)
+        void returnToPool()
+        {
+            TaskQueue.this.sequentialTasksPerContext.remove(this.context);
+            TaskQueue.this.sequentialTasksPool.offer(this);
+        }
+
+        // NOTE: called by a thread that synchronizes on TaskQueue.this.lock
+        @Override
+        void internalAdd(ISequentialRunnable latest)
         {
             synchronized (this.sequentialTasks)
             {
-                this.sequentialTasks.offer(latest);
+                this.sequentialTasks.addLast(latest);
                 this.size++;
             }
-            this.stats.itemSubmitted();
-
-            if (!this.active)
-            {
-                this.active = true;
-                TaskQueue.this.queue.offer(this);
-                return true;
-            }
-            return false;
         }
 
         @Override
@@ -186,42 +216,23 @@ final class TaskQueue {
         }
 
         @Override
-        Runnable onTaskFinished()
+        boolean queueNotEmpty()
         {
-            this.stats.itemExecuted();
-            final ICoalescingRunnable next = this.latestTask.get();
-            final Runnable poll =
-                    TaskQueue.this.queue.size() == 0 && next != null ? this : TaskQueue.this.queue.poll();
-            if (next != null)
-            {
-                if (poll != this)
-                {
-                    TaskQueue.this.queue.offer(this);
-                    TaskQueue.this.lock.notify();
-                }
-            }
-            else
-            {
-                TaskQueue.this.coalescingTasksPerContext.remove(this.context);
-                TaskQueue.this.coalescingTasksPool.offer(this);
-            }
-            return poll;
+            return this.latestTask.get() != null;
         }
 
-        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock
         @Override
-        boolean offer(ICoalescingRunnable latest)
+        void returnToPool()
+        {
+            TaskQueue.this.coalescingTasksPerContext.remove(this.context);
+            TaskQueue.this.coalescingTasksPool.offer(this);
+        }
+
+        // NOTE: called by a thread that synchronizes on TaskQueue.this.lock
+        @Override
+        void internalAdd(ICoalescingRunnable latest)
         {
             this.latestTask.getAndSet(latest);
-            this.stats.itemSubmitted();
-
-            if (!this.active)
-            {
-                this.active = true;
-                TaskQueue.this.queue.offer(this);
-                return true;
-            }
-            return false;
         }
 
         @Override
@@ -278,12 +289,12 @@ final class TaskQueue {
     /**
      * Add the runnable to the queue, ordering it as appropriate for any annotation present on the runnable.
      */
-    void offer_callWhilstHoldingLock(Runnable runnable)
+    void add_callWhilstHoldingLock(Runnable runnable)
     {
         if (runnable instanceof ISequentialRunnable)
         {
             if (this.sequentialTasksPerContext.computeIfAbsent(((ISequentialRunnable) runnable).context(),
-                    this.sequentialTasksFunction).offer((ISequentialRunnable) runnable))
+                    this.sequentialTasksFunction).add((ISequentialRunnable) runnable))
             {
                 this.lock.notify();
             }
@@ -293,14 +304,14 @@ final class TaskQueue {
             if (runnable instanceof ICoalescingRunnable)
             {
                 if (this.coalescingTasksPerContext.computeIfAbsent(((ICoalescingRunnable) runnable).context(),
-                        this.coalescingTasksFunction).offer((ICoalescingRunnable) runnable))
+                        this.coalescingTasksFunction).add((ICoalescingRunnable) runnable))
                 {
                     this.lock.notify();
                 }
             }
             else
             {
-                this.queue.offer(runnable);
+                this.queue.add(runnable);
                 this.lock.notify();
             }
         }

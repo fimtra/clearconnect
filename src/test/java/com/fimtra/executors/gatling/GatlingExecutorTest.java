@@ -22,6 +22,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,7 +35,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 
 import com.fimtra.executors.ICoalescingRunnable;
 import com.fimtra.executors.ISequentialRunnable;
@@ -55,6 +55,8 @@ public class GatlingExecutorTest {
     private static final int SIZE = Runtime.getRuntime().availableProcessors();
     public static final int DELAY = 250;
     public static final int WAIT_TIME = 500;
+    public static final Runnable NOOP_RUNNABLE = () -> {
+    };
 
     @Rule
     public TestName name = new TestName();
@@ -96,13 +98,13 @@ public class GatlingExecutorTest {
         @Override
         public Object context()
         {
-            return "CoalescigngTestingRunnable";
+            return "CoalescingTestingRunnable";
         }
 
         @Override
         public String toString()
         {
-            return "CoalescigngTestingRunnable [myCount=" + this.myCount + "]";
+            return "CoalescingTestingRunnable [myCount=" + this.myCount + "]";
         }
     }
 
@@ -210,7 +212,8 @@ public class GatlingExecutorTest {
         {
             this.candidate.execute(new CoalescingTestingRunnable(current, i, maxCount, latch, runCount));
         }
-        assertTrue("Not all coalescing runnables were run, got up to " + current, latch.await(2, TimeUnit.SECONDS));
+        final boolean await = latch.await(2, TimeUnit.SECONDS);
+        assertTrue("Not all coalescing runnables were run, got up to " + current, await);
         assertTrue("got: " + runCount.get(), runCount.get() < count);
     }
 
@@ -238,7 +241,7 @@ public class GatlingExecutorTest {
     @Test
     public void testExecuteCoalescingAndSequential() throws InterruptedException
     {
-        final int count = 50000 ;
+        final int count = 50000;
         final AtomicInteger runCount = new AtomicInteger();
         final AtomicInteger sequentialCounter = new AtomicInteger();
         final CountDownLatch sequentialLatch = new CountDownLatch(count);
@@ -254,8 +257,7 @@ public class GatlingExecutorTest {
             for (int j = 0; j < SIZE; j++)
             {
                 int finalI = i;
-                this.candidate.execute(() -> {
-                });
+                this.candidate.execute(NOOP_RUNNABLE);
             }
         }
         assertTrue("Not all sequential runnables were run, remaining is " + sequentialLatch.getCount(),
@@ -276,16 +278,64 @@ public class GatlingExecutorTest {
             this.candidate.execute(new SequentialTestingRunnable(counter, i, latch));
             for (int j = 0; j < SIZE; j++)
             {
-                this.candidate.execute(new Runnable() {
-                    @Override
-                    public void run()
-                    {
-                    }
-                });
+                this.candidate.execute(NOOP_RUNNABLE);
             }
         }
-        assertTrue("Not all sequential runnables were run, remaining is " + latch.getCount(),
-                latch.await(2, TimeUnit.SECONDS));
+        final boolean await = latch.await(2, TimeUnit.SECONDS);
+        assertTrue("Not all sequential runnables were run, remaining is " + latch.getCount(), await);
+    }
+
+    @Test
+    public void testTransferring() throws InterruptedException
+    {
+        Set<String> threadNames = Collections.synchronizedSet(new HashSet<>());
+        final int LOOPS = 10000;
+        int contextMax = 10;
+        final CountDownLatch latch = new CountDownLatch(contextMax);
+
+        final ISequentialRunnable sequences[] = new ISequentialRunnable[contextMax];
+        for (int i = 0; i < sequences.length; i++)
+        {
+            int finalI = i;
+
+            sequences[i] = new ISequentialRunnable() {
+                AtomicInteger count = new AtomicInteger();
+
+                @Override
+                public Object context()
+                {
+                    return finalI;
+                }
+
+                @Override
+                public void run()
+                {
+                    threadNames.add(Thread.currentThread().getName());
+
+                    // do some work to tie up the thread so we get a backlog
+                    AtomicInteger work = new AtomicInteger();
+                    for (int j = 0; j < 500; j++)
+                    {
+                        work.incrementAndGet();
+                    }
+
+                    if (count.incrementAndGet() == LOOPS)
+                    {
+                        latch.countDown();
+                    }
+                }
+            };
+        }
+        for (int j = 0; j < LOOPS; j++)
+        {
+            for (int i = 0; i < contextMax; i++)
+            {
+                candidate.execute(sequences[i]);
+            }
+        }
+
+        assertTrue(latch.await(20, TimeUnit.SECONDS));
+        assertTrue("Got " + threadNames, threadNames.size() > 1);
     }
 
     @Test
@@ -525,8 +575,10 @@ public class GatlingExecutorTest {
     {
         assertFalse(this.candidate.isTerminated());
         this.candidate.shutdown();
-        while(!this.candidate.isTerminated())
+        while (!this.candidate.isTerminated())
+        {
             Thread.sleep(10);
+        }
         assertTrue(this.candidate.isTerminated());
     }
 }

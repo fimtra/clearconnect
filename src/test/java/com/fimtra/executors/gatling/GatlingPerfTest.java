@@ -50,13 +50,13 @@ public class GatlingPerfTest
     @Test
     public void testSequentialPerformanceVsExecutors() throws InterruptedException
     {
-        int LOOP_MAX = 100000;
+        int LOOP_MAX = 50000;
         int contextCount = 16;
         long executorTime = getExecutorTime(LOOP_MAX, contextCount);
         long gatlingTime = getGatlingTime(LOOP_MAX, contextCount);
         System.err.println("executorTime=" + executorTime / 1_000_000d);
         System.err.println(" gatlingTime=" + gatlingTime / 1_000_000d);
-        assertTrue(executorTime > gatlingTime);
+        assertTrue(executorTime * 1.2 > gatlingTime);
 
     }
 
@@ -65,7 +65,9 @@ public class GatlingPerfTest
         CountDownLatch gatlingLatch = new CountDownLatch(1);
         AtomicLong[] gatlingCounters = new AtomicLong[contextCount];
         ISequentialRunnable[] gatlingRunnables = new ISequentialRunnable[contextCount];
-        IContextExecutor gatling = new GatlingExecutor("test-vs-exec", contextCount);
+        IContextExecutor gatling = new GatlingExecutor("test-vs-exec",
+                // todo fewer threads to improve throughput
+                contextCount / 4);
 
         // create gatling components
         for (int i = 0; i < contextCount; i++)
@@ -76,6 +78,7 @@ public class GatlingPerfTest
                 @Override
                 public void run()
                 {
+                    doWork(LOOP_MAX);
                     if(gatlingCounters[finalI].incrementAndGet() == LOOP_MAX)
                     {
                         gatlingLatch.countDown();
@@ -98,9 +101,10 @@ public class GatlingPerfTest
                 gatling.execute(gatlingRunnables[i]);
             }
         }
-        System.err.println("Gatling done...waiting...");
+        System.err.println("Gatling loop done, waiting...");
         gatlingLatch.await();
         gatlingTime = System.nanoTime() - gatlingTime;
+        System.err.println("Gatling finished");
         return gatlingTime;
     }
 
@@ -118,6 +122,7 @@ public class GatlingPerfTest
             executors[i] = Executors.newSingleThreadExecutor();
             int finalI = i;
             executorRunnables[i] = () -> {
+                doWork(LOOP_MAX);
                 if(executorCounters[finalI].incrementAndGet() == LOOP_MAX)
                 {
                     executorLatch.countDown();
@@ -134,9 +139,20 @@ public class GatlingPerfTest
                 executors[i].execute(executorRunnables[i]);
             }
         }
+        System.err.println("executors loop done, waiting...");
         executorLatch.await();
         executorTime = System.nanoTime() - executorTime;
+        System.err.println("executors finished");
         return executorTime;
+    }
+
+    private void doWork(int LOOP_MAX)
+    {
+        AtomicLong l = new AtomicLong();
+        for (int j = 0; j < LOOP_MAX / 10; j++)
+        {
+            l.incrementAndGet();
+        }
     }
 
     @Test
