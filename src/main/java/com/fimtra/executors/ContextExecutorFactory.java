@@ -16,9 +16,7 @@
 package com.fimtra.executors;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -42,7 +40,7 @@ public class ContextExecutorFactory {
     public static final boolean POOL_ACTIVE =
             SystemUtils.getProperty("ContextExecutorFactory.poolActive", true);
 
-    private static final int CORE_SIZE = SystemUtils.getPropertyAsInt("ContextExecutorFactory.coreSize", 1);
+    private static final int CORE_SIZE = SystemUtils.getPropertyAsInt("ContextExecutorFactory.coreSize", 2);
 
     private static final LazyObject<GatlingExecutor> POOL_HOLDER =
             new LazyObject<>(() -> new GatlingExecutor("gatling-core", CORE_SIZE){
@@ -102,14 +100,7 @@ public class ContextExecutorFactory {
         return (Set<IContextExecutor>) GatlingExecutor.getExecutors();
     }
 
-    static final Map<Object, IContextExecutor> CLASS_LEVEL = new HashMap<>();
-    static final WeakHashMap<Object, IContextExecutor> AD_HOCS = new WeakHashMap<>();
-
-    public static synchronized IContextExecutor get(Class<?> c)
-    {
-        return CLASS_LEVEL.computeIfAbsent(c,
-                context -> new GatlingExecutor(context.toString(), 1, POOL_HOLDER.get()));
-    }
+    private static final WeakHashMap<Object, IContextExecutor> AD_HOCS = new WeakHashMap<>();
 
     public static synchronized IContextExecutor get(Object c)
     {
