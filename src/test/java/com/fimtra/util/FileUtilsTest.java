@@ -95,6 +95,12 @@ public class FileUtilsTest {
 	@Test
 	public void testCopyMoveDeleteDirectory() throws IOException {
 		final File srcDir = new File("./logs");
+		// add a file
+		final File testFile = new File(srcDir, "testCopyMoveDeleteDirectory.txt");
+		if(!testFile.exists())
+		{
+			assertTrue("Could not create test file!", testFile.createNewFile());
+		}
 		final File targetDir = new File(System.getProperty("java.io.tmpdir"), srcDir.getName());
 
 		// copy
@@ -105,14 +111,14 @@ public class FileUtilsTest {
 		// move
 		final File moveTarget = new File(targetDir.getParent(), "unit-test-files");
 		FileUtils.move(targetDir, moveTarget);
-		assertTrue(!targetDir.exists());
+		assertFalse(targetDir.exists());
 		assertTrue(moveTarget.exists());
 		assertEquals(srcDir.listFiles().length, moveTarget.listFiles().length);
 
 		// delete
 		FileUtils.deleteRecursive(moveTarget);
-		assertTrue(!moveTarget.exists());
-		assertTrue(!targetDir.exists());
+		assertFalse(moveTarget.exists());
+		assertFalse(targetDir.exists());
 	}
 
 	@Test
