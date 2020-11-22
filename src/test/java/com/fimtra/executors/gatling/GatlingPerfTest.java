@@ -78,7 +78,7 @@ public class GatlingPerfTest {
                 {
                     // simulate some work
                     AtomicLong someWork = new AtomicLong();
-                    for (int j = 0; j < LOOP_MAX / 10; j++)
+                    for (int j = 0; j < 1000; j++)
                     {
                         someWork.incrementAndGet();
                     }
@@ -128,7 +128,7 @@ public class GatlingPerfTest {
             executorRunnables[i] = () -> {
                 // simulate some work
                 AtomicLong someWork = new AtomicLong();
-                for (int j = 0; j < LOOP_MAX / 10; j++)
+                for (int j = 0; j < 1000; j++)
                 {
                     someWork.incrementAndGet();
                 }
