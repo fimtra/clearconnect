@@ -207,14 +207,10 @@ public class ConfigService {
                                 if (!configFile.exists())
                                 {
                                     Log.log(this, "Creating default config: ", configFile.getPath());
-                                    final InputStream configInputStream = configJar.getInputStream(configFileZipEntry);
-                                    try
+                                    try (final InputStream configInputStream = configJar.getInputStream(
+                                            configFileZipEntry))
                                     {
                                         FileUtils.writeInputStreamToFile(configInputStream, configFile);
-                                    }
-                                    finally
-                                    {
-                                        FileUtils.safeClose(configInputStream);
                                     }
                                 }
                                 else

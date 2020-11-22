@@ -74,7 +74,6 @@ import com.fimtra.datafission.ui.RowOrientedRecordTableModel;
 import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.lf.FimtraTableHeaderUI;
 import com.fimtra.tcpchannel.TcpChannelUtils;
-import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
@@ -1500,27 +1499,28 @@ public class PlatformDesktop
 
     void loadDesktopPlatformViewState()
     {
-        BufferedReader br = null;
         try
         {
             File stateFile = new File(getStateFileName());
             if (stateFile.exists())
             {
-                br = new BufferedReader(new FileReader(stateFile));
-                if (br.ready())
+                try (BufferedReader br = new BufferedReader(new FileReader(stateFile)))
                 {
-                    fromStateString(this, br.readLine());
-                    String line;
-                    while (br.ready())
+                    if (br.ready())
                     {
-                        line = br.readLine();
-                        try
+                        fromStateString(this, br.readLine());
+                        String line;
+                        while (br.ready())
                         {
-                            AbstractPlatformDesktopView.fromStateString(this, line);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.log(PlatformDesktop.this, "Could not view from state: " + line, e);
+                            line = br.readLine();
+                            try
+                            {
+                                AbstractPlatformDesktopView.fromStateString(this, line);
+                            }
+                            catch (Exception e)
+                            {
+                                Log.log(PlatformDesktop.this, "Could not view from state: " + line, e);
+                            }
                         }
                     }
                 }
@@ -1529,10 +1529,6 @@ public class PlatformDesktop
         catch (Exception e)
         {
             Log.log(this, "Could not read state", e);
-        }
-        finally
-        {
-            FileUtils.safeClose(br);
         }
     }
 
