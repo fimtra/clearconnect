@@ -20,7 +20,6 @@ import static org.junit.Assert.assertTrue;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -39,8 +38,7 @@ import org.junit.Test;
  * @author Ramon Servadei
  */
 @SuppressWarnings({ "boxing", "unused" })
-public class GatlingPerfTest
-{
+public class GatlingPerfTest {
 
     @Before
     public void setUp() throws Exception
@@ -60,26 +58,31 @@ public class GatlingPerfTest
 
     }
 
-    private long getGatlingTime(int LOOP_MAX, int contextCount) throws InterruptedException
+    static long getGatlingTime(int LOOP_MAX, int contextCount) throws InterruptedException
     {
         CountDownLatch gatlingLatch = new CountDownLatch(1);
         AtomicLong[] gatlingCounters = new AtomicLong[contextCount];
         ISequentialRunnable[] gatlingRunnables = new ISequentialRunnable[contextCount];
         IContextExecutor gatling = new GatlingExecutor("test-vs-exec",
-                // todo fewer threads to improve throughput
-                contextCount / 4);
+                // start with 2 threads
+                2);
 
         // create gatling components
         for (int i = 0; i < contextCount; i++)
         {
             int finalI = i;
             gatlingCounters[i] = new AtomicLong(0);
-            gatlingRunnables[i] = new ISequentialRunnable(){
+            gatlingRunnables[i] = new ISequentialRunnable() {
                 @Override
                 public void run()
                 {
-                    doWork(LOOP_MAX);
-                    if(gatlingCounters[finalI].incrementAndGet() == LOOP_MAX)
+                    // simulate some work
+                    AtomicLong someWork = new AtomicLong();
+                    for (int j = 0; j < LOOP_MAX / 10; j++)
+                    {
+                        someWork.incrementAndGet();
+                    }
+                    if (gatlingCounters[finalI].incrementAndGet() == LOOP_MAX)
                     {
                         gatlingLatch.countDown();
                     }
@@ -105,14 +108,15 @@ public class GatlingPerfTest
         gatlingLatch.await();
         gatlingTime = System.nanoTime() - gatlingTime;
         System.err.println("Gatling finished");
+        gatling.destroy();
         return gatlingTime;
     }
 
-    private long getExecutorTime(int LOOP_MAX, int contextCount) throws InterruptedException
+    static long getExecutorTime(int LOOP_MAX, int contextCount) throws InterruptedException
     {
         CountDownLatch executorLatch = new CountDownLatch(1);
         AtomicLong[] executorCounters = new AtomicLong[contextCount];
-        Executor[] executors = new Executor[contextCount];
+        ExecutorService[] executors = new ExecutorService[contextCount];
         Runnable[] executorRunnables = new Runnable[contextCount];
 
         // create components
@@ -122,8 +126,13 @@ public class GatlingPerfTest
             executors[i] = Executors.newSingleThreadExecutor();
             int finalI = i;
             executorRunnables[i] = () -> {
-                doWork(LOOP_MAX);
-                if(executorCounters[finalI].incrementAndGet() == LOOP_MAX)
+                // simulate some work
+                AtomicLong someWork = new AtomicLong();
+                for (int j = 0; j < LOOP_MAX / 10; j++)
+                {
+                    someWork.incrementAndGet();
+                }
+                if (executorCounters[finalI].incrementAndGet() == LOOP_MAX)
                 {
                     executorLatch.countDown();
                 }
@@ -143,16 +152,11 @@ public class GatlingPerfTest
         executorLatch.await();
         executorTime = System.nanoTime() - executorTime;
         System.err.println("executors finished");
-        return executorTime;
-    }
-
-    private void doWork(int LOOP_MAX)
-    {
-        AtomicLong l = new AtomicLong();
-        for (int j = 0; j < LOOP_MAX / 10; j++)
+        for (int i = 0; i < contextCount; i++)
         {
-            l.incrementAndGet();
+            executors[i].shutdown();
         }
+        return executorTime;
     }
 
     @Test
@@ -160,7 +164,8 @@ public class GatlingPerfTest
     {
         final int eventCount = 500;
         final int procCount = 5;
-        long arrtime = 0, gatlingTime = 0, gatlingSequentialTime = 0, gatlingCoalesceTime = 0, executorTime = 0;
+        long arrtime = 0, gatlingTime = 0, gatlingSequentialTime = 0, gatlingCoalesceTime = 0, executorTime =
+                0;
         double factor = 4;
         for (int j = 1; j < procCount; j++)
         {
@@ -170,8 +175,9 @@ public class GatlingPerfTest
             gatlingCoalesceTime = runGatling(Boolean.FALSE, eventCount, 1 << j);
             executorTime = runExecutor(eventCount, 1 << j, 1 << j);
             final String results =
-                "events=" + eventCount + ", threads=" + (1 << j) + ", arrT=" + +arrtime + ", gatT=" + gatlingTime + ", seqT=" + gatlingSequentialTime + ", coaT="
-                    + gatlingCoalesceTime + ", exeT=" + executorTime;
+                    "events=" + eventCount + ", threads=" + (1 << j) + ", arrT=" + +arrtime + ", gatT="
+                            + gatlingTime + ", seqT=" + gatlingSequentialTime + ", coaT="
+                            + gatlingCoalesceTime + ", exeT=" + executorTime;
             System.err.println(results);
             assertTrue("Got " + results, gatlingTime < executorTime * factor);
             assertTrue("Got " + results, gatlingCoalesceTime < executorTime);
@@ -192,7 +198,7 @@ public class GatlingPerfTest
     }
 
     private static long runBlockingQueue(final int eventCount, final int size, final int procCount)
-        throws InterruptedException
+            throws InterruptedException
     {
         long start;
         // final BlockingQueue<AtomicLong> queue = new ArrayBlockingQueue<AtomicLong>(1000);
@@ -215,7 +221,7 @@ public class GatlingPerfTest
     }
 
     private static long runExecutor(final int eventCount, final int size, final int procCount)
-        throws InterruptedException
+            throws InterruptedException
     {
         long start;
         final CountDownLatch queueLatch = new CountDownLatch(eventCount);
@@ -237,7 +243,7 @@ public class GatlingPerfTest
     }
 
     private static long runGatling(Boolean sequential, final int eventCount, final int procCount)
-        throws InterruptedException
+            throws InterruptedException
     {
         long start;
         GatlingExecutor executor = new GatlingExecutor("Gatling-testPerformance", procCount);
@@ -266,7 +272,8 @@ public class GatlingPerfTest
                 queueLatch = new CountDownLatch(1);
                 for (int i = 0; i < eventCount; i++)
                 {
-                    executor.execute(createCoalescingGatlingConsumer(queueLatch, new AtomicLong(i), eventCount));
+                    executor.execute(
+                            createCoalescingGatlingConsumer(queueLatch, new AtomicLong(i), eventCount));
                 }
             }
         }
@@ -277,10 +284,10 @@ public class GatlingPerfTest
         return time;
     }
 
-    private static Runnable createQueueConsumer(final BlockingQueue<AtomicLong> queue, final CountDownLatch queueLatch)
+    private static Runnable createQueueConsumer(final BlockingQueue<AtomicLong> queue,
+            final CountDownLatch queueLatch)
     {
-        return new Runnable()
-        {
+        return new Runnable() {
             @Override
             public void run()
             {
@@ -301,10 +308,10 @@ public class GatlingPerfTest
         };
     }
 
-    private static Runnable createRunnableConsumer(final CountDownLatch queueLatch, final AtomicLong atomicLong)
+    private static Runnable createRunnableConsumer(final CountDownLatch queueLatch,
+            final AtomicLong atomicLong)
     {
-        return new Runnable()
-        {
+        return new Runnable() {
             @Override
             public void run()
             {
@@ -315,10 +322,10 @@ public class GatlingPerfTest
         };
     }
 
-    private static Runnable createSequentialGatlingConsumer(final CountDownLatch queueLatch, final AtomicLong atomicLong)
+    private static Runnable createSequentialGatlingConsumer(final CountDownLatch queueLatch,
+            final AtomicLong atomicLong)
     {
-        return new ISequentialRunnable()
-        {
+        return new ISequentialRunnable() {
             @Override
             public void run()
             {
@@ -336,17 +343,18 @@ public class GatlingPerfTest
     }
 
     private static Runnable createCoalescingGatlingConsumer(final CountDownLatch queueLatch,
-        final AtomicLong atomicLong, final long eventCount)
+            final AtomicLong atomicLong, final long eventCount)
     {
         final long end = eventCount - 1;
-        return new ICoalescingRunnable()
-        {
+        return new ICoalescingRunnable() {
             @Override
             public void run()
             {
                 doSomething();
                 if (atomicLong.get() == end)
+                {
                     queueLatch.countDown();
+                }
                 // System.err.println(queueLatch.getCount() + " for sequence:" + atomicLong);
             }
 

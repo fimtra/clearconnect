@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -54,10 +55,12 @@ import com.fimtra.util.ThreadUtils;
  * <h1>Execution</h1>
  * <p>
  * The executor has a thread pool that expands as tasks are needed. A core number is kept alive. Extra threads
- * that are idle in the pool stay alive for 10 seconds (configurable).
+ * (auxiliary threads) stay alive for 10 seconds (configurable).
  * <p>
- * Every 500ms (configurable, see {@link #CHECK_PERIOD}) all threads are checked for "stalled" status (i.e.
- * not RUNNING and the queue is increasing). In this state, a new thread is added.
+ * Every 250ms (configurable, see {@link #CHECK_PERIOD}) all threads are checked for "blocked" status (i.e.
+ * not RUNNING and there are tasks still pending in the queue). In this state, new threads are added. Also
+ * during the check, if there are free threads and threads that have a backlog of tasks, the backlog is
+ * distributed to the free threads.
  *
  * <h1>Scheduling</h1>
  * <p>
@@ -82,16 +85,16 @@ public class GatlingExecutor implements IContextExecutor {
 
     private static final long NON_CORE_LIVE_PERIOD_MILLIS =
             SystemUtils.getPropertyAsLong("gatling.nonCoreLivePeriodMillis", 10_000);
+    /** The number of times (repeating) the core count is exceeded before bumping up the core count by 1. */
+    private static final int CORE_COUNT_BUMP_THRESHOLD =
+            SystemUtils.getPropertyAsInt("gatling.coreCountBumpThreshold", 10);
     private static final long NON_CORE_LIVE_PERIOD_NANOS = NON_CORE_LIVE_PERIOD_MILLIS * 1_000_000;
-    private static final int BURST_THREAD_COUNT = SystemUtils.getPropertyAsInt("gatling.burstThreadCount",
-            // need logic like CORE
-            // (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
-            //                        (Runtime.getRuntime().availableProcessors() < 32 ?
-            //                                Runtime.getRuntime().availableProcessors() / 2 : 16))
-            Runtime.getRuntime().availableProcessors() * 2);
-    private static final int TASK_TRANSFER_THRESHOLD =
-            SystemUtils.getPropertyAsInt("gatling.taskTransferThreshold", 2);
-    private static final long CHECK_PERIOD = SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 100);
+    private static final int PENDING_TASK_COUNT_TRANSFER_THRESHOLD =
+            SystemUtils.getPropertyAsInt("gatling.pendingTaskCountTransferThreshold", 1000);
+    /** The number of pending contexts to process in a runner that will trigger transfer to a free runner */
+    private static final int PENDING_CONTEXT_TRANSFER_THRESHOLD =
+            SystemUtils.getPropertyAsInt("gatling.pendingContextTransferThreshold", 1);
+    private static final long CHECK_PERIOD = SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 250);
     private static final ScheduledExecutorService CHECKER =
             ThreadUtils.newPermanentScheduledExecutorService("gatling-checker", 1);
     private static final ScheduledExecutorService SCHEDULER =
@@ -142,11 +145,8 @@ public class GatlingExecutor implements IContextExecutor {
             this.number = number;
             this.lock = new Object();
             this.workerThread = ThreadUtils.newDaemonThread(this, name);
-
-            // setup initial state
             this.runningTask = false;
             this.tasks.addAll(initialTasks);
-
             this.workerThread.start();
             addThreadId(this.workerThread.getId());
         }
@@ -234,7 +234,6 @@ public class GatlingExecutor implements IContextExecutor {
                                 }
                                 else
                                 {
-                                    // todo is addFirst correct?
                                     // add it in front of other tasks so it is executed next
                                     this.tasks.addFirst(t);
                                 }
@@ -251,7 +250,6 @@ public class GatlingExecutor implements IContextExecutor {
 
                 if (toRun == null)
                 {
-                    // todo this causes a lot of contention
                     synchronized (taskQueue.lock)
                     {
                         toRun = taskQueue.poll_callWhilstHoldingLock();
@@ -287,23 +285,20 @@ public class GatlingExecutor implements IContextExecutor {
 
     }
 
-    final Set<TaskRunner> taskRunnersWaiting_accessWithQLock = new HashSet<>();
-
     volatile boolean active = true;
     volatile long[] tids = new long[0];
-    int lastCheckQSize = Integer.MAX_VALUE;
     final TaskQueue taskQueue;
     final List<TaskRunner> taskRunners;
-    private final GatlingExecutor pool;
+    final Set<TaskRunner> taskRunnersWaiting_accessWithQLock;
+    private int size;
     private final String name;
-    private final int size;
-    private final LowGcLinkedList<Integer> freeNumbers;
+    private final GatlingExecutor pool;
     private final AtomicInteger threadCounter;
+    private final AtomicInteger coreCountExceeded;
+    private final LowGcLinkedList<Integer> freeNumbers;
 
     /**
-     * Construct the {@link GatlingExecutor} with a thread pool minimum size and name for the threads.
-     *
-     * @param name the name to use for each thread in the thread pool
+     * @param name the initial core thread pool minimum thread size
      * @param size the internal core thread pool minimum thread size.
      */
     public GatlingExecutor(String name, int size)
@@ -312,10 +307,8 @@ public class GatlingExecutor implements IContextExecutor {
     }
 
     /**
-     * Construct the {@link GatlingExecutor} with a thread pool minimum size and name for the threads.
-     *
      * @param name the name to use for each thread in the thread pool
-     * @param size the internal core thread pool minimum thread size.
+     * @param size the initial core thread pool minimum thread size
      * @param pool the instance that will execute all tasks (used for thread pooling)
      */
     public GatlingExecutor(String name, int size, GatlingExecutor pool)
@@ -323,11 +316,12 @@ public class GatlingExecutor implements IContextExecutor {
         this.name = name;
         this.size = size;
         this.pool = pool;
-
         this.threadCounter = new AtomicInteger(0);
+        this.coreCountExceeded = new AtomicInteger(0);
         this.freeNumbers = new LowGcLinkedList<>();
         this.taskQueue = new TaskQueue(this.name);
         this.taskRunners = new CopyOnWriteArrayList<>();
+        this.taskRunnersWaiting_accessWithQLock = new HashSet<>();
 
         if (this.pool == null)
         {
@@ -597,48 +591,62 @@ public class GatlingExecutor implements IContextExecutor {
                             }
                             blockedTaskLists.add(taskList);
                         }
-                        else if (taskRunner.tasks.size() > TASK_TRANSFER_THRESHOLD)
+                        else
                         {
-                            runnersWithWork.add(taskRunner);
+                            if (taskRunner.tasks.size() > PENDING_CONTEXT_TRANSFER_THRESHOLD)
+                            {
+                                // compute full size
+                                int taskCount = 0;
+                                for (Runnable task : taskRunner.tasks)
+                                {
+                                    if (task instanceof TaskQueue.SequentialTasks)
+                                    {
+                                        taskCount += ((TaskQueue.SequentialTasks) task).size;
+                                    }
+                                    else
+                                    {
+                                        taskCount++;
+                                    }
+                                }
+                                if (taskCount > PENDING_TASK_COUNT_TRANSFER_THRESHOLD)
+                                {
+                                    runnersWithWork.add(taskRunner);
+                                }
+                            }
                         }
                     }
                 }
-                // go through runners with work and transfer a task to free runner
-                synchronized (this.taskQueue.lock)
+
+                if (runnersWithWork.size() > 0)
                 {
-                    if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
+                    // go through runners with work and transfer a SINGLE task to free or new runner
+                    synchronized (this.taskQueue.lock)
                     {
-                        for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
+                        if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
                         {
-                            final TaskRunner runner = runnersWithWork.poll();
-                            if (runner != null)
+                            for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
                             {
-                                // transfer a task
-                                taskRunner.tasks.add(runner.tasks.poll());
+                                final TaskRunner runner = runnersWithWork.poll();
+                                if (runner != null)
+                                {
+                                    taskRunner.tasks.add(runner.tasks.poll());
+                                }
                             }
+                            this.taskQueue.lock.notifyAll();
                         }
-                        this.taskQueue.lock.notifyAll();
-                    }
-                    else
-                    {
-                        System.err.println("CREATE + TRANSFER");
-                        // todo we need to be careful about this - can spawn many
-                        TaskRunner runner = runnersWithWork.poll();
-                        final Deque<Runnable> initialTasks = CollectionUtils.newDeque();
-                        if (runner != null)
+                        else
                         {
-                            // transfer a single task to the new runner
-                            initialTasks.add(runner.tasks.poll());
+                            final Deque<Runnable> initialTasks = CollectionUtils.newDeque();
+                            final Runnable task = Objects.requireNonNull(runnersWithWork.poll()).tasks.poll();
+                            Log.log(this, "Creating new thread to handle transferred task: " + task);
+                            initialTasks.add(task);
+                            addTaskRunner_callWhilstHoldingLock(initialTasks);
                         }
-                        addTaskRunner_callWhilstHoldingLock(initialTasks);
                     }
                 }
 
                 if (blockedTaskLists.size() > 0)
                 {
-                    // todo
-                    int initial = blockedTaskLists.size();
-
                     // pass blocked lists to available runners
                     synchronized (this.taskQueue.lock)
                     {
@@ -657,9 +665,9 @@ public class GatlingExecutor implements IContextExecutor {
                     }
                     if (blockedTaskLists.size() > 0)
                     {
-                        System.err.println("Re-assigning " + blockedTaskLists.size() + "/" + initial);
                         // create task runners for the remaining
-                        // todo need a burst count?
+                        Log.log(this,
+                                "Creating " + blockedTaskLists.size() + " threads to handle blocked tasks");
                         for (Deque<Runnable> blockedTaskList : blockedTaskLists)
                         {
                             addTaskRunner_callWhilstHoldingLock(blockedTaskList);
@@ -682,6 +690,16 @@ public class GatlingExecutor implements IContextExecutor {
             number = Integer.valueOf(this.threadCounter.getAndIncrement());
         }
         final boolean isCore = number < this.size;
+        if (number == this.size)
+        {
+            this.coreCountExceeded.incrementAndGet();
+            // if we go over the core size every X times then bump up the core size
+            if (this.coreCountExceeded.get() % CORE_COUNT_BUMP_THRESHOLD == 0)
+            {
+                this.size++;
+                Log.log(this, "Increasing core size to " + this.size);
+            }
+        }
         this.taskRunners.add(new TaskRunner(this.name + (isCore ? "" : "-aux") + "-" + number, number, isCore,
                 initialTasks));
     }
