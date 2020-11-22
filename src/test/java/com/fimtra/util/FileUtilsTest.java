@@ -17,6 +17,7 @@ package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -44,6 +45,7 @@ public class FileUtilsTest {
 	private static final String logFileName = "Test-messages_20151122_221934.log.0.logged";
 	private static final String EXT_OK = "okext";
 	private static final String EXT_RECORD = "record";
+	public static final String TMP_DIR = System.getProperty("java.io.tmpdir");
 	private ExtensionFileFilter recordFileFilter;
 	private File directory;
 
@@ -94,14 +96,21 @@ public class FileUtilsTest {
 	
 	@Test
 	public void testCopyMoveDeleteDirectory() throws IOException {
-		final File srcDir = new File("./logs");
+		final File srcDir =
+				new File(TMP_DIR, "testCopyMoveDeleteDirectory-test-dir");
+		FileUtils.deleteRecursive(srcDir);
+		if (!srcDir.exists())
+		{
+			assertTrue(srcDir.mkdir());
+		}
 		// add a file
 		final File testFile = new File(srcDir, "testCopyMoveDeleteDirectory.txt");
-		if(!testFile.exists())
+		if (!testFile.exists())
 		{
 			assertTrue("Could not create test file!", testFile.createNewFile());
 		}
-		final File targetDir = new File(System.getProperty("java.io.tmpdir"), srcDir.getName());
+		final File targetDir = new File(TMP_DIR, srcDir.getName() + "-COPY");
+		FileUtils.deleteRecursive(targetDir);
 
 		// copy
 		FileUtils.copyRecursive(srcDir, targetDir);
@@ -113,7 +122,11 @@ public class FileUtilsTest {
 		FileUtils.move(targetDir, moveTarget);
 		assertFalse(targetDir.exists());
 		assertTrue(moveTarget.exists());
-		assertEquals(srcDir.listFiles().length, moveTarget.listFiles().length);
+		final File[] srcDirFiles = srcDir.listFiles();
+		final File[] destDirFiles = moveTarget.listFiles();
+		assertNotNull(srcDirFiles);
+		assertNotNull(destDirFiles);
+		assertEquals(srcDirFiles.length, destDirFiles.length);
 
 		// delete
 		FileUtils.deleteRecursive(moveTarget);
