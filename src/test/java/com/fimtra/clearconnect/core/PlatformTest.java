@@ -275,9 +275,9 @@ public class PlatformTest
     String secondary = "SECONDARY";
 
     // todo consider using full ephemeral ports
-    static int servicePort3 = 0;
-    static int servicePort2 = 0;
-    static int servicePort = 0;
+    static int servicePort3 = 34001;
+    static int servicePort2 = 33001;
+    static int servicePort = 32001;
     static int registryPort = 31001;
 
     PlatformRegistry registry;
@@ -291,6 +291,9 @@ public class PlatformTest
         ChannelUtils.WATCHDOG.configure(RECONNECT_PERIOD, 10);
 
         registryPort += 1;
+        servicePort += 1;
+        servicePort2 += 1;
+        servicePort3 += 1;
 
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
