@@ -95,8 +95,8 @@ public class PlatformTest
 
     static class TestServiceAvailableListener implements IServiceAvailableListener
     {
-        final List<String> available = new ArrayList<String>();
-        final List<String> unavailable = new ArrayList<String>();
+        final List<String> available = new ArrayList<>();
+        final List<String> unavailable = new ArrayList<>();
         boolean debug = false;
 
         @Override
@@ -196,8 +196,8 @@ public class PlatformTest
 
     static class TestServiceInstanceAvailableListener implements IServiceInstanceAvailableListener
     {
-        List<String> available = new CopyOnWriteArrayList<String>();
-        List<String> unavailable = new CopyOnWriteArrayList<String>();
+        List<String> available = new CopyOnWriteArrayList<>();
+        List<String> unavailable = new CopyOnWriteArrayList<>();
 
         @Override
         public String toString()
@@ -275,9 +275,9 @@ public class PlatformTest
     String secondary = "SECONDARY";
 
     // todo consider using full ephemeral ports
-    static int servicePort3 = 34001;
-    static int servicePort2 = 33001;
-    static int servicePort = 32001;
+    static int servicePort3 = 0;
+    static int servicePort2 = 0;
+    static int servicePort = 0;
     static int registryPort = 31001;
 
     PlatformRegistry registry;
@@ -291,9 +291,6 @@ public class PlatformTest
         ChannelUtils.WATCHDOG.configure(RECONNECT_PERIOD, 10);
 
         registryPort += 1;
-        servicePort += 1;
-        servicePort2 += 1;
-        servicePort3 += 1;
 
         this.registry = new PlatformRegistry(getPlatformName(), this.registryHost, registryPort);
         this.registry.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
@@ -389,7 +386,7 @@ public class PlatformTest
             PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
     }
 
-    @Test(timeout = 30000l)
+    @Test(timeout = 30000L)
     public void testWaitForServices() throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
@@ -400,7 +397,7 @@ public class PlatformTest
         this.agent.waitForPlatformService(SERVICE1);
     }
 
-    @Test(timeout = 30000l)
+    @Test(timeout = 30000L)
     public void testWaitForServicesNull() throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
@@ -1048,10 +1045,8 @@ public class PlatformTest
         final String SERVICE2 = this.name.getMethodName() + "2";
         createAgent();
         createAgent008();
-        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch = new AtomicReference<>(new CountDownLatch(1));
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -1120,10 +1115,8 @@ public class PlatformTest
             new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
-        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch = new AtomicReference<>(new CountDownLatch(1));
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -1197,10 +1190,8 @@ public class PlatformTest
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
-        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch = new AtomicReference<>(new CountDownLatch(1));
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -1215,10 +1206,8 @@ public class PlatformTest
                 agentRegistryConnectedLatch.get().countDown();
             }
         });
-        final AtomicReference<CountDownLatch> agent008RegistryConnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> agent008RegistryDisconnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agent008RegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agent008RegistryDisconnectedLatch = new AtomicReference<>(new CountDownLatch(1));
         this.agent008.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -1373,10 +1362,8 @@ public class PlatformTest
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
-        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> agentRegistryDisconnectedLatch = new AtomicReference<>(new CountDownLatch(1));
         this.agent.addRegistryAvailableListener(new IRegistryAvailableListener()
         {
             @Override
@@ -1513,8 +1500,8 @@ public class PlatformTest
         createAgent();
         createAgent008();
 
-        final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<IRecord> serviceRecordImage = new AtomicReference<IRecord>();
+        final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<IRecord> serviceRecordImage = new AtomicReference<>();
         IRecordListener serviceListener = new IRecordListener()
         {
             @Override
@@ -1533,9 +1520,8 @@ public class PlatformTest
 
         serviceLatch.set(new CountDownLatch(1));
 
-        final AtomicReference<CountDownLatch> serviceInstanceLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(2));
-        final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<IRecord>();
+        final AtomicReference<CountDownLatch> serviceInstanceLatch = new AtomicReference<>(new CountDownLatch(2));
+        final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<>();
         IRecordListener serviceInstanceListener = new IRecordListener()
         {
             @Override
@@ -1659,7 +1645,7 @@ public class PlatformTest
                 }
                 catch (NullPointerException e)
                 {
-                    return -1l;
+                    return -1L;
                 }
             }
         });
