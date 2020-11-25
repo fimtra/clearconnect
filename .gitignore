@@ -7,3 +7,5 @@ logs/
 ipc-tests/
 *.out
 *.gz
+.idea/
+*.iml
