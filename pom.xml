@@ -4,7 +4,7 @@
 
 	<groupId>com.fimtra</groupId>
 	<artifactId>clearconnect</artifactId>
-	<version>3.17.1-SNAPSHOT</version>
+	<version>3.17.1</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>A micro services platform</description>
 	<packaging>jar</packaging>
