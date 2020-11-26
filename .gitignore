@@ -9,3 +9,6 @@ ipc-tests/
 *.gz
 .idea/
 *.iml
+/testAppendCharSequence.log
+/testEmergency.log
+/config/*.properties
