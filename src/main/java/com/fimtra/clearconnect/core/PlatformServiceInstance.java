@@ -398,17 +398,20 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
      */
     public void destroy()
     {
-        Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-        this.statsUpdateTask.cancel(false);
-        this.publisher.destroy();
-        this.context.destroy();
+        if (this.active)
+        {
+            Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+            this.statsUpdateTask.cancel(false);
+            this.publisher.destroy();
+            this.context.destroy();
 
-        this.recordAvailableNotifyingCache.destroy();
-        this.rpcAvailableNotifyingCache.destroy();
-        this.subscriptionNotifyingCache.destroy();
-        this.proxyConnectionListenerCache.destroy();
+            this.recordAvailableNotifyingCache.destroy();
+            this.rpcAvailableNotifyingCache.destroy();
+            this.subscriptionNotifyingCache.destroy();
+            this.proxyConnectionListenerCache.destroy();
 
-        this.active = false;
+            this.active = false;
+        }
     }
 
     @Override
@@ -443,7 +446,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
     public String toString()
     {
         return "PlatformServiceInstance [platform{" + this.platformName + "} service{" + this.serviceFamily
-                + "} member{" + this.serviceMember + "}] " + getEndPointAddress();
+                + "} member{" + this.serviceMember + "}] " + getEndPointAddress() + " " + (this.active ?
+                "ACTIVE" : "DEAD");
     }
 
     @Override
@@ -608,7 +612,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
                         PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
 
                 // disconnect all clients EXCEPT the registry connection
-                this.publisher.disconnectClients("No longer master instance",
+                Log.log(this, this.toString(), " no longer master instance, disconnecting proxies");
+                this.publisher.disconnectClients(
+                        "Closing proxyService connection, service is no longer the master instance: "
+                                + PlatformServiceInstance.this,
                         (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
             }
 
