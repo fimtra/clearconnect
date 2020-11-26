@@ -572,6 +572,29 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
         return this.context.getName();
     }
 
+    void initialiseFtState()
+    {
+        if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
+        {
+            this.context.executeSequentialCoreTask(new ISequentialRunnable() {
+                @Override
+                public Object context()
+                {
+                    return PlatformServiceInstance.this;
+                }
+
+                @Override
+                public void run()
+                {
+                    if (PlatformServiceInstance.this.isFtMasterInstance == null)
+                    {
+                        doSetFtState(Boolean.FALSE);
+                    }
+                }
+            });
+        }
+    }
+
     void setFtState(final Boolean isMaster)
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
@@ -594,7 +617,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
 
     void doSetFtState(final Boolean isFtMaster)
     {
-        if (!isFtMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
+        if (!isFtMaster.equals(this.isFtMasterInstance))
         {
             final Boolean previousState = this.isFtMasterInstance;
             this.isFtMasterInstance = isFtMaster;
@@ -612,10 +635,11 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
                         PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
 
                 // disconnect all clients EXCEPT the registry connection
-                Log.log(this, this.toString(), " no longer master instance, disconnecting proxies");
-                this.publisher.disconnectClients(
-                        "Closing proxyService connection, service is no longer the master instance: "
-                                + PlatformServiceInstance.this,
+                final String instanceMsg =
+                        "no longer the master instance {" + this.serviceFamily + ":" + this.serviceMember
+                                + "}";
+                Log.log(this, "Disconnecting proxy connections, ", instanceMsg);
+                this.publisher.disconnectClients("Closing proxy connection: " + instanceMsg,
                         (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
             }
 

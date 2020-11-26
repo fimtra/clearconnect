@@ -595,8 +595,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
         if (serviceInstance.isActive())
         {
-            // FT services always start as standby
-            serviceInstance.setFtState(Boolean.FALSE);
+            // *NEW* FT services always start as standby
+            serviceInstance.initialiseFtState();
 
             final CountDownLatch latch = new CountDownLatch(1);
             final IServiceInstanceAvailableListener listener =
