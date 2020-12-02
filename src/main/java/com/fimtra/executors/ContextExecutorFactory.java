@@ -71,7 +71,7 @@ public class ContextExecutorFactory {
      */
     public static IContextExecutor create(String name, int corePoolSize)
     {
-        return POOL_ACTIVE ? POOL_HOLDER.get() : new GatlingExecutor(name, corePoolSize, null);
+        return POOL_ACTIVE ? POOL_HOLDER.get() : new GatlingExecutor(name, corePoolSize);
     }
 
     /**
@@ -104,8 +104,7 @@ public class ContextExecutorFactory {
 
     public static synchronized IContextExecutor get(Object c)
     {
-        return AD_HOCS.computeIfAbsent(c,
-                context -> new GatlingExecutor(context.toString(), 1, POOL_HOLDER.get()));
+        return AD_HOCS.computeIfAbsent(c, (o) -> create(o.toString()));
     }
 
     public static synchronized void remove(Object c)

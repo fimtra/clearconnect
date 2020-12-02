@@ -292,7 +292,6 @@ public class GatlingExecutor implements IContextExecutor {
     final Set<TaskRunner> taskRunnersWaiting_accessWithQLock;
     private int size;
     private final String name;
-    private final GatlingExecutor pool;
     private final AtomicInteger threadCounter;
     private final AtomicInteger coreCountExceeded;
     private final LowGcLinkedList<Integer> freeNumbers;
@@ -303,19 +302,8 @@ public class GatlingExecutor implements IContextExecutor {
      */
     public GatlingExecutor(String name, int size)
     {
-        this(name, size, null);
-    }
-
-    /**
-     * @param name the name to use for each thread in the thread pool
-     * @param size the initial core thread pool minimum thread size
-     * @param pool the instance that will execute all tasks (used for thread pooling)
-     */
-    public GatlingExecutor(String name, int size, GatlingExecutor pool)
-    {
         this.name = name;
         this.size = size;
-        this.pool = pool;
         this.threadCounter = new AtomicInteger(0);
         this.coreCountExceeded = new AtomicInteger(0);
         this.freeNumbers = new LowGcLinkedList<>();
@@ -323,15 +311,12 @@ public class GatlingExecutor implements IContextExecutor {
         this.taskRunners = new CopyOnWriteArrayList<>();
         this.taskRunnersWaiting_accessWithQLock = new HashSet<>();
 
-        if (this.pool == null)
+        // create core threads
+        for (int i = 0; i < size; i++)
         {
-            // create core threads
-            for (int i = 0; i < size; i++)
-            {
-                addTaskRunner_callWhilstHoldingLock(NOOP_INITIAL_TASKS);
-            }
-            EXECUTORS.add(this);
+            addTaskRunner_callWhilstHoldingLock(NOOP_INITIAL_TASKS);
         }
+        EXECUTORS.add(this);
     }
 
     @Override
@@ -343,8 +328,7 @@ public class GatlingExecutor implements IContextExecutor {
     @Override
     public String toString()
     {
-        return "GatlingExecutor[" + this.name + ":" + (this.pool == null ? this.taskRunners.size() :
-                "pool=" + this.pool) + "]";
+        return "GatlingExecutor[" + this.name + ":" + this.taskRunners.size() + "]";
     }
 
     @Override
@@ -352,12 +336,6 @@ public class GatlingExecutor implements IContextExecutor {
     {
         if (!this.active)
         {
-            return;
-        }
-
-        if (this.pool != null)
-        {
-            this.pool.execute(command);
             return;
         }
 
