@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -61,8 +61,7 @@ import org.mockito.Mockito;
 /**
  * @author Ramon Servadei
  */
-public class ContextTest
-{
+public class ContextTest {
     private final static String name = "test";
     private static final String K1 = "1";
     private static final String K2 = "2";
@@ -112,13 +111,13 @@ public class ContextTest
     @Test
     public void testAddAllEntriesRemovedToAtomicChange()
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         instance.put(K2, V2);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
         instance.clear();
-        final IRecordChange changes = this.candidate.pendingAtomicChanges.get(name);
+        final IRecordChange changes = instance.getPendingAtomicChange();
         assertNotNull(changes);
         assertEquals(0, changes.getPutEntries().size());
         assertEquals(0, changes.getOverwrittenEntries().size());
@@ -128,12 +127,12 @@ public class ContextTest
     @Test
     public void testAddEntryRemovedToAtomicChange()
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
         instance.remove(K1);
-        final IRecordChange changes = this.candidate.pendingAtomicChanges.get(name);
+        final IRecordChange changes = instance.getPendingAtomicChange();
         assertNotNull(changes);
         assertEquals(0, changes.getPutEntries().size());
         assertEquals(0, changes.getOverwrittenEntries().size());
@@ -143,12 +142,12 @@ public class ContextTest
     @Test
     public void testAddEntryUpdatedToAtomicChange()
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         instance.put(K1, V1);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, name);
         instance.put(K1, V1n);
-        final IRecordChange changes = this.candidate.pendingAtomicChanges.get(name);
+        final IRecordChange changes = instance.getPendingAtomicChange();
         assertNotNull(changes);
         assertEquals(1, changes.getPutEntries().size());
         assertEquals(1, changes.getOverwrittenEntries().size());
@@ -206,7 +205,8 @@ public class ContextTest
 
         // add the first observer, wait for update
         observer.latch = new CountDownLatch(1);
-        Map<String, Boolean> result = this.candidate.addObserver(permissionToken, observer, name, name2).get();
+        Map<String, Boolean> result =
+                this.candidate.addObserver(permissionToken, observer, name, name2).get();
         assertEquals(2, result.size());
         assertTrue("Got: " + result, result.get(name));
         assertFalse("Got: " + result, result.get(name2));
@@ -221,20 +221,20 @@ public class ContextTest
     @Test
     public void testAddObserverAfterCreating() throws InterruptedException
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         assertNotNull(instance);
         instance.put(K1, V1);
         instance.put(K2, V2);
         this.candidate.publishAtomicChange(name).await();
-        
+
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         final TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
-        
+
         // add the first observer, wait for update
         observer.latch = new CountDownLatch(1);
         this.candidate.addObserver(observer, name);
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
-        
+
         // check image notified to observer added after creation
         Map<String, IValue> expectedImage = new HashMap<String, IValue>();
         expectedImage.put(K1, V1);
@@ -244,24 +244,24 @@ public class ContextTest
         assertEquals(2, observer.changes.get(0).getPutEntries().size());
         assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
-        
+
         observer.reset();
         CountDownLatch countDownLatch = new CountDownLatch(2);
         observer.latch = countDownLatch;
         observer2.latch = countDownLatch;
-        
+
         // change the instance and publish the change
         instance.put(K1, V1n);
         instance.put(K5, V5);
         expectedImage.put(K1, V1n);
         expectedImage.put(K5, V5);
         this.candidate.publishAtomicChange(name).await();
-        
+
         // add observer2 AFTER publishing the last change
         this.candidate.addObserver(observer2, name);
-        
+
         assertTrue(countDownLatch.await(1, TimeUnit.SECONDS));
-        
+
         // check both observers have the same image
         Map<String, IValue> putEntries = new HashMap<String, IValue>();
         putEntries.put(K1, V1n);
@@ -271,7 +271,7 @@ public class ContextTest
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
-        
+
         assertEquals(expectedImage, observer2.first.get());
         assertEquals("changes: " + observer2.changes, 1, observer2.changes.size());
         assertEquals(new HashMap<String, IValue>(instance), observer2.changes.get(0).getPutEntries());
@@ -279,11 +279,11 @@ public class ContextTest
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
         assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
-    
+
     @Test
     public void testAddObserverIdempotent() throws InterruptedException
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         assertNotNull(instance);
         instance.put(K1, V1);
         instance.put(K2, V2);
@@ -312,7 +312,7 @@ public class ContextTest
 
         // re-add the same listener - checks IDEMPOTENCY
         this.candidate.addObserver(observer, name);
-        
+
         // change the instance and publish the change
         instance.put(K1, V1n);
         instance.put(K5, V5);
@@ -331,7 +331,7 @@ public class ContextTest
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
-        
+
         assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
     }
 
@@ -347,7 +347,7 @@ public class ContextTest
         Map<String, IValue> expectedMap = new HashMap<String, IValue>();
         expectedMap.put(K1, V1);
         expectedMap.put(K2, V2);
-        Map<String, IValue> instance = createRecordWaitForUpdate(name, expectedMap);
+        Record instance = createRecordWaitForUpdate(name, expectedMap);
         assertNotNull(instance);
         assertTrue("Did not get notified on creation", latch.await(1, TimeUnit.SECONDS));
 
@@ -401,7 +401,6 @@ public class ContextTest
         this.candidate.addObserver(observer, name);
         this.candidate.addObserver(observer2, name);
         this.candidate.addObserver(observer2, name);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
         assertEquals(2, this.candidate.recordObservers.getSubscribersFor(name).length);
         assertEquals(0, observer.changes.size());
         assertEquals(0, observer2.changes.size());
@@ -410,7 +409,7 @@ public class ContextTest
     @Test
     public void testAddObserverForSameObserverAfterCreating() throws InterruptedException
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
         assertNotNull(instance);
         instance.put(K1, V1);
         instance.put(K2, V2);
@@ -423,7 +422,6 @@ public class ContextTest
         this.candidate.addObserver(observer, name);
         this.candidate.addObserver(observer2, name);
         this.candidate.addObserver(observer2, name);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
         assertEquals(2, this.candidate.recordObservers.getSubscribersFor(name).length);
 
         assertTrue(latch.await(1, TimeUnit.SECONDS));
@@ -493,10 +491,10 @@ public class ContextTest
         final TestCachingAtomicChangeObserver registryObserver = new TestCachingAtomicChangeObserver(true);
         this.candidate.addObserver(registryObserver, ISystemRecordNames.CONTEXT_RECORDS);
 
-        final Set<String> expected = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
-            "ContextRecords", "ContextRpcs", "ContextStatus", "test"));
-        waitForEvent(new EventChecker()
-        {
+        final Set<String> expected = new HashSet<String>(
+                Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords", "ContextRpcs",
+                        "ContextStatus", "test"));
+        waitForEvent(new EventChecker() {
             @Override
             public Object got()
             {
@@ -517,10 +515,10 @@ public class ContextTest
 
         // remove the instance
         this.candidate.removeRecord(name);
-        final Set<String> expected2 = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
-            "ContextRecords", "ContextRpcs", "ContextStatus"));
-        waitForEvent(new EventChecker()
-        {
+        final Set<String> expected2 = new HashSet<String>(
+                Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords", "ContextRpcs",
+                        "ContextStatus"));
+        waitForEvent(new EventChecker() {
             @Override
             public Object got()
             {
@@ -577,26 +575,25 @@ public class ContextTest
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
 
         TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
         subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(observer2, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L1");
 
         // remove the instance
         this.candidate.removeRecord(name);
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
     }
 
-    static void verify(final String name_context, final TestCachingAtomicChangeObserver observer, final String... items)
-        throws InterruptedException
+    static void verify(final String name_context, final TestCachingAtomicChangeObserver observer,
+            final String... items) throws InterruptedException
     {
-        waitForEvent(new EventChecker()
-        {
+        waitForEvent(new EventChecker() {
             @Override
             public Object got()
             {
@@ -651,7 +648,7 @@ public class ContextTest
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
 
         subscriptionsObserver.latch = new CountDownLatch(1);
         subscriptionsObserver.reset();
@@ -659,43 +656,44 @@ public class ContextTest
         this.candidate.addObserver(observer2, name);
         this.candidate.addObserver(observer2, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L1");
 
         // add second observer to the name2 record
         subscriptionsObserver.latch = new CountDownLatch(1);
         TestCachingAtomicChangeObserver observer3 = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer3, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L2");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L2");
 
         subscriptionsObserver.latch = new CountDownLatch(1);
         subscriptionsObserver.reset();
         this.candidate.removeObserver(observer2, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L1");
 
         subscriptionsObserver.latch = new CountDownLatch(1);
         subscriptionsObserver.reset();
         this.candidate.removeObserver(observer3, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
 
         // attempt duff removes
         this.candidate.removeObserver(observer3, name);
         this.candidate.removeObserver(observer3, name);
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
     }
 
     @Test
     public void testContextSubscriptionsListsObserversForMapWhenAddingObserverBerforeCreatingMap()
-        throws InterruptedException
+            throws InterruptedException
     {
-        Map<String, IValue> subscriptions = this.candidate.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+        Map<String, IValue> subscriptions =
+                this.candidate.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
         // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
@@ -703,7 +701,7 @@ public class ContextTest
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
-            "ContextSubscriptions=L1");
+                "ContextSubscriptions=L1");
 
         TestCachingAtomicChangeObserver observer2 = new TestCachingAtomicChangeObserver();
         subscriptionsObserver.latch = new CountDownLatch(2);
@@ -711,8 +709,8 @@ public class ContextTest
         this.candidate.addObserver(observer2, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         assertEquals(subscriptions.toString(), 2, subscriptions.size());
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L2");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L2");
     }
 
     @Test
@@ -727,14 +725,14 @@ public class ContextTest
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
 
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L1");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L1");
 
         subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(subscriptionsObserver, name);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
-        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver, "ContextSubscriptions=L1",
-            "test=L2");
+        verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
+                "ContextSubscriptions=L1", "test=L2");
     }
 
     @Test(expected = IllegalStateException.class)
@@ -807,8 +805,7 @@ public class ContextTest
     @Test
     public void testInitialObserverForBlankMap() throws InterruptedException
     {
-        @SuppressWarnings("unused")
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        @SuppressWarnings("unused") final Record instance = createRecordWaitForUpdate(name);
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
@@ -824,9 +821,8 @@ public class ContextTest
         final int instanceCount = 100;
         for (int i = 0; i < instanceCount; i++)
         {
-            final Map<String, IValue> instance = createRecordWaitForUpdate(name + i);
-            executor.scheduleAtFixedRate(new Runnable()
-            {
+            final Record instance = createRecordWaitForUpdate(name + i);
+            executor.scheduleAtFixedRate(new Runnable() {
                 long i;
 
                 @Override
@@ -838,8 +834,7 @@ public class ContextTest
         }
 
         // notify ALL every 10ms
-        executor.scheduleAtFixedRate(new Runnable()
-        {
+        executor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run()
             {
@@ -855,21 +850,21 @@ public class ContextTest
         for (int i = 0; i < instanceCount; i++)
         {
             TestLongValueSequenceCheckingAtomicChangeObserver observer =
-                new TestLongValueSequenceCheckingAtomicChangeObserver();
+                    new TestLongValueSequenceCheckingAtomicChangeObserver();
             observer.latch = latch;
             this.candidate.addObserver(observer, name + i);
         }
 
         // wait for
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        
+
         executor.shutdown();
     }
-    
+
     @Test
     public void testPublishAtomicChangesForNoChange() throws InterruptedException
     {
-        final Map<String, IValue> instance = createRecordWaitForUpdate(name);
+        final Record instance = createRecordWaitForUpdate(name);
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
@@ -890,22 +885,22 @@ public class ContextTest
     @Test
     public void testPublishChangesWhenNoObserversRegistered() throws InterruptedException
     {
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
         this.candidate.publishAtomicChange(name).await();
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
 
-        assertNotNull(createRecordWaitForUpdate(name));
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        final Record instance = createRecordWaitForUpdate(name);
+        assertNotNull(instance);
+        assertNull(instance.atomicChange);
         this.candidate.publishAtomicChange(name).await();
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNull(instance.atomicChange);
     }
 
     @Test
     public void testRemoveInstance() throws InterruptedException
     {
         assertNull(this.candidate.removeRecord("sdf"));
-        final Map<String, IValue> createInstance = createRecordWaitForUpdate(name);
-        final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(new CountDownLatch(1));
+        final Record instance = createRecordWaitForUpdate(name);
+        final TestCachingAtomicChangeObserver observer =
+                new TestCachingAtomicChangeObserver(new CountDownLatch(1));
         this.candidate.addObserver(observer, name);
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
         assertNotNull(this.candidate.imageCache.images.get(name));
@@ -915,15 +910,14 @@ public class ContextTest
         this.candidate.addObserver(new TestCachingAtomicChangeObserver(), name);
         this.candidate.addObserver(new TestCachingAtomicChangeObserver(), name);
         this.candidate.addObserver(new TestCachingAtomicChangeObserver(), name);
-        createInstance.put(K1, V1);
-        assertNotNull(this.candidate.pendingAtomicChanges.get(name));
+        instance.put(K1, V1);
+        assertNotNull(instance.getPendingAtomicChange());
         assertEquals(3, this.candidate.recordObservers.getSubscribersFor(name).length);
 
         // remove and check
-        assertEquals(createInstance, this.candidate.removeRecord(name));
+        assertEquals(instance, this.candidate.removeRecord(name));
         assertNull(this.candidate.records.get(name));
         assertNull(this.candidate.imageCache.images.get(name));
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
         // NOTE: subscribers are INDEPENDENT of record existence
         assertEquals(3, this.candidate.recordObservers.getSubscribersFor(name).length);
 
@@ -946,13 +940,13 @@ public class ContextTest
         this.candidate.removeObserver(observer, name);
         this.candidate.removeObserver(observer, name);
         assertEquals(1, this.candidate.recordObservers.getSubscribersFor(name).length);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
 
         // now we only have observer2
         Map<String, IValue> record = new HashMap<String, IValue>();
         record.put(K1, V1);
         record.put(K2, V2);
-        assertNotNull(createRecordWaitForUpdate(name, record));
+        final Record instance = createRecordWaitForUpdate(name, record);
+        assertNotNull(instance);
         assertTrue(latch.await(1, TimeUnit.SECONDS));
 
         // only observer2 is notified
@@ -967,7 +961,7 @@ public class ContextTest
 
         this.candidate.removeObserver(observer2, name);
         assertEquals(0, this.candidate.recordObservers.getSubscribersFor(name).length);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNull(instance.atomicChange);
     }
 
     @Test
@@ -1056,7 +1050,7 @@ public class ContextTest
         this.candidate.removeRpc("rpc1");
         this.candidate.createRpc(new RpcInstance(TypeEnum.TEXT, "rpc1", TypeEnum.TEXT));
     }
-    
+
     @Test(expected = UnsupportedOperationException.class)
     public void testGetAllRpcUnmodifiable()
     {
@@ -1084,8 +1078,7 @@ public class ContextTest
         final List<IRecord> validateCalls1 = new ArrayList<IRecord>();
         final List<IRecord> validateCalls2 = new ArrayList<IRecord>();
 
-        IValidator validator1 = new IValidator()
-        {
+        IValidator validator1 = new IValidator() {
             @Override
             public void validate(IRecord record, IRecordChange change)
             {
@@ -1110,8 +1103,7 @@ public class ContextTest
             }
         };
 
-        IValidator validator2 = new IValidator()
-        {
+        IValidator validator2 = new IValidator() {
             @Override
             public void validate(IRecord record, IRecordChange change)
             {
@@ -1182,20 +1174,20 @@ public class ContextTest
 
     }
 
-    private IRecord createRecordWaitForUpdate(String name)
+    private Record createRecordWaitForUpdate(String name)
     {
         return createRecordWaitForUpdate(name, null);
     }
 
-    private IRecord createRecordWaitForUpdate(String name, Map<String, IValue> data)
+    private Record createRecordWaitForUpdate(String name, Map<String, IValue> data)
     {
         // wait for the first record image
         CountDownLatch latch = new CountDownLatch(1);
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(latch);
         this.candidate.addObserver(observer, name);
 
-        final IRecord record =
-            data == null ? this.candidate.createRecord(name) : this.candidate.createRecord(name, data);
+        final Record record = (Record) (data == null ? this.candidate.createRecord(name) :
+                this.candidate.createRecord(name, data));
         try
         {
             assertTrue(latch.await(1, TimeUnit.SECONDS));

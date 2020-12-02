@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import org.junit.After;
@@ -287,7 +288,7 @@ public class AtomicChangeTest
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
         this.candidate.mergeEntryRemovedChange(K2, V1);
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
-        final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
+        final IObserverContext mock = mock(IObserverContext.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
         
         target.put(K2, V2);
@@ -322,7 +323,7 @@ public class AtomicChangeTest
         changes.removedSize = 0;
         this.candidate.mergeBulkSubMapChanges(SUBMAP_KEY1, changes);
         
-        final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
+        final IObserverContext mock = mock(IObserverContext.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
 
         target.put(K2, V2);
