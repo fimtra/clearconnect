@@ -263,7 +263,8 @@ public final class ChannelWatchdog implements Runnable {
                     final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d);
                     if (hbDelta > this.lateHeartbeatLimit)
                     {
-                        Log.log(ChannelWatchdog.this, "LATE heartbeat ", Long.toString(hbDelta), "ms from ",
+                        Log.log(ChannelWatchdog.this, "LATE heartbeat ",
+                                Long.toString(hbDelta - this.heartbeatPeriodMillis), "ms delayed from ",
                                 ObjectUtils.safeToString(channel));
                     }
                     checkHeartbeatRecovered(channel);
