@@ -29,6 +29,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
@@ -380,6 +382,42 @@ public class RecordTest
         this.candidate.put(K1, V1);
         this.context.publishAtomicChange(name).await();
         assertEquals("got " + this.listener.changes, 0, this.listener.changes.size());
+    }
+
+    @Test
+    public void testMassivePutAll() throws InterruptedException
+    {
+        Map<String, IValue> hugeChange = new HashMap<String, IValue>();
+        final TextValue value = TextValue.valueOf("Value");
+        for (int i = 0; i < 100000; i++)
+        {
+            hugeChange.put("k" + i, value);
+        }
+        final CountDownLatch latch = new CountDownLatch(1);
+        new Thread(() -> {
+            this.candidate.putAll(hugeChange);
+            latch.countDown();
+        }).start();
+        assertTrue("Bulk change has taken over 2 seconds and still not done",
+                latch.await(2, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testMassivePutAll_submap() throws InterruptedException
+    {
+        Map<String, IValue> hugeChange = new HashMap<String, IValue>();
+        final TextValue value = TextValue.valueOf("Value");
+        for (int i = 0; i < 100000; i++)
+        {
+            hugeChange.put("k" + i, value);
+        }
+        final CountDownLatch latch = new CountDownLatch(1);
+        new Thread(() -> {
+            this.candidate.getOrCreateSubMap("submap").putAll(hugeChange);
+            latch.countDown();
+        }).start();
+        assertTrue("Bulk change has taken over 2 seconds and still not done",
+                latch.await(2, TimeUnit.SECONDS));
     }
 
     @Test

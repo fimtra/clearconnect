@@ -391,10 +391,10 @@ final class Record implements IRecord, Cloneable
                         }
                     }
                 }
-                changes.putSize = putPtr;
-                changes.removedSize = removePtr;
-                getPendingAtomicChange().mergeBulkChanges(changes);
             }
+            changes.putSize = putPtr;
+            changes.removedSize = removePtr;
+            getPendingAtomicChange().mergeBulkChanges(changes);
         }
     }
 
@@ -968,7 +968,6 @@ final class SubMap implements Map<String, IValue>
                     changes.removedKeys[removePtr] = internKey;
                     changes.removedValues[removePtr] = previous;
                     removePtr++;
-
                 }
             }
             changes.putSize = putPtr;
