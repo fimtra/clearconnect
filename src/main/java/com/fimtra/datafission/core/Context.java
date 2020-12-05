@@ -198,7 +198,7 @@ public final class Context implements IPublisherContext
             final Record record = this.images.get(name);
             if (record != null)
             {
-                change.applyCompleteAtomicChangeToRecord(record);
+                record.applyChangeAndSetSequence(change);
             }
             // the Record in the images map backs the ImmutableRecord in the immutableImages map
             return this.immutableImages.get(name);
@@ -450,12 +450,8 @@ public final class Context implements IPublisherContext
 
         final Record record = new Record(name, ContextUtils.EMPTY_MAP, this);
         this.records.put(name, record);
-        // start at -1 because the record.getPendingAtomicChange will incrementAndGet thus starting at 0
-        record.setSequence(-1);
-        synchronized (record.getWriteLock())
-        {
-            record.getPendingAtomicChange().setScope(IRecordChange.IMAGE_SCOPE_CHAR);
-        }
+
+        record.getPendingAtomicChange().setScope(IRecordChange.IMAGE_SCOPE_CHAR);
 
         // this will set off an atomic change for the construction
         record.putAll(initialData);
@@ -632,8 +628,7 @@ public final class Context implements IPublisherContext
                 }
 
                 // update the sequence (version) of the record when publishing
-                final long sequence = atomicChange.getSequence();
-                record.setSequence(sequence);
+                record.setSequence(atomicChange.getSequence());
 
                 atomicChange.preparePublish(latch, this);
 
@@ -1066,15 +1061,6 @@ public final class Context implements IPublisherContext
     void executeRpcTask(ISequentialRunnable sequentialRunnable)
     {
         this.rpcExecutor.execute(sequentialRunnable);
-    }
-
-    /**
-     * Provides the means for a {@link ProxyContext} to tell its internal {@link Context} what sequence to use
-     * when processing a received record change
-     */
-    void setSequence(Record record, long sequence)
-    {
-        record.getPendingAtomicChange().setSequence(sequence);
     }
 
     final boolean permissionTokenValidForRecord(String permissionToken, String recordName)

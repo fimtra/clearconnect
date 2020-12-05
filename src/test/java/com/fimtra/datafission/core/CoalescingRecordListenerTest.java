@@ -176,7 +176,7 @@ public class CoalescingRecordListenerTest
             @Override
             public Object expect()
             {
-                return 1l;
+                return 1L;
             }
         });
 
@@ -207,7 +207,7 @@ public class CoalescingRecordListenerTest
         });
 
         final int size = observer.changes.size();
-        final int limit = 250;
+        final int limit = recordCount / 10;
         System.err.println("testHeavyLoadCoalescing_100000_updates checking " + size + " < " + limit);
         assertTrue("Got: " + observer.changes.size(), size < limit);
     }

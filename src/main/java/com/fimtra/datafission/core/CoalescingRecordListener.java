@@ -27,8 +27,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import com.fimtra.clearconnect.core.PlatformRegistry;
-import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
@@ -187,7 +185,7 @@ public class CoalescingRecordListener implements IRecordListener {
          */
         NO_IMAGE_NEEDED;
 
-        IRecord getImage(Map<String, IRecord> cachedImages, String name)
+        Record getImage(Map<String, Record> cachedImages, String name)
         {
             switch(this)
             {
@@ -199,22 +197,6 @@ public class CoalescingRecordListener implements IRecordListener {
                     return null;
             }
             throw new UnsupportedOperationException("Unhandled policy type " + this);
-        }
-
-        void storeImage(Map<String, IRecord> cachedImages, String name, IRecord imageCopy)
-        {
-            switch(this)
-            {
-                case KEEP_IMAGE_ON_COALESCE:
-                case REMOVE_IMAGE_ON_COALESCE:
-                    if (!cachedImages.containsKey(name))
-                    {
-                        cachedImages.put(name, Record.snapshot(imageCopy));
-                    }
-                    break;
-                case NO_IMAGE_NEEDED:
-                    break;
-            }
         }
     }
 
@@ -237,7 +219,7 @@ public class CoalescingRecordListener implements IRecordListener {
         @Override
         public void run()
         {
-            IRecord image = null;
+            Record image = null;
             if (CoalescingRecordListener.this.cachePolicy == CachePolicyEnum.NO_IMAGE_NEEDED || (image =
                     CoalescingRecordListener.this.cachePolicy.getImage(
                             CoalescingRecordListener.this.cachedImages, this.name)) != null)
@@ -254,7 +236,7 @@ public class CoalescingRecordListener implements IRecordListener {
                     mergedAtomicChange.coalesce(changes);
                     if (image != null)
                     {
-                        mergedAtomicChange.applyCompleteAtomicChangeToRecord(image);
+                        image.applyChangeAndSetSequence(mergedAtomicChange);
                     }
                     CoalescingRecordListener.this.delegate.onChange(image, mergedAtomicChange);
                 }
@@ -272,7 +254,7 @@ public class CoalescingRecordListener implements IRecordListener {
     final IRecordListener delegate;
     final CachePolicyEnum cachePolicy;
     final ICoalescingStrategy strategy;
-    final Map<String, IRecord> cachedImages;
+    final Map<String, Record> cachedImages;
     final Map<String, List<IRecordChange>> cachedAtomicChanges;
 
     /**
@@ -410,7 +392,19 @@ public class CoalescingRecordListener implements IRecordListener {
         synchronized (this.lock)
         {
             this.cachedAtomicChanges.computeIfAbsent(name, createArrayList).add(atomicChange);
-            this.cachePolicy.storeImage(this.cachedImages, name, imageCopy);
+
+            switch(this.cachePolicy)
+            {
+                case KEEP_IMAGE_ON_COALESCE:
+                case REMOVE_IMAGE_ON_COALESCE:
+                    if (!this.cachedImages.containsKey(name))
+                    {
+                        this.cachedImages.put(name, Record.snapshot(imageCopy));
+                    }
+                    break;
+                case NO_IMAGE_NEEDED:
+                    break;
+            }
         }
         this.strategy.handle(name, this);
     }

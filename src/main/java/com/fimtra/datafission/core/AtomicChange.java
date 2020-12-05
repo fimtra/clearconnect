@@ -686,12 +686,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         synchronized (record.getWriteLock())
         {
-            // user code should not be able to set sequences, hence the instance-of check
-            if (record instanceof Record)
-            {
-                ((Record) record).setSequence(this.sequence.get().longValue());
-            }
-
             applyTo(record);
 
             if (this.subMapAtomicChanges != null)

@@ -32,6 +32,7 @@ import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
@@ -108,7 +109,7 @@ final class Record implements IRecord, Cloneable
     static final ObjectPool<String> keysPool =
             new ObjectPool<>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
-    final AtomicLong sequence;
+    final AtomicLong sequence = new AtomicLong(-1);
     final String name;
     final IObserverContext context;
     Map<String, IValue> data;
@@ -122,7 +123,6 @@ final class Record implements IRecord, Cloneable
         this.data = CollectionUtils.newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
-        this.sequence = new AtomicLong(0);
     }
 
     /**
@@ -136,7 +136,6 @@ final class Record implements IRecord, Cloneable
         this.data = CollectionUtils.newMap(data);
         this.subMaps = subMaps;
         this.context = context;
-        this.sequence = new AtomicLong(0);
     }
 
     @Override
@@ -639,6 +638,24 @@ final class Record implements IRecord, Cloneable
         this.sequence.set(sequence);
     }
 
+    /**
+     * Update the record with the complete state of the record change AND set the record sequence to that of
+     * the change.
+     */
+    void applyChangeAndSetSequence(IRecordChange change)
+    {
+        synchronized (this)
+        {
+            change.applyCompleteAtomicChangeToRecord(this);
+            setSequence(change.getSequence());
+            this.atomicChange = null;
+        }
+    }
+
+    /**
+     * Get the pending {@link AtomicChange}, creating if necessary. The change always has a sequence that is 1
+     * ahead of the current record sequence.
+     */
     AtomicChange getPendingAtomicChange()
     {
         if (this.atomicChange == null)
