@@ -1,4 +1,4 @@
-# Introduction {#introduction}
+# Introduction
 
 ![](assets/image6.png)
 
