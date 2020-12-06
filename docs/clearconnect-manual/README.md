@@ -1,8 +1,8 @@
-# ClearConnect Concepts and Programming Manual {#clearconnect-concepts-and-programming-manual}
+# ClearConnect Concepts and Programming Manual
 
 ![](assets/image1.png)
 
-| Attr | |
+| Attr | Val |
 | --- | --- |
 | Version: | 1.1 |
 | API: | 3.17.2 and above |
@@ -34,6 +34,3 @@
   * [The GatlingExecutor](design_notes/the_GatlingExecutor.md)
 
 © 2014-20 Ramon Servadei, Paul Mackinlay, James Lupton, Fimtra, All rights reserved
-
-© 2014-20 Ramon Servadei, Paul Mackinlay, James Lupton, Fimtra, All rights reserved
-
