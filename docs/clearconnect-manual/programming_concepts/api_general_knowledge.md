@@ -93,7 +93,7 @@ The type codes per record `IValue` class are:
 | L | LongValue |
 | B | BlobValue |
 
-So the string `message=SHello World` is self-describing; the key is `message`, the data is a `TextValue` (it starts with `S`) with string value of `Hello World`. Similarly, the string `pi=D3.1415926535898` describes the key `pi` has data that is a `DoubleValue` with string value `3.1415926535898`.
+So the string `message=SHello World` is self-describing; the key is `message`, the data is a `TextValue` (it starts with `S`) with value of `Hello World`. Similarly, the string `pi=D3.1415926535898` describes the key `pi` has data that is a `DoubleValue` with a value `3.1415926535898`.
 
 **Note:** any `IValue` class can be constructed from its string representation as in the example below:
 

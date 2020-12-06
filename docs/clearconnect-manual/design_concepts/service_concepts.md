@@ -6,7 +6,7 @@ All data in the ClearConnect platform is held in records. A service provides a l
 
 A service is identified by a _service family name_ that is unique on the platform. A service needs at least one _service instance_ for the service to exist. A service instance belongs to a single family. The service instance shares the service family name of the service it supports and identifies itself within the family with a _member name_.
 
-![](../assets/family members instances.png)
+![](../assets/family%20members%20instances.png)
 
 The diagram above illustrates this concept. This shows a service, family name "Foo", composed of two instances with member names "Bar1" and "Bar2". Each instance is uniquely identifiable by its service family name and member name (much like individuals in a family). Thus the "Foo" service exists on the platform, composed of two service instances "Foo[Bar1]" and "Foo[Bar2]".
 
