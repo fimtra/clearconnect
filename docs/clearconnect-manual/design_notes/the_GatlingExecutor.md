@@ -205,10 +205,10 @@ By the way, these results are not meant to show any deficiencies in the standard
 
 The core of the GatlingExecutor is a queue framework that is context aware and type aware. The following series of frames illustrates the conceptual function of the queuing internals. For reference:
 
-| ![coalescing task](../assets/coalescing task.PNG) is a coalescing task (diamond) | **![main queue element](../assets/main queue element.PNG) is a main queue element** |
+| ![coalescing task](../assets/coalescing%20task.PNG) is a coalescing task (diamond) | **![main queue element](../assets/main%20queue%20element.PNG) is a main queue element** |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| **![sequential task](../assets/sequential task.PNG)is a sequential task (square)** | **![local queue element](../assets/local queue element.PNG) is a local queue element** |
-| **![runnable task](../assets/runnable task.PNG)is a runnable task (triangle)** | **![element with sequential context tasks](../assets/element with sequential context tasks.PNG) is a main queue element holding a sequential context that has 2 tasks** |
+| **![sequential task](../assets/sequential%20task.PNG)is a sequential task (square)** | **![local queue element](../assets/local%20queue%20element.PNG) is a local queue element** |
+| **![runnable task](../assets/runnable%20task.PNG)is a runnable task (triangle)** | **![element with sequential context tasks](../assets/element%20with%20sequential%20context%20tasks.PNG) is a main queue element holding a sequential context that has 2 tasks** |
 
 ### Main queue vs local queue
 
@@ -235,7 +235,7 @@ A standard runnable has no explicit context, it is its own context so is always 
 
 In frame 1 below, the main queue has 6 elements composed of sequential, coalescing and runnable task types. The contexts are represented as colours and labelled to indicate the context and sequence, e.g. purple context has tasks p1, p2, p3 whilst blue context has b1, b2 (and b3 later on).
 
-![gatling seq 1](../assets/gatling seq 1.png)
+![gatling%20seq%201](../assets/gatling%20seq%201.png)
 
 Frame 1 shows 3 tasks being added:
 
@@ -258,45 +258,45 @@ The push back onto the queue for sequential contexts with multiple tasks prevent
 
 Frame 2 below shows thread T1 starting its poll-execute-push cycle:
 
-![gatling seq 2](../assets/gatling seq 2.PNG)
+![gatling%20seq%202](../assets/gatling%20seq%202.PNG)
 
 In frame 3, T1 has polled the main queue and popped the blue sequential context element; T1 executes the first task b1. At the same time as this happens, a 3rd blue sequential task b3 is added; this will be add at the back of the list of tasks in the element. Thread T2 polls (note coalescing task g3 is being added and will replace g2).
 
-![gatling seq 3](../assets/gatling seq 3.png)
+![gatling%20seq%203](../assets/gatling%20seq%203.png)
 
 In frame 4 T1 pushes the blue context element to the back of its local queue; blue context still has 2 sequential tasks; b2 and b3. T2 executes coalescing context g3 (note g2 was skipped as it was replaced by g3).
 
-![gatling seq 3](../assets/gatling seq 4.png)
+![gatling%20seq%203](../assets/gatling%20seq%204.png)
 
 Frame 5 shows T1 goes back to polling to start a new cycle. T2 does not push because the element is empty after executing the coalescing task g3.
 
-![gatling seq 3](../assets/gatling seq 5.png)
+![gatling%20seq%203](../assets/gatling%20seq%205.png)
 
 Frame 6 shows T1 in the execute part of the poll-execute-push cycle, T2 in in the poll phase.
 
-![gatling seq 3](../assets/gatling seq 6.png)
+![gatling%20seq%203](../assets/gatling%20seq%206.png)
 
 Frame 7 has T1 in the push phase of its cycle, T2 in the execute phase.
 
-![gatling seq 3](../assets/gatling seq 7.png)
+![gatling%20seq%203](../assets/gatling%20seq%207.png)
 
 Frame 8 shows T1 starting a new cycle, T2 will also start a new cycle when T1 finishes its poll.
 
-![gatling seq 3](../assets/gatling seq 8.png)
+![gatling%20seq%203](../assets/gatling%20seq%208.png)
 
 Frames 9 and 10 show the continuation until the main queue is drained.
 
-![gatling seq 9-10](../assets/gatling seq 9-10.PNG)
+![gatling%20seq%209-10](../assets/gatling%20seq%209-10.PNG)
 
 ### Task transfer
 
 Now in frame 11 we see something new; a checker thread transfers one of the elements from the local queue of T1 to T2. This is an important feature of the queue internals; active task transfer of pending local queue elements. The checker thread runs every 250ms (configurable) and will transfer elements from busy threads to free threads.
 
-![gatling seq 11](../assets/gatling seq 11.PNG)
+![gatling%20seq%2011](../assets/gatling%20seq%2011.PNG)
 
 The remaining frames 12 -12d show the sequential contexts being executed in a poll-execute-push cycle across the two threads.
 
-![gatling seq 12a-d](../assets/gatling seq 12a-d.PNG)
+![gatling%20seq%2012a-d](../assets/gatling%20seq%2012a-d.PNG)
 
 
 
@@ -309,13 +309,13 @@ Here we can see what the net effect of the poll-execute-push cycles across the t
 - The coalescing contexts (g3, y1) only had the most recent submitted task executed.
 - The standard runnable tasks were arbitrarily executed.
 
-![gatling seq 3](../assets/gatling net effect.png)
+![gatling%20seq%203](../assets/gatling%20net%20effect.png)
 
 #### More threads
 
 If there were 4 threads for the above scenario we could expect all tasks to be finished in 1/2 the time and possibly in the following sequence:
 
-![gatling net effect 4 threads](../assets/gatling net effect 4 threads.PNG)
+![gatling net effect 4 threads](../assets/gatling%20net%20effect%204%20threads.PNG)
 
 #### Thread-locals
 
