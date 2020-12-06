@@ -1,4 +1,4 @@
-## Platform Concepts {#platform-concepts}
+## Platform Concepts
 
 This is an example diagram showing all the components of a ClearConnect platform and their general interaction. 
 
@@ -19,13 +19,13 @@ _**Note:**_
 
 As an observation, the Registry-Agent relationship follows the same behaviour as the Service-Proxy relationship; the agent subscribes for records from the registry and can (and does) invoke RPCs on the registry.
 
-### Data flow {#data-flow}
+### Data flow
 
 Data flow is **one-way** between a service and proxy; from service to proxy. The service holds the records that change and distributes the changes to the connected proxies that have subscribed for the records. This reflects a general pattern that exists in all real-time data systems; data updates flow from publisher to subscriber. A proxy cannot change any records in a service.
 
 In contrast to this, RPC invocation is in the opposite direction; from proxy to service. This also reflects another general pattern in real-time data systems where the publisher exposes control procedures that can be invoked by the subscribers.
 
-### How Connections are Initiated {#how-connections-are-initiated}
+### How Connections are Initiated
 
 Connections are initiated by the proxy asking the agent for connection details for the service family. The agent does this by requesting a `service info record` from the registry for the service family. The service info record includes all the parameters needed to connect to a service instance for the requested service family. The proxy then makes a connection using this information. If there is no service info record, the proxy will pause for 5000ms before asking the agent again. This cycle continues until either:
 
@@ -41,6 +41,6 @@ DISCONNECTED <-> CONNECTING -> CONNECTED
        |___________________________|
 ```
 
-### Connection Auto-Reconnect {#connection-auto-reconnect}
+### Connection Auto-Reconnect
 
 If a connection between a service and a proxy closes unexpectedly (i.e. without the proxy being destroyed), the proxy re-initiates the connection to the service. When the connection is re-established, the proxy re-subscribes for all records that were previously subscribed for. This mechanism ensures that auto-reconnect occurs and also ensures that all data in the proxy is refreshed and is live.

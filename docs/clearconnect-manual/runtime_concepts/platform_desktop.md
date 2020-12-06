@@ -1,4 +1,4 @@
-### Platform Desktop {#platform-desktop}
+### Platform Desktop 
 
 The ClearConnect platform has a built in graphical interface tool for investigating and visualising all services and data running on the platform. The tool is called the 'platform desktop' and is run by executing the main method of the class `com.fimtra.clearconnect.core.PlatformDesktop`
 
@@ -14,7 +14,7 @@ The interface uses a context menu (right-click menu) user interaction model. Rig
 
 The rows in each view may have further context menu navigation to open up further windows showing context information of the selected row. This allows a drill-down investigation of services and data in the platform. A full map of navigation of the various views is shown later on.
 
-#### Behaviour {#behaviour}
+#### Behaviour 
 
 *   All data in the desktop is live data on the platform.
 *   The view windows can be resized, repositioned within the confines of the desktop.
@@ -28,13 +28,13 @@ The rows in each view may have further context menu navigation to open up furthe
 
 Note: sub-maps viewable by double-clicking on the `SubMap...` text.
 
-#### Platform Desktop Navigation {#platform-desktop-navigation}
+#### Platform Desktop Navigation 
 
 The diagram below illustrates the navigation drill-down paths available in the PlatformDesktop. The views are described in the next section.
 
 ![](../assets/PlatformDesktop navigation.png)
 
-#### Platform Desktop Views {#platform-desktop-views}
+#### Platform Desktop Views 
 
 The table below describes each of the views and the attributes associated with each one. Generally, statistic-type attributes update at 10 second intervals (e.g. messages received, Kb received). Services (and instances) appear as soon as they are registered with the platform registry. Services disappear from desktop views when the platform registry detects that the service instance is no longer available (so this can be subject to heartbeats being missed before the service is removed, these are discussed later on).
 

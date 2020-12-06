@@ -1,4 +1,4 @@
-## Data Model Concepts {#data-model-concepts}
+## Data Model Concepts
 
 All data on the platform is represented using _records_. A record is a dictionary (or map) of key-value field pairs. An example of a record with 3 fields might look like this:
 
@@ -18,19 +18,19 @@ The keys are strings that identify the field. The value of a field can be one of
 
 Records are identified by a name. The name of a record is unique within its declaring _service_ (see [Platform Concepts](platform_concepts.md) for more on services).
 
-### Nesting {#nesting}
+### Nesting
 
 A record allows nesting of record structures by using a _sub-map_ to represent the nested record structure. However, unlike a record, a sub-map does not allow further nesting. This means that nesting is limited to a depth of 1; a parent record with many child sub-maps.
 
 A nesting depth of 1 using sub-maps provides a simple mechanism for describing 2 dimensional data structures. This is sufficient, for example, to represent the data in a database table.
 
-### Atomic Changes {#atomic-changes}
+### Atomic Changes
 
 An _atomic change_ to a record defines a group of fields and their values that change in a single transactional action. Observers of records only receive atomic changes. The scope of an atomic change is defined by the publisher.
 
 Atomic changes provide consistency for record changes, a natural delta (incremental change) mechanism for sending record changes and a means to control data publishing rates.
 
-#### Example {#example}
+#### Example
 
 Consider the following record with this initial field state:
 
@@ -57,7 +57,7 @@ When the publisher publishes the atomic change to this record, all the independe
 
 A publisher can, of course, publish an atomic change for every single field change to a record. However, this approach can be inefficient for rapidly changing data sets and causes unnecessary network traffic.
 
-### Image-on-subscribe {#image-on-subscribe}
+### Image-on-subscribe
 
 The concept of ‘image-on-subscribe’, in the context of real-time data systems, describes the pattern where a subscriber for data receives a current image of the data when it subscribes and after that receives only the deltas (incremental changes) of the initial image. The key principle of image-on-join semantics is that the subscriber must start consuming deltas from the point-in-time that the image represents, otherwise the state of the data item is incoherent.
 

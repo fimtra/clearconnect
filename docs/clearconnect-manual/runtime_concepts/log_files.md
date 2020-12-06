@@ -1,4 +1,4 @@
-## Log files {#log-files}
+## Log files 
 
 At runtime, the VM running any ClearConnect platform component produces log files that reside in the _logs_ directory (configurable) of the working directory of the VM. The logs directory is automatically created. All the files automatically roll-over after 4Mb (configurable) and automatically delete or archive files older than 24hrs on VM startup (also configurable).
 
@@ -11,7 +11,7 @@ At runtime, the VM running any ClearConnect platform component produces log file
 
 e.g. `RemoteTestRunner-messages_20141020_200504.log` is the log file created when running the JUnit tests (the main class is RemoteTestRunner)
 
-### Logging Format {#logging-format}
+### Logging Format 
 
 The format of the log messages is:
 

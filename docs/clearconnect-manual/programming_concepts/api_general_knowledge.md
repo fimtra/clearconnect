@@ -1,19 +1,19 @@
-## API general knowledge {#api-general-knowledge}
+## API general knowledge 
 
 This section discusses some of the general features you will come across when using the ClearConnect API.
 
 **Note:** the Javadoc of the API classes also provides further descriptions.
 
-### Tecnology stack {#technology-stack}
+### Tecnology stack 
 The ClearConnect platform is designed to have zero dependencies on any 3rd party products. The technology stack is shown in the diagram below.
 
 ![](../assets/Fimtra tech stack.png)
 
-### Ephemeral ports {#ephemeral-ports}
+### Ephemeral ports 
 
 When a service instance is constructed with no TCP port specified (or 0) then an _ephemeral_ port is used. This allows the network layer to allocate available ports for the service without application configuration (a big plus!).
 
-### Wire Protocol {#wire-protocol}
+### Wire Protocol
 
 ClearConnect has various built-in wire protocols that encode and decode data for different use-cases. A service is declared to use a wire protocol. Services are free to choose what protocol they want so the ClearConnect platform can have services using different wire protocols.
 
@@ -23,7 +23,7 @@ ClearConnect has various built-in wire protocols that encode and decode data for
 | `GZIP` | An ISO-8859-1 variation of the STRING wire protocol and uses a gzip algorithm to compress the wire format. This is the default for services. |
 | `CIPHER` | An encrypted STRING wire protocol using AES 128bit encryption. |
 
-### Event Listeners {#event-listeners}
+### Event Listeners
 
 Listening to record changes (with the `IRecordListener`) allows data changes to be handled. However, what about being able to detect when data is available or when a service is ready or what connections a service has? The ClearConnect platform provides an extensive set of event listeners to detect the various platform signals that represent service, data and function availability.
 
@@ -40,14 +40,14 @@ Listening to record changes (with the `IRecordListener`) allows data changes to 
 | `IServiceAvailableListener` | Agent | Notifies when a service family becomes available or unavailable. |
 | `IServiceInstanceAvailableListener` | Agent | Notifies when a service instance becomes available or unavailable. |
 
-### Handling fast-producer scenarios {#handling-fast-producer-scenarios}
+### Handling fast-producer scenarios
 
 A proxy has no control over the record publishing rate of the service it is connected to. To solve the situation where the data rates are too fast for application code in the `IRecordListener.onChange` to process efficiently, the listener can be replaced with a `CoalescingRecordListener`. This provides a means to consume the updates from the service, batch them up and essentially produce an atomic change representing multiple atomic changes made to the record.
 
 However the `CoalescingRecordListener` cannot be used if the service publishes discrete changes that should not be coalesced into a single, bigger change. This is application specific.
 
 
-### RPC 2-phase timeout {#2-phase-timeout}
+### RPC 2-phase timeout
 
 One of the features of the RPC mechanism in the ClearConnect platform is its 2-phase timeout. The phases for a timeout are:
 
@@ -58,7 +58,7 @@ One of the features of the RPC mechanism in the ClearConnect platform is its 2-p
 
 The timeouts are defined when executing the RPC, by default they are both 5 seconds.
 
-### Record `toString` {#record-toString}
+### Record `toString`
 This is an example of the `toString` of a record:
 ```
 (Immutable)Foo->Agent1-20141023-20:52:22:744@192.168.56.1|HelloWorld|1|{message=SHello World,pi=D3.1415926535898,time=SThu Oct 23 20:52:23 BST 2014}|subMaps{}

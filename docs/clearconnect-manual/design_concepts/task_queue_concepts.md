@@ -1,4 +1,4 @@
-## Task Queue Concepts {#task-queue-concepts}
+## Task Queue Concepts
 
 ClearConnect uses a bespoke threading model based on a task queue that makes efficient use of available threads. Real-time data systems require tasks in different contexts to be executed in-order; many systems designs end up having single-threaded executors to handle task processing for a single context, leading to a proliferation of threads.
 

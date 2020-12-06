@@ -1,4 +1,4 @@
-## Threading Block Diagram {#threading-block-diagram}
+## Threading Block Diagram
 
 The diagram below shows the threading hand-over points in ClearConnect.
 
