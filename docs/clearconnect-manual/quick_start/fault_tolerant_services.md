@@ -4,7 +4,7 @@ One of the key features of the ClearConnect platform is its ability to allow ser
 
 It also introduces the concept of a service being supported by one or more instances.
 
-![](../assets/HelloWorld FT.png)
+![](../assets/HelloWorld%20FT.png)
 
 For a service, the master instance is the earliest to connect to the registry. If the current master disconnects, the next master is the instance that connected to the regsitry after the previous. So assuming that the Foo:Bar1 instance is started first, it will be the master.
 

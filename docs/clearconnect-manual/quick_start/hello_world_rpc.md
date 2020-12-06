@@ -3,7 +3,7 @@ Hopefully you have looked at and understood the [Hello World](hello_world.md) tu
 
 This is what this tutorial will run in a single VM:
 
-![](../assets/HelloWorld RPC.png)
+![](../assets/HelloWorld%20RPC.png)
 
 Running this code will output the following to the console:
 ```
