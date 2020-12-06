@@ -2,6 +2,28 @@
 
 ![gatling-s](../assets/gatling-s.png)
 
+- [The GatlingExecutor](#the-gatlingexecutor)
+  * [In a nutshell](#in-a-nutshell)
+    + [Why Gatling?](#why-gatling-)
+  * [Overview](#overview)
+    + [Task Context](#task-context)
+    + [Typical scenarios](#typical-scenarios)
+    + [What are the benefits?](#what-are-the-benefits-)
+      - [Benchmark comparison test](#benchmark-comparison-test)
+      - [Results](#results)
+  * [How it works](#how-it-works)
+    + [Main queue vs local queue](#main-queue-vs-local-queue)
+    + [Adding to the queue](#adding-to-the-queue)
+    + [Executing tasks from the queue](#executing-tasks-from-the-queue)
+    + [Task transfer](#task-transfer)
+    + [The net effect](#the-net-effect)
+      - [More threads](#more-threads)
+      - [Thread-locals](#thread-locals)
+    + [The thread pool](#the-thread-pool)
+      - [Core count bump up](#core-count-bump-up)
+      - [Thread spawning conditions](#thread-spawning-conditions)
+  * [Summary](#summary)
+
 ## In a nutshell
 
 The GatlingExecutor is a multi-threaded, elastic, executor implementation that ensures in-order execution of ordered-tasks and skipping of out-of-date tasks. Tasks (*Runnables*) need to be tagged as sequential or coalescing. Standard *Runnables* are executed with no ordering or skipping.
