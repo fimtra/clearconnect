@@ -32,7 +32,7 @@ Note: sub-maps viewable by double-clicking on the `SubMap...` text.
 
 The diagram below illustrates the navigation drill-down paths available in the PlatformDesktop. The views are described in the next section.
 
-![](../assets/PlatformDesktop navigation.png)
+![](../assets/PlatformDesktop%20navigation.png)
 
 #### Platform Desktop Views 
 
