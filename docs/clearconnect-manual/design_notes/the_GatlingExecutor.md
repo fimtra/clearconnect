@@ -235,7 +235,7 @@ A standard runnable has no explicit context, it is its own context so is always 
 
 In frame 1 below, the main queue has 6 elements composed of sequential, coalescing and runnable task types. The contexts are represented as colours and labelled to indicate the context and sequence, e.g. purple context has tasks p1, p2, p3 whilst blue context has b1, b2 (and b3 later on).
 
-![gatling%20seq%201](../assets/gatling%20seq%201.png)
+![gatling%20seq%201](../assets/gatling%20seq%201.PNG)
 
 Frame 1 shows 3 tasks being added:
 
@@ -262,27 +262,27 @@ Frame 2 below shows thread T1 starting its poll-execute-push cycle:
 
 In frame 3, T1 has polled the main queue and popped the blue sequential context element; T1 executes the first task b1. At the same time as this happens, a 3rd blue sequential task b3 is added; this will be add at the back of the list of tasks in the element. Thread T2 polls (note coalescing task g3 is being added and will replace g2).
 
-![gatling%20seq%203](../assets/gatling%20seq%203.png)
+![gatling%20seq%203](../assets/gatling%20seq%203.PNG)
 
 In frame 4 T1 pushes the blue context element to the back of its local queue; blue context still has 2 sequential tasks; b2 and b3. T2 executes coalescing context g3 (note g2 was skipped as it was replaced by g3).
 
-![gatling%20seq%203](../assets/gatling%20seq%204.png)
+![gatling%20seq%203](../assets/gatling%20seq%204.PNG)
 
 Frame 5 shows T1 goes back to polling to start a new cycle. T2 does not push because the element is empty after executing the coalescing task g3.
 
-![gatling%20seq%203](../assets/gatling%20seq%205.png)
+![gatling%20seq%203](../assets/gatling%20seq%205.PNG)
 
 Frame 6 shows T1 in the execute part of the poll-execute-push cycle, T2 in in the poll phase.
 
-![gatling%20seq%203](../assets/gatling%20seq%206.png)
+![gatling%20seq%203](../assets/gatling%20seq%206.PNG)
 
 Frame 7 has T1 in the push phase of its cycle, T2 in the execute phase.
 
-![gatling%20seq%203](../assets/gatling%20seq%207.png)
+![gatling%20seq%203](../assets/gatling%20seq%207.PNG)
 
 Frame 8 shows T1 starting a new cycle, T2 will also start a new cycle when T1 finishes its poll.
 
-![gatling%20seq%203](../assets/gatling%20seq%208.png)
+![gatling%20seq%203](../assets/gatling%20seq%208.PNG)
 
 Frames 9 and 10 show the continuation until the main queue is drained.
 
@@ -309,7 +309,7 @@ Here we can see what the net effect of the poll-execute-push cycles across the t
 - The coalescing contexts (g3, y1) only had the most recent submitted task executed.
 - The standard runnable tasks were arbitrarily executed.
 
-![gatling%20seq%203](../assets/gatling%20net%20effect.png)
+![gatling%20seq%203](../assets/gatling%20net%20effect.PNG)
 
 #### More threads
 
