@@ -1,13 +1,8 @@
-# ClearConnect Concepts and Programming Manual
+# ![](assets/fimtra-logo-triangle-120x108.png)ClearConnect Concepts and Programming Manual
 
-![](assets/image1.png)
-
-| Attr | Val |
-| --- | --- |
-| Version: | 1.1 |
-| API: | 3.17.2 and above |
-| Authors: | Ramon Servadei, Paul Mackinlay, James Lupton |
-| Date: | 20/11/2020 |
+- API: 3.17.2 and above
+- Authors: Ramon Servadei, Paul Mackinlay, James Lupton
+- Date: 20/11/2020
 
 * [Introduction](introduction.md)
   * [License](license.md)

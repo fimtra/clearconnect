@@ -17,6 +17,6 @@ ClearConnect is a micro services platform written in Java and uses TCP for conne
 ---
 The latest release is always on [maven central](https://oss.sonatype.org/#nexus-search;quick~clearconnect)
 
-**If you want to know more, checkout the project (all code has good javadoc) or take a look at the [ClearConnect Manual](https://fimtra.gitbooks.io/clearconnect-manual/content/)**
+**If you want to know more, checkout the project (all code has good javadoc) or take a look at the [ClearConnect Manual](docs/clearconnect-manual/README.md)**
 
 
