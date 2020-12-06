@@ -18,7 +18,7 @@ When a service instance is constructed with no TCP port specified (or 0) then an
 ClearConnect has various built-in wire protocols that encode and decode data for different use-cases. A service is declared to use a wire protocol. Services are free to choose what protocol they want so the ClearConnect platform can have services using different wire protocols.
 
 | Wire Protocol | Description |
-| --- |
+| --- | --- |
 | `STRING` | A UTF-8 based wire format. |
 | `GZIP` | An ISO-8859-1 variation of the STRING wire protocol and uses a gzip algorithm to compress the wire format. This is the default for services. |
 | `CIPHER` | An encrypted STRING wire protocol using AES 128bit encryption. |
