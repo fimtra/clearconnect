@@ -1,4 +1,4 @@
-# ![gatling-s](..\assets\gatling-s.png)The GatlingExecutor (chew on this buddy!)
+# ![gatling-s](..\assets\gatling-s.png)The GatlingExecutor
 
 [TOC]
 

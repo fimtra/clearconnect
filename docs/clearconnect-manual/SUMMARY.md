@@ -23,3 +23,4 @@
   * [Monitoring](runtime_concepts/monitoring.md)
 * [Design Notes](design_notes/README.md)
   * [Threading block diagram](design_notes/thread_block_diagram.md)
+  * [The GatlingExecutor](design_notes/The GatlingExecutor.md)
