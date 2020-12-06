@@ -152,6 +152,10 @@ public class Publisher {
          */
         final Map<String, AtomicLong> systemRecordSequences;
 
+        final Map<String, Long> lastSlowPublishLogTime = new ConcurrentHashMap<>();
+        final Map<String, AtomicLong> slowPublishCounts = new ConcurrentHashMap<>();
+        final Function<String, AtomicLong> createAtomicLongFunction = (n) -> new AtomicLong(-1);
+
         ProxyContextMultiplexer(IEndPointService service)
         {
             super();
@@ -269,13 +273,22 @@ public class Publisher {
             publishTime = splitTime + encodeTime + sendTime;
             if (publishTime > DataFissionProperties.Values.SLOW_PUBLISH_THRESHOLD_NANOS)
             {
-                Log.log(this, "SLOW publish: ",
-                        Long.toString((long) (publishTime * ContextUtils.INVERSE_1000000)), "ms [",
-                        atomicChange.getName(), "] [split=",
-                        Long.toString((long) (splitTime * ContextUtils.INVERSE_1000000)), "ms, encode=",
-                        Long.toString((long) (encodeTime * ContextUtils.INVERSE_1000000)), "ms, send=",
-                        Long.toString((long) (sendTime * ContextUtils.INVERSE_1000000)), "ms, parts=",
-                        Long.toString(parts == null ? 1 : parts.length), "]");
+                final long now = System.nanoTime();
+                final Long lastSlowTime = this.lastSlowPublishLogTime.get(name);
+                this.slowPublishCounts.computeIfAbsent(name,
+                        this.createAtomicLongFunction).incrementAndGet();
+                if ((lastSlowTime == null || (now - lastSlowTime >= 60_000_000_000L)))
+                {
+                    this.lastSlowPublishLogTime.put(name, now);
+                    Log.log(this, "SLOW publish for [", atomicChange.getName(), "] (",
+                            Long.toString(this.slowPublishCounts.get(name).getAndSet(-1)),
+                            " since last log): ",
+                            Long.toString((long) (publishTime * ContextUtils.INVERSE_1000000)), "ms {split=",
+                            Long.toString((long) (splitTime * ContextUtils.INVERSE_1000000)), "ms, encode=",
+                            Long.toString((long) (encodeTime * ContextUtils.INVERSE_1000000)), "ms, send=",
+                            Long.toString((long) (sendTime * ContextUtils.INVERSE_1000000)), "ms, parts=",
+                            Long.toString(parts == null ? 1 : parts.length), "}");
+                }
             }
         }
 
@@ -412,6 +425,8 @@ public class Publisher {
                 for (String name : remove)
                 {
                     ProxyContextMultiplexer.this.service.endBroadcast(name);
+                    this.slowPublishCounts.remove(name);
+                    this.lastSlowPublishLogTime.remove(name);
                 }
             }
         }
