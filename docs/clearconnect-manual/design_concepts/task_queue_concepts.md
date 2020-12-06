@@ -9,5 +9,5 @@ The ClearConnect platform addresses this by having a small (elastic) pool of thr
 
 Both task genres declare the context they are bound to. These two task genres ensure in-order execution of tasks and skipping of old, out-of-date tasks using a single pool of threads. 
 
-The threading model is called the GatlingExecutor and is described [here](../design_notes/The GatlingExecutor.md).
+The threading model is called the GatlingExecutor and is described [here](../design_notes/the_GatlingExecutor.md).
 
