@@ -1,6 +1,6 @@
-# ![gatling-s](../assets/gatling-s.png)The GatlingExecutor
+# The GatlingExecutor
 
-[TOC]
+![gatling-s](../assets/gatling-s.png)
 
 ## In a nutshell
 
@@ -205,10 +205,14 @@ By the way, these results are not meant to show any deficiencies in the standard
 
 The core of the GatlingExecutor is a queue framework that is context aware and type aware. The following series of frames illustrates the conceptual function of the queuing internals. For reference:
 
-| ![coalescing task](../assets/coalescing%20task.PNG) is a coalescing task (diamond) | **![main queue element](../assets/main%20queue%20element.PNG) is a main queue element** |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| **![sequential task](../assets/sequential%20task.PNG)is a sequential task (square)** | **![local queue element](../assets/local%20queue%20element.PNG) is a local queue element** |
-| **![runnable task](../assets/runnable%20task.PNG)is a runnable task (triangle)** | **![element with sequential context tasks](../assets/element%20with%20sequential%20context%20tasks.PNG) is a main queue element holding a sequential context that has 2 tasks** |
+| Icon | Meaning |
+| ----------- | -------------- |
+| ![coalescing task](../assets/coalescing%20task.PNG) | A coalescing task (diamond) |
+| ![sequential task](../assets/sequential%20task.PNG) | A sequential task (square) | 
+| ![runnable task](../assets/runnable%20task.PNG) | A runnable task (triangle) |
+| ![main queue element](../assets/main%20queue%20element.PNG) | A main queue element |
+| ![local queue element](../assets/local%20queue%20element.PNG) | A local queue element |
+| ![element with sequential context tasks](../assets/element%20with%20sequential%20context%20tasks.PNG) | A main queue element holding a sequential context that has 2 tasks |
 
 ### Main queue vs local queue
 
