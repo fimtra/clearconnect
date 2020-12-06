@@ -7,7 +7,7 @@ This section discusses some of the general features you will come across when us
 ### Tecnology stack 
 The ClearConnect platform is designed to have zero dependencies on any 3rd party products. The technology stack is shown in the diagram below.
 
-![](../assets/Fimtra tech stack.png)
+![](../assets/Fimtra%20tech%20stack.png)
 
 ### Ephemeral ports 
 
