@@ -619,6 +619,12 @@ public final class Context implements IPublisherContext
                 // 3. T1 has created record and finishes createRecord which calls
                 // publishAtomicChange - pending change will have been used
 
+                // update the sequence (version) of the record when publishing
+                if (atomicChange != null)
+                {
+                    record.setSequence(atomicChange.getSequence());
+                }
+
                 // prevent empty changes BUT also allow the initial create if it had blank data
                 if (atomicChange == null || (!forcePublish && atomicChange.isEmpty()))
                 {
@@ -627,8 +633,6 @@ public final class Context implements IPublisherContext
                     return latch;
                 }
 
-                // update the sequence (version) of the record when publishing
-                record.setSequence(atomicChange.getSequence());
 
                 atomicChange.preparePublish(latch, this);
 
