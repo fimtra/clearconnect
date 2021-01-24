@@ -15,6 +15,7 @@
  */
 package com.fimtra.executors.gatling;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,7 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -72,7 +72,8 @@ import com.fimtra.util.ThreadUtils;
  * @see ISequentialRunnable
  * @see ICoalescingRunnable
  */
-public class GatlingExecutor implements IContextExecutor {
+public class GatlingExecutor implements IContextExecutor
+{
 
     public static final Deque<Runnable> NOOP_INITIAL_TASKS = CollectionUtils.newDeque();
 
@@ -91,6 +92,8 @@ public class GatlingExecutor implements IContextExecutor {
     private static final long NON_CORE_LIVE_PERIOD_NANOS = NON_CORE_LIVE_PERIOD_MILLIS * 1_000_000;
     private static final int PENDING_TASK_COUNT_TRANSFER_THRESHOLD =
             SystemUtils.getPropertyAsInt("gatling.pendingTaskCountTransferThreshold", 1000);
+    private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("gatling.maxThreads",
+            Runtime.getRuntime().availableProcessors() * 10);
     /** The number of pending contexts to process in a runner that will trigger transfer to a free runner */
     private static final int PENDING_CONTEXT_TRANSFER_THRESHOLD =
             SystemUtils.getPropertyAsInt("gatling.pendingContextTransferThreshold", 1);
@@ -127,7 +130,8 @@ public class GatlingExecutor implements IContextExecutor {
      *
      * @author Ramon Servadei
      */
-    final class TaskRunner implements Runnable {
+    final class TaskRunner implements Runnable
+    {
         final Thread workerThread;
         final Object lock;
         final Integer number;
@@ -554,6 +558,12 @@ public class GatlingExecutor implements IContextExecutor {
             {
                 final Deque<TaskRunner> runnersWithWork = CollectionUtils.newDeque();
                 final Deque<Deque<Runnable>> blockedTaskLists = CollectionUtils.newDeque();
+                int projectedThreadCount = this.taskRunners.size();
+                int blockedCount = 0;
+                int taskCount;
+                Deque<Runnable> taskList;
+                // find runners that are blocked - remove ALL tasks to re-assign
+                // OR if a runner has too many tasks - mark for one task to re-assign
                 for (TaskRunner taskRunner : this.taskRunners)
                 {
                     synchronized (taskRunner.tasks)
@@ -561,20 +571,26 @@ public class GatlingExecutor implements IContextExecutor {
                         if (taskRunner.runningTask
                                 && taskRunner.workerThread.getState() != Thread.State.RUNNABLE)
                         {
-                            final Deque<Runnable> taskList = CollectionUtils.newDeque();
-                            // remove the tasks and place onto the blocked queue
-                            while (taskRunner.tasks.size() > 0)
+                            blockedCount++;
+                            if (projectedThreadCount < MAX_THREADS && taskRunner.tasks.size() > 0)
                             {
-                                taskList.add(taskRunner.tasks.poll());
+                                taskList = CollectionUtils.newDeque();
+                                // remove the tasks and place onto the blocked queue
+                                while (taskRunner.tasks.size() > 0)
+                                {
+                                    taskList.add(taskRunner.tasks.poll());
+                                }
+                                blockedTaskLists.add(taskList);
+                                projectedThreadCount++;
                             }
-                            blockedTaskLists.add(taskList);
                         }
                         else
                         {
+                            // check if runners have too much work
                             if (taskRunner.tasks.size() > PENDING_CONTEXT_TRANSFER_THRESHOLD)
                             {
                                 // compute full size
-                                int taskCount = 0;
+                                taskCount = 0;
                                 for (Runnable task : taskRunner.tasks)
                                 {
                                     if (task instanceof TaskQueue.SequentialTasks)
@@ -595,6 +611,13 @@ public class GatlingExecutor implements IContextExecutor {
                     }
                 }
 
+                if (blockedCount == this.taskRunners.size() && blockedTaskLists.size() == 0)
+                {
+                    Log.log(this, "All runners blocked, adding a spare");
+                    // All runners blocked, add an extra one...
+                    blockedTaskLists.add(new ArrayDeque<>());
+                }
+
                 if (runnersWithWork.size() > 0)
                 {
                     // go through runners with work and transfer a SINGLE task to free or new runner
@@ -602,23 +625,35 @@ public class GatlingExecutor implements IContextExecutor {
                     {
                         if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
                         {
+                            TaskRunner runner;
                             for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
                             {
-                                final TaskRunner runner = runnersWithWork.poll();
+                                runner = runnersWithWork.poll();
                                 if (runner != null)
                                 {
                                     taskRunner.tasks.add(runner.tasks.poll());
+                                }
+                                else
+                                {
+                                    break;
                                 }
                             }
                             this.taskQueue.lock.notifyAll();
                         }
                         else
                         {
-                            final Deque<Runnable> initialTasks = CollectionUtils.newDeque();
-                            final Runnable task = Objects.requireNonNull(runnersWithWork.poll()).tasks.poll();
-                            Log.log(this, "Creating new thread to handle transferred task: " + task);
-                            initialTasks.add(task);
-                            addTaskRunner_callWhilstHoldingLock(initialTasks);
+                            if (projectedThreadCount < MAX_THREADS)
+                            {
+                                final Deque<Runnable> initialTasks = CollectionUtils.newDeque();
+                                final TaskRunner polled = runnersWithWork.poll();
+                                if (polled != null)
+                                {
+                                    final Runnable task = polled.tasks.poll();
+                                    Log.log(this, "Creating new thread to handle transferred task: " + task);
+                                    initialTasks.add(task);
+                                    addTaskRunner_callWhilstHoldingLock(initialTasks);
+                                }
+                            }
                         }
                     }
                 }
@@ -630,9 +665,10 @@ public class GatlingExecutor implements IContextExecutor {
                     {
                         if (this.taskRunnersWaiting_accessWithQLock.size() > 0)
                         {
+                            Deque<Runnable> blocked;
                             for (TaskRunner taskRunner : this.taskRunnersWaiting_accessWithQLock)
                             {
-                                final Deque<Runnable> blocked = blockedTaskLists.poll();
+                                blocked = blockedTaskLists.poll();
                                 if (blocked != null)
                                 {
                                     taskRunner.tasks.addAll(blocked);
@@ -643,6 +679,8 @@ public class GatlingExecutor implements IContextExecutor {
                     }
                     if (blockedTaskLists.size() > 0)
                     {
+                        // NOTE: blockedTaskLists.size can never be > MAX_THREADS
+
                         // create task runners for the remaining
                         Log.log(this,
                                 "Creating " + blockedTaskLists.size() + " threads to handle blocked tasks");
