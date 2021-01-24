@@ -222,7 +222,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
         l_lastMessagesPublished.set(messagesPublished);
         l_lastBytesPublished.set(bytesPublished);
 
-        final double perSec = 1000000000d / (nanoTime - l_lastTimeNanos.get());
+        final double perSec = 1_000_000_000d / (nanoTime - l_lastTimeNanos.get());
         l_lastTimeNanos.set(nanoTime);
         final double inverse_1K = 1 / 1024d;
 

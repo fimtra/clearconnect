@@ -32,6 +32,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -667,7 +670,8 @@ final class EventHandler {
     private static final String RUNTIME_STATUS = "runtimeStatus";
     private static final String SLOW = "*** SLOW EVENT HANDLING *** ";
     private static final int SLOW_EVENT_MILLIS = 200;
-
+    private static final ThreadFactory IO_EXECUTOR_THREAD_FACTORY =
+            ThreadUtils.newDaemonThreadFactory("io-executor");
     private static final boolean SERVICES_LOG_DISABLED =
             SystemUtils.getProperty("platform.servicesLogDisabled", false);
     private static final RollingFileAppender SERVICES_LOG = SERVICES_LOG_DISABLED ? null :
@@ -782,7 +786,10 @@ final class EventHandler {
 
         this.pendingPublish = new HashSet<>();
         this.eventCount = new AtomicInteger(0);
-        this.ioExecutor = ContextExecutorFactory.create("io-executor");
+        this.ioExecutor =
+                new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
+                        IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
+
     }
 
     void execute(String description, Object context, Runnable runnable)
