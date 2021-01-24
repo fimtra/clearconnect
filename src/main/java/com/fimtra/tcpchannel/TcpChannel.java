@@ -218,7 +218,7 @@ public class TcpChannel implements ITransportChannel
     private final Object lock = new Object();
 
     /**
-     * The channel state - always access using the {@link #lock}
+     * The channel state - always write whilst holding the {@link #lock}
      */
     volatile StateEnum state = StateEnum.IDLE;
 
@@ -394,7 +394,8 @@ public class TcpChannel implements ITransportChannel
             {
                 if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1]))
                 {
-                    throw new Exception("Queue too large");
+                    throw new Exception("Queue too large: pending=" + this.txFrames[0].size() + " sending="
+                            + this.txFrames[1].size());
                 }
             }
 
@@ -648,7 +649,10 @@ public class TcpChannel implements ITransportChannel
                 }
                 if ((data = this.txFrames[this.sendingQueue].poll()) == null)
                 {
-                    this.state = StateEnum.IDLE;
+                    if (this.state != StateEnum.DESTROYED)
+                    {
+                        this.state = StateEnum.IDLE;
+                    }
                     return;
                 }
             }
@@ -685,6 +689,10 @@ public class TcpChannel implements ITransportChannel
     @Override
     public void destroy(String reason, Exception... e)
     {
+        // get the description BEFORE setting onChannelCloseCalled so we display the channel state PRIOR to destroying
+        final String channelDescription =
+                this.onChannelClosedCalled.get() ? null : ObjectUtils.safeToString(this);
+
         if (this.onChannelClosedCalled.getAndSet(true))
         {
             return;
@@ -692,11 +700,11 @@ public class TcpChannel implements ITransportChannel
 
         if (e == null || e.length == 0)
         {
-            Log.log(this, reason, ", destroying ", ObjectUtils.safeToString(this));
+            Log.log(this, reason, ", destroying ", channelDescription);
         }
         else
         {
-            Log.log(this, reason + ", destroying " + ObjectUtils.safeToString(this), e[0]);
+            Log.log(this, reason + ", destroying " + channelDescription, e[0]);
         }
 
         try
