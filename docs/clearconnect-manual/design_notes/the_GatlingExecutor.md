@@ -30,7 +30,7 @@ The GatlingExecutor is a multi-threaded, elastic, executor implementation that e
 
 ### Why Gatling?
 
-A Gatling cannon achieves high rates of fire due to the rotating barrel which allows rifle barrel reloading for the next rotation whilst one is firing. The GatlingExecutor has a task queue that rotates after task as it is is executed. So in abstract terms, the operations are similar. Its also an awesome name :) 
+A Gatling cannon achieves high rates of fire due to the rotating barrel which allows rifle reloading whilst another rifle fires. The GatlingExecutor has a task queue that rotates groups of tasks after one task in the group is executed. So in abstract terms, the operations are similar.
 
 ## Overview
 
