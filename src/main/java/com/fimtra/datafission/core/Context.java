@@ -16,7 +16,9 @@
 package com.fimtra.datafission.core;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -91,6 +93,8 @@ public final class Context implements IPublisherContext
      * </ul>
      */
     public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
+
+    static final String GET_REMOTE_RECORD_RPC = "getRemoteRecord";
 
     static final AtomicInteger eventCount = new AtomicInteger();
 
@@ -313,6 +317,33 @@ public final class Context implements IPublisherContext
         createSystemRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         this.active = true;
+
+        // create AFTER setting active
+        createGetRemoteRecordImageAsMapRpc();
+    }
+
+    private void createGetRemoteRecordImageAsMapRpc()
+    {
+        final RpcInstance rpc =
+                new RpcInstance(IValue.TypeEnum.TEXT, GET_REMOTE_RECORD_RPC, IValue.TypeEnum.TEXT);
+        rpc.setHandler(args -> {
+            IRecord record = getRecord(args[0].textValue());
+            if (record != null)
+            {
+                try
+                {
+                    final StringWriter sw = new StringWriter();
+                    ContextUtils.serializeRecordMapToStream(sw, record.asFlattenedMap());
+                    return TextValue.valueOf(sw.toString());
+                }
+                catch (IOException e)
+                {
+                    throw new IRpcInstance.ExecutionException(e);
+                }
+            }
+            return null;
+        });
+        createRpc(rpc);
     }
 
     private void createSystemRecord(String recordName)

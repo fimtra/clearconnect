@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -125,6 +127,24 @@ public class ContextUtilsTest
 
         assertEquals(((Record) record).data, ((Record) resolvedRecord).data);
         assertEquals(((Record) record).subMaps, ((Record) resolvedRecord).subMaps);
+    }
+
+    @Test
+    public void test_serializeRecordMapToStream() throws IOException
+    {
+        Context c = new Context("test_serializeRecordMapToStream_c1");
+        final IRecord record = c.createRecord(TEST_SERIALIZE_AND_RESOLVE_RECORD);
+        updateRecord(record);
+
+        StringWriter sw = new StringWriter();
+        ContextUtils.serializeRecordMapToStream(sw, record.asFlattenedMap());
+        StringReader sr = new StringReader(sw.toString());
+
+        Context c2 = new Context("test_serializeRecordMapToStream_C2");
+        final IRecord resolvedRecord = c2.createRecord(TEST_SERIALIZE_AND_RESOLVE_RECORD);
+        ContextUtils.resolveRecordMapFromStream(sr, resolvedRecord);
+
+        assertEquals(record.asFlattenedMap(), resolvedRecord.asFlattenedMap());
     }
 
     @Test

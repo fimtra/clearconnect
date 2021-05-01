@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1008,6 +1009,7 @@ public final class ProxyContext implements IObserverContext {
         this.channelBuilderFactory = channelBuilderFactory;
     }
 
+
     /**
      * A convenience method to get the <b>image</b> of a record from the remote context. This may cause a
      * remote network operation if the record is not locally subscribed for so a timeout is passed in.
@@ -1019,36 +1021,67 @@ public final class ProxyContext implements IObserverContext {
      */
     public IRecord getRemoteRecordImage(final String recordName, long timeoutMillis)
     {
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<IRecord> image = new AtomicReference<>();
-        final IRecordListener observer = (imageCopy, atomicChange) -> {
-            if (latch.getCount() != 0)
+        /*
+         * A more efficient way to get a remote record image, this uses an RPC to get the image as a map,
+         * the benefit here is that the RPC will return almost immediately if there is no record.
+         * The original way (still supported) suffers from a timeout that has to be absorbed if there is
+         *  no record that exists.
+         */
+        final IRpcInstance rpc = getRpc(Context.GET_REMOTE_RECORD_RPC);
+        if (rpc != null)
+        {
+            try
             {
-                image.set(ImmutableSnapshotRecord.create(imageCopy));
-                if (imageCopy.size() > 0)
+                rpc.setRemoteExecutionStartTimeoutMillis(timeoutMillis);
+                rpc.setRemoteExecutionDurationTimeoutMillis(timeoutMillis);
+                final IValue info = rpc.execute(TextValue.valueOf(recordName));
+                if (info != null)
                 {
-                    latch.countDown();
+                    final Record template = new Record(recordName, new HashMap<>(), this);
+                    template.resolveFromStream(new StringReader(info.textValue()));
+                    return new ImmutableRecord(template);
                 }
             }
-        };
-        addObserver(observer, recordName);
-        try
-        {
-            if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS))
+            catch (Exception e)
             {
-                Log.log(this, "Got no response to getRemoteRecordImage for: ", recordName, " after waiting ",
-                        Long.toString(timeoutMillis), "ms");
+                Log.log(this, "Could not get record image for " + recordName, e);
             }
+            return null;
         }
-        catch (InterruptedException e)
+        else
         {
-            Log.log(this, "Got interrupted whilst waiting for record: " + recordName, e);
+            // its pre 3.17.6 - use old record image subscribe (which has drawbacks of a long timeout if there is no service info record)
+            final CountDownLatch latch = new CountDownLatch(1);
+            final AtomicReference<IRecord> image = new AtomicReference<>();
+            final IRecordListener observer = (imageCopy, atomicChange) -> {
+                if (latch.getCount() != 0)
+                {
+                    image.set(ImmutableSnapshotRecord.create(imageCopy));
+                    if (imageCopy.size() > 0)
+                    {
+                        latch.countDown();
+                    }
+                }
+            };
+            addObserver(observer, recordName);
+            try
+            {
+                if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS))
+                {
+                    Log.log(this, "Got no response to getRemoteRecordImage for: ", recordName,
+                            " after waiting ", Long.toString(timeoutMillis), "ms");
+                }
+            }
+            catch (InterruptedException e)
+            {
+                Log.log(this, "Got interrupted whilst waiting for record: " + recordName, e);
+            }
+            finally
+            {
+                removeObserver(observer, recordName);
+            }
+            return image.get();
         }
-        finally
-        {
-            removeObserver(observer, recordName);
-        }
-        return image.get();
     }
 
     @Override

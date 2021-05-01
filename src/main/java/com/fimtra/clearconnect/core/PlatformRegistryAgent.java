@@ -797,7 +797,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             (proxy != null ? " (proxy is inactive)" : ""));
                     return null;
                 }
-                // todo this must be an RPC
                 Map<String, IValue> serviceInfoRecord = this.registryProxy.getRemoteRecordImage(
                         ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
                         getRemoteRecordImageTimeoutMillis());
@@ -988,7 +987,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 Log.log(this, "Registry has no service registered for '", serviceFamily, "'");
                 return null;
             }
-            // todo we need to have a new RPC to get the record for the service
             return this.registryProxy.getRemoteRecordImage(instanceForService.textValue(),
                     getRemoteRecordImageTimeoutMillis());
         }
