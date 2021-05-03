@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.fimtra.executors.ICoalescingRunnable;
@@ -252,11 +253,13 @@ final class TaskQueue {
     final Object lock = new Object();
     final SingleThreadReusableObjectPool<SequentialTasks> sequentialTasksPool;
     final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;
+    final Consumer<TaskQueue> taskNotifier;
     final String name;
 
-    TaskQueue(String name)
+    TaskQueue(String name, Consumer<TaskQueue> taskNotifier)
     {
         this.name = name;
+        this.taskNotifier = taskNotifier;
         this.sequentialTasksPool =
                 new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new,
                         (instance) -> {
@@ -296,7 +299,7 @@ final class TaskQueue {
             if (this.sequentialTasksPerContext.computeIfAbsent(((ISequentialRunnable) runnable).context(),
                     this.sequentialTasksFunction).add((ISequentialRunnable) runnable))
             {
-                this.lock.notify();
+                this.taskNotifier.accept(this);
             }
         }
         else
@@ -306,13 +309,13 @@ final class TaskQueue {
                 if (this.coalescingTasksPerContext.computeIfAbsent(((ICoalescingRunnable) runnable).context(),
                         this.coalescingTasksFunction).add((ICoalescingRunnable) runnable))
                 {
-                    this.lock.notify();
+                    this.taskNotifier.accept(this);
                 }
             }
             else
             {
                 this.queue.add(runnable);
-                this.lock.notify();
+                this.taskNotifier.accept(this);
             }
         }
     }

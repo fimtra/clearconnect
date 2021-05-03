@@ -52,7 +52,7 @@ import org.junit.rules.TestName;
  */
 public class GatlingExecutorTest {
 
-    private static final int SIZE = Runtime.getRuntime().availableProcessors();
+    private static final int SIZE = 2;//Runtime.getRuntime().availableProcessors();
     public static final int DELAY = 250;
     public static final int WAIT_TIME = 500;
     public static final Runnable NOOP_RUNNABLE = () -> {
@@ -256,7 +256,6 @@ public class GatlingExecutorTest {
                     new CoalescingTestingRunnable(coalescingCounter, i, maxCount, coalesingLatch, runCount));
             for (int j = 0; j < SIZE; j++)
             {
-                int finalI = i;
                 this.candidate.execute(NOOP_RUNNABLE);
             }
         }
@@ -314,7 +313,7 @@ public class GatlingExecutorTest {
 
                     // do some work to tie up the thread so we get a backlog
                     AtomicInteger work = new AtomicInteger();
-                    for (int j = 0; j < 500; j++)
+                    for (int j = 0; j < 1000; j++)
                     {
                         work.incrementAndGet();
                     }
@@ -334,7 +333,7 @@ public class GatlingExecutorTest {
             }
         }
 
-        assertTrue(latch.await(20, TimeUnit.SECONDS));
+        assertTrue(latch.await(10, TimeUnit.SECONDS));
         assertTrue("Got " + threadNames, threadNames.size() > 1);
     }
 
