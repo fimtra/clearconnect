@@ -21,6 +21,7 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.executors.IContextExecutor;
 import com.fimtra.util.SystemUtils;
 
@@ -239,7 +240,7 @@ public abstract class DataFissionProperties {
          * @see Names#CORE_THREAD_COUNT
          */
         int CORE_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.CORE_THREAD_COUNT,
-                (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
                         (Runtime.getRuntime().availableProcessors() < 32 ?
                                 Runtime.getRuntime().availableProcessors() / 2 : 16)));
 
@@ -257,7 +258,7 @@ public abstract class DataFissionProperties {
          * @see Names#RPC_THREAD_COUNT
          */
         int RPC_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.RPC_THREAD_COUNT,
-                (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
                         (Runtime.getRuntime().availableProcessors() < 32 ?
                                 Runtime.getRuntime().availableProcessors() / 2 : 16)));
 
