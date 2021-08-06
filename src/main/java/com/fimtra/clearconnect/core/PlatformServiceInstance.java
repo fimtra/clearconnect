@@ -624,7 +624,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance {
 
             final boolean isMaster = isFtMaster.booleanValue();
 
-            Log.banner(this, this.toString() + " " + (isMaster ? "ACTIVE" : "STANDBY"));
+            Log.banner(this, this.toString() + " " + (isMaster ? "MASTER" : "STANDBY"));
 
             // if we are not the master but previously we were, we need to cut all connections so
             // proxies reconnect to the new master
