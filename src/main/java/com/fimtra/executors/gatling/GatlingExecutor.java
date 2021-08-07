@@ -89,7 +89,7 @@ public class GatlingExecutor implements IContextExecutor
     private static final int PENDING_TASK_COUNT_TRANSFER_THRESHOLD =
             SystemUtils.getPropertyAsInt("gatling.pendingTaskCountTransferThreshold", 1000);
     private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("gatling.maxThreads",
-            Runtime.getRuntime().availableProcessors() * 10);
+            Runtime.getRuntime().availableProcessors() * 4);
     /** The number of pending contexts to process in a runner that will trigger transfer to a free runner */
     private static final int PENDING_CONTEXT_TRANSFER_THRESHOLD =
             SystemUtils.getPropertyAsInt("gatling.pendingContextTransferThreshold", 1);
@@ -99,20 +99,23 @@ public class GatlingExecutor implements IContextExecutor
     private static final ScheduledExecutorService SCHEDULER =
             ThreadUtils.newPermanentScheduledExecutorService("gatling-scheduler", 1);
 
-    private static TaskRunner removeLast(List<TaskRunner> taskRunnersWaiting_accessWithQLock)
+    private static TaskRunner removeLast(Deque<TaskRunner> taskRunnersWaiting_accessWithQLock)
     {
-        return taskRunnersWaiting_accessWithQLock.remove(taskRunnersWaiting_accessWithQLock.size() - 1);
+        return taskRunnersWaiting_accessWithQLock.removeLast();
     }
 
     private static void setTaskAndNotifyRunner(Runnable toRun,
-            List<TaskRunner> taskRunnersWaiting_accessWithQLock)
+            Deque<TaskRunner> taskRunnersWaiting_accessWithQLock)
     {
-        // reverse lookup - get newest added first
-        final TaskRunner taskRunner = removeLast(taskRunnersWaiting_accessWithQLock);
-        synchronized (taskRunner)
+        if (toRun != null)
         {
-            taskRunner.toRun = toRun;
-            taskRunner.notify();
+            // reverse lookup
+            final TaskRunner taskRunner = removeLast(taskRunnersWaiting_accessWithQLock);
+            synchronized (taskRunner)
+            {
+                taskRunner.toRun = toRun;
+                taskRunner.notify();
+            }
         }
     }
 
@@ -183,9 +186,8 @@ public class GatlingExecutor implements IContextExecutor
             long startTimeNanos = System.nanoTime();
             while (true)
             {
-                if (this.toRun != null)
+                if (signalRunningTask(this.toRun != null))
                 {
-                    signalRunningTask(true);
                     try
                     {
                         this.toRun.run();
@@ -195,36 +197,31 @@ public class GatlingExecutor implements IContextExecutor
                         Log.log(this, "Could not execute " + ObjectUtils.safeToString(this.toRun), e);
                     }
                     signalRunningTask(false);
+
+                    if (this.toRun instanceof TaskQueue.InternalTaskQueue<?>)
+                    {
+                        this.toRun = ((TaskQueue.InternalTaskQueue<?>) this.toRun).onTaskFinished(this.tasks);
+                    }
+                    else
+                    {
+                        this.toRun = null;
+                    }
                 }
                 else
                 {
-                    signalRunningTask(false);
-
                     if (isTerminated() || (!this.isCore
                             && System.nanoTime() - startTimeNanos >= NON_CORE_LIVE_PERIOD_NANOS))
                     {
                         synchronized (GatlingExecutor.this.taskRunners)
                         {
                             // must access inside taskRunners lock - see check()
-                            if (this.tasks.size() == 0)
-                            {
-                                GatlingExecutor.this.taskRunners.remove(this);
-                                GatlingExecutor.this.freeNumbers.push(this.number);
-                                Collections.sort(GatlingExecutor.this.freeNumbers);
-                                removeThreadId(this.workerThread.getId());
-                                return;
-                            }
+                            GatlingExecutor.this.taskRunners.remove(this);
+                            GatlingExecutor.this.freeNumbers.push(this.number);
+                            Collections.sort(GatlingExecutor.this.freeNumbers);
+                            removeThreadId(this.workerThread.getId());
+                            return;
                         }
                     }
-                }
-
-                if (this.toRun instanceof TaskQueue.InternalTaskQueue<?>)
-                {
-                    this.toRun = ((TaskQueue.InternalTaskQueue<?>) this.toRun).onTaskFinished(this.tasks);
-                }
-                else
-                {
-                    this.toRun = null;
                 }
 
                 checkPendingWork(taskQueue);
@@ -245,12 +242,12 @@ public class GatlingExecutor implements IContextExecutor
                             // prioritise core runners - add at the end (we always remove from the end)
                             if (this.isCore)
                             {
-                                GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.add(this);
+                                GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.addLast(this);
                             }
                             else
                             {
                                 // aux runners will go to the beginning, less chance of being re-used
-                                GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.add(0, this);
+                                GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.addFirst(this);
                             }
                         }
                     }
@@ -275,16 +272,18 @@ public class GatlingExecutor implements IContextExecutor
                     }
                     finally
                     {
-                        // if we have no task, see if there is work to grab from the global queue
-                        // NOTE: if we have a task, the runner will also not be in the
-                        // taskRunnersWaiting_accessWithQLock, this is done in all places that notify
-                        // - see usages of removeLast
-                        if (this.toRun == null && this.tasks.size() == 0)
+                        // toRun can be null for spurious thread wake-ups
+                        if (this.toRun == null)
                         {
                             synchronized (taskQueue.lock)
                             {
-                                GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.remove(this);
-                                this.toRun = taskQueue.queue.poll();
+                                synchronized (this)
+                                {
+                                    if (this.toRun == null)
+                                    {
+                                        GatlingExecutor.this.taskRunnersWaiting_accessWithQLock.remove(this);
+                                    }
+                                }
                             }
                         }
                     }
@@ -332,9 +331,10 @@ public class GatlingExecutor implements IContextExecutor
             }
         }
 
-        private void signalRunningTask(boolean runningTask)
+        private boolean signalRunningTask(boolean runningTask)
         {
             this.runningTask = runningTask;
+            return this.runningTask;
         }
 
     }
@@ -343,7 +343,7 @@ public class GatlingExecutor implements IContextExecutor
     volatile long[] tids = new long[0];
     final TaskQueue taskQueue;
     final List<TaskRunner> taskRunners;
-    final List<TaskRunner> taskRunnersWaiting_accessWithQLock;
+    final Deque<TaskRunner> taskRunnersWaiting_accessWithQLock;
     private final int size;
     private final String name;
     private final AtomicInteger threadCounter;
@@ -359,7 +359,7 @@ public class GatlingExecutor implements IContextExecutor
         this.size = size;
         this.threadCounter = new AtomicInteger(0);
         this.freeNumbers = new LowGcLinkedList<>();
-        this.taskRunnersWaiting_accessWithQLock = new ArrayList<>();
+        this.taskRunnersWaiting_accessWithQLock = new LowGcLinkedList<>();
         this.taskQueue = new TaskQueue(this.name, this::notifyTaskRunner_calledWhilstHoldingLock);
         this.taskRunners = new CopyOnWriteArrayList<>();
 
@@ -461,10 +461,10 @@ public class GatlingExecutor implements IContextExecutor
         this.active = false;
         synchronized (this.taskQueue.lock)
         {
+            final Runnable noop = () -> {};
             while (this.taskRunnersWaiting_accessWithQLock.size() > 0)
             {
-                setTaskAndNotifyRunner(this.taskQueue.poll_callWhilstHoldingLock(),
-                        this.taskRunnersWaiting_accessWithQLock);
+                setTaskAndNotifyRunner(noop, this.taskRunnersWaiting_accessWithQLock);
             }
         }
         EXECUTORS.remove(this);
