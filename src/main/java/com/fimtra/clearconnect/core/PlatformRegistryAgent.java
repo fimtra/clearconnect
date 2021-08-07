@@ -646,16 +646,20 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     if (e.getCause() instanceof AlreadyRegisteredException)
                     {
                         final AlreadyRegisteredException details = (AlreadyRegisteredException) e.getCause();
-                        if (is.eq(this.agentName, details.agentName) && is.eq(details.port, serviceInstance.endPointAddress.getPort()) && is.eq(details.nodeName,
+                        if (is.eq(this.agentName, details.agentName) && is.eq(details.port,
+                                serviceInstance.endPointAddress.getPort()) && is.eq(details.nodeName,
                                 serviceInstance.endPointAddress.getNode()) && is.eq(details.redundancyMode,
                                 serviceInstance.getRedundancyMode().toString()))
                         // NOTE: we're not checking the transport tech or wire protocol
                         {
-                            Log.log(this, "Registry has already registered ", ObjectUtils.safeToString(serviceInstance));
-                            return;
+                            Log.log(this, "Registry has already registered ",
+                                    ObjectUtils.safeToString(serviceInstance));
                         }
                     }
-                    throw e;
+                    else
+                    {
+                        throw e;
+                    }
                 }
 
                 // now setup an "expectation" that the service will become registered - if the service

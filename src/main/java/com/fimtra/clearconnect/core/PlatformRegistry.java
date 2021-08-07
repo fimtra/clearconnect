@@ -877,22 +877,24 @@ final class EventHandler {
             final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
             final Map<String, IValue> serviceRecordStructure, final IValue... args)
     {
-        registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily, agentName,
-                serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology, args);
-
-        executeTaskWithIO(() -> {
-            try
-            {
-                registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken,
-                        serviceFamily, agentName, serviceRecordStructure, serviceInstanceId,
-                        redundancyModeEnum, transportTechnology);
-            }
-            catch (Exception e)
-            {
-                logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
-                        "Could not connect");
-            }
-        });
+        if (registerStep1_checkRegistrationDetailsForServiceInstance(registrationToken, serviceFamily,
+                agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, transportTechnology,
+                args))
+        {
+            executeTaskWithIO(() -> {
+                try
+                {
+                    registerStep2_connectToServiceInstanceThenContinueRegistration(registrationToken,
+                            serviceFamily, agentName, serviceRecordStructure, serviceInstanceId,
+                            redundancyModeEnum, transportTechnology);
+                }
+                catch (Exception e)
+                {
+                    logExceptionAndExecuteDeregister(registrationToken, serviceFamily, serviceInstanceId, e,
+                            "Could not connect");
+                }
+            });
+        }
     }
 
     void executeDeregisterPlatformServiceInstance(RegistrationToken registrationToken,
@@ -1268,7 +1270,7 @@ final class EventHandler {
      *                                    registration
      */
     @SuppressWarnings("unused")
-    private void registerStep1_checkRegistrationDetailsForServiceInstance(
+    private boolean registerStep1_checkRegistrationDetailsForServiceInstance(
             final RegistrationToken registrationToken, final String serviceFamily, final String agentName,
             final Map<String, IValue> serviceRecordStructure, final String serviceInstanceId,
             final RedundancyModeEnum redundancyModeEnum, final TransportTechnologyEnum transportTechnology,
@@ -1281,21 +1283,11 @@ final class EventHandler {
                 this.registrationTokenPerInstance.putIfAbsent(serviceInstanceId, registrationToken);
         if (currentToken != null)
         {
-            final ProxyContext proxy = this.monitoredServiceInstances.get(currentToken);
-
-            if (proxy != null && proxy.isConnected())
-            {
-                throw new AlreadyRegisteredException(serviceInstanceId, agentName,
-                        proxy.getEndPointAddress().getNode(), proxy.getEndPointAddress().getPort(),
-                        checkServiceType(serviceFamily, RedundancyModeEnum.FAULT_TOLERANT) ?
-                                RedundancyModeEnum.FAULT_TOLERANT.toString() :
-                                RedundancyModeEnum.LOAD_BALANCED.toString());
-            }
-
-            // no connection, so its an in-flight registration
-            throw new IllegalStateException(
-                    "[DUPLICATE INSTANCE] Platform service instance '" + serviceInstanceId
-                            + "' is currently being registered with " + currentToken);
+            // If we get here, then there is very slow processing in the registry or service being connected
+            // (registerStep2 has not completed and if it fails it will clear registrationTokenPerInstance)
+            // Just signal to stop processing this registration with no exception
+            Log.log(this, "Already being processed with ", ObjectUtils.safeToString(registrationToken));
+            return false;
         }
 
         switch(redundancyModeEnum)
@@ -1330,6 +1322,8 @@ final class EventHandler {
                     "Platform service '" + serviceFamily + "' is currently being registered as "
                             + RedundancyModeEnum.valueOf(current.textValue()));
         }
+
+        return true;
     }
 
     private void registerStep2_connectToServiceInstanceThenContinueRegistration(
@@ -1878,7 +1872,9 @@ final class EventHandler {
  * Thrown when a service attempts a re-registration when it is still active
  *
  * @author Ramon Servadei
+ * @deprecated no longer used for 3.17.7 onwards
  */
+@Deprecated
 final class AlreadyRegisteredException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
