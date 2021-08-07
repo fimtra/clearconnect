@@ -634,12 +634,10 @@ public class StringProtocolCodec implements ICodec<char[]>
             final char[] chars = charsRef.ref;
             valueToSend.getChars(0, valueToSend.length(), chars, 0);
 
-            char charAt;
             int last = 0;
             for (int i = 0; i < length; i++)
             {
-                charAt = chars[i];
-                switch(charAt)
+                switch(chars[i])
                 {
                     case CR:
                         dest.append(chars, last, i - last);
@@ -658,7 +656,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     case CHAR_KEY_VALUE_SEPARATOR:
                     case CHAR_SYMBOL_PREFIX:
                         dest.append(chars, last, i - last);
-                        escapedChars[1] = charAt;
+                        escapedChars[1] = chars[i];
                         dest.append(escapedChars, 0, 2);
                         last = i + 1;
                         break;
