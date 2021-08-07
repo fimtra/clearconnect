@@ -49,12 +49,12 @@ public class GatlingPerfTest {
     public void testSequentialPerformanceVsExecutors() throws InterruptedException
     {
         int LOOP_MAX = 50000;
-        int contextCount = 16;
+        int contextCount = Runtime.getRuntime().availableProcessors();
         long executorTime = getExecutorTime(LOOP_MAX, contextCount);
         long gatlingTime = getGatlingTime(LOOP_MAX, contextCount);
         System.err.println("executorTime=" + executorTime / 1_000_000d);
         System.err.println(" gatlingTime=" + gatlingTime / 1_000_000d);
-        assertTrue(executorTime * 1.2 > gatlingTime);
+        assertTrue("executorTime (" + executorTime + ") > gatlingTime (" + gatlingTime + ")", executorTime > gatlingTime);
 
     }
 
