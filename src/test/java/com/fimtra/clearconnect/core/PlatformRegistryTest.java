@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -58,7 +60,8 @@ public class PlatformRegistryTest {
     PlatformRegistry candidate;
     static int regPort = 21212;
     static int port = regPort + 1;
-    private int LOG_COUNT = 50;
+    static final int MAX = Runtime.getRuntime().availableProcessors() * 20;
+    static final int LOG_COUNT = MAX / 4;
 
     @Before
     public void setup()
@@ -78,7 +81,6 @@ public class PlatformRegistryTest {
     @Test
     public void testMultipleConnectionsRestart() throws IOException, InterruptedException
     {
-        final int MAX = 150;
         final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<CountDownLatch>();
         connectedLatch.set(new CountDownLatch(MAX));
         final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<CountDownLatch>();
@@ -114,10 +116,14 @@ public class PlatformRegistryTest {
 
         }
 
+        // limit the parallel service create load to 2x available cores
+        final ExecutorService serviceCreateThreads =
+                Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+
         // create a service too (async)
         AtomicInteger serviceCounter = new AtomicInteger();
         Arrays.stream(agents).forEach((a) -> {
-            ThreadUtils.newThread(() -> {
+            serviceCreateThreads.execute(() -> {
                 final boolean platformServiceInstance =
                         a.createPlatformServiceInstance(serviceFamily, "instance-" + a.getAgentName(),
                                 TcpChannelUtils.LOCALHOST_IP, WireProtocolEnum.GZIP,
@@ -128,7 +134,7 @@ public class PlatformRegistryTest {
                     System.err.println(i + "/" + MAX + " service registered=" + platformServiceInstance);
                 }
                 assertTrue(platformServiceInstance);
-            }, "service-create-" + a.getAgentName()).start();
+            });
         });
 
         try
@@ -182,11 +188,11 @@ public class PlatformRegistryTest {
             listenForServices(MAX, serviceFamily, servicesLatch);
 
             System.err.println("Waiting for all agents to re-connect...");
-            assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()),
+            assertTrue("Only got: " + (connectedLatch.get().getCount() + " re-connected"),
                     connectedLatch.get().await(timeout, TimeUnit.SECONDS));
 
             System.err.println("Waiting for all services to be re-registered...");
-            assertTrue("Only got: " + (MAX - servicesLatch.get().getCount()),
+            assertTrue("Only got: " + (servicesLatch.get().getCount() + " re-registered"),
                     servicesLatch.get().await(timeout, TimeUnit.SECONDS));
         }
         finally
@@ -197,6 +203,7 @@ public class PlatformRegistryTest {
             {
                 agent.destroy();
             }
+            System.err.println("DONE!");
         }
     }
 
