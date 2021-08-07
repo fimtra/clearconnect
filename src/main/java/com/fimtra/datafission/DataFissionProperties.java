@@ -240,9 +240,7 @@ public abstract class DataFissionProperties {
          * @see Names#CORE_THREAD_COUNT
          */
         int CORE_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.CORE_THREAD_COUNT,
-                ContextExecutorFactory.POOL_ACTIVE ? 1 : (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
-                        (Runtime.getRuntime().availableProcessors() < 32 ?
-                                Runtime.getRuntime().availableProcessors() / 2 : 16)));
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : SystemUtils.getRuntimeSupportedThreadCount());
 
         /**
          * The number of threads used in the {@link IContextExecutor} for RPCs used by all DataFission {@link
@@ -258,9 +256,7 @@ public abstract class DataFissionProperties {
          * @see Names#RPC_THREAD_COUNT
          */
         int RPC_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.RPC_THREAD_COUNT,
-                ContextExecutorFactory.POOL_ACTIVE ? 1 : (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
-                        (Runtime.getRuntime().availableProcessors() < 32 ?
-                                Runtime.getRuntime().availableProcessors() / 2 : 16)));
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : SystemUtils.getRuntimeSupportedThreadCount());
 
         /**
          * The timeout to wait for an RPC to start.
