@@ -65,7 +65,7 @@ public class GatlingPerfTest {
         ISequentialRunnable[] gatlingRunnables = new ISequentialRunnable[contextCount];
         IContextExecutor gatling = new GatlingExecutor("test-vs-exec",
                 // start with 2 threads
-                2);
+                1);
 
         // create gatling components
         for (int i = 0; i < contextCount; i++)

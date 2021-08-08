@@ -86,14 +86,10 @@ public class GatlingExecutor implements IContextExecutor
     private static final long NON_CORE_LIVE_PERIOD_MILLIS =
             SystemUtils.getPropertyAsLong("gatling.nonCoreLivePeriodMillis", 10_000);
     private static final long NON_CORE_LIVE_PERIOD_NANOS = NON_CORE_LIVE_PERIOD_MILLIS * 1_000_000;
-    private static final int PENDING_TASK_COUNT_TRANSFER_THRESHOLD =
-            SystemUtils.getPropertyAsInt("gatling.pendingTaskCountTransferThreshold", 1000);
     private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("gatling.maxThreads",
             Runtime.getRuntime().availableProcessors() * 4);
-    /** The number of pending contexts to process in a runner that will trigger transfer to a free runner */
-    private static final int PENDING_CONTEXT_TRANSFER_THRESHOLD =
-            SystemUtils.getPropertyAsInt("gatling.pendingContextTransferThreshold", 1);
     private static final long CHECK_PERIOD = SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 250);
+    private static final long CHECK_PERIOD_NANOS = CHECK_PERIOD * 1_000_000;
     private static final ScheduledExecutorService CHECKER =
             ThreadUtils.newPermanentScheduledExecutorService("gatling-checker", 1);
     private static final ScheduledExecutorService SCHEDULER =
@@ -140,6 +136,38 @@ public class GatlingExecutor implements IContextExecutor
                 TimeUnit.MILLISECONDS);
     }
 
+    static final class ThroughputStats
+    {
+        final List<Long>[] lists = new List[] { new ArrayList<>(), new ArrayList<>() };
+        volatile long current = Long.MAX_VALUE;
+        volatile int currentList = 0;
+
+        void taskStarted()
+        {
+            this.current = System.nanoTime();
+        }
+
+        void taskCompleted()
+        {
+            this.lists[this.currentList].add(System.nanoTime() - this.current);
+            this.current = Long.MAX_VALUE;
+        }
+
+        int swapLists()
+        {
+            if (this.currentList == 0)
+            {
+                this.currentList = 1;
+                return 0;
+            }
+            else
+            {
+                this.currentList = 0;
+                return 1;
+            }
+        }
+    }
+
     /**
      * A task runner has a single thread that handles dequeuing of tasks from the {@link TaskQueue} and
      * executing them.
@@ -152,6 +180,7 @@ public class GatlingExecutor implements IContextExecutor
         final Object lock;
         final Integer number;
         final boolean isCore;
+        final ThroughputStats stats;
 
         Runnable toRun;
         private boolean runningTask;
@@ -164,6 +193,7 @@ public class GatlingExecutor implements IContextExecutor
             this.isCore = isCore;
             this.number = number;
             this.lock = new Object();
+            this.stats = new ThroughputStats();
             this.workerThread = ThreadUtils.newDaemonThread(this, name);
             this.runningTask = false;
             this.tasks.addAll(initialTasks);
@@ -188,6 +218,7 @@ public class GatlingExecutor implements IContextExecutor
             {
                 if (signalRunningTask(this.toRun != null))
                 {
+                    this.stats.taskStarted();
                     try
                     {
                         this.toRun.run();
@@ -196,6 +227,7 @@ public class GatlingExecutor implements IContextExecutor
                     {
                         Log.log(this, "Could not execute " + ObjectUtils.safeToString(this.toRun), e);
                     }
+                    this.stats.taskCompleted();
                     signalRunningTask(false);
 
                     if (this.toRun instanceof TaskQueue.InternalTaskQueue<?>)
@@ -461,7 +493,8 @@ public class GatlingExecutor implements IContextExecutor
         this.active = false;
         synchronized (this.taskQueue.lock)
         {
-            final Runnable noop = () -> {};
+            final Runnable noop = () -> {
+            };
             while (this.taskRunnersWaiting_accessWithQLock.size() > 0)
             {
                 setTaskAndNotifyRunner(noop, this.taskRunnersWaiting_accessWithQLock);
@@ -614,15 +647,17 @@ public class GatlingExecutor implements IContextExecutor
                 int blockedCount = 0;
                 int taskCount;
                 Deque<Runnable> taskList;
+                List<Long> tasksInPeriod;
                 // find runners that are blocked - remove ALL tasks to re-assign
                 // OR if a runner has too many tasks - mark for one task to re-assign
                 for (TaskRunner taskRunner : this.taskRunners)
                 {
                     synchronized (taskRunner.tasks)
                     {
-                        if (taskRunner.runningTask
-                                && taskRunner.workerThread.getState() != Thread.State.RUNNABLE)
+                        // check "blocking" task
+                        if (System.nanoTime() - taskRunner.stats.current >= CHECK_PERIOD_NANOS)
                         {
+                            // task has been going on for > check period time - effectively blocking...
                             blockedCount++;
                             if (projectedThreadCount < MAX_THREADS && taskRunner.tasks.size() > 0)
                             {
@@ -636,30 +671,34 @@ public class GatlingExecutor implements IContextExecutor
                                 projectedThreadCount++;
                             }
                         }
-                        else
+
+                        tasksInPeriod = taskRunner.stats.lists[taskRunner.stats.swapLists()];
+
+                        // check if runner has too much work
+                        if (taskRunner.tasks.size() > 1)
                         {
-                            // check if runners have too much work
-                            if (taskRunner.tasks.size() > PENDING_CONTEXT_TRANSFER_THRESHOLD)
+                            // compute full size
+                            taskCount = 0;
+                            for (Runnable task : taskRunner.tasks)
                             {
-                                // compute full size
-                                taskCount = 0;
-                                for (Runnable task : taskRunner.tasks)
+                                if (task instanceof TaskQueue.SequentialTasks)
                                 {
-                                    if (task instanceof TaskQueue.SequentialTasks)
-                                    {
-                                        taskCount += ((TaskQueue.SequentialTasks) task).size;
-                                    }
-                                    else
-                                    {
-                                        taskCount++;
-                                    }
+                                    taskCount += ((TaskQueue.SequentialTasks) task).size;
                                 }
-                                if (taskCount > PENDING_TASK_COUNT_TRANSFER_THRESHOLD)
+                                else
+                                {
+                                    taskCount++;
+                                }
+                                // check if there are more tasks than are executed in the period
+                                if (taskCount > tasksInPeriod.size())
                                 {
                                     runnersWithWork.add(taskRunner);
+                                    break;
                                 }
                             }
                         }
+
+                        tasksInPeriod.clear();
                     }
                 }
 
