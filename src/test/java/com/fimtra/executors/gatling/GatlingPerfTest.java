@@ -54,7 +54,7 @@ public class GatlingPerfTest {
         long gatlingTime = getGatlingTime(LOOP_MAX, contextCount);
         System.err.println("executorTime=" + executorTime / 1_000_000d);
         System.err.println(" gatlingTime=" + gatlingTime / 1_000_000d);
-        assertTrue("executorTime (" + executorTime + ") > gatlingTime (" + gatlingTime + ")", executorTime > gatlingTime);
+        assertTrue("executorTime (" + executorTime + ") < gatlingTime (" + gatlingTime + ")", executorTime > gatlingTime);
 
     }
 
@@ -63,9 +63,7 @@ public class GatlingPerfTest {
         CountDownLatch gatlingLatch = new CountDownLatch(1);
         AtomicLong[] gatlingCounters = new AtomicLong[contextCount];
         ISequentialRunnable[] gatlingRunnables = new ISequentialRunnable[contextCount];
-        IContextExecutor gatling = new GatlingExecutor("test-vs-exec",
-                // start with 2 threads
-                1);
+        IContextExecutor gatling = new GatlingExecutor("test-vs-exec", 1);
 
         // create gatling components
         for (int i = 0; i < contextCount; i++)

@@ -87,7 +87,7 @@ public class GatlingExecutor implements IContextExecutor
             SystemUtils.getPropertyAsLong("gatling.nonCoreLivePeriodMillis", 10_000);
     private static final long NON_CORE_LIVE_PERIOD_NANOS = NON_CORE_LIVE_PERIOD_MILLIS * 1_000_000;
     private static final int MAX_THREADS = SystemUtils.getPropertyAsInt("gatling.maxThreads",
-            Runtime.getRuntime().availableProcessors() * 4);
+            Runtime.getRuntime().availableProcessors());
     private static final long CHECK_PERIOD = SystemUtils.getPropertyAsLong("gatling.checkPeriodMillis", 250);
     private static final long CHECK_PERIOD_NANOS = CHECK_PERIOD * 1_000_000;
     private static final ScheduledExecutorService CHECKER =
@@ -675,25 +675,20 @@ public class GatlingExecutor implements IContextExecutor
                         tasksInPeriod = taskRunner.stats.lists[taskRunner.stats.swapLists()];
 
                         // check if runner has too much work
-                        if (taskRunner.tasks.size() > 1)
+                        if (taskRunner.tasks.size() > 0)
                         {
-                            // compute full size
+                            final int tasksCompletedInPeriod = tasksInPeriod.size();
                             taskCount = 0;
                             for (Runnable task : taskRunner.tasks)
                             {
                                 if (task instanceof TaskQueue.SequentialTasks)
                                 {
                                     taskCount += ((TaskQueue.SequentialTasks) task).size;
-                                }
-                                else
-                                {
-                                    taskCount++;
-                                }
-                                // check if there are more tasks than are executed in the period
-                                if (taskCount > tasksInPeriod.size())
-                                {
-                                    runnersWithWork.add(taskRunner);
-                                    break;
+                                    if (taskCount > tasksCompletedInPeriod)
+                                    {
+                                        runnersWithWork.add(taskRunner);
+                                        break;
+                                    }
                                 }
                             }
                         }
