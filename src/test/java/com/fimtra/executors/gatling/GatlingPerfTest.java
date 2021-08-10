@@ -45,19 +45,6 @@ public class GatlingPerfTest {
     {
     }
 
-    @Test
-    public void testSequentialPerformanceVsExecutors() throws InterruptedException
-    {
-        int LOOP_MAX = 50000;
-        int contextCount = Runtime.getRuntime().availableProcessors();
-        long executorTime = getExecutorTime(LOOP_MAX, contextCount);
-        long gatlingTime = getGatlingTime(LOOP_MAX, contextCount);
-        System.err.println("executorTime=" + executorTime / 1_000_000d);
-        System.err.println(" gatlingTime=" + gatlingTime / 1_000_000d);
-        assertTrue("executorTime (" + executorTime + ") < gatlingTime (" + gatlingTime + ")", executorTime > gatlingTime);
-
-    }
-
     static long getGatlingTime(int LOOP_MAX, int contextCount) throws InterruptedException
     {
         CountDownLatch gatlingLatch = new CountDownLatch(1);
@@ -152,7 +139,7 @@ public class GatlingPerfTest {
         System.err.println("executors finished");
         for (int i = 0; i < contextCount; i++)
         {
-            executors[i].shutdown();
+            executors[i].shutdownNow();
         }
         return executorTime;
     }
@@ -214,7 +201,7 @@ public class GatlingPerfTest {
         }
         awaitLatch(queueLatch);
         start = System.currentTimeMillis() - start;
-        threadPool.shutdown();
+        threadPool.shutdownNow();
         return start;
     }
 
@@ -231,7 +218,7 @@ public class GatlingPerfTest {
         }
         awaitLatch(queueLatch);
         start = System.currentTimeMillis() - start;
-        threadPool.shutdown();
+        threadPool.shutdownNow();
         return start;
     }
 
