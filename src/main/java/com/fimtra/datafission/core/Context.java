@@ -380,10 +380,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             + "-" + UUID.randomUUID();
 
         final int initialSize = 1024;
-        this.sequences = new HashMap<>(initialSize);
+        this.sequences = new ConcurrentHashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
         this.records = new ConcurrentHashMap<>(initialSize);
-        this.pendingAtomicChanges = new HashMap<>(initialSize);
+        this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
         this.tokenPerRecord = new ConcurrentHashMap<>(initialSize);
         this.rpcInstances = new HashMap<>();
         this.validators = new CopyOnWriteArraySet<>();
