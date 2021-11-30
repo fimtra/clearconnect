@@ -27,14 +27,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.fimtra.datafission.DataFissionProperties;
+import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.LazyObject.IDestructor;
 
 /**
@@ -57,12 +56,9 @@ import com.fimtra.util.LazyObject.IDestructor;
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
     private static final Executor IMAGE_NOTIFIER =
-        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
-            ThreadUtils.newDaemonThreadFactory("image-notifier"), new ThreadPoolExecutor.DiscardPolicy());
-
+            ContextExecutorFactory.create("image-notifier", DataFissionProperties.Values.CORE_THREAD_COUNT);
     private static final Executor UPDATE_NOTIFIER =
-        new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
-            ThreadUtils.newDaemonThreadFactory("update-notifier"), new ThreadPoolExecutor.DiscardPolicy());
+            ContextExecutorFactory.create("update-notifier", DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     @SuppressWarnings("rawtypes")
     private static final IDestructor NOOP_DESTRUCTOR = (ref) -> {
@@ -454,8 +450,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * Notify all registered listeners that the data for this key is removed. The notification is
      * done using the internal executor.
      * 
-     * @param the
-     *            key for the data that is removed
+     * @param key
+     *            the key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
      *         found (no listeners are notified in this case)
      */
