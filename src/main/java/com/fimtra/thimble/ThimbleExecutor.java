@@ -258,7 +258,7 @@ public final class ThimbleExecutor implements IContextExecutor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    ThimbleExecutor(int size)
+    public ThimbleExecutor(int size)
     {
         this(ThimbleExecutor.class.getSimpleName(), size);
     }
@@ -272,7 +272,7 @@ public final class ThimbleExecutor implements IContextExecutor
      * @param size
      *            the internal thread pool size. The thread pool does not shrink or grow.
      */
-    ThimbleExecutor(String name, int size)
+    public ThimbleExecutor(String name, int size)
     {
         this.name = name;
         this.size = size;
