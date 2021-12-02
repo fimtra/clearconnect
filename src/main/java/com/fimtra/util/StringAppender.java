@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2019 Ramon Servadei
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,7 @@ import java.nio.CharBuffer;
 
 /**
  * Cut-down version of a {@link StringBuilder} that provides direct access to the backing char[]
- * 
+ *
  * @author Ramon Servadei
  */
 public final class StringAppender
@@ -48,12 +48,12 @@ public final class StringAppender
 
     public StringAppender append(long v)
     {
-        return append(String.valueOf(v));
+        return append(Long.toString(v));
     }
 
     public StringAppender append(double v)
     {
-        return append(String.valueOf(v));
+        return append(Double.toString(v));
     }
 
     public StringAppender append(char v)
@@ -67,11 +67,8 @@ public final class StringAppender
     {
         final int length = v.length;
         resize(length);
-
-        for (int i = 0; i < length; i++)
-        {
-            this.chars[this.len++] = v[i];
-        }
+        System.arraycopy(v, 0, this.chars, this.len, length);
+        this.len += length;
         return this;
     }
 
@@ -81,14 +78,9 @@ public final class StringAppender
         {
             throw new IllegalArgumentException("Negative length not allowed: " + len);
         }
-
         resize(len);
-
-        final int length = offset + len;
-        for (int i = offset; i < length; i++)
-        {
-            this.chars[this.len++] = v[i];
-        }
+        System.arraycopy(v, offset, this.chars, this.len, len);
+        this.len += len;
         return this;
     }
 
@@ -98,14 +90,10 @@ public final class StringAppender
         {
             return append("null");
         }
-
         final int length = v.length();
         resize(length);
-
-        for (int i = 0; i < length; i++)
-        {
-            this.chars[this.len++] = v.charAt(i);
-        }
+        v.getChars(0, length, this.chars, this.len);
+        this.len += length;
         return this;
     }
 
@@ -113,7 +101,7 @@ public final class StringAppender
     {
         if (this.len + length > this.chars.length)
         {
-            char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
+            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
         }
