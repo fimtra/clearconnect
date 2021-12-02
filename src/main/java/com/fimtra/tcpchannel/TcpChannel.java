@@ -35,7 +35,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -66,7 +65,7 @@ public class TcpChannel implements ITransportChannel
     static final double _INVERSE_1000000 = 1 / 1000000d;
 
     /** Expresses the encoding format for the data frames */
-    public static enum FrameEncodingFormatEnum
+    public enum FrameEncodingFormatEnum
     {
         /**
          * Length-based frame encoding, in the following format (ABNF notation):
@@ -116,7 +115,7 @@ public class TcpChannel implements ITransportChannel
 
     private enum StateEnum
     {
-        DESTROYED, IDLE, SENDING;
+        DESTROYED, IDLE, SENDING
     }
 
     private static final String TCP_CHANNEL_CLOSED = "TcpChannel [closed ";
@@ -172,7 +171,7 @@ public class TcpChannel implements ITransportChannel
         ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
 
     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
-        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", () -> new RxFrameResolver(), (instance) -> {
+        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", RxFrameResolver::new, (instance) -> {
             instance.buffer.clear();
             instance.channel = null;
         }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
@@ -458,14 +457,7 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            this.writer.register(this.socketChannel, new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    writeFrames(TcpChannel.this.writer);
-                }
-            });
+            this.writer.register(this.socketChannel, () -> writeFrames(TcpChannel.this.writer));
 
             this.writerKey = this.writer.getKeyFor(this.socketChannel);
             SelectorProcessor.resetInterest(this.writerKey);
@@ -479,20 +471,15 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            this.reader.register(this.socketChannel, new Runnable()
-            {
-                @Override
-                public void run()
+            this.reader.register(this.socketChannel, () -> {
+                try
                 {
-                    try
-                    {
-                        readFrames();
-                    }
-                    catch (BufferOverflowException e)
-                    {
-                        TcpChannel.this.destroy("Buffer overflow during frame decode", e);
-                        throw e;
-                    }
+                    readFrames();
+                }
+                catch (BufferOverflowException e)
+                {
+                    TcpChannel.this.destroy("Buffer overflow during frame decode", e);
+                    throw e;
                 }
             });
         }
@@ -680,7 +667,7 @@ public class TcpChannel implements ITransportChannel
 
             ByteBuffer data;
             size = this.fragmentsSize[0];
-            int i = 0;
+            int i;
             int resolvedFramesSize = 0;
             for (i = 0; i < size; i++)
             {
@@ -767,7 +754,7 @@ public class TcpChannel implements ITransportChannel
          * runtime. This prevents one channel starving out other channels by having a queue that is
          * being fed as fast as it can be dequeued, which leads to starvation of other channels.
          */
-        TxByteArrayFragment data = null;
+        TxByteArrayFragment data;
         TcpChannel channel = null;
         final SendChannelChain chain;
         synchronized (TcpChannel.class)
@@ -780,7 +767,7 @@ public class TcpChannel implements ITransportChannel
             return;
         }
 
-        boolean writeInProgress = false;
+        boolean writeInProgress;
         while (chain.first != null)
         {
             if (channel == null)
@@ -1001,9 +988,6 @@ interface IFrameReaderWriter
  */
 abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 {
-
-    static final long SLOW_FRAME_WRITE_TIME_NANOS = 10000000;
-
     // note: the header will never by this large, but we just use it to ensure we have enough so the
     // txBuffer never resizes
     static final int HEADER_SPACE = 1024;
@@ -1028,8 +1012,6 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     /**
      * Write the internal {@link #buffers} to the socket. This will continually try to write the
      * buffer to the socket until all the data has been written.
-     * 
-     * @throws IOException
      */
     final void writeBufferToSocket() throws IOException
     {
@@ -1048,7 +1030,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)
         {
             final long current = System.nanoTime();
-            if (current - this.zeroByteWriteTimeNanos > 5000000000l)
+            if (current - this.zeroByteWriteTimeNanos > 5000000000L)
             {
                 this.zeroByteWriteTimeNanos = current;
                 Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",

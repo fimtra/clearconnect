@@ -17,6 +17,7 @@ package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
 import com.fimtra.datafission.ICodec;
@@ -33,11 +34,10 @@ import com.fimtra.util.GZipUtils;
  */
 public class GZipProtocolCodec extends StringProtocolCodec
 {
-    final static Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
     private static Function<ByteBuffer, byte[]> createEncodedBytesHandler()
     {
-        return (encoded) -> GZipUtils.compress(encoded);
+        return GZipUtils::compress;
     }
 
     public GZipProtocolCodec()
@@ -72,7 +72,7 @@ public class GZipProtocolCodec extends StringProtocolCodec
     public char[] decode(ByteBuffer data)
     {
         final ByteBuffer uncompressed = GZipUtils.uncompress(this.sessionSyncProtocol.decode(data));
-        final char[] decoded = ISO_8859_1.decode(uncompressed).array();
+        final char[] decoded = getCharset().decode(uncompressed).array();
         ByteArrayPool.offer(uncompressed.array());
         return decoded;
     }
@@ -98,6 +98,6 @@ public class GZipProtocolCodec extends StringProtocolCodec
     @Override
     public Charset getCharset()
     {
-        return ISO_8859_1;
+        return StandardCharsets.ISO_8859_1;
     }
 }

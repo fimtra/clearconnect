@@ -53,9 +53,9 @@ public abstract class TcpChannelUtils
     static final Map<String, String> SOCKET_OPTIONS = new HashMap<>();
     static
     {
-        Map.Entry<Object, Object> entry = null;
+        Map.Entry<Object, Object> entry;
         Object key = null;
-        Object value = null;
+        Object value;
         for (Iterator<Map.Entry<Object, Object>> it = System.getProperties().entrySet().iterator(); it.hasNext();)
         {
             try
@@ -122,7 +122,7 @@ public abstract class TcpChannelUtils
      * Handles socket read operations for {@link TcpChannel} instances. Allocation based on
      * round-robin.
      */
-    private final static SelectorProcessor[] READER;
+    static final SelectorProcessor[] READER;
     private static int currentReader = 0;
     static
     {
@@ -146,7 +146,7 @@ public abstract class TcpChannelUtils
      * Handles socket write operations for {@link TcpChannel} instances. Allocation based on
      * round-robin.
      */
-    private final static SelectorProcessor[] WRITER;
+    static final SelectorProcessor[] WRITER;
     private static int currentWriter = 0;
     static
     {

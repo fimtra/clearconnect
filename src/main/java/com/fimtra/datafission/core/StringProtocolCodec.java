@@ -20,6 +20,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -73,8 +74,6 @@ public class StringProtocolCodec implements ICodec<char[]>
 {
     public static final int CHARRAY_SIZE = 32;
 
-    static final byte[] SYNC = "sync".getBytes();
-
     static final char CHAR_TOKEN_DELIM = '|';
     static final char CHAR_KEY_VALUE_SEPARATOR = '=';
     static final char CHAR_ESCAPE = '\\';
@@ -86,8 +85,6 @@ public class StringProtocolCodec implements ICodec<char[]>
     // escaping
     static final char CR = '\r';
     static final char LF = '\n';
-
-    static final Charset UTF8 = Charset.forName("UTF-8");
 
     static final char DELIMITER = '|';
     static final char[] DELIMITER_CHARS = new char[] { DELIMITER };
@@ -192,12 +189,6 @@ public class StringProtocolCodec implements ICodec<char[]>
     /**
      * Get the string representing the record changes to transmit to a {@link ProxyContext}.
      * 
-     * @param subMapName
-     *            the name of the record
-     * @param putEntries
-     *            the entries that were put
-     * @param removedEntries
-     *            the entries that were removed
      * @return the string representing the changes
      */
     @Override
@@ -231,7 +222,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     /**
-     * Convert a byte[] created from the {@link #getTxMessageForAtomicChange(String, Map, Map)}
+     * Convert a byte[] created from the {@link #getTxMessageForAtomicChange}
      * method into a {@link AtomicChange} representing the 'puts' and 'removes' to a named record
      * instance.
      * 
@@ -255,19 +246,14 @@ public class StringProtocolCodec implements ICodec<char[]>
         int[] bijTokenLen;
     }
 
-    final static ThreadLocal<DecodingBuffers> DECODING_BUFFERS = new ThreadLocal<DecodingBuffers>()
-    {
-        @Override
-        protected DecodingBuffers initialValue()
-        {
-            final DecodingBuffers instance = new DecodingBuffers();
-            instance.tempArr = new char[50];
-            instance.bijTokenOffset = new int[1][10];
-            instance.bijTokenLimit = new int[1][10];
-            instance.bijTokenLen = new int[1];
-            return instance;
-        }
-    };
+    final static ThreadLocal<DecodingBuffers> DECODING_BUFFERS = ThreadLocal.withInitial(() -> {
+        final DecodingBuffers instance = new DecodingBuffers();
+        instance.tempArr = new char[50];
+        instance.bijTokenOffset = new int[1][10];
+        instance.bijTokenLimit = new int[1][10];
+        instance.bijTokenLen = new int[1];
+        return instance;
+    });
 
     @SuppressWarnings("null")
     static IRecordChange decodeAtomicChange(char[] decodedMessage)
@@ -422,25 +408,20 @@ public class StringProtocolCodec implements ICodec<char[]>
         }
     }
 
-    final static ThreadLocal<EncodingBuffers> ENCODING_BUFFERS = new ThreadLocal<EncodingBuffers>()
-    {
-        @Override
-        protected EncodingBuffers initialValue()
-        {
-            final EncodingBuffers instance = new EncodingBuffers();
-            instance.sb = new StringAppender(1000);
-            instance.charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+    final static ThreadLocal<EncodingBuffers> ENCODING_BUFFERS = ThreadLocal.withInitial(() -> {
+        final EncodingBuffers instance = new EncodingBuffers();
+        instance.sb = new StringAppender(1000);
+        instance.charArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
 
-            instance.keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
-            instance.keyCharArrayRef.ref[0] = NULL_CHAR;
-            instance.keyCharArrayRef.ref[1] = NULL_CHAR;
+        instance.keyCharArrayRef = new CharArrayReference(new char[CHARRAY_SIZE]);
+        instance.keyCharArrayRef.ref[0] = NULL_CHAR;
+        instance.keyCharArrayRef.ref[1] = NULL_CHAR;
 
-            instance.escapedChars = new char[2];
-            instance.escapedChars[0] = CHAR_ESCAPE;
+        instance.escapedChars = new char[2];
+        instance.escapedChars[0] = CHAR_ESCAPE;
 
-            return instance;
-        }
-    };
+        return instance;
+    });
 
     static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet,
         Function<ByteBuffer, byte[]> encodedHandler)
@@ -518,10 +499,9 @@ public class StringProtocolCodec implements ICodec<char[]>
     {
         if (entries != null && entries.size() > 0)
         {
-            Map.Entry<String, IValue> entry;
             String key;
             IValue value;
-            int i = 0;
+            int i;
             int last;
             int length;
             char[] cbuf;
@@ -529,9 +509,8 @@ public class StringProtocolCodec implements ICodec<char[]>
             boolean needToEscape;
             txString.append(changeType);
 
-            for (Iterator<Map.Entry<String, IValue>> it = entries.entrySet().iterator(); it.hasNext();)
+            for (Map.Entry<String, IValue> entry : entries.entrySet())
             {
-                entry = it.next();
                 key = entry.getKey();
                 value = entry.getValue();
                 txString.append(DELIMITER);
@@ -595,7 +574,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     txString.append(escapedChars, 0, 2);
                                     last = i + 1;
                                     break;
-                                default :
+                                default:
                             }
                         }
                         txString.append(cbuf, last, length - last);
@@ -623,7 +602,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                             value.appendTo(txString);
                             break;
                         case TEXT:
-                        default :
+                        default:
                             txString.append(IValue.TEXT_CODE);
                             escape(value.textValue(), txString, chars, escapedChars);
                             break;
@@ -952,7 +931,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public char[] decode(ByteBuffer data)
     {
-        return UTF8.decode(this.sessionSyncProtocol.decode(data)).array();
+        return getCharset().decode(this.sessionSyncProtocol.decode(data)).array();
     }
 
     @Override
@@ -970,7 +949,7 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public Charset getCharset()
     {
-        return UTF8;
+        return StandardCharsets.UTF_8;
     }
 
     @Override

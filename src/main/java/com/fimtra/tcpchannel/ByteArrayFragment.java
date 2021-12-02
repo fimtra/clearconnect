@@ -16,7 +16,7 @@
 package com.fimtra.tcpchannel;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import com.fimtra.util.ByteArrayPool;
 import com.fimtra.util.IReusableObjectBuilder;
@@ -36,7 +36,6 @@ import com.fimtra.util.is;
  */
 class ByteArrayFragment
 {
-    static final Charset UTF8 = Charset.forName("UTF-8");
 
     static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
         new MultiThreadReusableObjectPool<>("RxFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
@@ -79,11 +78,11 @@ class ByteArrayFragment
                         }
                         sb = new StringBuilder();
                         break;
-                    default :
+                    default:
                         sb.append(chars[i]);
                 }
             }
-            numbers[index++] = Integer.parseInt(sb.toString());
+            numbers[index] = Integer.parseInt(sb.toString());
             return numbers;
         }
 
@@ -142,7 +141,7 @@ class ByteArrayFragment
     /**
      * Resolve a {@link ByteArrayFragment} from the received {@link ByteBuffer} with the header
      * encoded in raw byte form. The byte[] will be one of those returned from
-     * {@link #toTxBytesRawByteHeader()}
+     * {@link TxByteArrayFragment#toTxBytesRawByteHeader()}
      * 
      * @param rxData
      *            the {@link ByteBuffer} for a ByteArrayFragment
@@ -161,7 +160,7 @@ class ByteArrayFragment
     /**
      * Resolve a {@link ByteArrayFragment} from the received {@link ByteBuffer} with the header
      * encoded in UTF8 characters. The byte[] will be one of those returned from
-     * {@link #toTxBytesUTF8Header()}
+     * {@link TxByteArrayFragment#toTxBytesUTF8Header}
      * 
      * @param rxData
      *            the {@link ByteBuffer} for a ByteArrayFragment
@@ -172,13 +171,13 @@ class ByteArrayFragment
         final byte[] lenArr = new byte[4];
         rxData.get(lenArr);
         // UTF8 has 1 byte per char
-        final int headerLen = Integer.parseInt(new String(lenArr, UTF8));
+        final int headerLen = Integer.parseInt(new String(lenArr, StandardCharsets.UTF_8));
 
         // we don't want the first "|"
         rxData.get();
         final byte[] headerArr = new byte[headerLen - 1];
         rxData.get(headerArr);
-        final String header = new String(headerArr, UTF8);
+        final String header = new String(headerArr, StandardCharsets.UTF_8);
 
         final int[] parts = ByteArrayFragmentUtils.split3NumbersByPipe(header);
         final int id = parts[0];
@@ -268,10 +267,7 @@ class ByteArrayFragment
     @Override
     public final int hashCode()
     {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (this.id ^ (this.id >>> 32));
-        return result;
+        return this.id;
     }
 
     @Override
