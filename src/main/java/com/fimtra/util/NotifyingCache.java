@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -50,7 +50,7 @@ import com.fimtra.util.LazyObject.IDestructor;
  * cache are notified using the respective thread model used for cache construction.
  * <p>
  * A notifying cache should be equal by object reference only.
- * 
+ *
  * @author Ramon Servadei
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
@@ -80,7 +80,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     final Map<String, DATA> cache;
-    /** Tracks the change sequence per data item in the cache */
+    /**
+     * Tracks the change sequence per data item in the cache
+     */
     final Map<String, Long> sequences;
     final Executor executor;
     final Lock readLock;
@@ -102,9 +104,13 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     final List<Runnable> notifyTasks;
     final Runnable notifyingTasksRunner;
-    /** Allows one update thread - blocks all images */
+    /**
+     * Allows one update thread - blocks all images
+     */
     final Lock updateLock;
-    /** Allows multiple image notifications - blocks updates */
+    /**
+     * Allows multiple image notifications - blocks updates
+     */
     final Lock imageLock;
 
     /**
@@ -181,8 +187,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * @param key
-     *            the key for the data to retrieve
+     * @param key the key for the data to retrieve
      * @return the data held in the cache for the key, may be null
      */
     public final DATA get(String key)
@@ -215,8 +220,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * @param key
-     *            the key to look for
+     * @param key the key to look for
      * @return <code>true</code> if the cache contains an entry for the key
      */
     public final boolean containsKey(String key)
@@ -250,7 +254,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     /**
      * Add the listener and notify it with the current data using the internal executor
-     * 
+     *
      * @return <code>true</code> if the listener was added, <code>false</code> otherwise
      */
     public final boolean addListener(final LISTENER_CLASS listener)
@@ -364,10 +368,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * Notify all registered listeners with the new data. The notification is done using the
      * internal executor.
-     * 
+     *
      * @return <code>true</code> if the data was added (it was not already contained),
-     *         <code>false</code> if it was already in the cache (no listeners are notified in this
-     *         case).
+     * <code>false</code> if it was already in the cache (no listeners are notified in this
+     * case).
      */
     public final boolean notifyListenersDataAdded(final String key, final DATA data)
     {
@@ -449,11 +453,10 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * Notify all registered listeners that the data for this key is removed. The notification is
      * done using the internal executor.
-     * 
-     * @param key
-     *            the key for the data that is removed
+     *
+     * @param key the key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
-     *         found (no listeners are notified in this case)
+     * found (no listeners are notified in this case)
      */
     public final boolean notifyListenersDataRemoved(final String key)
     {
@@ -566,10 +569,12 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    private void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e, String operation)
+    private void handleException(String key, DATA data, LISTENER_CLASS listener, Exception e,
+            String operation)
     {
-        Log.log(this, "Could not notify " + ObjectUtils.safeToString(listener) + " with " + operation + " " + key + "="
-            + ObjectUtils.safeToString(data), e);
+        Log.log(this,
+                "Could not notify " + ObjectUtils.safeToString(listener) + " with " + operation + " " + key
+                        + "=" + ObjectUtils.safeToString(data), e);
     }
 
     public final void destroy()
@@ -601,18 +606,17 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     @Override
     public final String toString()
     {
-        return "NotifyingCache [cache.size=" + this.cache.size() + ", listener.size=" + this.listeners.size() + "]";
+        return "NotifyingCache [cache.size=" + this.cache.size() + ", listener.size=" + this.listeners.size()
+                + "]";
     }
 
     /**
      * Called after the data has been added to the cache.
      * <p>
      * <b>This can be called by multiple threads concurrently and must be thread-safe.</b>
-     * 
-     * @param key
-     *            the key for the data that was added
-     * @param data
-     *            the data that was added
+     *
+     * @param key  the key for the data that was added
+     * @param data the data that was added
      */
     protected abstract void notifyListenerDataAdded(LISTENER_CLASS listener, String key, DATA data);
 
@@ -620,11 +624,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      * Called after the data has been removed from the cache.
      * <p>
      * <b>This can be called by multiple threads concurrently and must be thread-safe.</b>
-     * 
-     * @param key
-     *            the key for the data that was removed
-     * @param data
-     *            the data that was removed
+     *
+     * @param key  the key for the data that was removed
+     * @param data the data that was removed
      */
     protected abstract void notifyListenerDataRemoved(LISTENER_CLASS listener, String key, DATA data);
 }

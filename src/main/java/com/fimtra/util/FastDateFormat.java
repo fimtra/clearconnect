@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ import java.util.GregorianCalendar;
  * is the most expensive operation for this date formatter.
  * <p>
  * <b>THIS IS NOT THREAD SAFE.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 public final class FastDateFormat
@@ -40,24 +40,34 @@ public final class FastDateFormat
 
     /**
      * @return a string representing the time format <code>yyyyMMdd-HH:mm:ss:SSS</code> for the
-     *         passed in arguments
+     * passed in arguments
      */
     static String formatDateTime(int yearsMonthsDays, int hours, int mins, int secs, int millis)
     {
-        return new StringBuilder(22).append(yearsMonthsDays).append(hours < 10 ? "-0" : "-").append(hours).append(
-            mins < 10 ? ":0" : ":").append(mins).append(secs < 10 ? ":0" : ":").append(secs).append(
-            millis < 10 ? ":00" : (millis < 100 ? ":0" : ":")).append(millis).toString();
+        return new StringBuilder(22).append(yearsMonthsDays).append(hours < 10 ? "-0" : "-").append(
+                hours).append(mins < 10 ? ":0" : ":").append(mins).append(secs < 10 ? ":0" : ":").append(
+                secs).append(millis < 10 ? ":00" : (millis < 100 ? ":0" : ":")).append(millis).toString();
     }
 
-    /** year, month, day of month */
+    /**
+     * year, month, day of month
+     */
     int yyyyMMdd = -1;
-    /** hours */
+    /**
+     * hours
+     */
     int HH = -1;
-    /** minutes */
+    /**
+     * minutes
+     */
     int mm = -1;
-    /** seconds */
+    /**
+     * seconds
+     */
     int ss = -1;
-    /** millis */
+    /**
+     * millis
+     */
     int SSS = -1;
 
     long lastTimeMillis = -1;
@@ -66,7 +76,7 @@ public final class FastDateFormat
 
     /**
      * @return the current time in milliseconds in the format <code>yyyyMMdd-HH:mm:ss:SSS</code>,
-     *         e.g. 20121215-21:25:14:580
+     * e.g. 20121215-21:25:14:580
      */
     public String yyyyMMddHHmmssSSS(long currentTimeMillis)
     {
@@ -173,8 +183,8 @@ public final class FastDateFormat
     {
         this.cal.setTimeInMillis(currentMillis);
         this.yyyyMMdd =
-            this.cal.get(Calendar.YEAR) * 10000 + (1 + this.cal.get(Calendar.MONTH)) * 100
-                + this.cal.get(Calendar.DAY_OF_MONTH);
+                this.cal.get(Calendar.YEAR) * 10000 + (1 + this.cal.get(Calendar.MONTH)) * 100 + this.cal.get(
+                        Calendar.DAY_OF_MONTH);
         this.HH = this.cal.get(Calendar.HOUR_OF_DAY);
         this.mm = this.cal.get(Calendar.MINUTE);
         this.ss = this.cal.get(Calendar.SECOND);
