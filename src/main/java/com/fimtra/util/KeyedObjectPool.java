@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2015 Ramon Servadei 
- *  
+ * Copyright (c) 2015 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,40 +26,36 @@ import java.util.concurrent.TimeUnit;
  * A pool for holding canonical versions of objects held against a key.
  * <p>
  * Thread safe and equal by object reference.
- * 
+ *
  * @author Ramon Servadei
  */
 public class KeyedObjectPool<K, T>
 {
-    final static List<WeakReference<KeyedObjectPool<?, ?>>> pools = new LowGcLinkedList<WeakReference<KeyedObjectPool<?, ?>>>();
+    final static List<WeakReference<KeyedObjectPool<?, ?>>> pools = new LowGcLinkedList<>();
+
     static
     {
-        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(new Runnable()
-        {
-            @Override
-            public void run()
-            {
+        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(() -> {
 
-                synchronized (pools)
+            synchronized (pools)
+            {
+                for (Iterator<WeakReference<KeyedObjectPool<?, ?>>> iterator =
+                     pools.iterator(); iterator.hasNext(); )
                 {
-                    for (Iterator<WeakReference<KeyedObjectPool<?, ?>>> iterator =
-                        pools.iterator(); iterator.hasNext();)
+                    final WeakReference<KeyedObjectPool<?, ?>> weakReference = iterator.next();
+                    final KeyedObjectPool<?, ?> object = weakReference.get();
+                    if (object == null)
                     {
-                        final WeakReference<KeyedObjectPool<?, ?>> weakReference = iterator.next();
-                        final KeyedObjectPool<?, ?> object = weakReference.get();
-                        if (object == null)
-                        {
-                            // GC'ed as no other references so remove
-                            iterator.remove();
-                        }
-                        else
-                        {
-                            Log.log(KeyedObjectPool.class, object.toString());
-                        }
+                        // GC'ed as no other references so remove
+                        iterator.remove();
+                    }
+                    else
+                    {
+                        Log.log(KeyedObjectPool.class, object.toString());
                     }
                 }
-            
             }
+
         }, 1, UtilProperties.Values.OBJECT_POOL_SIZE_LOG_PERIOD_MINS, TimeUnit.MINUTES);
     }
 
@@ -87,7 +83,7 @@ public class KeyedObjectPool<K, T>
         this.maxSize = maxSize;
         this.pool = new ConcurrentHashMap<>();
         this.order = (maxSize > 0 ? new LowGcLinkedList<>() : null);
-        this.weakRef = new WeakReference<KeyedObjectPool<?,?>>(this);
+        this.weakRef = new WeakReference<>(this);
         synchronized (pools)
         {
             pools.add(this.weakRef);
@@ -101,7 +97,7 @@ public class KeyedObjectPool<K, T>
             this.order.clear();
             this.pool.clear();
         }
-        
+
         synchronized (pools)
         {
             pools.remove(this.weakRef);
@@ -112,15 +108,15 @@ public class KeyedObjectPool<K, T>
      * Intern the object into the pool. If the pool is limited in size and the pool does not contain
      * the argument, the oldest pool entry is evicted and the argument added as the newest member of
      * the pool.
-     * 
+     *
      * @return the pooled version of the object (the same object if the object is the first instance
-     *         of itself in the pool).
+     * of itself in the pool).
      */
     public final T intern(K k, T t)
     {
         if (t == null)
         {
-            return t;
+            return null;
         }
         final T putIfAbsent = this.pool.putIfAbsent(k, t);
         if (putIfAbsent == null)
@@ -147,8 +143,8 @@ public class KeyedObjectPool<K, T>
     @Override
     public String toString()
     {
-        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.pool.size() + "/"
-            + (this.maxSize == 0 ? "inf" : Integer.toString(this.maxSize)) + "]";
+        return this.getClass().getSimpleName() + "[" + this.name + ", " + this.pool.size() + "/" + (
+                this.maxSize == 0 ? "inf" : Integer.toString(this.maxSize)) + "]";
     }
 
     public final T get(K k)

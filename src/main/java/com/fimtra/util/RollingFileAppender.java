@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,16 +28,16 @@ import java.io.Writer;
  * An {@link Appendable} implementation that writes to a {@link File} and will roll the file when
  * the allotted number of characters has been written. The rolling convention is to name the current
  * file:
- * 
+ *
  * <pre>
  * {filename}.{counter}.logged
  * </pre>
- * 
+ * <p>
  * and then create a new file called {filename}. This all occurs in the same directory as the
  * original file.
  * <p>
  * <b>This is not thread safe</b>
- * 
+ *
  * @author Ramon Servadei
  */
 public final class RollingFileAppender implements Appendable, Closeable, Flushable
@@ -45,11 +45,11 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
     /**
      * Create a standard {@link RollingFileAppender} allowing 1M per file, deleting older than 1
      * day.
-     * 
-     * @throws RuntimeException
-     *             if the file cannot be created due to some {@link IOException}
+     *
+     * @throws RuntimeException if the file cannot be created due to some {@link IOException}
      */
-    public static final RollingFileAppender createStandardRollingFileAppender(String fileIdentity, String directory)
+    public static RollingFileAppender createStandardRollingFileAppender(String fileIdentity,
+            String directory)
     {
         final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-" + fileIdentity;
         final File file = FileUtils.createLogFile_yyyyMMddHHmmss(directory, filePrefix);
@@ -59,7 +59,8 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         }
         catch (IOException e)
         {
-            final RuntimeException runtimeException = new RuntimeException("Could not create file: " + file, e);
+            final RuntimeException runtimeException =
+                    new RuntimeException("Could not create file: " + file, e);
             runtimeException.printStackTrace();
             throw runtimeException;
         }
@@ -79,20 +80,21 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
 
     /**
      * Combines the interfaces {@link Appendable}, {@link Flushable} and {@link Closeable}
-     * 
+     *
      * @author Ramon Servadei
      */
-    static interface AppendableFlushableCloseable extends Appendable, Flushable, Closeable
+    interface AppendableFlushableCloseable extends Appendable, Flushable, Closeable
     {
     }
 
     /**
      * An implementation of {@link AppendableFlushableCloseable} that writes to a file that will
      * roll after it exceeds a certain size.
-     * 
+     *
      * @author Ramon Servadei
      */
-    private final class FileWriterAppendableFlushableCloseableImplementation implements AppendableFlushableCloseable
+    private final class FileWriterAppendableFlushableCloseableImplementation
+            implements AppendableFlushableCloseable
     {
         private final int maxChars;
         private final String parent;
@@ -103,7 +105,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         private Writer writer;
 
         public FileWriterAppendableFlushableCloseableImplementation(File file, int maximumCharacters)
-            throws IOException
+                throws IOException
         {
             this.currentFile = file;
             this.name = this.currentFile.getName();
@@ -224,8 +226,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
                 }
                 else
                 {
-                    throw new IOException("Could not rename " + this.currentFile + " to "
-                        + rolledFile);
+                    throw new IOException("Could not rename " + this.currentFile + " to " + rolledFile);
                 }
             }
         }
@@ -233,7 +234,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
 
     /**
      * An {@link AppendableFlushableCloseable} that simply writes to std.err
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class StdErrAppendableFlushableCloseable implements AppendableFlushableCloseable
@@ -278,18 +279,16 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         }
     }
 
-    private static final StdErrAppendableFlushableCloseable STD_ERR_APPENDER = new StdErrAppendableFlushableCloseable();
+    private static final StdErrAppendableFlushableCloseable STD_ERR_APPENDER =
+            new StdErrAppendableFlushableCloseable();
 
     AppendableFlushableCloseable delegate;
 
     /**
      * Construct an instance writing to the given file.
-     * 
-     * @param file
-     *            the file to write to
-     * @param maximumCharacters
-     *            the maximum number of characters to write to the file before rolling to a new file
-     * @throws IOException
+     *
+     * @param file              the file to write to
+     * @param maximumCharacters the maximum number of characters to write to the file before rolling to a new file
      */
     public RollingFileAppender(final File file, int maximumCharacters) throws IOException
     {
@@ -306,7 +305,7 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
      */
     @Deprecated
     public RollingFileAppender(final File file, int maximumCharacters, final long olderThanMinutes,
-        final String prefixToMatchWhenDeleting) throws IOException
+            final String prefixToMatchWhenDeleting) throws IOException
     {
         this(file, maximumCharacters);
     }
@@ -378,16 +377,17 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
         {
             synchronized (System.err)
             {
-                System.err.println("ALERT! Could not close stream for " + RollingFileAppender.class.getSimpleName()
-                    + " " + this
-                    + " but switching to stderr anyway due to emergency situation (see message following this).");
+                System.err.println(
+                        "ALERT! Could not close stream for " + RollingFileAppender.class.getSimpleName() + " "
+                                + this
+                                + " but switching to stderr anyway due to emergency situation (see message following this).");
                 e.printStackTrace();
             }
         }
         synchronized (System.err)
         {
             System.err.println("ALERT! " + RollingFileAppender.class.getSimpleName() + " " + this
-                + " output switching to stderr. See exception below.");
+                    + " output switching to stderr. See exception below.");
             e.printStackTrace();
         }
         this.delegate = STD_ERR_APPENDER;

@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2016 Ramon Servadei 
- *  
+ * Copyright (c) 2016 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -48,7 +48,7 @@ import com.fimtra.util.FieldTemplate.FieldTypeEnum;
  * Each instance of an {@link ObjectSerializer} keeps references to the objects that are
  * read/written. An object reference can be removed by calling {@link #recordDeleted(IRecord)} or
  * when the {@link ObjectSerializer} instance is garbage collected.
- * 
+ *
  * @author Ramon Servadei
  */
 public final class ObjectSerializer
@@ -68,37 +68,32 @@ public final class ObjectSerializer
     {
         super();
         this.refs = new ConcurrentHashMap<>();
-        this.classTemplates = new ConcurrentHashMap<Class<?>, ClassTemplate>();
+        this.classTemplates = new ConcurrentHashMap<>();
     }
 
     /**
      * Write the object member variables into the fields of the record. The same record for the
      * object should be used to ensure that a proper delta is created for subsequent writes of the
      * same object.
-     * 
-     * @param o
-     *            the object to write
-     * @param record
-     *            the record to store the member attributes of the object
-     * @throws Exception
+     *
+     * @param o      the object to write
+     * @param record the record to store the member attributes of the object
      */
     public void writeObject(Object o, IRecord record) throws Exception
     {
         if (!record.getSubMapKeys().contains(CLASS_TEMPLATE))
         {
             record.getOrCreateSubMap(CLASS_TEMPLATE).put(CLASS_NAME,
-                TextValue.valueOf(o.getClass().getCanonicalName()));
+                    TextValue.valueOf(o.getClass().getCanonicalName()));
         }
         getClassTemplate(o).writeToRecord(o, record);
     }
 
     /**
      * Read an object whose member attributes are stored in the fields of the record.
-     * 
-     * @param record
-     *            the record holding the state of the object
+     *
+     * @param record the record holding the state of the object
      * @return the resolved object from the record
-     * @throws Exception
      */
     @SuppressWarnings("unchecked")
     public <T> T readObject(IRecord record) throws Exception
@@ -135,7 +130,8 @@ public final class ObjectSerializer
                 object = this.refs.get(name);
                 if (object == null)
                 {
-                    final IValue classNameFieldValue = record.getOrCreateSubMap(CLASS_TEMPLATE).get(CLASS_NAME);
+                    final IValue classNameFieldValue =
+                            record.getOrCreateSubMap(CLASS_TEMPLATE).get(CLASS_NAME);
                     if (classNameFieldValue != null)
                     {
                         object = Class.forName(classNameFieldValue.textValue()).newInstance();
@@ -157,12 +153,12 @@ public final class ObjectSerializer
  * class and its super-classes.
  * <p>
  * <b>Note: a class template for a nested class is not supported.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 final class ClassTemplate
 {
-    private final static List<FieldTemplate> getFieldTemplates(Field[] declaredFields, int level)
+    private static List<FieldTemplate> getFieldTemplates(Field[] declaredFields, int level)
     {
         List<FieldTemplate> result = new ArrayList<>(declaredFields.length);
         Class<?> type;
@@ -170,10 +166,11 @@ final class ClassTemplate
         {
             type = field.getType();
             if (!Modifier.isTransient(field.getModifiers()) && !Modifier.isStatic(field.getModifiers())
-                && !Modifier.isFinal(field.getModifiers()))
+                    && !Modifier.isFinal(field.getModifiers()))
             {
                 field.setAccessible(true);
-                result.add(new FieldTemplate(field, FieldTypeEnum.from(type), (field.getName() + "." + level)));
+                result.add(
+                        new FieldTemplate(field, FieldTypeEnum.from(type), (field.getName() + "." + level)));
             }
         }
         return result;
@@ -224,19 +221,19 @@ final class ClassTemplate
 /**
  * Holds a {@link Field}, the record name for the field and its type. This allows a field for an
  * object reference to be correctly written and read.
- * 
+ *
  * @author Ramon Servadei
  */
 final class FieldTemplate
 {
     enum FieldTypeEnum
     {
-            BOOLEAN(Boolean.TYPE), LONG(Long.TYPE), INT(Integer.TYPE), SHORT(Short.TYPE), BYTE(Byte.TYPE),
-            CHAR(Character.TYPE), DOUBLE(Double.TYPE), FLOAT(Float.TYPE), OBJECT(Object.class), TEXT(String.class);
+        BOOLEAN(Boolean.TYPE), LONG(Long.TYPE), INT(Integer.TYPE), SHORT(Short.TYPE), BYTE(Byte.TYPE), CHAR(
+            Character.TYPE), DOUBLE(Double.TYPE), FLOAT(Float.TYPE), OBJECT(Object.class), TEXT(String.class);
 
         final Class<?> type;
 
-        private FieldTypeEnum(Class<?> type)
+        FieldTypeEnum(Class<?> type)
         {
             this.type = type;
         }
@@ -256,11 +253,9 @@ final class FieldTemplate
 
         void readFromRecord(Object o, IRecord record, Field field, String recFieldName) throws Exception
         {
-            final String name = recFieldName;
-
             try
             {
-                final IValue iValue = record.get(name);
+                final IValue iValue = record.get(recFieldName);
                 if (iValue == null)
                 {
                     return;
@@ -272,7 +267,7 @@ final class FieldTemplate
                         field.set(o, iValue.textValue());
                         break;
                     case BOOLEAN:
-                        field.setBoolean(o, iValue.longValue() == 1l);
+                        field.setBoolean(o, iValue.longValue() == 1L);
                         break;
                     case BYTE:
                         field.setByte(o, (byte) iValue.longValue());
@@ -298,19 +293,18 @@ final class FieldTemplate
                     case OBJECT:
                         field.set(o, SerializationUtils.fromByteArray(iValue.byteValue()));
                         break;
-                    default :
+                    default:
                         break;
                 }
             }
             catch (Exception e)
             {
-                throw new RuntimeException(field + ", record field=" + name, e);
+                throw new RuntimeException(field + ", record field=" + recFieldName, e);
             }
         }
 
         void writeToRecord(Object o, IRecord record, Field field, String recFieldName) throws Exception
         {
-            final String name = recFieldName;
             try
             {
                 final Object fieldObject = field.get(o);
@@ -322,42 +316,42 @@ final class FieldTemplate
                 switch(this)
                 {
                     case TEXT:
-                        record.put(name, String.valueOf(fieldObject));
+                        record.put(recFieldName, String.valueOf(fieldObject));
                         break;
                     case BOOLEAN:
-                        record.put(name, field.getBoolean(o) ? 1l : 0l);
+                        record.put(recFieldName, field.getBoolean(o) ? 1L : 0L);
                         break;
                     case BYTE:
-                        record.put(name, field.getByte(o));
+                        record.put(recFieldName, field.getByte(o));
                         break;
                     case SHORT:
-                        record.put(name, field.getShort(o));
+                        record.put(recFieldName, field.getShort(o));
                         break;
                     case CHAR:
-                        record.put(name, field.getChar(o));
+                        record.put(recFieldName, field.getChar(o));
                         break;
                     case INT:
-                        record.put(name, field.getInt(o));
+                        record.put(recFieldName, field.getInt(o));
                         break;
                     case LONG:
-                        record.put(name, field.getLong(o));
+                        record.put(recFieldName, field.getLong(o));
                         break;
                     case FLOAT:
-                        record.put(name, field.getFloat(o));
+                        record.put(recFieldName, field.getFloat(o));
                         break;
                     case DOUBLE:
-                        record.put(name, field.getDouble(o));
+                        record.put(recFieldName, field.getDouble(o));
                         break;
                     case OBJECT:
-                        record.put(name, BlobValue.toBlob((Serializable) fieldObject));
+                        record.put(recFieldName, BlobValue.toBlob((Serializable) fieldObject));
                         break;
-                    default :
+                    default:
                         break;
                 }
             }
             catch (Exception e)
             {
-                throw new RuntimeException(field + ", record field=" + name, e);
+                throw new RuntimeException(field + ", record field=" + recFieldName, e);
             }
         }
 

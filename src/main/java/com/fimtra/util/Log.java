@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei, Paul Mackinlay
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,24 +31,26 @@ import java.util.concurrent.TimeUnit;
  * A simple logger that writes to a file and to <code>System.err</code>. Uses a
  * {@link RollingFileAppender} to log to a file in the logs directory called
  * message_yyyyMMddHHmmss.log.
- * 
- * @see UtilProperties
+ *
  * @author Ramon Servadei
  * @author Paul Mackinlay
+ * @see UtilProperties
  */
 public abstract class Log
 {
     private static final int LOG_PREFIX_EST_SIZE = 256;
-    /** Controls logging to std.err, default is <code>false</code> for performance reasons */
+    /**
+     * Controls logging to std.err, default is <code>false</code> for performance reasons
+     */
     private static final boolean LOG_TO_STDERR = UtilProperties.Values.LOG_TO_STDERR;
     private static final String DELIM = "|";
     private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
-        ThreadUtils.newScheduledExecutorService("Log-file-appender", 1);
+            ThreadUtils.newScheduledExecutorService("Log-file-appender", 1);
     private static final Object lock = new Object();
     private static final Object qLock = new Object();
     private static final ExecutorService CONSOLE_WRITER_EXECUTOR =
-        ThreadUtils.newSingleThreadExecutorService("console-writer");
+            ThreadUtils.newSingleThreadExecutorService("console-writer");
     private static PrintStream consoleStream = System.err;
 
     static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ArrayDeque<>();
@@ -56,18 +58,11 @@ public abstract class Log
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;
     private static boolean flushTaskPending;
-    private static final Runnable flushTask = new Runnable()
-    {
-        @Override
-        public void run()
-        {
-            flushMessages();
-        }
-    };
+    private static final Runnable flushTask = Log::flushMessages;
 
     /**
      * Encapsulates a log message with logic to print to a stream
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class LogMessage
@@ -119,7 +114,8 @@ public abstract class Log
                 }
             }
             final StringBuilder sb = new StringBuilder(len);
-            final Class<?> c = (this.source instanceof Class<?> ? (Class<?>) this.source : this.source.getClass());
+            final Class<?> c =
+                    (this.source instanceof Class<?> ? (Class<?>) this.source : this.source.getClass());
             String classSimpleName = cachedSimpleNames.get(c);
             if (classSimpleName == null)
             {
@@ -134,8 +130,9 @@ public abstract class Log
                 }
                 cachedSimpleNames.put(c, classSimpleName);
             }
-            sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(classSimpleName).append(
-                ":").append(Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
+            sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(
+                    classSimpleName).append(":").append(
+                    Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
             for (int i = 0; i < this.messages.length; i++)
             {
                 sb.append(this.messages[i]);
@@ -148,7 +145,7 @@ public abstract class Log
         }
     }
 
-    final static ConcurrentHashMap<Class<?>, String> cachedSimpleNames = new ConcurrentHashMap<Class<?>, String>();
+    final static ConcurrentHashMap<Class<?>, String> cachedSimpleNames = new ConcurrentHashMap<>();
 
     static
     {
@@ -181,24 +178,19 @@ public abstract class Log
         }));
 
         // use a thread to perform archiving/purging to prevent startup delays
-        ThreadUtils.newThread(new Runnable()
-        {
-            @Override
-            public void run()
+        ThreadUtils.newThread(() -> {
+            if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
             {
-                if (UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
-                {
-                    FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-                }
-                if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
-                {
-                    FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
-                }
+                FileUtils.archiveLogs(UtilProperties.Values.ARCHIVE_LOGS_OLDER_THAN_MINUTES);
+            }
+            if (UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES > 0)
+            {
+                FileUtils.purgeArchiveLogs(UtilProperties.Values.PURGE_ARCHIVE_LOGS_OLDER_THAN_MINUTES);
             }
         }, "log-archiver").start();
 
-        FILE_APPENDER =
-            RollingFileAppender.createStandardRollingFileAppender("messages", UtilProperties.Values.LOG_DIR);
+        FILE_APPENDER = RollingFileAppender.createStandardRollingFileAppender("messages",
+                UtilProperties.Values.LOG_DIR);
         System.out.println("Log file " + FILE_APPENDER);
     }
 
@@ -209,11 +201,10 @@ public abstract class Log
 
     /**
      * Set the PrintStream to use for console messages
-     * 
-     * @param stream
-     *            the console stream to use
+     *
+     * @param stream the console stream to use
      */
-    public static final void setConsoleStream(PrintStream stream)
+    public static void setConsoleStream(PrintStream stream)
     {
         CONSOLE_WRITER_EXECUTOR.execute(() -> {
             synchronized (lock)
@@ -223,18 +214,19 @@ public abstract class Log
         });
     }
 
-    public static final void log(Object source, String... messages)
+    public static void log(Object source, String... messages)
     {
         log(new LogMessage(Thread.currentThread(), source, messages));
     }
 
-    public static final void log(Object source, String message, Throwable t)
+    public static void log(Object source, String message, Throwable t)
     {
         final StringWriter stringWriter = new StringWriter(1024);
         final PrintWriter pw = new PrintWriter(stringWriter);
         pw.println();
         t.printStackTrace(pw);
-        final LogMessage logMessage = new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
+        final LogMessage logMessage =
+                new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
         log(logMessage);
     }
 
@@ -274,7 +266,7 @@ public abstract class Log
     /**
      * Create a banner message
      */
-    public static final void banner(Object source, String message)
+    public static void banner(Object source, String message)
     {
         // note: use "\n" to cover unix "\n" and windows "\r\n"
         final String[] elements = message.split("\n");
@@ -294,7 +286,7 @@ public abstract class Log
         }
         final String surround = sb.toString();
         Log.log(source, SystemUtils.lineSeparator(), surround, SystemUtils.lineSeparator(), message,
-            SystemUtils.lineSeparator(), surround);
+                SystemUtils.lineSeparator(), surround);
     }
 
     static void flushMessages()
@@ -303,7 +295,7 @@ public abstract class Log
 
         synchronized (lock)
         {
-            LogMessage message = null;
+            LogMessage message;
             if (exceptionEncountered)
             {
                 while ((message = pollMessages()) != null)
@@ -356,7 +348,8 @@ public abstract class Log
         {
             synchronized (System.err)
             {
-                System.err.println("ALERT! LOG MESSAGE(S) LOST! Log output switching to stderr. See exception below.");
+                System.err.println(
+                        "ALERT! LOG MESSAGE(S) LOST! Log output switching to stderr. See exception below.");
                 e.printStackTrace();
             }
             exceptionEncountered = true;
