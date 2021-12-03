@@ -29,10 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
-
 /**
  * Simple performance test for the {@link ThimbleExecutor}
  * 
@@ -52,7 +48,6 @@ public class ThimblePerfTest
     {
         final int eventCount = 500;
         final int procCount = 5;
-        System.err.println("Events, Consumers, arrayTime, thimbleTime, thimbleSeq, thimbleCoalesce, executorsTime");
         long arrtime = 0, thimbleTime = 0, thimSequentialTime = 0, thimbleCoalesceTime = 0, executorTime = 0;
         double factor = 4;
         for (int j = 1; j < procCount; j++)
@@ -63,8 +58,10 @@ public class ThimblePerfTest
             thimbleCoalesceTime = runThimble(Boolean.FALSE, eventCount, 1 << j);
             executorTime = runExecutor(eventCount, 1 << j, 1 << j);
             final String results =
-                eventCount + ", " + (1 << j) + ", " + +arrtime + ", " + thimbleTime + ", " + thimSequentialTime + ", "
-                    + thimbleCoalesceTime + ", " + executorTime;
+                    "evtCount=" + eventCount + ", threads=" + (1 << j) + ", arrtime=" + +arrtime
+                            + ", thimbleTime=" + thimbleTime + ", thimSequentialTime=" + thimSequentialTime
+                            + ", thimbleCoalesceTime=" + thimbleCoalesceTime + ", executorTime="
+                            + executorTime;
             System.err.println(results);
             assertTrue("Got " + results, thimbleTime < executorTime * factor);
             assertTrue("Got " + results, thimbleCoalesceTime < executorTime);
