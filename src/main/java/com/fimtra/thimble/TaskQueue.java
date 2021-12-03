@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,30 +28,32 @@ import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.SingleThreadReusableObjectPool;
 
 /**
- * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted
- * via the {@link #offer_callWhilstHoldingLock(Runnable)} method. The
- * {@link #poll_callWhilstHoldingLock()} method will return the most appropriate task.
+ * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted via the
+ * {@link #offer_callWhilstHoldingLock(Runnable)} method. The {@link #poll_callWhilstHoldingLock()} method
+ * will return the most appropriate task.
  * <p>
- * Generally, runnables are returned from the queue in a FIFO manner. Runnables extending
- * {@link ISequentialRunnable} or {@link ICoalescingRunnable} will be returned from the queue in a
- * manner that fits the interface description, e.g. for {@link ISequentialRunnable}, the runnable is
- * only returned if no other runnable (for the same context) is executing, thus maintaining the
- * contract of sequentially executing tasks.
+ * Generally, runnables are returned from the queue in a FIFO manner. Runnables extending {@link
+ * ISequentialRunnable} or {@link ICoalescingRunnable} will be returned from the queue in a manner that fits
+ * the interface description, e.g. for {@link ISequentialRunnable}, the runnable is only returned if no other
+ * runnable (for the same context) is executing, thus maintaining the contract of sequentially executing
+ * tasks.
  * <p>
  * <b>This is thread safe.</b>
- * 
+ *
  * @author Ramon Servadei
  */
 final class TaskQueue
 {
-    /** By default, the queue tracks task statistics at a queue level, not at a per-context level */
+    /**
+     * By default, the queue tracks task statistics at a queue level, not at a per-context level
+     */
     private final static boolean GENERATE_STATISTICS_PER_CONTEXT =
-        Boolean.getBoolean("thimble.generateStatisticsPerContext");
+            Boolean.getBoolean("thimble.generateStatisticsPerContext");
 
     private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
-        Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
+            Integer.parseInt(System.getProperty("thimble.sequentialTasksMaxPoolSize", "1000"));
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
-        Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
+            Integer.parseInt(System.getProperty("thimble.coalescingTasksMaxPoolSize", "1000"));
 
     interface InternalTaskQueue<T> extends Runnable
     {
@@ -61,9 +63,9 @@ final class TaskQueue
     }
 
     /**
-     * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to
-     * {@link #run()} will dequeue the next runnable from an internal list and execute it.
-     * 
+     * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to {@link
+     * #run()} will dequeue the next runnable from an internal list and execute it.
+     *
      * @author Ramon Servadei
      */
     final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
@@ -155,9 +157,9 @@ final class TaskQueue
     }
 
     /**
-     * Holds all {@link ICoalescingRunnable} objects for the same execution context. Each call to
-     * {@link #run()} will execute the latest {@link ICoalescingRunnable} for the context.
-     * 
+     * Holds all {@link ICoalescingRunnable} objects for the same execution context. Each call to {@link
+     * #run()} will execute the latest {@link ICoalescingRunnable} for the context.
+     *
      * @author Ramon Servadei
      */
     final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
@@ -210,8 +212,11 @@ final class TaskQueue
         @Override
         public void offer(ICoalescingRunnable latest)
         {
-            this.stats.itemSubmitted();
-            this.latestTask.set(latest);
+            if (this.latestTask.getAndSet(latest) == null)
+            {
+                // only track submitted if there was no coalescing (else the qOverflow becomes skewed)
+                this.stats.itemSubmitted();
+            }
         }
 
         @Override
@@ -238,17 +243,19 @@ final class TaskQueue
     {
         this.name = name;
         this.sequentialTasksPool =
-            new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new, (instance) -> {
-                instance.context = null;
-                instance.stats = null;
-                instance.active = false;
-            }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
+                new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new,
+                        (instance) -> {
+                            instance.context = null;
+                            instance.stats = null;
+                            instance.active = false;
+                        }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
         this.coalescingTasksPool =
-            new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new, (instance) -> {
-                instance.context = null;
-                instance.stats = null;
-                instance.active = false;
-            }, COALESCING_TASKS_MAX_POOL_SIZE);
+                new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new,
+                        (instance) -> {
+                            instance.context = null;
+                            instance.stats = null;
+                            instance.active = false;
+                        }, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
         this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
         this.allSequentialStats = new TaskStatistics("Sequential" + IContextExecutor.QUEUE_LEVEL_STATS);
@@ -256,8 +263,7 @@ final class TaskQueue
     }
 
     /**
-     * Add the runnable to the queue, ordering it as appropriate for any annotation present on the
-     * runnable.
+     * Add the runnable to the queue, ordering it as appropriate for any annotation present on the runnable.
      */
     void offer_callWhilstHoldingLock(Runnable runnable)
     {
@@ -268,23 +274,11 @@ final class TaskQueue
             SequentialTasks sequentialTasks = this.sequentialTasksPerContext.get(context);
             if (sequentialTasks == null)
             {
-                TaskStatistics stats;
-                if (GENERATE_STATISTICS_PER_CONTEXT)
-                {
-                    stats = this.sequentialTaskStatsPerContext.get(context);
-                    if (stats == null)
-                    {
-                        stats = new TaskStatistics(context);
-                        this.sequentialTaskStatsPerContext.put(context, stats);
-                    }
-                }
-                else
-                {
-                    stats = this.allSequentialStats;
-                }
                 sequentialTasks = this.sequentialTasksPool.get();
                 sequentialTasks.context = context;
-                sequentialTasks.stats = stats;
+                sequentialTasks.stats = this.sequentialTaskStatsPerContext.computeIfAbsent(
+                        GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
+                        TaskStatistics::new);
                 this.sequentialTasksPerContext.put(context, sequentialTasks);
             }
 
@@ -303,23 +297,11 @@ final class TaskQueue
                 CoalescingTasks coalescingTasks = this.coalescingTasksPerContext.get(context);
                 if (coalescingTasks == null)
                 {
-                    TaskStatistics stats;
-                    if (GENERATE_STATISTICS_PER_CONTEXT)
-                    {
-                        stats = this.coalescingTaskStatsPerContext.get(context);
-                        if (stats == null)
-                        {
-                            stats = new TaskStatistics(context);
-                            this.coalescingTaskStatsPerContext.put(context, stats);
-                        }
-                    }
-                    else
-                    {
-                        stats = this.allCoalescingStats;
-                    }
                     coalescingTasks = this.coalescingTasksPool.get();
                     coalescingTasks.context = context;
-                    coalescingTasks.stats = stats;
+                    coalescingTasks.stats = this.coalescingTaskStatsPerContext.computeIfAbsent(
+                            GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
+                            TaskStatistics::new);
                     this.coalescingTasksPerContext.put(context, coalescingTasks);
                 }
 
@@ -349,8 +331,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats =
-            new HashMap<>(this.sequentialTaskStatsPerContext.size());
+        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.sequentialTaskStatsPerContext.size());
         for (Map.Entry<Object, TaskStatistics> entry : this.sequentialTaskStatsPerContext.entrySet())
         {
             stats.put(entry.getKey(), entry.getValue().intervalFinished());
@@ -363,8 +344,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats =
-            new HashMap<>(this.coalescingTaskStatsPerContext.size());
+        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.coalescingTaskStatsPerContext.size());
         for (Map.Entry<Object, TaskStatistics> entry : this.coalescingTaskStatsPerContext.entrySet())
         {
             stats.put(entry.getKey(), entry.getValue().intervalFinished());
