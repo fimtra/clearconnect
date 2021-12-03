@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -55,7 +55,7 @@ import com.fimtra.util.ObjectUtils;
  * <p>
  * TCP socket options are configured by system properties and are applied by the
  * {@link TcpChannelUtils#setOptions(SocketChannel)} method.
- * 
+ *
  * @author Ramon Servadei
  */
 public class TcpChannel implements ITransportChannel
@@ -69,11 +69,11 @@ public class TcpChannel implements ITransportChannel
     {
         /**
          * Length-based frame encoding, in the following format (ABNF notation):
-         * 
+         *
          * <pre>
          *  stream = 1*frame
          *  frame = length data
-         * 
+         *
          *  length = 4OCTET ; big-endian integer indicating the length of the data
          *  data = 1*OCTET ; the data
          * </pre>
@@ -82,13 +82,13 @@ public class TcpChannel implements ITransportChannel
 
         /**
          * Terminator-based frame encoding, in the following format (ABNF notation):
-         * 
+         *
          * <pre>
          * stream = 1*frame
-         * 
+         *
          * frame = data terminator
          * data = 1*OCTET ; the data
-         * 
+         *
          * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
          * </pre>
          */
@@ -129,7 +129,7 @@ public class TcpChannel implements ITransportChannel
      * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
      * from the socket and logic to resolve a frame from the fragments received from the socket
      * buffer.
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class RxFrameResolver implements ISequentialRunnable
@@ -179,7 +179,7 @@ public class TcpChannel implements ITransportChannel
     /**
      * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
      * the same {@link SelectorProcessor}.
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class SendChannelChain
@@ -198,7 +198,7 @@ public class TcpChannel implements ITransportChannel
         volatile TcpChannel first;
         /**
          * The end of the logical linked-list of TcpChannels with data to send.
-         * 
+         *
          * @see #first
          */
         volatile TcpChannel last;
@@ -209,13 +209,13 @@ public class TcpChannel implements ITransportChannel
 
     /**
      * Add the channel into the chain. If it already there, does nothing.
-     * 
+     *
      * @param channel
      *            the channel to add
      * @return <code>true</code> if this is the first channel to be added into the chain - and thus
      *         the {@link SelectorProcessor} needs to be triggered for writing
      */
-    private synchronized static final boolean linkChannel(TcpChannel channel)
+    private synchronized static boolean linkChannel(TcpChannel channel)
     {
         final SendChannelChain chain = channel.sendChannelChain;
         if (channel.prev == null && channel.next == null && chain.first != channel)
@@ -224,15 +224,12 @@ public class TcpChannel implements ITransportChannel
             {
                 chain.first = channel;
                 chain.last = channel;
-                channel.prev = null;
-                channel.next = null;
                 return true;
             }
             else
             {
                 chain.last.next = channel;
                 channel.prev = chain.last;
-                channel.next = null;
                 chain.last = channel;
                 return false;
             }
@@ -240,7 +237,7 @@ public class TcpChannel implements ITransportChannel
         return false;
     }
 
-    private synchronized static final void unlinkChannel(TcpChannel channel)
+    private synchronized static void unlinkChannel(TcpChannel channel)
     {
         switch(channel.state)
         {
@@ -280,7 +277,7 @@ public class TcpChannel implements ITransportChannel
 
     final SelectorProcessor reader;
     final SelectorProcessor writer;
-    volatile int rxData;
+    volatile boolean rxData;
     final IReceiver receiver;
     final ByteBuffer rxByteBuffer;
     final byte[] rxBytes;
@@ -300,12 +297,12 @@ public class TcpChannel implements ITransportChannel
     /** The short-hand description of the end-point connections */
     final String shortSocketDescription;
     /**
-     * Tracks if the {@link IReceiver#onChannelConnected(ITcpChannel)} has been called. Ensures its
+     * Tracks if the {@link IReceiver#onChannelConnected(ITransportChannel)} has been called. Ensures its
      * only called once.
      */
     private boolean onChannelConnectedCalled;
     /**
-     * Tracks if the {@link IReceiver#onChannelClosed(ITcpChannel)} has been called. Ensures its
+     * Tracks if the {@link IReceiver#onChannelClosed(ITransportChannel)} has been called. Ensures its
      * only called once.
      */
     private final AtomicBoolean onChannelClosedCalled;
@@ -321,9 +318,9 @@ public class TcpChannel implements ITransportChannel
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
      * format.
-     * 
-     * @see TcpChannelProperties#FRAME_ENCODING
-     * @see TcpChannelProperties#RX_BUFFER_SIZE
+     *
+     * @see TcpChannelProperties.Values#FRAME_ENCODING
+     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver) throws ConnectException
@@ -334,8 +331,8 @@ public class TcpChannel implements ITransportChannel
     /**
      * Construct a {@link TcpChannel} with a specific receive buffer size and default frame encoding
      * format.
-     * 
-     * @see TcpChannelProperties#FRAME_ENCODING
+     *
+     * @see TcpChannelProperties.Values#FRAME_ENCODING
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver, int rxBufferSize) throws ConnectException
@@ -346,8 +343,8 @@ public class TcpChannel implements ITransportChannel
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
      * format.
-     * 
-     * @see TcpChannelProperties#RX_BUFFER_SIZE
+     *
+     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
      */
     public TcpChannel(String serverHost, int serverPort, IReceiver receiver,
@@ -362,10 +359,10 @@ public class TcpChannel implements ITransportChannel
      * ready for use however the underlying {@link SocketChannel} may not yet be connected. This
      * does not stop the channel from being used; any data queued up to send via the
      * {@link #send(byte[])} method will be sent when the connection completes.
-     * 
+     *
      * @param serverHost
      *            the target host for the TCP connection
-     * @param port
+     * @param serverPort
      *            the target port for the TCP connection
      * @param receiver
      *            the object that will receive all the communication data from the target host
@@ -508,7 +505,7 @@ public class TcpChannel implements ITransportChannel
             {
                 this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
             }
-            
+
             final Deque<TxByteArrayFragment> pendingTxFrames;
             StateEnum action = StateEnum.IDLE;
             synchronized (this.lock)
@@ -607,7 +604,7 @@ public class TcpChannel implements ITransportChannel
                 case 0:
                     return;
                 default :
-                    this.rxData++;
+                    this.rxData = true;
             }
 
             frameResolver.socketRead = System.nanoTime() - start;
@@ -616,7 +613,7 @@ public class TcpChannel implements ITransportChannel
         }
         catch (IOException e)
         {
-            destroy("Could not read from socket (" + e.toString() + ")");
+            destroy("Could not read from socket (" + e + ")");
         }
     }
 
@@ -683,31 +680,29 @@ public class TcpChannel implements ITransportChannel
             }
             resolveFrames = System.nanoTime();
 
+            ByteBuffer resolvedFrame;
             for (i = 0; i < resolvedFramesSize; i++)
             {
                 // NOTE: we know that all ByteBuffers coming in here have position=0
                 // (because they come from ByteArrayFragment.getData()
                 // so limit() is the length
-                switch(this.resolvedFrames[i].limit())
+                resolvedFrame = this.resolvedFrames[i];
+                if (resolvedFrame.limit() == 1 && ChannelUtils.HEARTBEAT_SIGNAL[0] == resolvedFrame.get(0))
                 {
-                    case 1:
-                        if (ChannelUtils.HEARTBEAT_SIGNAL[0] == this.resolvedFrames[i].get(0))
-                        {
-                            ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
-                            break;
-                        }
-                        //$FALL-THROUGH$
-                    default :
-                        try
-                        {
-                            this.receiver.onDataReceived(this.resolvedFrames[i], this);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.log(this, ObjectUtils.safeToString(this) + " receiver "
-                                + ObjectUtils.safeToString(this.receiver) + " threw exception during onDataReceived",
-                                e);
-                        }
+                    ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
+                }
+                else
+                {
+                    try
+                    {
+                        this.receiver.onDataReceived(resolvedFrame, this);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.log(this,
+                                ObjectUtils.safeToString(this) + " receiver " + ObjectUtils.safeToString(
+                                        this.receiver) + " threw exception during onDataReceived", e);
+                    }
                 }
                 this.resolvedFrames[i] = null;
             }
@@ -715,7 +710,7 @@ public class TcpChannel implements ITransportChannel
         }
         catch (Exception e)
         {
-            destroy("Could not read from socket (" + e.toString() + ")");
+            destroy("Could not read from socket (" + e + ")");
         }
         finally
         {
@@ -747,7 +742,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
-    static final void writeFrames(SelectorProcessor writer)
+    static void writeFrames(SelectorProcessor writer)
     {
         /*
          * This code logic will give equal opportunity for sending across all channels in the
@@ -806,10 +801,10 @@ public class TcpChannel implements ITransportChannel
                                 channel.state = StateEnum.IDLE;
                             }
                         }
-                        
+
                         action = channel.state;
                     }
-                    
+
                     // handle unlink/idle operation outside of the channel lock
                     switch(action)
                     {
@@ -856,7 +851,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
-    private synchronized static final void unlinkAndReset(TcpChannel channel)
+    private synchronized static void unlinkAndReset(TcpChannel channel)
     {
         if (channel.state == StateEnum.IDLE)
         {
@@ -912,7 +907,7 @@ public class TcpChannel implements ITransportChannel
                 this.txFrames[this.sendingQueue].clear();
                 this.rxByteBuffer.clear();
             }
-            
+
             unlinkChannel(this);
 
             if (this.socketChannel != null)
@@ -945,8 +940,8 @@ public class TcpChannel implements ITransportChannel
     @Override
     public boolean hasRxData()
     {
-        final boolean hasRxData = this.rxData > 0;
-        this.rxData = 0;
+        final boolean hasRxData = this.rxData;
+        this.rxData = false;
         return hasRxData;
     }
 
@@ -959,7 +954,7 @@ public class TcpChannel implements ITransportChannel
 
 /**
  * Interface for the component that reads and writes transmission frames for a {@link TcpChannel}
- * 
+ *
  * @author Ramon Servadei
  */
 interface IFrameReaderWriter
@@ -983,7 +978,7 @@ interface IFrameReaderWriter
  * Base class for {@link IFrameReaderWriter} implementations. This class handles partial writing of
  * data buffers to a socket. The {@link #writeBufferToSocket()} method will continually attempt to
  * write the buffers to the socket until all data has been sent.
- * 
+ *
  * @author Ramon Servadei
  */
 abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
@@ -1010,7 +1005,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     }
 
     /**
-     * Write the internal {@link #buffers} to the socket. This will continually try to write the
+     * Write the internal {@link #txBuffer} to the socket. This will continually try to write the
      * buffer to the socket until all the data has been written.
      */
     final void writeBufferToSocket() throws IOException
@@ -1060,8 +1055,8 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
 
 /**
  * Handles frame encoding using a terminator field after each frame.
- * 
- * @see TcpChannelUtils#decodeUsingTerminator(List, ByteBuffer, byte[])
+ *
+ * @see TcpChannelUtils#decodeUsingTerminator(ByteBuffer[], int[], ByteBuffer, byte[], byte[])
  * @author Ramon Servadei
  */
 final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
@@ -1093,8 +1088,8 @@ final class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter
 
 /**
  * Handles frame encoding with a 4-byte length field before each frame.
- * 
- * @see TcpChannelUtils#decode(ByteBuffer)
+ *
+ * @see TcpChannelUtils#decode(ByteBuffer[], int[], ByteBuffer, byte[])
  * @author Ramon Servadei
  */
 final class LengthBasedWriter extends AbstractFrameReaderWriter
