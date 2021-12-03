@@ -479,11 +479,15 @@ public abstract class GZipUtils
         }
     }
 
-    static final ThreadLocal<ReusableGZIPOutputStream> DEFLATER = ThreadLocal.withInitial(
-            () -> new ReusableGZIPOutputStream(new ByteArrayOutputStream(),
-                    new Deflater(Deflater.DEFAULT_COMPRESSION, true)));
-    static final ThreadLocal<ReusableGZIPInputStream> INFLATER = ThreadLocal.withInitial(
-            () -> new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1)));
+    static final ThreadLocal<ReusableGZIPOutputStream> DEFLATER = ThreadLocal.withInitial(() -> {
+        ThreadUtils.registerThreadLocalCleanup(GZipUtils.DEFLATER::remove);
+        return new ReusableGZIPOutputStream(new ByteArrayOutputStream(),
+                new Deflater(Deflater.DEFAULT_COMPRESSION, true));
+    });
+    static final ThreadLocal<ReusableGZIPInputStream> INFLATER = ThreadLocal.withInitial(() -> {
+        ThreadUtils.registerThreadLocalCleanup(GZipUtils.INFLATER::remove);
+        return new ReusableGZIPInputStream(new UnsynchronizedByteArrayInputStream(new byte[1], 0, 1));
+    });
 
     /**
      * Compress a ByteBuffer's byte[] with a {@link ReusableGZIPOutputStream}
