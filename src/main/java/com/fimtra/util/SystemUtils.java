@@ -15,11 +15,13 @@
  */
 package com.fimtra.util;
 
+import com.fimtra.tcpchannel.TcpChannelProperties;
+import sun.plugin2.util.SystemUtil;
+
 /**
  * @author Ramon Servadei
  */
-public abstract class SystemUtils
-{
+public abstract class SystemUtils {
     private static final String LINE_SEPARATOR = System.getProperty("line.separator", "\n");
 
     private SystemUtils()
@@ -29,5 +31,56 @@ public abstract class SystemUtils
     public static String lineSeparator()
     {
         return LINE_SEPARATOR;
+    }
+
+    /**
+     * @return the system property as a long, or the defaultValue
+     */
+    public static long getPropertyAsLong(String propertyKey, long defaultValue)
+    {
+        try
+        {
+            return Long.parseLong(System.getProperty(propertyKey, "" + defaultValue));
+        }
+        catch (Exception e)
+        {
+            Log.log(SystemUtils.class,
+                    "Could not parse " + propertyKey + ", returning default: " + defaultValue, e);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * @return the system property as an int, or the defaultValue
+     */
+    public static int getPropertyAsInt(String propertyKey, int defaultValue)
+    {
+        try
+        {
+            return Integer.parseInt(System.getProperty(propertyKey, "" + defaultValue));
+        }
+        catch (Exception e)
+        {
+            Log.log(SystemUtils.class,
+                    "Could not parse " + propertyKey + ", returning default: " + defaultValue, e);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * @return the system property as a boolean, or the defaultValue
+     */
+    public static boolean getProperty(String propertyKey, boolean defaultValue)
+    {
+        try
+        {
+            return Boolean.valueOf(System.getProperty(propertyKey, "" + defaultValue)).booleanValue();
+        }
+        catch (Exception e)
+        {
+            Log.log(SystemUtils.class,
+                    "Could not parse " + propertyKey + ", returning default: " + defaultValue, e);
+            return defaultValue;
+        }
     }
 }

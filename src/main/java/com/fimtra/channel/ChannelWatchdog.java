@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
+import com.fimtra.util.SystemUtils;
 
 /**
  * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
@@ -54,7 +55,7 @@ public final class ChannelWatchdog implements Runnable
 {
     /** The tolerance to allow before logging if a received heartbeat is too early or too late. */
     static final long HB_TOLERANCE_MILLIS =
-        Long.parseLong(System.getProperty("channelWatchdog.hbToleranceMillis", "1000"));
+            SystemUtils.getPropertyAsLong("channelWatchdog.hbToleranceMillis", 1000);
 
     int heartbeatPeriodMillis;
     long lateHeartbeatLimit;
@@ -89,8 +90,8 @@ public final class ChannelWatchdog implements Runnable
         this.channelsReceivingHeartbeat = new HashSet<>();
         this.channelsMissingHeartbeat = new HashMap<>();
         this.channelsHeartbeatArrivalTime = new ConcurrentHashMap<>();
-        configure(Integer.parseInt(System.getProperty("ChannelWatchdog.periodMillis", "30000")),
-            Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
+        configure(SystemUtils.getPropertyAsInt("ChannelWatchdog.periodMillis", 30_000),
+                SystemUtils.getPropertyAsInt("ChannelWatchdog.missedHbCount", 3));
     }
 
     public int getHeartbeatPeriodMillis()
@@ -112,7 +113,7 @@ public final class ChannelWatchdog implements Runnable
      */
     public void configure(int periodMillis)
     {
-        configure(periodMillis, Integer.parseInt(System.getProperty("ChannelWatchdog.missedHbCount", "3")));
+        configure(periodMillis, SystemUtils.getPropertyAsInt("ChannelWatchdog.missedHbCount", 3));
     }
 
     /**
