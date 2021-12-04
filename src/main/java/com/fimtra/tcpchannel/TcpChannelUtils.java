@@ -25,10 +25,14 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
@@ -121,54 +125,90 @@ public abstract class TcpChannelUtils
         void onConnectionFailed(Exception e);
     }
 
+    static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();
+
     /**
      * Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin.
      */
-    static final SelectorProcessor[] READER;
-    private static int currentReader = 0;
-
-    static
-    {
-        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
-    }
+    static final List<SelectorProcessor> READERS = new ArrayList<>();
+    private static SelectorProcessor currentReader;
 
     static synchronized SelectorProcessor nextReader()
     {
-        if (currentReader == READER.length)
-        {
-            currentReader = 0;
-        }
-        if (READER[currentReader] == null)
-        {
-            READER[currentReader] =
-                    new SelectorProcessor("tcp-channel-reader-" + currentReader, SelectionKey.OP_READ);
-        }
-        return READER[currentReader++];
+        currentReader = nextSelector(READERS, currentReader,
+                () -> new SelectorProcessor("tcp-channel-reader-" + READERS.size(), SelectionKey.OP_READ),
+                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.READER_CHANNELS_PER_SELECTOR,
+                TcpChannelProperties.Values.READER_THREAD_COUNT);
+        return currentReader;
     }
 
     /**
      * Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin.
      */
-    static final SelectorProcessor[] WRITER;
-    private static int currentWriter = 0;
-
-    static
-    {
-        WRITER = new SelectorProcessor[TcpChannelProperties.Values.WRITER_THREAD_COUNT];
-    }
+    static final List<SelectorProcessor> WRITERS = new ArrayList<>();
+    private static SelectorProcessor currentWriter;
 
     static synchronized SelectorProcessor nextWriter()
     {
-        if (currentWriter == WRITER.length)
+        currentWriter = nextSelector(WRITERS, currentWriter,
+                () -> new SelectorProcessor("tcp-channel-writer-" + WRITERS.size(), SelectionKey.OP_WRITE),
+                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.WRITER_CHANNELS_PER_SELECTOR,
+                TcpChannelProperties.Values.WRITER_THREAD_COUNT);
+        return currentWriter;
+    }
+
+    static synchronized void freeSelector(SelectorProcessor selectorProcessor)
+    {
+        freeSelector(selectorProcessor, COUNTS_PER_SELECTOR);
+    }
+
+    static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)
+    {
+        countsPerSelector.get(currentSelector).decrementAndGet();
+    }
+
+    static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,
+            Map<T, AtomicInteger> countsPerSelector, int maxChannelsPerSelector, int maxThreadCount)
+    {
+        T selectorToUse = currentSelector;
+        if (selectorToUse == null)
         {
-            currentWriter = 0;
+            selectorToUse = ctor.get();
+            selectors.add(selectorToUse);
         }
-        if (WRITER[currentWriter] == null)
+        else
         {
-            WRITER[currentWriter] =
-                    new SelectorProcessor("tcp-channel-writer-" + currentWriter, SelectionKey.OP_WRITE);
+            final AtomicInteger counts =
+                    countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger());
+            if (counts.get() >= maxChannelsPerSelector)
+            {
+                // find free one or create new one if under limit
+                if (selectors.size() < maxThreadCount)
+                {
+                    selectorToUse = ctor.get();
+                    selectors.add(selectorToUse);
+                }
+                else
+                {
+                    // find the one with the lowest counts
+                    int lowestCount = Integer.MAX_VALUE;
+                    for (T selector : selectors)
+                    {
+                        // NOTE: countsPerSelector has reader and writer selector counts!
+                        // We use our selectors list to find the correct reader/writer selectors to check
+                        final int current = countsPerSelector.get(selector).intValue();
+                        if (current < lowestCount)
+                        {
+                            lowestCount = current;
+                            selectorToUse = selector;
+                        }
+                    }
+                }
+            }
         }
-        return WRITER[currentWriter++];
+
+        countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger()).incrementAndGet();
+        return selectorToUse;
     }
 
     /** Handles all socket accept operations for all {@link TcpServer} instances */

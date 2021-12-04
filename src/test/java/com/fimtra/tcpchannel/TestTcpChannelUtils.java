@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,18 +21,23 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
+import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+import com.fimtra.util.ByteBufferUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
-import com.fimtra.util.ByteBufferUtils;
-
 /**
  * Tests for the {@link TcpChannelUtils}
- * 
+ *
  * @author Ramon Servadei
  */
 public class TestTcpChannelUtils
@@ -47,6 +52,63 @@ public class TestTcpChannelUtils
     @After
     public void tearDown() throws Exception
     {
+    }
+
+    @Test
+    public void testNextSelector()
+    {
+        List<String> selectors = new ArrayList<>();
+        String currentSelector = null;
+        Supplier<String> ctor = () -> "" + selectors.size();
+        Map<String, AtomicInteger> countsPerSelector = new ConcurrentHashMap<>();
+        int maxChannelsPerSelector = 4;
+        int maxThreadCount = 2;
+        for (int i = 0; i < maxChannelsPerSelector; i++)
+        {
+            currentSelector =
+                    TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                            maxChannelsPerSelector, maxThreadCount);
+            assertEquals("loop=" + i, "0", currentSelector);
+        }
+        for (int i = 0; i < maxChannelsPerSelector; i++)
+        {
+            currentSelector =
+                    TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                            maxChannelsPerSelector, maxThreadCount);
+            assertEquals("loop=" + i, "1", currentSelector);
+        }
+
+        // now we will have maxed out both threads - so round-robin
+        for (int i = 0; i < maxChannelsPerSelector; i++)
+        {
+            currentSelector =
+                    TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                            maxChannelsPerSelector, maxThreadCount);
+            assertEquals("loop=" + i, "0", currentSelector);
+            currentSelector =
+                    TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                            maxChannelsPerSelector, maxThreadCount);
+            assertEquals("loop=" + i, "1", currentSelector);
+        }
+
+        // free two "1"'s
+        TcpChannelUtils.freeSelector("1", countsPerSelector);
+        currentSelector =
+                TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                        maxChannelsPerSelector, maxThreadCount);
+        assertEquals("1", currentSelector);
+        TcpChannelUtils.freeSelector("1", countsPerSelector);
+        currentSelector =
+                TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                        maxChannelsPerSelector, maxThreadCount);
+        assertEquals("1", currentSelector);
+
+        // free a "0"
+        TcpChannelUtils.freeSelector("0", countsPerSelector);
+        currentSelector =
+                TcpChannelUtils.nextSelector(selectors, currentSelector, ctor, countsPerSelector,
+                        maxChannelsPerSelector, maxThreadCount);
+        assertEquals("0", currentSelector);
     }
 
     @Test
@@ -66,14 +128,16 @@ public class TestTcpChannelUtils
         buffer.put(unfinished.getBytes());
 
         ByteBuffer[] result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(),
+                terminator);
         assertEquals(2, this.readFramesSize[0]);
         assertEquals(hello, new String(ByteBufferUtils.asBytes(result[0])));
         assertEquals(world, new String(ByteBufferUtils.asBytes(result[1])));
         buffer.compact();
 
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(),
+                terminator);
         assertEquals(0, this.readFramesSize[0]);
         buffer.compact();
 
@@ -81,14 +145,16 @@ public class TestTcpChannelUtils
         buffer.put(terminator);
         buffer.put(terminator);
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(),
+                terminator);
         assertEquals(2, this.readFramesSize[0]);
         assertEquals(unfinished + finished, new String(ByteBufferUtils.asBytes(result[0])));
         assertEquals("", new String(ByteBufferUtils.asBytes(result[1])));
         buffer.compact();
 
         result = new ByteBuffer[2];
-        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(), terminator);
+        result = TcpChannelUtils.decodeUsingTerminator(result, this.readFramesSize, buffer, buffer.array(),
+                terminator);
         assertEquals(0, buffer.position());
         assertEquals(0, this.readFramesSize[0]);
     }
@@ -176,7 +242,7 @@ public class TestTcpChannelUtils
         ByteBuffer[] decode = new ByteBuffer[2];
         decode = TcpChannelUtils.decodeUsingTerminator(decode, this.readFramesSize, buffer, data, terminator);
     }
-    
+
     @Test(expected = IOException.class)
     public void testBindWithinRange() throws IOException
     {
@@ -184,12 +250,12 @@ public class TestTcpChannelUtils
         ssoc1.setReuseAddress(true);
         TcpChannelUtils.bindWithinRange(ssoc1, null, 2000, 2001);
         assertEquals(2000, ssoc1.getLocalPort());
-        
+
         ServerSocket ssoc2 = new ServerSocket();
         ssoc2.setReuseAddress(true);
         TcpChannelUtils.bindWithinRange(ssoc2, null, 2000, 2001);
         assertEquals(2001, ssoc2.getLocalPort());
-        
+
         // exception now
         ServerSocket ssoc3 = new ServerSocket();
         ssoc3.setReuseAddress(true);

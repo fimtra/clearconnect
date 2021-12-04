@@ -145,6 +145,22 @@ public abstract class TcpChannelProperties
         String WRITER_THREAD_COUNT = BASE + "writerThreadCount";
 
         /**
+         * The system property name to define the number of channels/sockets associated with a reader {@link
+         * SelectorProcessor} before creating a new selector to spread the load.
+         * <p>
+         * E.g. <code>-DtcpChannel.readerChannelsPerSelector=4</code>
+         */
+        String READER_CHANNELS_PER_SELECTOR = BASE + "readerChannelsPerSelector";
+
+        /**
+         * The system property name to define the number of channels/sockets associated with a writer {@link
+         * SelectorProcessor} before creating a new selector to spread the load.
+         * <p>
+         * E.g. <code>-DtcpChannel.writerChannelsPerSelector=4</code>
+         */
+        String WRITER_CHANNELS_PER_SELECTOR = BASE + "writerChannelsPerSelector";
+
+        /**
          * The system property name to define the maximum size of the pool to hold re-usable tx fragment
          * objects.
          * <p>
@@ -305,6 +321,26 @@ public abstract class TcpChannelProperties
          * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
          */
         int WRITER_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.WRITER_THREAD_COUNT,
+                DataFissionProperties.Values.CORE_THREAD_COUNT);
+
+        /**
+         * The number of channels/sockets associated with a reader {@link SelectorProcessor} before creating a
+         * new selector to spread the load. Reader selector count never exceeds {@link #READER_THREAD_COUNT}.
+         * If all selectors are maxed out, we round-robin between them using the lowest each time.
+         * <p>
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
+         */
+        int READER_CHANNELS_PER_SELECTOR = SystemUtils.getPropertyAsInt(Names.READER_CHANNELS_PER_SELECTOR,
+                DataFissionProperties.Values.CORE_THREAD_COUNT);
+
+        /**
+         * The number of channels/sockets associated with a writer {@link SelectorProcessor} before creating a
+         * new selector to spread the load. Writer selector count never exceeds {@link #WRITER_THREAD_COUNT}.
+         * If all selectors are maxed out, we round-robin between them using the lowest each time.
+         * <p>
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
+         */
+        int WRITER_CHANNELS_PER_SELECTOR = SystemUtils.getPropertyAsInt(Names.WRITER_CHANNELS_PER_SELECTOR,
                 DataFissionProperties.Values.CORE_THREAD_COUNT);
 
         /**

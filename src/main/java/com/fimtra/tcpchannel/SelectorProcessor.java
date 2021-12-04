@@ -40,8 +40,8 @@ import com.fimtra.util.ThreadUtils;
  * <p>
  * This provides scaling for multiple sockets.
  * 
- * @see TcpChannelUtils#READER
- * @see TcpChannelUtils#WRITER
+ * @see TcpChannelUtils#READERS
+ * @see TcpChannelUtils#WRITERS
  * @see TcpChannelUtils#ACCEPT_PROCESSOR
  * @author Ramon Servadei
  */

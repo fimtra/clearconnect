@@ -57,7 +57,7 @@ import com.fimtra.util.UtilProperties;
  * used to handle <b>all</b> client socket communication.
  * <p>
  * <h5>Threading</h5> All client messages are received using one of the
- * {@link TcpChannelUtils#READER} threads. The reader thread will invoke the
+ * {@link TcpChannelUtils#READERS} threads. The reader thread will invoke the
  * {@link IReceiver#onDataReceived} method for every TCP message received from a
  * connected client socket. Therefore the receiver implementation must be efficient so as not to
  * block other client messages from being processed.
