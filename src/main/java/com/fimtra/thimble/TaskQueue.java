@@ -63,21 +63,14 @@ final class TaskQueue
         void onTaskFinished();
     }
 
-    /**
-     * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to {@link
-     * #run()} will dequeue the next runnable from an internal list and execute it.
-     *
-     * @author Ramon Servadei
-     */
-    final class SequentialTasks implements InternalTaskQueue<ISequentialRunnable>
+    abstract static class AbstractInternalTasks<T> implements InternalTaskQueue<T>
     {
-        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);
-        int size;
-        Object context;
-        TaskStatistics stats;
-        boolean active;
+        // all common attributes must be volatile as they are updated by different threads
+        volatile Object context;
+        volatile TaskStatistics stats;
+        volatile boolean active;
 
-        SequentialTasks()
+        AbstractInternalTasks()
         {
             super();
         }
@@ -85,7 +78,7 @@ final class TaskQueue
         /**
          * @return <code>true</code> if it was activated, <code>false</code> if it is already active
          */
-        boolean activate()
+        final boolean activate()
         {
             if (!this.active)
             {
@@ -93,6 +86,30 @@ final class TaskQueue
                 return true;
             }
             return false;
+        }
+
+        final void reset()
+        {
+            this.context = null;
+            this.stats = null;
+            this.active = false;
+        }
+    }
+
+    /**
+     * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to {@link
+     * #run()} will dequeue the next runnable from an internal list and execute it.
+     *
+     * @author Ramon Servadei
+     */
+    final class SequentialTasks extends AbstractInternalTasks<ISequentialRunnable>
+    {
+        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);
+        volatile int size;
+
+        SequentialTasks()
+        {
+            super();
         }
 
         @Override
@@ -163,29 +180,13 @@ final class TaskQueue
      *
      * @author Ramon Servadei
      */
-    final class CoalescingTasks implements InternalTaskQueue<ICoalescingRunnable>
+    final class CoalescingTasks extends AbstractInternalTasks<ICoalescingRunnable>
     {
         final AtomicReference<ICoalescingRunnable> latestTask = new AtomicReference<>();
-        Object context;
-        TaskStatistics stats;
-        boolean active;
 
         CoalescingTasks()
         {
             super();
-        }
-
-        /**
-         * @return <code>true</code> if it was activated, <code>false</code> if it is already active
-         */
-        boolean activate()
-        {
-            if (!this.active)
-            {
-                this.active = true;
-                return true;
-            }
-            return false;
         }
 
         @Override
@@ -245,18 +246,10 @@ final class TaskQueue
         this.name = name;
         this.sequentialTasksPool =
                 new SingleThreadReusableObjectPool<>("sequential-" + name, SequentialTasks::new,
-                        (instance) -> {
-                            instance.context = null;
-                            instance.stats = null;
-                            instance.active = false;
-                        }, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
+                        SequentialTasks::reset, SEQUENTIAL_TASKS_MAX_POOL_SIZE);
         this.coalescingTasksPool =
                 new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new,
-                        (instance) -> {
-                            instance.context = null;
-                            instance.stats = null;
-                            instance.active = false;
-                        }, COALESCING_TASKS_MAX_POOL_SIZE);
+                        CoalescingTasks::reset, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
         this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
         this.allSequentialStats = new TaskStatistics("Sequential" + IContextExecutor.QUEUE_LEVEL_STATS);
@@ -265,8 +258,11 @@ final class TaskQueue
 
     /**
      * Add the runnable to the queue, ordering it as appropriate for any annotation present on the runnable.
+     *
+     * @return <code>true</code> if the queue changed, <code>false</code> if the task was merged with a
+     * coalescing or sequential task already in the queue
      */
-    void offer_callWhilstHoldingLock(Runnable runnable)
+    boolean offer_callWhilstHoldingLock(Runnable runnable)
     {
         if (runnable instanceof ISequentialRunnable)
         {
@@ -287,36 +283,37 @@ final class TaskQueue
             if (sequentialTasks.activate())
             {
                 this.queue.offer(sequentialTasks);
+                return true;
+            }
+        }
+        else if (runnable instanceof ICoalescingRunnable)
+        {
+            final ICoalescingRunnable coalescingRunnable = (ICoalescingRunnable) runnable;
+            final Object context = coalescingRunnable.context();
+            CoalescingTasks coalescingTasks = this.coalescingTasksPerContext.get(context);
+            if (coalescingTasks == null)
+            {
+                coalescingTasks = this.coalescingTasksPool.get();
+                coalescingTasks.context = context;
+                coalescingTasks.stats = this.coalescingTaskStatsPerContext.computeIfAbsent(
+                        GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
+                        TaskStatistics::new);
+                this.coalescingTasksPerContext.put(context, coalescingTasks);
+            }
+
+            coalescingTasks.offer((ICoalescingRunnable) runnable);
+            if (coalescingTasks.activate())
+            {
+                this.queue.offer(coalescingTasks);
+                return true;
             }
         }
         else
         {
-            if (runnable instanceof ICoalescingRunnable)
-            {
-                final ICoalescingRunnable coalescingRunnable = (ICoalescingRunnable) runnable;
-                final Object context = coalescingRunnable.context();
-                CoalescingTasks coalescingTasks = this.coalescingTasksPerContext.get(context);
-                if (coalescingTasks == null)
-                {
-                    coalescingTasks = this.coalescingTasksPool.get();
-                    coalescingTasks.context = context;
-                    coalescingTasks.stats = this.coalescingTaskStatsPerContext.computeIfAbsent(
-                            GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
-                            TaskStatistics::new);
-                    this.coalescingTasksPerContext.put(context, coalescingTasks);
-                }
-
-                coalescingTasks.offer((ICoalescingRunnable) runnable);
-                if (coalescingTasks.activate())
-                {
-                    this.queue.offer(coalescingTasks);
-                }
-            }
-            else
-            {
-                this.queue.offer(runnable);
-            }
+            this.queue.offer(runnable);
+            return true;
         }
+        return false;
     }
 
     /**
