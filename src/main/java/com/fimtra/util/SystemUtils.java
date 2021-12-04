@@ -15,9 +15,6 @@
  */
 package com.fimtra.util;
 
-import com.fimtra.tcpchannel.TcpChannelProperties;
-import sun.plugin2.util.SystemUtil;
-
 /**
  * @author Ramon Servadei
  */
