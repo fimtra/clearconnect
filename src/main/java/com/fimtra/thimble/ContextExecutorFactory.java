@@ -26,7 +26,7 @@ public class ContextExecutorFactory
 {
     public static IContextExecutor create(String name, int size)
     {
-        return new ThimbleExecutor(name, size);
+        return new ThimbleExecutor("cc-" + name, size);
     }
 
     public static IContextExecutor create(int size)
