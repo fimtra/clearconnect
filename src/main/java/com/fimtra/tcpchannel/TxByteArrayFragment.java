@@ -41,7 +41,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
                 txByteArrayFragment.poolRef = TX_FRAGMENTS_POOL;
                 return txByteArrayFragment;
             }
-        }, (instance) -> instance.reset(), TcpChannelProperties.Values.TX_FRAGMENT_POOL_MAX_SIZE);
+        }, TxByteArrayFragment::reset, TcpChannelProperties.Values.TX_FRAGMENT_POOL_MAX_SIZE);
 
     /**
      * Break the byte[] into fragments.
@@ -111,7 +111,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
      * 
      * </pre>
      * 
-     * @see #fromRxBytesRawByteHeader(byte[])
+     * @see #fromRxBytesRawByteHeader(ByteBuffer)
      * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
     ByteBuffer[] toTxBytesRawByteHeader()
@@ -151,7 +151,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
      * 
      * </pre>
      * 
-     * @see #fromRxBytesUTF8Header(byte[])
+     * @see #fromRxBytesUTF8Header(ByteBuffer)
      * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
     ByteBuffer[] toTxBytesUTF8Header()
