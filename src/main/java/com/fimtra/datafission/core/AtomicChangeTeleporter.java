@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,7 +97,7 @@ final class AtomicChangeTeleporter
      * 
      * @author Ramon Servadei
      */
-    private static enum EntryEnum
+    private enum EntryEnum
     {
             PUT, OVERWRITTEN, REMOVED;
 
@@ -142,7 +141,7 @@ final class AtomicChangeTeleporter
             {
                 throw new IncorrectSequenceException(source.getName(),
                     source.getName() + " expected fragment with sequence: " + sourceSequence + " but got: "
-                        + receivedPart.sequence.get().longValue());
+                        + receivedPart.sequence.get());
             }
         }
 
@@ -171,9 +170,9 @@ final class AtomicChangeTeleporter
      */
     private static void mergeEntries(EntryEnum type, AtomicChange source, AtomicChange receivedPart, String subMapKey)
     {
+        final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
         if (subMapKey == null)
         {
-            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
             if (entriesToCopy.size() > 0)
             {
                 type.getEntriesToWrite(source).putAll(entriesToCopy);
@@ -181,7 +180,6 @@ final class AtomicChangeTeleporter
         }
         else
         {
-            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
             if (entriesToCopy.size() > 0)
             {
                 type.getEntriesToWrite(source.internalGetSubMapAtomicChange(subMapKey)).putAll(entriesToCopy);
@@ -222,7 +220,7 @@ final class AtomicChangeTeleporter
         // NOTE: doing the mod here is less expensive than doing it each time within the loop!
         int loopCount = counter.get() % maxChangesPerPart;
 
-        Map<String, IValue> targetEntries = null;
+        Map<String, IValue> targetEntries;
         if (subMapKey != null)
         {
             targetEntries = type.getEntriesToWrite(parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
@@ -232,11 +230,8 @@ final class AtomicChangeTeleporter
             targetEntries = type.getEntriesToWrite(parts[partsIndex]);
         }
 
-        Map.Entry<String, IValue> entry = null;
-        for (Iterator<Map.Entry<String, IValue>> it =
-            type.getEntriesToRead(source).entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : type.getEntriesToRead(source).entrySet())
         {
-            entry = it.next();
             targetEntries.put(entry.getKey(), entry.getValue());
             loopCount++;
 
@@ -245,14 +240,15 @@ final class AtomicChangeTeleporter
             {
                 loopCount = 0;
                 partsIndex++;
-                parts[partsIndex] =
-                        new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
+                parts[partsIndex] = new AtomicChange(
+                        PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
                 parts[partsIndex].scope = source.scope;
                 parts[partsIndex].sequence = source.sequence;
 
                 if (subMapKey != null)
                 {
-                    targetEntries = type.getEntriesToWrite(parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
+                    targetEntries = type.getEntriesToWrite(
+                            parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
                 }
                 else
                 {
