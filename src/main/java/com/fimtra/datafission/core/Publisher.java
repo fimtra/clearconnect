@@ -1257,13 +1257,15 @@ public class Publisher
             return;
         }
 
-        final AtomicChange atomicChange = new AtomicChange(action + responseAction);
-        final Map<String, IValue> puts = atomicChange.internalGetPutEntries();
+        final Map<String, IValue> puts = new HashMap<>(recordNames.size());
         final LongValue dummy = LongValue.valueOf(1);
         for (String recordName : recordNames)
         {
             puts.put(recordName, dummy);
         }
+        final AtomicChange atomicChange =
+                new AtomicChange(action + responseAction, puts, Collections.emptyMap(),
+                        Collections.emptyMap());
 
         if (log)
         {
