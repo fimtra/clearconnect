@@ -136,8 +136,10 @@ public class TcpChannel implements ITransportChannel
     {
         /** direct byte buffer to optimise reading */
         final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
-        long socketRead;
+
+        // variables written by tcp-reader thread but read by a resolver thread
         TcpChannel channel;
+        volatile long v_socketRead;
 
         RxFrameResolver()
         {
@@ -146,9 +148,13 @@ public class TcpChannel implements ITransportChannel
         @Override
         public void run()
         {
+            // to ensure we read from main memory correctly, read into local vars and load socketRead LAST
+            final TcpChannel channel = this.channel;
+            final long socketRead = this.v_socketRead;
+
             try
             {
-                this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
+                channel.resolveFrameFromBuffer(socketRead, this.buffer);
             }
             finally
             {
@@ -161,6 +167,13 @@ public class TcpChannel implements ITransportChannel
         {
             return this.channel;
         }
+
+        void reset()
+        {
+            this.buffer.clear();
+            this.channel = null;
+            this.v_socketRead = -1;
+        }
     }
 
     /**
@@ -171,10 +184,8 @@ public class TcpChannel implements ITransportChannel
         ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
 
     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
-        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", RxFrameResolver::new, (instance) -> {
-            instance.buffer.clear();
-            instance.channel = null;
-        }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
+        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", RxFrameResolver::new,
+                RxFrameResolver::reset, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
 
     /**
      * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
@@ -607,7 +618,8 @@ public class TcpChannel implements ITransportChannel
                     this.rxData = true;
             }
 
-            frameResolver.socketRead = System.nanoTime() - start;
+            // write this LAST to ensure we flush channel + socketRead to main memory
+            frameResolver.v_socketRead = System.nanoTime() - start;
 
             RX_FRAME_PROCESSOR.execute(frameResolver);
         }
