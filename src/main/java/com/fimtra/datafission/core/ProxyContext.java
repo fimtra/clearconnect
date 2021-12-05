@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -31,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -176,7 +174,7 @@ public final class ProxyContext implements IObserverContext
      * 
      * @author Ramon Servadei
      */
-    public static interface IRemoteSystemRecordNames
+    public interface IRemoteSystemRecordNames
     {
         String REMOTE = "Remote";
 
@@ -254,23 +252,13 @@ public final class ProxyContext implements IObserverContext
      */
     public static final TextValue RECORD_DISCONNECTED = TextValue.valueOf("DISCONNECTED");
 
-    final static Executor SYNCHRONOUS_EXECUTOR = new Executor()
-    {
-        @Override
-        public void execute(Runnable command)
-        {
-            command.run();
-        }
-    };
-
     // constructs to handle mapping of local system record names to remote names
     static final Map<String, String> remoteToLocalSystemRecordNameConversions;
     static final Map<String, String> localToRemoteSystemRecordNameConversions;
 
     static
     {
-        Map<String, String> mapping = null;
-        mapping = new HashMap<>();
+        Map<String, String> mapping = new HashMap<>();
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, ISystemRecordNames.CONTEXT_RPCS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, ISystemRecordNames.CONTEXT_RECORDS);
         mapping.put(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS, ISystemRecordNames.CONTEXT_CONNECTIONS);
@@ -751,8 +739,8 @@ public final class ProxyContext implements IObserverContext
     }
 
     static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
-        new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", () -> new RxFrameHandler(),
-            (instance) -> instance.clear(), DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
+        new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", RxFrameHandler::new,
+                RxFrameHandler::clear, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
 
     final Object lock;
     volatile boolean active;
@@ -910,10 +898,10 @@ public final class ProxyContext implements IObserverContext
         };
         this.context = new Context(name);
         this.lock = new Object();
-        this.actionSubscribeFutures = new ConcurrentHashMap<CountDownLatch, RunnableFuture<?>>();
+        this.actionSubscribeFutures = new ConcurrentHashMap<>();
         this.actionSubscribeResults = new ConcurrentHashMap<>();
         this.actionResponseLatches = new ConcurrentHashMap<>();
-        // todo why 0
+        // maxChangesPerPart=0 because this is a RECEIVER and does not do any splitting
         this.teleportReceiver = new AtomicChangeTeleporter(0);
         this.imageDeltaProcessor = new ImageDeltaChangeProcessor();
         this.tokenPerRecord = new ConcurrentHashMap<>();
@@ -929,9 +917,7 @@ public final class ProxyContext implements IObserverContext
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver((image, atomicChange) -> {
-            updateRpcTemplates(atomicChange);
-        }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+        this.context.addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange), IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -1000,8 +986,7 @@ public final class ProxyContext implements IObserverContext
      */
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
     {
-        this.reconnectPeriodMillis = reconnectPeriodMillis < MINIMUM_RECONNECT_PERIOD_MILLIS
-            ? MINIMUM_RECONNECT_PERIOD_MILLIS : reconnectPeriodMillis;
+        this.reconnectPeriodMillis = Math.max(reconnectPeriodMillis, MINIMUM_RECONNECT_PERIOD_MILLIS);
     }
 
     /**
@@ -1274,8 +1259,7 @@ public final class ProxyContext implements IObserverContext
         final ITransportChannelBuilder channelBuilder = this.channelBuilderFactory.nextBuilder();
         this.currentEndPoint = channelBuilder.getEndPointAddress();
         Log.log(this, "Constructing channel for ", getShortName(), " using ", ObjectUtils.safeToString(channelBuilder));
-        final ITransportChannel channel = channelBuilder.buildChannel(receiver);
-        return channel;
+        return channelBuilder.buildChannel(receiver);
 
     }
 
@@ -1405,11 +1389,8 @@ public final class ProxyContext implements IObserverContext
             Log.log(this, "(<-) ", SUBSCRIBE, NOK, ObjectUtils.safeToString(recordNames));
         }
         Queue<CountDownLatch> latches;
-        String recordName;
-        final int recordNameCount = recordNames.size();
-        for (int i = 0; i < recordNameCount; i++)
+        for (String recordName : recordNames)
         {
-            recordName = recordNames.get(i);
             latches = this.actionResponseLatches.remove(action + recordName);
             if (latches != null)
             {
@@ -1620,7 +1601,7 @@ public final class ProxyContext implements IObserverContext
                 Long.toString(this.reconnectPeriodMillis), "ms ");
 
             this.reconnectTask =
-                RECONNECT_TASKS.schedule(() -> reconnect(), this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
+                RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -1838,7 +1819,7 @@ public final class ProxyContext implements IObserverContext
 
     private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total)
     {
-        int i = 0;
+        int i;
         if (ProxyContext.this.channel instanceof ISubscribingChannel)
         {
             for (i = 0; i < recordsToUnsubscribe.length; i++)
@@ -1873,7 +1854,7 @@ public final class ProxyContext implements IObserverContext
     void doResubscribe(final String[] recordNamesToSubscribeFor)
     {
         final Map<String, List<String>> recordsPerToken = new HashMap<>();
-        String token = null;
+        String token;
         List<String> records;
 
         {
@@ -1882,20 +1863,13 @@ public final class ProxyContext implements IObserverContext
             {
                 recordName = recordNamesToSubscribeFor[i];
                 token = this.tokenPerRecord.get(recordName);
-                records = recordsPerToken.get(token);
-                if (records == null)
-                {
-                    records = new ArrayList<>();
-                    recordsPerToken.put(token, records);
-                }
+                records = recordsPerToken.computeIfAbsent(token, k -> new ArrayList<>());
                 records.add(recordName);
             }
         }
 
-        Map.Entry<String, List<String>> entry = null;
-        for (Iterator<Map.Entry<String, List<String>>> it = recordsPerToken.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, List<String>> entry : recordsPerToken.entrySet())
         {
-            entry = it.next();
             token = entry.getKey();
             records = entry.getValue();
             subscribe(token, records.toArray(new String[records.size()]));
