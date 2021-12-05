@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
@@ -257,11 +258,8 @@ public class Publisher
                         clients[j].publish(txMessage, false, name);
                     }
                 }
-                
-                Publisher.this.messagesPublished += broadcastCount;
-                MESSAGES_PUBLISHED.addAndGet(broadcastCount);
-                Publisher.this.bytesPublished += bytesPublished;
-                BYTES_PUBLISHED.addAndGet(bytesPublished);
+
+                updatePublisherStats(bytesPublished, broadcastCount);
             }
             else
             {
@@ -269,11 +267,8 @@ public class Publisher
                 
                 broadcastCount = this.service.broadcast(name, txMessage, clients);
 
-                Publisher.this.messagesPublished += broadcastCount;
-                MESSAGES_PUBLISHED.addAndGet(broadcastCount);
                 bytesPublished = broadcastCount * txMessage.length;
-                Publisher.this.bytesPublished += bytesPublished;
-                BYTES_PUBLISHED.addAndGet(bytesPublished);
+                updatePublisherStats(bytesPublished, broadcastCount);
 
                 // even if the service is broadcast capable, perform this loop to capture stats
                 for (j = 0; j < clients.length; j++)
@@ -487,8 +482,9 @@ public class Publisher
          */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
-        volatile long messagesPublished;
-        volatile long bytesPublished;
+        final Object statsLock = new Object();
+        long messagesPublished;
+        long bytesPublished;
         String identity;
         volatile boolean active;
         boolean codecSyncExpected;
@@ -561,8 +557,13 @@ public class Publisher
                     }
 
                     final long nanoTime = System.nanoTime();
-                    final long l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
-                    final long l_bytesPublished = ProxyContextPublisher.this.bytesPublished;
+                    final long l_messagesPublished;
+                    final long l_bytesPublished;
+                    synchronized (ProxyContextPublisher.this.statsLock)
+                    {
+                        l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
+                        l_bytesPublished = ProxyContextPublisher.this.bytesPublished;
+                    }
 
                     final long intervalMessagesPublished = l_messagesPublished - this.lastMessagesPublished;
                     final long intervalBytesPublished = l_bytesPublished - this.lastBytesPublished;
@@ -583,14 +584,12 @@ public class Publisher
                             LongValue.valueOf((long) (intervalMessagesPublished * perSec)));
                         submapConnections.put(IContextConnectionsRecordFields.KB_PER_SEC, DoubleValue.valueOf(
                             (((long) ((intervalBytesPublished * inverse_1K * perSec) * 10)) / 10d)));
-                        submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE,
-                            LongValue.valueOf(ProxyContextPublisher.this.messagesPublished == 0 ? 0
-                                : ProxyContextPublisher.this.bytesPublished
-                                    / ProxyContextPublisher.this.messagesPublished));
+                        submapConnections.put(IContextConnectionsRecordFields.AVG_MSG_SIZE, LongValue.valueOf(
+                                l_messagesPublished == 0 ? 0 : l_bytesPublished / l_messagesPublished));
                         submapConnections.put(IContextConnectionsRecordFields.MESSAGE_COUNT,
-                            LongValue.valueOf(ProxyContextPublisher.this.messagesPublished));
+                            LongValue.valueOf(l_messagesPublished));
                         submapConnections.put(IContextConnectionsRecordFields.KB_COUNT,
-                            LongValue.valueOf((long) (ProxyContextPublisher.this.bytesPublished * inverse_1K)));
+                            LongValue.valueOf((long) (l_bytesPublished * inverse_1K)));
                         submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
                             LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
                         submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
@@ -605,10 +604,10 @@ public class Publisher
                     {
                         ProxyContextPublisher.this.statsUpdateTask =
                             Publisher.this.context.getUtilityExecutor().schedule(this,
-                                Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2, TimeUnit.MILLISECONDS);
+                                getContextConnectionsRecordPublishPeriodMillis() / 2, TimeUnit.MILLISECONDS);
                     }
                 }
-            }, Publisher.this.contextConnectionsRecordPublishPeriodMillis / 2, TimeUnit.MILLISECONDS);
+            }, getContextConnectionsRecordPublishPeriodMillis() / 2, TimeUnit.MILLISECONDS);
         }
 
         void publish(byte[] txMessage, boolean pointToPoint, String recordName)
@@ -617,8 +616,12 @@ public class Publisher
             {
                 send(txMessage);
             }
-            this.bytesPublished += txMessage.length;
-            this.messagesPublished++;
+
+            synchronized (this.statsLock)
+            {
+                this.bytesPublished += txMessage.length;
+                this.messagesPublished++;
+            }
 
             // peek at the size before attempting the synchronize block
             if (logVerboseSubscribes && this.firstPublishPending.size() > 0)
@@ -815,14 +818,14 @@ public class Publisher
     final IRecord connectionsRecord;
     final ProxyContextMultiplexer multiplexer;
     final TransportTechnologyEnum transportTechnology;
-    volatile long contextConnectionsRecordPublishPeriodMillis = DataFissionProperties.Values.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS;
+    long contextConnectionsRecordPublishPeriodMillis = DataFissionProperties.Values.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS;
     ScheduledFuture contextConnectionsRecordPublishTask;
-    volatile long messagesPublished;
-    volatile long bytesPublished;
+    long messagesPublished;
+    long bytesPublished;
 
     final List<Runnable> subscribeTasks;
     final Runnable throttleTask;
-    volatile boolean throttleRunning;
+    final AtomicBoolean throttleRunning;
 
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
@@ -870,9 +873,11 @@ public class Publisher
         this.proxyContextPublishers = new ConcurrentHashMap<>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
+        this.throttleRunning = new AtomicBoolean(false);
+
         this.subscribeTasks = new LinkedList<>();
         this.throttleTask = () -> {
-            this.throttleRunning = false;
+            this.throttleRunning.set(false);
 
             Runnable task = null;
             int size;
@@ -1056,7 +1061,7 @@ public class Publisher
         this.publishContextConnectionsRecordAtPeriod(this.contextConnectionsRecordPublishPeriodMillis);
     }
 
-    public long getContextConnectionsRecordPublishPeriodMillis()
+    public synchronized long getContextConnectionsRecordPublishPeriodMillis()
     {
         return this.contextConnectionsRecordPublishPeriodMillis;
     }
@@ -1319,9 +1324,8 @@ public class Publisher
 
     private void triggerThrottle()
     {
-        if (!this.throttleRunning)
+        if (!this.throttleRunning.getAndSet(true))
         {
-            this.throttleRunning = true;
             SUBSCRIBE_THROTTLE.execute(this.throttleTask);
         }
     }
@@ -1334,6 +1338,19 @@ public class Publisher
             {
                 entry.getKey().destroy(reason);
             }
+        }
+    }
+
+    void updatePublisherStats(int bytesPublished, int broadcastCount)
+    {
+        // we synchronize on MESSAGES_PUBLISHED rather than this.lock
+        // this is for stats only so no point contending with this.lock for stats
+        synchronized (MESSAGES_PUBLISHED)
+        {
+            this.messagesPublished += broadcastCount;
+            MESSAGES_PUBLISHED.addAndGet(broadcastCount);
+            this.bytesPublished += bytesPublished;
+            BYTES_PUBLISHED.addAndGet(bytesPublished);
         }
     }
 }
