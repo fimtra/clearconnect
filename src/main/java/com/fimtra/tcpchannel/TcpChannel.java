@@ -836,8 +836,9 @@ public class TcpChannel implements ITransportChannel
                 {
                     try
                     {
-                        ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(data.txDataWithHeader[0],
-                            data.txDataWithHeader[1]);
+                        final ByteBuffer[] txDataWithHeader = data.getTxDataWithHeader();
+                        ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(txDataWithHeader[0],
+                                txDataWithHeader[1]);
                     }
                     catch (Exception e)
                     {

@@ -75,8 +75,8 @@ final class TxByteArrayFragment extends ByteArrayFragment
         return fragments;
     }
 
-    final ByteBuffer[] txDataWithHeader;
-    byte[] header;
+    private final ByteBuffer[] txDataWithHeader;
+    private byte[] header;
 
     TxByteArrayFragment(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
@@ -114,7 +114,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
      * @see #fromRxBytesRawByteHeader(ByteBuffer)
      * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
-    ByteBuffer[] toTxBytesRawByteHeader()
+    synchronized ByteBuffer[] toTxBytesRawByteHeader()
     {
         // write the header
         this.header[0] = (byte) (this.id >> 24);
@@ -154,7 +154,7 @@ final class TxByteArrayFragment extends ByteArrayFragment
      * @see #fromRxBytesUTF8Header(ByteBuffer)
      * @return the ByteBuffer[] to send that represents the header and data for this fragment
      */
-    ByteBuffer[] toTxBytesUTF8Header()
+    synchronized ByteBuffer[] toTxBytesUTF8Header()
     {
         final StringBuilder sb = new StringBuilder(32);
         sb.append('|').append(this.id).append('|').append(this.sequenceId).append('|').append(this.lastElement).append(
@@ -175,6 +175,11 @@ final class TxByteArrayFragment extends ByteArrayFragment
         this.txDataWithHeader[0].limit(headerLen);
         this.txDataWithHeader[1] = ByteBuffer.wrap(this.data, this.offset, this.length);
 
+        return this.txDataWithHeader;
+    }
+
+    synchronized ByteBuffer[] getTxDataWithHeader()
+    {
         return this.txDataWithHeader;
     }
 }
