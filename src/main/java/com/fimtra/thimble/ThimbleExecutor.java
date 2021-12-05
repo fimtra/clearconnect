@@ -253,8 +253,15 @@ public final class ThimbleExecutor implements IContextExecutor
 
         synchronized (this.taskQueue.lock)
         {
-            this.taskQueue.offer_callWhilstHoldingLock(command);
+            final boolean addedToQueue = this.taskQueue.offer_callWhilstHoldingLock(command);
             this.stats.itemSubmitted();
+
+            if (!addedToQueue)
+            {
+                // depending on the type of runnable, the queue may return null (e.g. if its a
+                // sequential task that is already processing)
+                return;
+            }
 
             if (this.taskRunners.size() == 0)
             {

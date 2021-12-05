@@ -161,6 +161,7 @@ public class ThimbleExecutorTest
     @After
     public void tearDown() throws Exception
     {
+        this.candidate.destroy();
     }
 
     @Test
