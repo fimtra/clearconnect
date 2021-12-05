@@ -125,7 +125,7 @@ public class Publisher
         return channel.getDescription();
     }
 
-    static final boolean isSystemRecordUpdateCoalesced(String name)
+    static boolean isSystemRecordUpdateCoalesced(String name)
     {
         return ContextUtils.isSystemRecordName(name) &&
         // ignore the CONTEXT_STATUS - it hardly changes and is used to detect
@@ -155,7 +155,7 @@ public class Publisher
      * 
      * @author Ramon Servadei
      */
-    private static interface ISubscribeTask extends Runnable
+    private interface ISubscribeTask extends Runnable
     {
 
     }
@@ -202,18 +202,14 @@ public class Publisher
             {
                 this.systemRecordSequences.put(systemRecord, new AtomicLong());
                 this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(SYSTEM_RECORD_PUBLISHER,
-                    DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, new IRecordListener()
-                    {
-                        @Override
-                        public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
-                        {
+                    DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS,
+                        (imageValidInCallingThreadOnly, atomicChange) -> {
                             final AtomicLong currentSequence =
                                 ProxyContextMultiplexer.this.systemRecordSequences.get(atomicChange.getName());
                             atomicChange.setSequence(currentSequence.getAndIncrement());
 
                             handleRecordChange(atomicChange);
-                        }
-                    }, CachePolicyEnum.NO_IMAGE_NEEDED));
+                        }, CachePolicyEnum.NO_IMAGE_NEEDED));
             }
         }
 
@@ -236,7 +232,7 @@ public class Publisher
             byte[] txMessage;
             final String name = atomicChange.getName();
             final ProxyContextPublisher[] clients = this.subscribers.getSubscribersFor(name);
-            int j = 0;
+            int j;
             int broadcastCount = 0;
 
             //
@@ -246,7 +242,7 @@ public class Publisher
             int bytesPublished = 0;
             if (parts != null)
             {
-                int loopBroadcastCount = 0;
+                int loopBroadcastCount;
                 for (int i = 0; i < parts.length; i++)
                 {
                     txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
@@ -775,7 +771,7 @@ public class Publisher
             {
                 // log first 200 bytes that are sent
                 Log.log(ProxyContextPublisher.this, "(->) ",
-                    new String(toSend, 0, (toSend.length < 200 ? toSend.length : 200)),
+                    new String(toSend, 0, (Math.min(toSend.length, 200))),
                     (toSend.length < 200 ? "" : "...(truncated)"));
             }
             return this.channel.send(this.codec.finalEncode(toSend));
@@ -871,7 +867,7 @@ public class Publisher
         this.context = context;
         this.transportTechnology = transportTechnology;
         this.lock = new Object();
-        this.proxyContextPublishers = new ConcurrentHashMap<ITransportChannel, Publisher.ProxyContextPublisher>();
+        this.proxyContextPublishers = new ConcurrentHashMap<>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         this.subscribeTasks = new LinkedList<>();
@@ -879,7 +875,7 @@ public class Publisher
             this.throttleRunning = false;
 
             Runnable task = null;
-            int size = 0;
+            int size;
             do
             {
                 synchronized (this.subscribeTasks)
@@ -1184,14 +1180,7 @@ public class Publisher
         {
             for (final String name : recordNames)
             {
-                this.subscribeTasks.add(new ISubscribeTask()
-                {
-                    @Override
-                    public void run()
-                    {
-                        proxyContextPublisher.resync(name);
-                    }
-                });
+                this.subscribeTasks.add((ISubscribeTask) () -> proxyContextPublisher.resync(name));
             }
         }
         triggerThrottle();
