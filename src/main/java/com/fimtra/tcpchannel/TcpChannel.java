@@ -126,57 +126,6 @@ public class TcpChannel implements ITransportChannel
     static final byte[] TERMINATOR = { 0xd, 0xa };
 
     /**
-     * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
-     * from the socket and logic to resolve a frame from the fragments received from the socket
-     * buffer.
-     *
-     * @author Ramon Servadei
-     */
-    private static final class RxFrameResolver implements ISequentialRunnable
-    {
-        /** direct byte buffer to optimise reading */
-        final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
-
-        // variables written by tcp-reader thread but read by a resolver thread
-        TcpChannel channel;
-        volatile long v_socketRead;
-
-        RxFrameResolver()
-        {
-        }
-
-        @Override
-        public void run()
-        {
-            // to ensure we read from main memory correctly, read socketRead first
-            final long socketRead = this.v_socketRead;
-            final TcpChannel channel = this.channel;
-
-            try
-            {
-                channel.resolveFrameFromBuffer(socketRead, this.buffer);
-            }
-            finally
-            {
-                RX_FRAME_RESOLVER_POOL.offer(this);
-            }
-        }
-
-        @Override
-        public Object context()
-        {
-            return this.channel;
-        }
-
-        void reset()
-        {
-            this.buffer.clear();
-            this.channel = null;
-            this.v_socketRead = -1;
-        }
-    }
-
-    /**
      * Exclusively used to handle frames dispatched from the TCP socket reads. Has the same number
      * of threads as the TCP reader count.
      */
@@ -604,22 +553,24 @@ public class TcpChannel implements ITransportChannel
             final long start = System.nanoTime();
 
             final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
-            frameResolver.channel = this;
 
-            final int readCount = this.socketChannel.read(frameResolver.buffer);
-            switch(readCount)
+            final ByteBuffer buffer = frameResolver.getBuffer();
+            synchronized (buffer)
             {
-                case -1:
-                    destroy("End-of-stream reached");
-                    return;
-                case 0:
-                    return;
-                default :
-                    this.rxData = true;
-            }
+                final int readCount = this.socketChannel.read(buffer);
+                switch(readCount)
+                {
+                    case -1:
+                        destroy("End-of-stream reached");
+                        return;
+                    case 0:
+                        return;
+                    default:
+                        this.rxData = true;
+                }
 
-            // write this LAST to ensure we flush channel + socketRead to main memory
-            frameResolver.v_socketRead = System.nanoTime() - start;
+                frameResolver.setChannelAndReadTime(this, System.nanoTime() - start);
+            }
 
             RX_FRAME_PROCESSOR.execute(frameResolver);
         }
@@ -1132,5 +1083,73 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
         this.txBuffer.put(data.array(), data.position(), dataLen);
 
         writeBufferToSocket();
+    }
+}
+
+/**
+ * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
+ * from the socket and logic to resolve a frame from the fragments received from the socket
+ * buffer.
+ *
+ * @author Ramon Servadei
+ */
+final class RxFrameResolver implements ISequentialRunnable
+{
+    /** direct byte buffer to optimise reading */
+    private final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
+
+    // variables written by tcp-reader thread but read by a resolver thread
+    private TcpChannel channel;
+    private long socketRead;
+
+    RxFrameResolver()
+    {
+    }
+
+    @Override
+    public void run()
+    {
+        try
+        {
+            synchronized (this.buffer)
+            {
+                this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
+            }
+        }
+        finally
+        {
+            TcpChannel.RX_FRAME_RESOLVER_POOL.offer(this);
+        }
+    }
+
+    @Override
+    public Object context()
+    {
+        synchronized (this.buffer)
+        {
+            return this.channel;
+        }
+    }
+
+    void setChannelAndReadTime(TcpChannel channel, long socketRead)
+    {
+        synchronized (this.buffer)
+        {
+            this.channel = channel;
+            this.socketRead = socketRead;
+        }
+    }
+
+    ByteBuffer getBuffer()
+    {
+        return this.buffer;
+    }
+
+    void reset()
+    {
+        // note: reset is called by the object pool and with its own synchronization
+        this.buffer.clear();
+        this.channel = null;
+        this.socketRead = -1;
     }
 }
