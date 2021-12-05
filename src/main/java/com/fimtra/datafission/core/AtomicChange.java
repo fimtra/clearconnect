@@ -158,14 +158,17 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     public AtomicChange(IRecord image)
     {
         this(image.getName());
-        internalGetPutEntries().putAll(image);
-        for (String subMapKey : image.getSubMapKeys())
+        synchronized (image.getWriteLock())
         {
-            internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
-                    image.getOrCreateSubMap(subMapKey));
+            internalGetPutEntries().putAll(image);
+            for (String subMapKey : image.getSubMapKeys())
+            {
+                internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
+                        image.getOrCreateSubMap(subMapKey));
+            }
+            this.scope.set(IMAGE_SCOPE);
+            this.sequence.set(Long.valueOf(image.getSequence()));
         }
-        this.scope.set(IMAGE_SCOPE);
-        this.sequence.set(Long.valueOf(image.getSequence()));
     }
 
     public AtomicChange(String name, Map<String, IValue> putEntries, Map<String, IValue> overwrittenEntries,
