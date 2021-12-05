@@ -503,6 +503,7 @@ public final class ProxyContext implements IObserverContext
     private static final class RxFrameHandler implements ISequentialRunnable
     {
         final RxAtomicChangeHandler atomicChangeHandler;
+        // variables written by rx-frame-processor and read by a context thread
         ByteBuffer data;
         ITransportChannel source;
         ProxyContext proxyContext;
@@ -515,76 +516,94 @@ public final class ProxyContext implements IObserverContext
 
         RxFrameHandler initialise(ByteBuffer data, ITransportChannel source, ProxyContextReceiver receiver)
         {
-            this.data = data;
-            this.source = source;
-            this.receiver = receiver;
-            if (this.receiver != null)
+            synchronized (this)
             {
-                this.proxyContext = receiver.proxyContext;
+                this.data = data;
+                this.source = source;
+                this.receiver = receiver;
+                if (this.receiver != null)
+                {
+                    this.proxyContext = receiver.proxyContext;
+                }
             }
             return this;
         }
 
         void clear()
         {
-            this.data = null;
-            this.source = null;
-            this.receiver = null;
-            this.proxyContext = null;
-            this.atomicChangeHandler.initialise(null, null, null);
+            synchronized (this)
+            {
+                this.data = null;
+                this.source = null;
+                this.receiver = null;
+                this.proxyContext = null;
+                this.atomicChangeHandler.initialise(null, null, null);
+            }
         }
 
         @Override
         public void run()
         {
+            final ByteBuffer data;
+            final ITransportChannel source;
+            final ProxyContext proxyContext;
+            final ProxyContextReceiver receiver;
+            synchronized (this)
+            {
+                data = this.data;
+                source = this.source;
+                receiver = this.receiver;
+                proxyContext = this.proxyContext;
+            }
+            
             boolean onDataReceivedCalled = false;
             try
             {
-                BYTES_RECEIVED.addAndGet(this.data.limit() - this.data.position());
-                if (this.receiver.codecSyncExpected)
+                BYTES_RECEIVED.addAndGet(data.limit() - data.position());
+                if (receiver.codecSyncExpected)
                 {
                     final SyncResponse response =
-                        this.proxyContext.codec.getSessionProtocol().handleSessionSyncData(this.data);
+                        proxyContext.codec.getSessionProtocol().handleSessionSyncData(data);
                     if (!response.syncFailed)
                     {
-                        Log.log(this.proxyContext, "(<-) SYNC RESP ", ObjectUtils.safeToString(this.source));
+                        Log.log(proxyContext, "(<-) SYNC RESP ", ObjectUtils.safeToString(source));
                         if (response.syncDataResponse != null)
                         {
-                            this.receiver.localChannelRef.send(response.syncDataResponse);
-                            Log.log(this.proxyContext, "(->) SYNC RESP ", ObjectUtils.safeToString(this.source));
+                            receiver.localChannelRef.send(response.syncDataResponse);
+                            Log.log(proxyContext, "(->) SYNC RESP ", ObjectUtils.safeToString(source));
                         }
                         if (response.syncComplete)
                         {
-                            this.receiver.codecSyncExpected = false;
-                            Log.log(this.proxyContext, "SESSION SYNCED ", ObjectUtils.safeToString(this.source));
-                            this.proxyContext.onChannelConnected();
+                            receiver.codecSyncExpected = false;
+                            Log.log(proxyContext, "SESSION SYNCED ", ObjectUtils.safeToString(source));
+                            proxyContext.onChannelConnected();
                         }
                     }
                     else
                     {
-                        final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(this.source);
-                        Log.log(this.proxyContext, reason, new IllegalStateException(reason));
-                        this.proxyContext.destroy();
+                        final String reason = "SESSION SYNC FAILED " + ObjectUtils.safeToString(source);
+                        Log.log(proxyContext, reason, new IllegalStateException(reason));
+                        proxyContext.destroy();
                     }
                     return;
                 }
 
                 try
                 {
-                    onDataReceivedCalled = this.proxyContext.onDataReceived(this);
+                    onDataReceivedCalled = proxyContext.onDataReceived(this);
                 }
                 catch (IncorrectSequenceException e)
                 {
                     final String recordName = ProxyContext.substituteLocalNameWithRemoteName(
                         AtomicChangeTeleporter.getRecordName(e.recordName));
-                    if (this.proxyContext.resync(recordName))
+                    if (proxyContext.resync(recordName))
                     {
-                        Log.log(this.receiver,
+                        Log.log(receiver,
                             "Resync of " + recordName + " started due to error processing received change", e);
                     }
                     else
                     {
-                        Log.log(this.receiver, "Resync of ", recordName,
+                        Log.log(receiver, "Resync of ", recordName,
                             " in progress, error handling previous unsynced change: ", e.toString(),
                             " (this should be resolved when the next image is received)");
                     }
@@ -621,6 +640,7 @@ public final class ProxyContext implements IObserverContext
     private final static class RxAtomicChangeHandler implements ISequentialRunnable
     {
         final RxFrameHandler frameHandler;
+        // variables written by rx-frame-processor and read by a context thread
         String changeName;
         ProxyContext proxyContext;
         IRecordChange changeToApply;
@@ -632,28 +652,41 @@ public final class ProxyContext implements IObserverContext
 
         RxAtomicChangeHandler initialise(String changeName, IRecordChange changeToApply, ProxyContext proxyContext)
         {
-            this.changeName = changeName;
-            this.proxyContext = proxyContext;
-            this.changeToApply = changeToApply;
+            synchronized (this.frameHandler)
+            {
+                this.changeName = changeName;
+                this.proxyContext = proxyContext;
+                this.changeToApply = changeToApply;
+            }
             return this;
         }
 
         @Override
         public void run()
         {
+            final String changeName;
+            final ProxyContext proxyContext;
+            final IRecordChange changeToApply;
+            synchronized (this.frameHandler)
+            {
+                changeName = this.changeName;
+                proxyContext = this.proxyContext;
+                changeToApply = this.changeToApply;
+            }
+            
             try
             {
                 MESSAGES_RECEIVED.incrementAndGet();
-                final String name = substituteLocalNameWithRemoteName(this.changeName);
+                final String name = substituteLocalNameWithRemoteName(changeName);
 
-                final boolean isImage = this.changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
+                final boolean isImage = changeToApply.getScope() == IRecordChange.IMAGE_SCOPE_CHAR;
                 if (isImage)
                 {
-                    synchronized (this.proxyContext.resyncs)
+                    synchronized (proxyContext.resyncs)
                     {
-                        if (this.proxyContext.resyncs.remove(name))
+                        if (proxyContext.resyncs.remove(name))
                         {
-                            this.proxyContext.resyncInProgress = this.proxyContext.resyncs.size() > 0;
+                            proxyContext.resyncInProgress = proxyContext.resyncs.size() > 0;
                         }
                     }
                 }
@@ -661,69 +694,69 @@ public final class ProxyContext implements IObserverContext
                 {
                     // NOTE: this block is hit for every delta received, the resyncInProgress
                     // flag helps to optimise redundant hits to the resyncs.contains(name) call
-                    if (this.proxyContext.resyncInProgress && this.proxyContext.resyncs.contains(name))
+                    if (proxyContext.resyncInProgress && proxyContext.resyncs.contains(name))
                     {
-                        Log.log(this.proxyContext, "Ignoring delta change for record=", this.changeName,
+                        Log.log(proxyContext, "Ignoring delta change for record=", changeName,
                             ", resync in progress");
                         return;
                     }
                 }
 
                 // check if the record is subscribed
-                final IRecordListener[] subscribers = this.proxyContext.context.recordObservers.getSubscribersFor(name);
+                final IRecordListener[] subscribers = proxyContext.context.recordObservers.getSubscribersFor(name);
                 if (!(subscribers.length > 0))
                 {
-                    Log.log(this.proxyContext, "Received record but no subscription exists - ignoring record=",
-                        this.changeName, " seq=", (isImage ? "i" : "d"),
-                        Long.toString(this.changeToApply.getSequence()));
+                    Log.log(proxyContext, "Received record but no subscription exists - ignoring record=",
+                        changeName, " seq=", (isImage ? "i" : "d"),
+                        Long.toString(changeToApply.getSequence()));
                     return;
                 }
 
-                IRecord record = this.proxyContext.context.getRecord(name);
+                IRecord record = proxyContext.context.getRecord(name);
                 if (record == null)
                 {
-                    if (this.changeToApply.isEmpty())
+                    if (changeToApply.isEmpty())
                     {
                         // this creates the record AND notifies any listeners
                         // (publishAtomicChange would publish nothing)
-                        record = this.proxyContext.context.createRecord(name);
+                        record = proxyContext.context.createRecord(name);
                     }
                     else
                     {
-                        record = this.proxyContext.context.createRecordSilently_callInRecordContext(name);
+                        record = proxyContext.context.createRecordSilently_callInRecordContext(name);
                     }
                 }
 
                 synchronized (record.getWriteLock())
                 {
-                    switch(this.proxyContext.imageDeltaProcessor.processRxChange(this.changeToApply, name, record))
+                    switch(proxyContext.imageDeltaProcessor.processRxChange(changeToApply, name, record))
                     {
                         case ImageDeltaChangeProcessor.PUBLISH:
 
                             // only images determine connection status - don't need to do this
                             // put for every delta that is received!
-                            if (isImage && this.proxyContext.remoteConnectionStatusRecord.put(this.changeName,
+                            if (isImage && proxyContext.remoteConnectionStatusRecord.put(changeName,
                                 RECORD_CONNECTED) != RECORD_CONNECTED)
                             {
-                                this.proxyContext.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
+                                proxyContext.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
                             }
 
                             // note: use the record.getSequence() as this will be the DELTA
                             // sequence if an image was received and then cached deltas applied
                             // on top of it
-                            this.proxyContext.context.setSequence(name, record.getSequence());
-                            this.proxyContext.context.publishAtomicChange(name, false);
+                            proxyContext.context.setSequence(name, record.getSequence());
+                            proxyContext.context.publishAtomicChange(name, false);
                             break;
                         case ImageDeltaChangeProcessor.RESYNC:
-                            this.proxyContext.resync(name);
+                            proxyContext.resync(name);
                             break;
                     }
                 }
             }
             catch (Exception e)
             {
-                Log.log(this.proxyContext,
-                    "Could not process received message " + ObjectUtils.safeToString(this.changeToApply), e);
+                Log.log(proxyContext,
+                    "Could not process received message " + ObjectUtils.safeToString(changeToApply), e);
             }
             finally
             {
