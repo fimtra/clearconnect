@@ -148,9 +148,9 @@ public class TcpChannel implements ITransportChannel
         @Override
         public void run()
         {
-            // to ensure we read from main memory correctly, read into local vars and load socketRead LAST
-            final TcpChannel channel = this.channel;
+            // to ensure we read from main memory correctly, read socketRead first
             final long socketRead = this.v_socketRead;
+            final TcpChannel channel = this.channel;
 
             try
             {
