@@ -888,7 +888,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 synchronized (initialImagePending)
                 {
-                    initialImagePending.removeAll(Arrays.asList(names));
+                    // note: this is faster than set.removeAll(list) as set.removeAll can do a contains check
+                    Arrays.asList(names).forEach(initialImagePending::remove);
                     updateListenerCountsForInitialImages(observer, initialImagePending);
                 }
             }
