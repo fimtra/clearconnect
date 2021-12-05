@@ -41,7 +41,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
     private static final Long SEQ_INIT = Long.valueOf(-1);
 
-    static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(ContextUtils.EMPTY_MAP);
+    static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(new HashMap<>(0));
 
     final static IRecordChange NULL_CHANGE = new IRecordChange()
     {
@@ -161,7 +161,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         internalGetPutEntries().putAll(image);
         for (String subMapKey : image.getSubMapKeys())
         {
-            internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(image.getOrCreateSubMap(subMapKey));
+            internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
+                    image.getOrCreateSubMap(subMapKey));
         }
         this.scope.set(IMAGE_SCOPE);
         this.sequence.set(Long.valueOf(image.getSequence()));
@@ -251,16 +252,20 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     @Override
     public boolean isEmpty()
     {
-        boolean dataEmpty = noOverwrittenEntries() && noPutEntries() && noRemovedEntries();
-        if (dataEmpty && this.subMapAtomicChanges != null)
+        final boolean noMapEntries = noOverwrittenEntries() && noPutEntries() && noRemovedEntries();
+        if (noMapEntries && this.subMapAtomicChanges != null)
         {
-            for (Iterator<Map.Entry<String, AtomicChange>> it = this.subMapAtomicChanges.entrySet().iterator(); it.hasNext()
-                    && dataEmpty;)
+            for (Map.Entry<String, AtomicChange> entry : this.subMapAtomicChanges.entrySet())
             {
-                dataEmpty &= it.next().getValue().isEmpty();
+                if (!entry.getValue().isEmpty())
+                {
+                    return false;
+                }
             }
+            // no entries in maps and submaps
+            return true;
         }
-        return dataEmpty;
+        return noMapEntries;
     }
 
     @Override
@@ -272,11 +277,10 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 
         if (this.subMapAtomicChanges != null)
         {
-            AtomicChange value = null;
-            for (Iterator<Map.Entry<String, AtomicChange>> it =
-                this.subMapAtomicChanges.entrySet().iterator(); it.hasNext();)
+            AtomicChange value;
+            for (Map.Entry<String, AtomicChange> entry : this.subMapAtomicChanges.entrySet())
             {
-                value = it.next().getValue();
+                value = entry.getValue();
                 size += value.putEntries == null ? 0 : value.putEntries.size();
                 size += value.overwrittenEntries == null ? 0 : value.overwrittenEntries.size();
                 size += value.removedEntries == null ? 0 : value.removedEntries.size();
@@ -317,7 +321,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         Iterator<String> subMapKeysToMergeIterator;
         Map<String, List<IRecordChange>> subMapChangesToMerge = null;
 
-        List<IRecordChange> subMapChangesList;
         String subMapKey;
 
         // add self AT THE BEGINNING to the changes so we merge on top of ourself
@@ -327,11 +330,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         boolean newPutEntriesSizeGreaterThan0;
         boolean newRemovedEntriesSizeGreaterThan0;
         // process the changes in order, building up an aggregated atomic change
-        IRecordChange subsequentChange;
-        for (int i = 0; i < subsequentChanges.size(); i++)
+        for (IRecordChange subsequentChange : subsequentChanges)
         {
-            subsequentChange = subsequentChanges.get(i);
-
             if (subsequentChange == NULL_CHANGE || subsequentChange == null)
             {
                 continue;
@@ -401,16 +401,12 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 {
                     subMapChangesToMerge = newMap();
                 }
-                for (subMapKeysToMergeIterator = subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext();)
+                for (subMapKeysToMergeIterator =
+                             subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext(); )
                 {
                     subMapKey = subMapKeysToMergeIterator.next();
-                    subMapChangesList = subMapChangesToMerge.get(subMapKey);
-                    if (subMapChangesList == null)
-                    {
-                        subMapChangesList = new ArrayList<>(1);
-                        subMapChangesToMerge.put(subMapKey, subMapChangesList);
-                    }
-                    subMapChangesList.add(subsequentChange.getSubMapAtomicChange(subMapKey));
+                    subMapChangesToMerge.computeIfAbsent(subMapKey, k -> new ArrayList<>(1)).add(
+                            subsequentChange.getSubMapAtomicChange(subMapKey));
                 }
             }
         }
@@ -449,11 +445,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         // now coalesce the sub-maps in each list per sub-map key
         if (subMapChangesToMerge != null && subMapChangesToMerge.size() > 0)
         {
-            Map.Entry<String, List<IRecordChange>> entry = null;
-            for (Iterator<Map.Entry<String, List<IRecordChange>>> it =
-                subMapChangesToMerge.entrySet().iterator(); it.hasNext();)
+            for (Map.Entry<String, List<IRecordChange>> entry : subMapChangesToMerge.entrySet())
             {
-                entry = it.next();
                 internalGetSubMapAtomicChange(entry.getKey()).coalesce(entry.getValue());
             }
         }
@@ -762,15 +755,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
  */
 final class ThreadLocalBulkChanges
 {
-    static final ThreadLocal<ThreadLocalBulkChanges> THREAD_LOCAL = new ThreadLocal<ThreadLocalBulkChanges>()
-    {
-        @SuppressWarnings("synthetic-access")
-        @Override
-        protected ThreadLocalBulkChanges initialValue()
-        {
-            return new ThreadLocalBulkChanges();
-        }
-    };
+    static final ThreadLocal<ThreadLocalBulkChanges> THREAD_LOCAL =
+            ThreadLocal.withInitial(ThreadLocalBulkChanges::new);
 
     static ThreadLocalBulkChanges get()
     {
