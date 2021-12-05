@@ -55,7 +55,6 @@ import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
-import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
@@ -102,20 +101,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         if (DataFissionProperties.Values.ENABLE_THREAD_DEADLOCK_CHECK)
         {
             DeadlockDetector.newDeadlockDetectorTask(DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS,
-                new DeadlockObserver()
-                {
-                    @Override
-                    public void onDeadlockFound(ThreadInfoWrapper[] deadlocks)
-                    {
+                    deadlocks -> {
                         StringBuilder sb = new StringBuilder();
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
                         for (int i = 0; i < deadlocks.length; i++)
                         {
                             sb.append(deadlocks[i].toString());
                         }
-                        System.err.println(sb.toString());
-                    }
-                }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
+                        System.err.println(sb);
+                    }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -127,10 +121,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();
             if (threads != null)
             {
-                PrintWriter pw = null;
-                try
+                try (PrintWriter pw = new PrintWriter(threadDumpOnShutdownFile))
                 {
-                    pw = new PrintWriter(threadDumpOnShutdownFile);
                     for (int i = 0; i < threads.length; i++)
                     {
                         pw.print(threads[i].toString());
@@ -141,13 +133,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 catch (Exception e)
                 {
                     Log.log(Context.class, "Could not produce threaddump file on exit", e);
-                }
-                finally
-                {
-                    if (pw != null)
-                    {
-                        pw.close();
-                    }
                 }
             }
         }, "datafission-shutdown"));
@@ -945,7 +930,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 LongValue observerCount;
                 for (String recordName : recordNames)
                 {
-                    observerCount = (LongValue) contextSubscriptions.get(recordName);
+                    observerCount = contextSubscriptions.get(recordName);
                     if (observerCount == null)
                     {
                         observerCount = LongValue.valueOf(0);
@@ -1242,7 +1227,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         getPendingAtomicChangesForWrite(recordName).setSequence(sequence);
     }
 
-    final boolean permissionTokenValidForRecord(String permissionToken, String recordName)
+    boolean permissionTokenValidForRecord(String permissionToken, String recordName)
     {
         if (ContextUtils.isSystemRecordName(recordName) || RpcInstance.isRpcResultRecord(recordName))
         {
@@ -1251,7 +1236,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
         else
         {
-            return this.permissionFilter == null ? true : this.permissionFilter.accept(permissionToken, recordName);
+            return this.permissionFilter == null || this.permissionFilter.accept(permissionToken, recordName);
         }
     }
 
@@ -1261,16 +1246,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.permissionFilter = filter;
     }
 
-    final boolean isSystemRecordReady(IRecord systemRecord)
+    boolean isSystemRecordReady(IRecord systemRecord)
     {
-        if (systemRecord == null || !this.active)
-        {
-            return false;
-        }
-        return true;
+        return systemRecord != null && this.active;
     }
 
-    final void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
+    void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
     {
         if (initialImagePending.size() == 0)
         {
