@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +27,7 @@ import com.fimtra.util.Log;
  * Manages resolving {@link ByteArrayFragment} instances into a resolved data byte[]
  * <p>
  * This is NOT thread-safe.
- * 
+ *
  * @author Ramon Servadei
  */
 abstract class ByteArrayFragmentResolver
@@ -45,9 +45,10 @@ abstract class ByteArrayFragmentResolver
                 return new RawByteHeaderByteArrayFragmentResolver();
             case TERMINATOR_BASED:
                 return new UTF8HeaderByteArrayFragmentResolver();
-            default :
+            default:
                 throw new IllegalArgumentException(
-                    "No byte array fragment resolver available for frame encoding " + frameEncodingFormat);
+                        "No byte array fragment resolver available for frame encoding "
+                                + frameEncodingFormat);
         }
     }
 
@@ -62,8 +63,7 @@ abstract class ByteArrayFragmentResolver
         @Override
         ByteBuffer resolve(ByteBuffer byteFragmentTxData)
         {
-            return resolveInternal(
-                ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
+            return resolveInternal(ByteArrayFragment.fromRxBytesRawByteHeader(byteFragmentTxData));
         }
 
         @Override
@@ -79,8 +79,7 @@ abstract class ByteArrayFragmentResolver
         @Override
         ByteBuffer resolve(ByteBuffer byteFragmentTxData)
         {
-            return resolveInternal(
-                ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
+            return resolveInternal(ByteArrayFragment.fromRxBytesUTF8Header(byteFragmentTxData));
         }
 
         @Override
@@ -91,19 +90,18 @@ abstract class ByteArrayFragmentResolver
     }
 
     /**
-     * Resolve the {@link ByteBuffer} of the byteFragmentTxData into a data byte[]. If the original
-     * {@link ByteBuffer} was split into multiple fragments then only when all the fragments have
-     * been received (IN ORDER) will this method return the resolved data byte[].
-     * 
-     * @param byteFragmentTxData
-     *            a {@link ByteArrayFragment} in {@link ByteBuffer} form
+     * Resolve the {@link ByteBuffer} of the byteFragmentTxData into a data byte[]. If the original {@link
+     * ByteBuffer} was split into multiple fragments then only when all the fragments have been received (IN
+     * ORDER) will this method return the resolved data byte[].
+     *
+     * @param byteFragmentTxData a {@link ByteArrayFragment} in {@link ByteBuffer} form
      * @return the fully resolved data in a ByteBuffer or <code>null</code> if fragments are still missing
      */
     abstract ByteBuffer resolve(ByteBuffer byteFragmentTxData);
 
     /**
      * Get the header and data {@link ByteBuffer} to send from the fragment
-     * 
+     *
      * @param byteArrayFragment
      * @return an array holding the header and data as {@link ByteBuffer} objects
      */
