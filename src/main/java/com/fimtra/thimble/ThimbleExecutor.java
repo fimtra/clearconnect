@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.CollectionUtils;
@@ -151,7 +152,7 @@ public final class ThimbleExecutor implements IContextExecutor
                             idleTimeNanos = System.nanoTime();
                             try
                             {
-                                this.lock.wait(ThimbleExecutor.this.idlePeriodNanos / 1_000_000L);
+                                this.lock.wait(ThimbleExecutor.this.idlePeriodMillis);
                             }
                             catch (InterruptedException e)
                             {
@@ -169,9 +170,10 @@ public final class ThimbleExecutor implements IContextExecutor
                             if (destroy)
                             {
                                 // bump up the idle period
+                                ThimbleExecutor.this.idlePeriodMillis =
+                                        ThimbleExecutor.this.idlePeriodMillis + IDLE_PERIOD_MILLIS;
                                 ThimbleExecutor.this.idlePeriodNanos =
-                                        ThimbleExecutor.this.idlePeriodNanos + (IDLE_PERIOD_MILLIS
-                                                * 1_000_000L);
+                                        TimeUnit.MILLISECONDS.toNanos(ThimbleExecutor.this.idlePeriodMillis);
                                 // remove immediately to ensure no tasks given to this runner
                                 ThimbleExecutor.this.taskRunnersRef.remove(this);
                                 ThimbleExecutor.this.taskRunners.remove(this);
@@ -179,9 +181,10 @@ public final class ThimbleExecutor implements IContextExecutor
                         }
                         if (destroy)
                         {
-                            Log.log(this, ThimbleExecutor.this + " thread idle for [" + ((int) ((idleTimeNanos
-                                    / 1_000_000_000L))) + "s] new idle timeout [" + ((int) ((
-                                    ThimbleExecutor.this.idlePeriodNanos / 1_000_000_000L))) + "s]");
+                            Log.log(this, ThimbleExecutor.this + " thread idle for ["
+                                    + TimeUnit.NANOSECONDS.toSeconds(idleTimeNanos) + "s] new idle timeout ["
+                                    + TimeUnit.MILLISECONDS.toSeconds(ThimbleExecutor.this.idlePeriodMillis)
+                                    + "s]");
                             destroy();
                         }
                     }
@@ -221,6 +224,7 @@ public final class ThimbleExecutor implements IContextExecutor
     private final AtomicInteger threadCounter;
     final LowGcLinkedList<Integer> freeNumbers;
     long idlePeriodNanos;
+    long idlePeriodMillis;
     TaskStatistics stats;
 
     volatile long[] tids = new long[0];
@@ -277,7 +281,8 @@ public final class ThimbleExecutor implements IContextExecutor
         this.size = size;
         this.threadCounter = new AtomicInteger(0);
         this.freeNumbers = new LowGcLinkedList<>();
-        this.idlePeriodNanos = IDLE_PERIOD_MILLIS * 1_000_000L;
+        this.idlePeriodMillis = IDLE_PERIOD_MILLIS;
+        this.idlePeriodNanos = TimeUnit.MILLISECONDS.toNanos(this.idlePeriodMillis);
         this.stats = new TaskStatistics(this.name);
         this.taskRunners = CollectionUtils.newDeque();
         this.taskQueue = new TaskQueue(this.name);
