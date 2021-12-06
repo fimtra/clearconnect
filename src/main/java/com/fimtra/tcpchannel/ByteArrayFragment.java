@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.fimtra.util.ByteArrayPool;
+import com.fimtra.util.IMultiThreadReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
@@ -43,9 +44,7 @@ class ByteArrayFragment
             @Override
             public ByteArrayFragment newInstance()
             {
-                final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
-                byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL;
-                return byteArrayFragment;
+                return new ByteArrayFragment(BYTE_ARRAY_FRAGMENT_POOL);
             }
         }, (instance) -> instance.initialise(-1, -1, (byte) -1, null, -1, -1),
             TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
@@ -195,11 +194,12 @@ class ByteArrayFragment
     int sequenceId;
     byte[] data;
     @SuppressWarnings("rawtypes")
-    MultiThreadReusableObjectPool poolRef;
+    final MultiThreadReusableObjectPool poolRef;
 
-    ByteArrayFragment()
+    ByteArrayFragment(MultiThreadReusableObjectPool poolRef)
     {
         super();
+        this.poolRef = poolRef;
     }
 
     final ByteArrayFragment initialise(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
