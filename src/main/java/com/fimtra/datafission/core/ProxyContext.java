@@ -505,7 +505,7 @@ public final class ProxyContext implements IObserverContext
         final RxAtomicChangeHandler atomicChangeHandler;
         // variables written by rx-frame-processor and read by a context thread
         ByteBuffer data;
-        ITransportChannel source;
+        volatile ITransportChannel v_source;
         ProxyContext proxyContext;
         ProxyContextReceiver receiver;
 
@@ -516,46 +516,36 @@ public final class ProxyContext implements IObserverContext
 
         RxFrameHandler initialise(ByteBuffer data, ITransportChannel source, ProxyContextReceiver receiver)
         {
-            synchronized (this)
+            this.data = data;
+            this.receiver = receiver;
+            if (receiver != null)
             {
-                this.data = data;
-                this.source = source;
-                this.receiver = receiver;
-                if (this.receiver != null)
-                {
-                    this.proxyContext = receiver.proxyContext;
-                }
+                this.proxyContext = receiver.proxyContext;
             }
+            // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+            this.v_source = source;
             return this;
         }
 
         void clear()
         {
-            synchronized (this)
-            {
-                this.data = null;
-                this.source = null;
-                this.receiver = null;
-                this.proxyContext = null;
-                this.atomicChangeHandler.initialise(null, null, null);
-            }
+            this.data = null;
+            this.receiver = null;
+            this.proxyContext = null;
+            // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+            this.v_source = null;
+            this.atomicChangeHandler.initialise(null, null, null);
         }
 
         @Override
         public void run()
         {
-            final ByteBuffer data;
-            final ITransportChannel source;
-            final ProxyContext proxyContext;
-            final ProxyContextReceiver receiver;
-            synchronized (this)
-            {
-                data = this.data;
-                source = this.source;
-                receiver = this.receiver;
-                proxyContext = this.proxyContext;
-            }
-            
+            // read volatile first to force all vars in scope to read from main memory
+            final ITransportChannel source = this.v_source;
+            final ByteBuffer data = this.data;
+            final ProxyContext proxyContext = this.proxyContext;
+            final ProxyContextReceiver receiver = this.receiver;
+
             boolean onDataReceivedCalled = false;
             try
             {
@@ -643,7 +633,7 @@ public final class ProxyContext implements IObserverContext
         // variables written by rx-frame-processor and read by a context thread
         String changeName;
         ProxyContext proxyContext;
-        IRecordChange changeToApply;
+        volatile IRecordChange v_changeToApply;
 
         RxAtomicChangeHandler(RxFrameHandler rxFrameHandler)
         {
@@ -652,28 +642,21 @@ public final class ProxyContext implements IObserverContext
 
         RxAtomicChangeHandler initialise(String changeName, IRecordChange changeToApply, ProxyContext proxyContext)
         {
-            synchronized (this.frameHandler)
-            {
-                this.changeName = changeName;
-                this.proxyContext = proxyContext;
-                this.changeToApply = changeToApply;
-            }
+            this.changeName = changeName;
+            this.proxyContext = proxyContext;
+            // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+            this.v_changeToApply = changeToApply;
             return this;
         }
 
         @Override
         public void run()
         {
-            final String changeName;
-            final ProxyContext proxyContext;
-            final IRecordChange changeToApply;
-            synchronized (this.frameHandler)
-            {
-                changeName = this.changeName;
-                proxyContext = this.proxyContext;
-                changeToApply = this.changeToApply;
-            }
-            
+            // read volatile first to force all vars in scope to read from main memory
+            final IRecordChange changeToApply = this.v_changeToApply;
+            final String changeName = this.changeName;
+            final ProxyContext proxyContext = this.proxyContext;
+
             try
             {
                 MESSAGES_RECEIVED.incrementAndGet();
@@ -697,18 +680,19 @@ public final class ProxyContext implements IObserverContext
                     if (proxyContext.resyncInProgress && proxyContext.resyncs.contains(name))
                     {
                         Log.log(proxyContext, "Ignoring delta change for record=", changeName,
-                            ", resync in progress");
+                                ", resync in progress");
                         return;
                     }
                 }
 
                 // check if the record is subscribed
-                final IRecordListener[] subscribers = proxyContext.context.recordObservers.getSubscribersFor(name);
+                final IRecordListener[] subscribers =
+                        proxyContext.context.recordObservers.getSubscribersFor(name);
                 if (!(subscribers.length > 0))
                 {
                     Log.log(proxyContext, "Received record but no subscription exists - ignoring record=",
-                        changeName, " seq=", (isImage ? "i" : "d"),
-                        Long.toString(changeToApply.getSequence()));
+                            changeName, " seq=", (isImage ? "i" : "d"),
+                            Long.toString(changeToApply.getSequence()));
                     return;
                 }
 
@@ -736,7 +720,7 @@ public final class ProxyContext implements IObserverContext
                             // only images determine connection status - don't need to do this
                             // put for every delta that is received!
                             if (isImage && proxyContext.remoteConnectionStatusRecord.put(changeName,
-                                RECORD_CONNECTED) != RECORD_CONNECTED)
+                                    RECORD_CONNECTED) != RECORD_CONNECTED)
                             {
                                 proxyContext.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
                             }
@@ -756,7 +740,7 @@ public final class ProxyContext implements IObserverContext
             catch (Exception e)
             {
                 Log.log(proxyContext,
-                    "Could not process received message " + ObjectUtils.safeToString(changeToApply), e);
+                        "Could not process received message " + ObjectUtils.safeToString(changeToApply), e);
             }
             finally
             {
