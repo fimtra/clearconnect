@@ -42,7 +42,7 @@ public class ByteArrayFragmentTest
 {
     /**
      * Test method for
-     * {@link com.fimtra.tcpchannel.ByteArrayFragment#getFragmentsForTxData(byte[], int)}.
+     * {@link com.fimtra.tcpchannel.TxByteArrayFragment#getFragmentsForTxData(byte[], int)}.
      */
     @Test
     public void testGetFragmentsForTxData()
@@ -116,7 +116,7 @@ public class ByteArrayFragmentTest
             resolved = ByteArrayFragment.fromRxBytesRawByteHeader(joinBuffers(fragment.toTxBytesRawByteHeader()));
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
-            assertEquals(fragment.lastElement, resolved.lastElement);
+            assertEquals(fragment.v_lastElement, resolved.v_lastElement);
             assertArrayEquals(ByteBufferUtils.asBytes(fragment.getData()), ByteBufferUtils.asBytes(resolved.getData()));
         }
     }
@@ -339,7 +339,7 @@ public class ByteArrayFragmentTest
             resolved = ByteArrayFragment.fromRxBytesUTF8Header(joinBuffers(fragment.toTxBytesUTF8Header()));
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
-            assertEquals(fragment.lastElement, resolved.lastElement);
+            assertEquals(fragment.v_lastElement, resolved.v_lastElement);
             assertArrayEquals(ByteBufferUtils.asBytes(fragment.getData()), ByteBufferUtils.asBytes(resolved.getData()));
         }
     }

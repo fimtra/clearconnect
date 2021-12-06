@@ -187,11 +187,11 @@ class ByteArrayFragment
     }
 
     int id;
-    byte lastElement;
+    volatile byte v_lastElement;
     int offset;
     int length;
     int sequenceId;
-    byte[] data;
+    volatile byte[] v_data;
     @SuppressWarnings("rawtypes")
     final MultiThreadReusableObjectPool poolRef;
 
@@ -205,10 +205,11 @@ class ByteArrayFragment
     {
         this.id = id;
         this.sequenceId = sequenceId;
-        this.lastElement = lastElement;
-        this.data = data;
         this.offset = offset;
         this.length = len;
+        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+        this.v_data = data;
+        this.v_lastElement = lastElement;
         return this;
     }
 
@@ -217,7 +218,7 @@ class ByteArrayFragment
      */
     final boolean isLastElement()
     {
-        return this.lastElement != 0;
+        return this.v_lastElement != 0;
     }
 
     /**
@@ -229,16 +230,30 @@ class ByteArrayFragment
      */
     final ByteArrayFragment merge(ByteArrayFragment other) throws IncorrectSequenceException
     {
-        if (++this.sequenceId != other.sequenceId)
+        // read volatile first to force all vars in scope to read from main memory
+        final byte[] data = this.v_data;
+        final int offset = this.offset;
+        final int length = this.length;
+        int sequenceId = this.sequenceId;
+
+        final byte[] other_data = other.v_data;
+        final int other_length = other.length;
+        final int other_offset = other.offset;
+        final int other_sequenceId = other.sequenceId;
+
+        if (++sequenceId != other_sequenceId)
         {
-            throw new IncorrectSequenceException("Expected " + (this.sequenceId) + " but got " + other.sequenceId);
+            throw new IncorrectSequenceException("Expected " + (sequenceId) + " but got " + other_sequenceId);
         }
-        byte[] d = ByteArrayPool.get(this.length + other.length);
-        System.arraycopy(this.data, this.offset, d, 0, this.length);
-        System.arraycopy(other.data, other.offset, d, this.length, other.length);
-        this.data = d;
+
+        byte[] d = ByteArrayPool.get(length + other_length);
+        System.arraycopy(data, offset, d, 0, length);
+        System.arraycopy(other_data, other_offset, d, length, other_length);
+        this.sequenceId = sequenceId;
         this.offset = 0;
-        this.length += other.length;
+        this.length += other_length;
+        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+        this.v_data = d;
         return this;
     }
 
@@ -247,20 +262,27 @@ class ByteArrayFragment
      */
     final ByteBuffer getData()
     {
-        if (this.data == null)
+        // read volatile first to force all vars in scope to read from main memory
+        final byte[] data = this.v_data;
+        if (data == null)
         {
             return null;
         }
-
-        if (this.offset != 0 || this.length != this.data.length)
+        
+        final int offset = this.offset;
+        final int length = this.length;
+        
+        if (offset != 0 || length != data.length)
         {
-            final byte[] d = ByteArrayPool.get(this.length);
-            System.arraycopy(this.data, this.offset, d, 0, this.length);
+            final byte[] d = ByteArrayPool.get(length);
+            System.arraycopy(data, offset, d, 0, length);
             // don't free the old data byte[] - could be the rxData permanent byte[]
-            this.data = d;
             this.offset = 0;
+            // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+            this.v_data = d;
+            return ByteBuffer.wrap(d, 0, length);
         }
-        return ByteBuffer.wrap(this.data, this.offset, this.length);
+        return ByteBuffer.wrap(data, offset, length);
     }
 
     @Override
@@ -287,8 +309,14 @@ class ByteArrayFragment
     @Override
     public final String toString()
     {
-        return getClass().getSimpleName() + " [id=" + this.id + ", sequenceId=" + this.sequenceId + ", lastElement="
-            + this.lastElement + ", data=" + this.length + "]";
+        // read volatile first to force all vars in scope to read from main memory
+        final byte lastElement = this.v_lastElement;
+        final int id = this.id;
+        final int length = this.length;
+        final int sequenceId = this.sequenceId;
+
+        return getClass().getSimpleName() + " [id=" + id + ", sequenceId=" + sequenceId + ", lastElement="
+            + lastElement + ", data=" + length + "]";
     }
 
     @SuppressWarnings("unchecked")
