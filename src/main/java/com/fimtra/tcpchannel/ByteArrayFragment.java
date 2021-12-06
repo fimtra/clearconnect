@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.fimtra.util.ByteArrayPool;
-import com.fimtra.util.IMultiThreadReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
