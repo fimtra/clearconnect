@@ -554,23 +554,19 @@ public class TcpChannel implements ITransportChannel
 
             final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
 
-            final ByteBuffer buffer = frameResolver.getBuffer();
-            synchronized (buffer)
+            final int readCount = this.socketChannel.read(frameResolver.getBuffer());
+            switch(readCount)
             {
-                final int readCount = this.socketChannel.read(buffer);
-                switch(readCount)
-                {
-                    case -1:
-                        destroy("End-of-stream reached");
-                        return;
-                    case 0:
-                        return;
-                    default:
-                        this.rxData = true;
-                }
-
-                frameResolver.setChannelAndReadTime(this, System.nanoTime() - start);
+                case -1:
+                    destroy("End-of-stream reached");
+                    return;
+                case 0:
+                    return;
+                default:
+                    this.rxData = true;
             }
+
+            frameResolver.setChannelAndReadTime(this, System.nanoTime() - start);
 
             RX_FRAME_PROCESSOR.execute(frameResolver);
         }
@@ -1100,7 +1096,7 @@ final class RxFrameResolver implements ISequentialRunnable
 
     // variables written by tcp-reader thread but read by a resolver thread
     private TcpChannel channel;
-    private long socketRead;
+    private volatile long v_socketRead;
 
     RxFrameResolver()
     {
@@ -1111,10 +1107,12 @@ final class RxFrameResolver implements ISequentialRunnable
     {
         try
         {
-            synchronized (this.buffer)
-            {
-                this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
-            }
+            // read volatile first to force all vars in scope to read from main memory
+            final long socketRead = this.v_socketRead;
+            final TcpChannel channel = this.channel;
+            final ByteBuffer buffer = this.buffer;
+
+            channel.resolveFrameFromBuffer(socketRead, buffer);
         }
         finally
         {
@@ -1125,19 +1123,14 @@ final class RxFrameResolver implements ISequentialRunnable
     @Override
     public Object context()
     {
-        synchronized (this.buffer)
-        {
-            return this.channel;
-        }
+        return this.channel;
     }
 
     void setChannelAndReadTime(TcpChannel channel, long socketRead)
     {
-        synchronized (this.buffer)
-        {
-            this.channel = channel;
-            this.socketRead = socketRead;
-        }
+        this.channel = channel;
+        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+        this.v_socketRead = socketRead;
     }
 
     ByteBuffer getBuffer()
@@ -1150,6 +1143,7 @@ final class RxFrameResolver implements ISequentialRunnable
         // note: reset is called by the object pool and with its own synchronization
         this.buffer.clear();
         this.channel = null;
-        this.socketRead = -1;
+        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
+        this.v_socketRead = -1;
     }
 }
