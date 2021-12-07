@@ -15,12 +15,12 @@
  */
 package com.fimtra.thimble;
 
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.util.CollectionUtils;
@@ -46,12 +46,6 @@ import com.fimtra.util.SystemUtils;
  */
 final class TaskQueue
 {
-    /**
-     * By default, the queue tracks task statistics at a queue level, not at a per-context level
-     */
-    private final static boolean GENERATE_STATISTICS_PER_CONTEXT =
-            Boolean.getBoolean("thimble.generateStatisticsPerContext");
-
     private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =
             SystemUtils.getPropertyAsInt("thimble.sequentialTasksMaxPoolSize", 1000);
     private final static int COALESCING_TASKS_MAX_POOL_SIZE =
@@ -229,8 +223,6 @@ final class TaskQueue
     final Queue<Runnable> queue = CollectionUtils.newDeque();
     final Map<Object, SequentialTasks> sequentialTasksPerContext = new HashMap<>();
     final Map<Object, CoalescingTasks> coalescingTasksPerContext = new HashMap<>();
-    final Map<Object, TaskStatistics> sequentialTaskStatsPerContext = new ConcurrentHashMap<>();
-    final Map<Object, TaskStatistics> coalescingTaskStatsPerContext = new ConcurrentHashMap<>();
     final TaskStatistics allCoalescingStats;
     final TaskStatistics allSequentialStats;
     final Object lock = new Object();
@@ -249,9 +241,7 @@ final class TaskQueue
                 new SingleThreadReusableObjectPool<>("coalescing-" + name, CoalescingTasks::new,
                         CoalescingTasks::reset, COALESCING_TASKS_MAX_POOL_SIZE);
         this.allCoalescingStats = new TaskStatistics("Coalescing" + IContextExecutor.QUEUE_LEVEL_STATS);
-        this.coalescingTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allCoalescingStats);
         this.allSequentialStats = new TaskStatistics("Sequential" + IContextExecutor.QUEUE_LEVEL_STATS);
-        this.sequentialTaskStatsPerContext.put(IContextExecutor.QUEUE_LEVEL_STATS, this.allSequentialStats);
     }
 
     /**
@@ -271,9 +261,7 @@ final class TaskQueue
             {
                 sequentialTasks = this.sequentialTasksPool.get();
                 sequentialTasks.context = context;
-                sequentialTasks.stats = this.sequentialTaskStatsPerContext.computeIfAbsent(
-                        GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
-                        TaskStatistics::new);
+                sequentialTasks.stats = this.allSequentialStats;
                 this.sequentialTasksPerContext.put(context, sequentialTasks);
             }
 
@@ -293,9 +281,7 @@ final class TaskQueue
             {
                 coalescingTasks = this.coalescingTasksPool.get();
                 coalescingTasks.context = context;
-                coalescingTasks.stats = this.coalescingTaskStatsPerContext.computeIfAbsent(
-                        GENERATE_STATISTICS_PER_CONTEXT ? context : IContextExecutor.QUEUE_LEVEL_STATS,
-                        TaskStatistics::new);
+                coalescingTasks.stats = this.allCoalescingStats;
                 this.coalescingTasksPerContext.put(context, coalescingTasks);
             }
 
@@ -327,12 +313,8 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.sequentialTaskStatsPerContext.size());
-        for (Map.Entry<Object, TaskStatistics> entry : this.sequentialTaskStatsPerContext.entrySet())
-        {
-            stats.put(entry.getKey(), entry.getValue().intervalFinished());
-        }
-        return stats;
+        return Collections.singletonMap(this.allSequentialStats.getContext(),
+                this.allSequentialStats.intervalFinished());
     }
 
     /**
@@ -340,11 +322,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
-        HashMap<Object, TaskStatistics> stats = new HashMap<>(this.coalescingTaskStatsPerContext.size());
-        for (Map.Entry<Object, TaskStatistics> entry : this.coalescingTaskStatsPerContext.entrySet())
-        {
-            stats.put(entry.getKey(), entry.getValue().intervalFinished());
-        }
-        return stats;
+        return Collections.singletonMap(this.allCoalescingStats.getContext(),
+                this.allCoalescingStats.intervalFinished());
     }
 }
