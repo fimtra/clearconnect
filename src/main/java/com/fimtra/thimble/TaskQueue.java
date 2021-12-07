@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.IReusableObject;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.SingleThreadReusableObjectPool;
 import com.fimtra.util.SystemUtils;
@@ -63,12 +64,11 @@ final class TaskQueue
         void onTaskFinished();
     }
 
-    abstract static class AbstractInternalTasks<T> implements InternalTaskQueue<T>
+    abstract static class AbstractInternalTasks<T> implements InternalTaskQueue<T>, IReusableObject
     {
-        // all common attributes must be volatile as they are updated by different threads
-        volatile Object context;
-        volatile TaskStatistics stats;
-        volatile boolean active;
+        Object context;
+        TaskStatistics stats;
+        boolean active;
 
         AbstractInternalTasks()
         {
@@ -88,7 +88,8 @@ final class TaskQueue
             return false;
         }
 
-        final void reset()
+        @Override
+        public final void reset()
         {
             this.context = null;
             this.stats = null;
@@ -105,7 +106,7 @@ final class TaskQueue
     final class SequentialTasks extends AbstractInternalTasks<ISequentialRunnable>
     {
         final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);
-        volatile int size;
+        int size;
 
         SequentialTasks()
         {
@@ -167,10 +168,7 @@ final class TaskQueue
         @Override
         public String toString()
         {
-            synchronized (this.sequentialTasks)
-            {
-                return "SequentialTasks [" + this.context + ", size=" + this.size + "]";
-            }
+            return "SequentialTasks [" + this.context + ", size=" + this.size + "]";
         }
     }
 
