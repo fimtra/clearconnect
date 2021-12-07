@@ -43,14 +43,15 @@ public class ByteArrayPool
      */
     public static byte[] get(final int size)
     {
-        if (size > POOLS.length)
+        if (size >= POOLS.length)
         {
             return new byte[size];
         }
         final int index = getIndex(size);
-        if (index < POOLS.length)
+        MultiThreadReusableObjectPool<byte[]> pool;
+        synchronized (POOLS)
         {
-            MultiThreadReusableObjectPool<byte[]> pool = POOLS[index];
+            pool = POOLS[index];
             if (pool == null)
             {
                 pool = new MultiThreadReusableObjectPool<>("byte[" + index + "]", () -> new byte[index],
@@ -58,9 +59,8 @@ public class ByteArrayPool
                         }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
                 POOLS[index] = pool;
             }
-            return pool.get();
         }
-        return new byte[size];
+        return pool.get();
     }
 
     /**
@@ -70,7 +70,11 @@ public class ByteArrayPool
     {
         if (array.length < POOLS.length)
         {
-            final MultiThreadReusableObjectPool<byte[]> pool = POOLS[array.length];
+            final MultiThreadReusableObjectPool<byte[]> pool;
+            synchronized (POOLS)
+            {
+                pool = POOLS[array.length];
+            }
             if (pool != null)
             {
                 pool.offer(array);
