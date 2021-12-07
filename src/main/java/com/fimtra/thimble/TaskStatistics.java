@@ -15,8 +15,6 @@
  */
 package com.fimtra.thimble;
 
-import com.fimtra.util.AtomicOp;
-
 /**
  * Tracks statistics for tasks . The statistics are gathered in intervals. An interval is the time
  * between successive calls to {@link #intervalFinished()}.
@@ -29,27 +27,22 @@ import com.fimtra.util.AtomicOp;
  * <li>totalSubmitted - the cumulative total number of tasks that were submitted for the context
  * <li>totalExecuted - the cumulative total number of tasks that have been executed for the context
  * </ul>
- * 
+ *
+ * Not thread safe.
+ *
  * @author Ramon Servadei
  */
 public final class TaskStatistics
 {
     private final Object context;
-    private long currentSubmitted, currentExecuted;
     private long intervalSubmitted, intervalExecuted;
     private long totalSubmitted, totalExecuted;
-    private final AtomicOp atomicOp;
+    private long submittedMark, executedMark;
 
     TaskStatistics(Object context)
     {
-        this(context, new AtomicOp());
-    }
-
-    TaskStatistics(Object context, AtomicOp lock)
-    {
         super();
         this.context = context;
-        this.atomicOp = lock;
     }
 
     public Object getContext()
@@ -87,12 +80,12 @@ public final class TaskStatistics
 
     void itemSubmitted()
     {
-        this.atomicOp.execute(() -> this.currentSubmitted++);
+        this.totalSubmitted++;
     }
 
     void itemExecuted()
     {
-        this.atomicOp.execute(() -> this.currentExecuted++);
+        this.totalExecuted++;
     }
 
     /**
@@ -102,21 +95,25 @@ public final class TaskStatistics
      */
     TaskStatistics intervalFinished()
     {
-        final TaskStatistics snapshot = new TaskStatistics(this.context, new AtomicOp());
+        final TaskStatistics snapshot = new TaskStatistics(this.context);
 
-        this.atomicOp.execute(() -> {
-            this.intervalSubmitted = this.currentSubmitted;
-            this.currentSubmitted = 0;
-            this.intervalExecuted = this.currentExecuted;
-            this.currentExecuted = 0;
-            this.totalSubmitted += this.intervalSubmitted;
-            this.totalExecuted += this.intervalExecuted;
+        // just to ensure we read / write
+        synchronized (this)
+        {
+            long lastSubmittedMark = this.submittedMark;
+            long lastExecutedMark = this.executedMark;
 
-            snapshot.intervalExecuted = this.intervalExecuted;
+            this.submittedMark = this.totalSubmitted;
+            this.executedMark = this.totalExecuted;
+
+            this.intervalSubmitted = this.submittedMark - lastSubmittedMark;
+            this.intervalExecuted = this.executedMark - lastExecutedMark;
+
             snapshot.intervalSubmitted = this.intervalSubmitted;
+            snapshot.intervalExecuted = this.intervalExecuted;
             snapshot.totalSubmitted = this.totalSubmitted;
             snapshot.totalExecuted = this.totalExecuted;
-        });
+        }
 
         return snapshot;
     }
