@@ -1097,7 +1097,7 @@ final class RxFrameResolver implements ISequentialRunnable, IReusableObject
 
     // variables written by tcp-reader thread but read by a resolver thread
     private TcpChannel channel;
-    private volatile long v_socketRead;
+    private long socketRead;
 
     RxFrameResolver()
     {
@@ -1108,12 +1108,7 @@ final class RxFrameResolver implements ISequentialRunnable, IReusableObject
     {
         try
         {
-            // read volatile first to force all vars in scope to read from main memory
-            final long socketRead = this.v_socketRead;
-            final TcpChannel channel = this.channel;
-            final ByteBuffer buffer = this.buffer;
-
-            channel.resolveFrameFromBuffer(socketRead, buffer);
+            this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
         }
         finally
         {
@@ -1130,8 +1125,7 @@ final class RxFrameResolver implements ISequentialRunnable, IReusableObject
     void setChannelAndReadTime(TcpChannel channel, long socketRead)
     {
         this.channel = channel;
-        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-        this.v_socketRead = socketRead;
+        this.socketRead = socketRead;
     }
 
     ByteBuffer getBuffer()
@@ -1145,7 +1139,6 @@ final class RxFrameResolver implements ISequentialRunnable, IReusableObject
         // note: reset is called by the object pool and with its own synchronization
         this.buffer.clear();
         this.channel = null;
-        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-        this.v_socketRead = -1;
+        this.socketRead = -1;
     }
 }

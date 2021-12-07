@@ -187,11 +187,11 @@ class ByteArrayFragment implements IReusableObject
     }
 
     int id;
-    volatile byte v_lastElement;
+    byte lastElement;
     int offset;
     int length;
     int sequenceId;
-    volatile byte[] v_data;
+    byte[] data;
     @SuppressWarnings("rawtypes")
     final MultiThreadReusableObjectPool poolRef;
 
@@ -214,9 +214,8 @@ class ByteArrayFragment implements IReusableObject
         this.sequenceId = sequenceId;
         this.offset = offset;
         this.length = len;
-        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-        this.v_data = data;
-        this.v_lastElement = lastElement;
+        this.data = data;
+        this.lastElement = lastElement;
         return this;
     }
 
@@ -225,7 +224,7 @@ class ByteArrayFragment implements IReusableObject
      */
     final boolean isLastElement()
     {
-        return this.v_lastElement != 0;
+        return this.lastElement != 0;
     }
 
     /**
@@ -237,30 +236,17 @@ class ByteArrayFragment implements IReusableObject
      */
     final ByteArrayFragment merge(ByteArrayFragment other) throws IncorrectSequenceException
     {
-        // read volatile first to force all vars in scope to read from main memory
-        final byte[] data = this.v_data;
-        final int offset = this.offset;
-        final int length = this.length;
-        int sequenceId = this.sequenceId;
-
-        final byte[] other_data = other.v_data;
-        final int other_length = other.length;
-        final int other_offset = other.offset;
-        final int other_sequenceId = other.sequenceId;
-
-        if (++sequenceId != other_sequenceId)
+        if (++this.sequenceId != other.sequenceId)
         {
-            throw new IncorrectSequenceException("Expected " + (sequenceId) + " but got " + other_sequenceId);
+            throw new IncorrectSequenceException("Expected " + (this.sequenceId) + " but got " + other.sequenceId);
         }
 
-        byte[] d = ByteArrayPool.get(length + other_length);
-        System.arraycopy(data, offset, d, 0, length);
-        System.arraycopy(other_data, other_offset, d, length, other_length);
-        this.sequenceId = sequenceId;
+        byte[] d = ByteArrayPool.get(this.length + other.length);
+        System.arraycopy(this.data, this.offset, d, 0, this.length);
+        System.arraycopy(other.data, other.offset, d, this.length, other.length);
         this.offset = 0;
-        this.length += other_length;
-        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-        this.v_data = d;
+        this.length += other.length;
+        this.data = d;
         return this;
     }
 
@@ -269,27 +255,20 @@ class ByteArrayFragment implements IReusableObject
      */
     final ByteBuffer getData()
     {
-        // read volatile first to force all vars in scope to read from main memory
-        final byte[] data = this.v_data;
-        if (data == null)
+        if (this.data == null)
         {
             return null;
         }
-        
-        final int offset = this.offset;
-        final int length = this.length;
-        
-        if (offset != 0 || length != data.length)
+
+        if (this.offset != 0 || this.length != this.data.length)
         {
-            final byte[] d = ByteArrayPool.get(length);
-            System.arraycopy(data, offset, d, 0, length);
+            final byte[] d = ByteArrayPool.get(this.length);
+            System.arraycopy(this.data, this.offset, d, 0, this.length);
             // don't free the old data byte[] - could be the rxData permanent byte[]
             this.offset = 0;
-            // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-            this.v_data = d;
-            return ByteBuffer.wrap(d, 0, length);
+            this.data = d;
         }
-        return ByteBuffer.wrap(data, offset, length);
+        return ByteBuffer.wrap(this.data, this.offset, this.length);
     }
 
     @Override
@@ -316,14 +295,8 @@ class ByteArrayFragment implements IReusableObject
     @Override
     public final String toString()
     {
-        // read volatile first to force all vars in scope to read from main memory
-        final byte lastElement = this.v_lastElement;
-        final int id = this.id;
-        final int length = this.length;
-        final int sequenceId = this.sequenceId;
-
-        return getClass().getSimpleName() + " [id=" + id + ", sequenceId=" + sequenceId + ", lastElement="
-            + lastElement + ", data=" + length + "]";
+        return getClass().getSimpleName() + " [id=" + this.id + ", sequenceId=" + this.sequenceId + ", lastElement="
+            + this.lastElement + ", data=" + this.length + "]";
     }
 
     @SuppressWarnings("unchecked")

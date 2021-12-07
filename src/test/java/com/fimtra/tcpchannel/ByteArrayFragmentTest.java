@@ -116,7 +116,7 @@ public class ByteArrayFragmentTest
             resolved = ByteArrayFragment.fromRxBytesRawByteHeader(joinBuffers(fragment.toTxBytesRawByteHeader()));
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
-            assertEquals(fragment.v_lastElement, resolved.v_lastElement);
+            assertEquals(fragment.lastElement, resolved.lastElement);
             assertArrayEquals(ByteBufferUtils.asBytes(fragment.getData()), ByteBufferUtils.asBytes(resolved.getData()));
         }
     }
@@ -339,7 +339,7 @@ public class ByteArrayFragmentTest
             resolved = ByteArrayFragment.fromRxBytesUTF8Header(joinBuffers(fragment.toTxBytesUTF8Header()));
             assertEquals(fragment, resolved);
             assertEquals(fragment.sequenceId, resolved.sequenceId);
-            assertEquals(fragment.v_lastElement, resolved.v_lastElement);
+            assertEquals(fragment.lastElement, resolved.lastElement);
             assertArrayEquals(ByteBufferUtils.asBytes(fragment.getData()), ByteBufferUtils.asBytes(resolved.getData()));
         }
     }

@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.fimtra.util.IReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 
@@ -114,32 +113,22 @@ final class TxByteArrayFragment extends ByteArrayFragment
      */
     ByteBuffer[] toTxBytesRawByteHeader()
     {
-        // read volatile first to force all vars in scope to read from main memory
-        final byte[] data = this.v_data;
-        final byte lastElement = this.v_lastElement;
-        final byte[] header = this.header;
-        final int id = this.id;
-        final int offset = this.offset;
-        final int length = this.length;
-        final int sequenceId = this.sequenceId;
-        final ByteBuffer[] txDataWithHeader = this.txDataWithHeader;
-
         // write the header
-        header[0] = (byte) (id >> 24);
-        header[1] = (byte) (id >> 16);
-        header[2] = (byte) (id >> 8);
-        header[3] = (byte) (id);
-        header[4] = (byte) (sequenceId >> 24);
-        header[5] = (byte) (sequenceId >> 16);
-        header[6] = (byte) (sequenceId >> 8);
-        header[7] = (byte) (sequenceId);
-        header[8] = (lastElement);
+        this.header[0] = (byte) (this.id >> 24);
+        this.header[1] = (byte) (this.id >> 16);
+        this.header[2] = (byte) (this.id >> 8);
+        this.header[3] = (byte) (this.id);
+        this.header[4] = (byte) (this.sequenceId >> 24);
+        this.header[5] = (byte) (this.sequenceId >> 16);
+        this.header[6] = (byte) (this.sequenceId >> 8);
+        this.header[7] = (byte) (this.sequenceId);
+        this.header[8] = (this.lastElement);
 
-        txDataWithHeader[0].position(0);
-        txDataWithHeader[0].limit(9);
-        txDataWithHeader[1] = ByteBuffer.wrap(data, offset, length);
+        this.txDataWithHeader[0].position(0);
+        this.txDataWithHeader[0].limit(9);
+        this.txDataWithHeader[1] = ByteBuffer.wrap(this.data, this.offset, this.length);
 
-        return txDataWithHeader;
+        return this.txDataWithHeader;
     }
 
     /**
@@ -164,38 +153,26 @@ final class TxByteArrayFragment extends ByteArrayFragment
      */
     ByteBuffer[] toTxBytesUTF8Header()
     {
-        // read volatile first to force all vars in scope to read from main memory
-        final byte[] data = this.v_data;
-        final byte lastElement = this.v_lastElement;
-        byte[] header = this.header;
-        final int id = this.id;
-        final int offset = this.offset;
-        final int length = this.length;
-        final int sequenceId = this.sequenceId;
-        final ByteBuffer[] txDataWithHeader = this.txDataWithHeader;
-
         final StringBuilder sb = new StringBuilder(32);
-        sb.append('|').append(id).append('|').append(sequenceId).append('|').append(lastElement).append(
+        sb.append('|').append(this.id).append('|').append(this.sequenceId).append('|').append(this.lastElement).append(
             '|');
         final byte[] idSeqLstElement = sb.toString().getBytes(StandardCharsets.UTF_8);
         final byte[] len = ByteArrayFragmentUtils.pad4DigitWithLeadingZeros(idSeqLstElement.length).getBytes(
                 StandardCharsets.UTF_8);
         final int headerLen = len.length + idSeqLstElement.length;
-        if (header.length < headerLen)
+        if (this.header.length < headerLen)
         {
-            header = this.header = new byte[headerLen];
-            // perform this to force a write to main memory for header
-            this.v_lastElement = lastElement;
-            txDataWithHeader[0] = ByteBuffer.wrap(header, 0, headerLen);
+            this.header = new byte[headerLen];
+            this.txDataWithHeader[0] = ByteBuffer.wrap(this.header, 0, headerLen);
         }
-        System.arraycopy(len, 0, header, 0, len.length);
-        System.arraycopy(idSeqLstElement, 0, header, len.length, idSeqLstElement.length);
+        System.arraycopy(len, 0, this.header, 0, len.length);
+        System.arraycopy(idSeqLstElement, 0, this.header, len.length, idSeqLstElement.length);
 
-        txDataWithHeader[0].position(0);
-        txDataWithHeader[0].limit(headerLen);
-        txDataWithHeader[1] = ByteBuffer.wrap(data, offset, length);
+        this.txDataWithHeader[0].position(0);
+        this.txDataWithHeader[0].limit(headerLen);
+        this.txDataWithHeader[1] = ByteBuffer.wrap(this.data, this.offset, this.length);
 
-        return txDataWithHeader;
+        return this.txDataWithHeader;
     }
 
     ByteBuffer[] getTxDataWithHeader()
