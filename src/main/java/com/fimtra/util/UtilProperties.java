@@ -114,6 +114,12 @@ public abstract class UtilProperties
          * <code>-Dutil.notifyingCacheFairLockPolicy=true</code>
          */
         String NOTIFYING_CACHE_FAIR_LOCK_POLICY = BASE + "notifyingCacheFairLockPolicy";
+
+        /**
+         * The system property name to define using dedicated update threads.
+         * <code>-Dutil.notifyingCacheUseUpdateThreads=false</code>
+         */
+        String NOTIFYING_CACHE_USE_UPDATE_THREADS = BASE + "notifyingCacheUseUpdateThreads";
     }
 
     /**
@@ -211,6 +217,13 @@ public abstract class UtilProperties
          */
         boolean NOTIFYING_CACHE_FAIR_LOCK_POLICY =
                 SystemUtils.getProperty(Names.NOTIFYING_CACHE_FAIR_LOCK_POLICY, true);
+
+        /**
+         * Defines if the {@link NotifyingCache} default behaviour uses update threads.<br> Default is
+         * <code>false</code>.
+         */
+        boolean NOTIFYING_CACHE_USE_UPDATE_THREADS =
+                SystemUtils.getProperty(Names.NOTIFYING_CACHE_USE_UPDATE_THREADS, false);
     }
 
 }

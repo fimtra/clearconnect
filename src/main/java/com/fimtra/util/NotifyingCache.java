@@ -55,15 +55,24 @@ import com.fimtra.util.LazyObject.IDestructor;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
-    private static final Executor IMAGE_NOTIFIER =
-            ContextExecutorFactory.create("image-notifier", DataFissionProperties.Values.CORE_THREAD_COUNT);
-    private static final Executor UPDATE_NOTIFIER =
-            ContextExecutorFactory.create("update-notifier", DataFissionProperties.Values.CORE_THREAD_COUNT);
+    private static final Executor IMAGE_NOTIFIER = ThreadUtils.newCachedThreadPoolExecutor("image-notifier");
+
+    private static final class UpdateNotifier
+    {
+        static final Executor INSTANCE = ContextExecutorFactory.create("update-notifier",
+                DataFissionProperties.Values.CORE_THREAD_COUNT);
+    }
 
     @SuppressWarnings("rawtypes")
     private static final IDestructor NOOP_DESTRUCTOR = (ref) -> {
         // noop
     };
+
+    private static Executor getUpdateNotifier()
+    {
+        return UtilProperties.Values.NOTIFYING_CACHE_USE_UPDATE_THREADS ? UpdateNotifier.INSTANCE :
+                Runnable::run;
+    }
 
     private static boolean isLatest(String key, Long sequence, Map<String, Long> notifySequences)
     {
@@ -119,7 +128,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     @SuppressWarnings("unchecked")
     public NotifyingCache()
     {
-        this(NOOP_DESTRUCTOR, UPDATE_NOTIFIER);
+        this(NOOP_DESTRUCTOR, getUpdateNotifier());
     }
 
     /**
@@ -127,7 +136,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor)
     {
-        this(destructor, UPDATE_NOTIFIER);
+        this(destructor, getUpdateNotifier());
     }
 
     /**
@@ -147,7 +156,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.destructor = destructor;
         this.cache = new LinkedHashMap<>(2);
         this.sequences = new HashMap<>();
-        this.listeners = new ArrayList<LISTENER_CLASS>(1);
+        this.listeners = new ArrayList<>(1);
         this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
         final Object runnerLock = new Object();
         this.notifyingTasksRunner = () -> {
@@ -283,7 +292,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                     this.listenerSequences.put(listener, notifySequence);
 
                     // add the listener
-                    final List<LISTENER_CLASS> copy = new ArrayList<LISTENER_CLASS>(this.listeners);
+                    final List<LISTENER_CLASS> copy = new ArrayList<>(this.listeners);
                     result.set(copy.add(listener));
                     this.listeners = copy;
 
@@ -352,7 +361,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             List<LISTENER_CLASS> copy = new ArrayList<>(this.listeners);
             final boolean removed = copy.remove(listener);
             // take another copy so we have the correct size
-            copy = new ArrayList<LISTENER_CLASS>(copy);
+            copy = new ArrayList<>(copy);
             this.listeners = copy;
 
             this.listenerSequences.remove(listener);
@@ -376,7 +385,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final boolean notifyListenersDataAdded(final String key, final DATA data)
     {
         final boolean added;
-        Runnable command = null;
+        Runnable command;
         this.writeLock.lock();
         try
         {
@@ -461,7 +470,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     public final boolean notifyListenersDataRemoved(final String key)
     {
         final boolean removed;
-        Runnable command = null;
+        Runnable command;
         this.writeLock.lock();
         try
         {
@@ -545,7 +554,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         return start;
     }
 
-    private final void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    private void safeNotifyAdd(final String key, final DATA data, LISTENER_CLASS listener, String action)
     {
         try
         {
@@ -557,7 +566,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    private final void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    private void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener, String action)
     {
         try
         {
