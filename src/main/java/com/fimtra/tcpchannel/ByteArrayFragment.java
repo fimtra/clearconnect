@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.fimtra.util.ByteArrayPool;
+import com.fimtra.util.IReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
@@ -34,20 +35,19 @@ import com.fimtra.util.is;
  * @see TxByteArrayFragment
  * @author Ramon Servadei
  */
-class ByteArrayFragment
+class ByteArrayFragment implements IReusableObject
 {
-
     static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
-        new MultiThreadReusableObjectPool<>("RxFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
-        {
-            @Override
-            public ByteArrayFragment newInstance()
-            {
-                return new ByteArrayFragment(BYTE_ARRAY_FRAGMENT_POOL);
-            }
-        }, (instance) -> instance.initialise(-1, -1, (byte) -1, null, -1, -1),
-            TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
-    
+            new MultiThreadReusableObjectPool<>("RxFragmentPool",
+                    new IReusableObjectBuilder<ByteArrayFragment>()
+                    {
+                        @Override
+                        public ByteArrayFragment newInstance()
+                        {
+                            return new ByteArrayFragment(BYTE_ARRAY_FRAGMENT_POOL);
+                        }
+                    }, ByteArrayFragment::reset, TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
+
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
      * 
@@ -195,10 +195,17 @@ class ByteArrayFragment
     @SuppressWarnings("rawtypes")
     final MultiThreadReusableObjectPool poolRef;
 
+    @SuppressWarnings("rawtypes")
     ByteArrayFragment(MultiThreadReusableObjectPool poolRef)
     {
         super();
         this.poolRef = poolRef;
+    }
+
+    @Override
+    public void reset()
+    {
+        initialise(-1, -1, (byte) -1, null, -1, -1);
     }
 
     final ByteArrayFragment initialise(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)

@@ -66,6 +66,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.ByteArrayPool;
+import com.fimtra.util.IReusableObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.NotifyingCache;
@@ -497,10 +498,10 @@ public final class ProxyContext implements IObserverContext
     /**
      * Handles the received TCP frame data. If the data is an atomic change, this will be passed to
      * a {@link RxAtomicChangeHandler}
-     * 
+     *
      * @author Ramon Servadei
      */
-    private static final class RxFrameHandler implements ISequentialRunnable
+    private static final class RxFrameHandler implements ISequentialRunnable, IReusableObject
     {
         final RxAtomicChangeHandler atomicChangeHandler;
         // variables written by rx-frame-processor and read by a context thread
@@ -527,8 +528,10 @@ public final class ProxyContext implements IObserverContext
             return this;
         }
 
-        void clear()
+        @Override
+        public void reset()
         {
+            ByteArrayPool.offer(this.data.array());
             this.data = null;
             this.receiver = null;
             this.proxyContext = null;
@@ -610,7 +613,6 @@ public final class ProxyContext implements IObserverContext
 
         void free()
         {
-            ByteArrayPool.offer(this.data.array());
             RX_FRAME_HANDLER_POOL.offer(this);
         }
 
@@ -624,7 +626,7 @@ public final class ProxyContext implements IObserverContext
     /**
      * Handles a single {@link IRecordChange} created from a received frame decoded from a
      * {@link RxFrameHandler}
-     * 
+     *
      * @author Ramon Servadei
      */
     private final static class RxAtomicChangeHandler implements ISequentialRunnable
@@ -757,7 +759,7 @@ public final class ProxyContext implements IObserverContext
 
     static final MultiThreadReusableObjectPool<RxFrameHandler> RX_FRAME_HANDLER_POOL =
         new MultiThreadReusableObjectPool<>("ProxyContext-RxFrameHandlerPool", RxFrameHandler::new,
-                RxFrameHandler::clear, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
+                RxFrameHandler::reset, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
 
     final Object lock;
     volatile boolean active;

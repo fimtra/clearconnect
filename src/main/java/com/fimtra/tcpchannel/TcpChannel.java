@@ -46,6 +46,7 @@ import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.IReusableObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.ObjectUtils;
@@ -1089,7 +1090,7 @@ final class LengthBasedWriter extends AbstractFrameReaderWriter
  *
  * @author Ramon Servadei
  */
-final class RxFrameResolver implements ISequentialRunnable
+final class RxFrameResolver implements ISequentialRunnable, IReusableObject
 {
     /** direct byte buffer to optimise reading */
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
@@ -1138,7 +1139,8 @@ final class RxFrameResolver implements ISequentialRunnable
         return this.buffer;
     }
 
-    void reset()
+    @Override
+    public void reset()
     {
         // note: reset is called by the object pool and with its own synchronization
         this.buffer.clear();

@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.fimtra.util.IReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 
@@ -84,14 +85,12 @@ final class TxByteArrayFragment extends ByteArrayFragment
         this.txDataWithHeader[0] = ByteBuffer.wrap(this.header, 0, this.header.length);
     }
 
-    void reset()
+    @Override
+    public void reset()
     {
-        this.id = this.sequenceId = this.offset = this.length = -1;
         // reset the data part only
         this.txDataWithHeader[1] = null;
-        // write volatile last to write all vars in scope to main-memory (write visibility guarantee)
-        this.v_data = null;
-        this.v_lastElement = -1;
+        super.reset();
     }
 
     /**
