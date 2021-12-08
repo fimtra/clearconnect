@@ -313,7 +313,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getSequentialTaskStatistics()
     {
-        return Collections.singletonMap(this.allSequentialStats.getContext(),
+        return Collections.singletonMap(IContextExecutor.QUEUE_LEVEL_STATS,
                 this.allSequentialStats.intervalFinished());
     }
 
@@ -322,7 +322,7 @@ final class TaskQueue
      */
     Map<Object, TaskStatistics> getCoalescingTaskStatistics()
     {
-        return Collections.singletonMap(this.allCoalescingStats.getContext(),
+        return Collections.singletonMap(IContextExecutor.QUEUE_LEVEL_STATS,
                 this.allCoalescingStats.intervalFinished());
     }
 }
