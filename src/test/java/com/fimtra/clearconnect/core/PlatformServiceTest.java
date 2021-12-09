@@ -220,10 +220,10 @@ public class PlatformServiceTest
     @Test
     public void testGetAllRpcs()
     {
-        assertEquals(1, this.candidate.getAllRpcs().size());
+        assertEquals(2, this.candidate.getAllRpcs().size());
         IRpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         assertTrue(this.candidate.publishRPC(rpc1));
-        assertEquals(2, this.candidate.getAllRpcs().size());
+        assertEquals(3, this.candidate.getAllRpcs().size());
         assertEquals(rpc1, this.candidate.getAllRpcs().get(RPC1));
     }
     
@@ -238,7 +238,7 @@ public class PlatformServiceTest
         final IRpcAvailableListener synchronizedListener = EventListenerUtils.synchronizedListener(rpcListener1);
         assertTrue(this.candidate.addRpcAvailableListener(synchronizedListener));
         assertFalse(this.candidate.addRpcAvailableListener(synchronizedListener));
-        verify(rpcListener1, timeout(500).times(2)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener1, timeout(500).times(3)).onRpcAvailable(any(IRpcInstance.class));
         verify(rpcListener1).onRpcAvailable(eq(rpc1));
         reset(rpcListener1);
 
@@ -253,7 +253,7 @@ public class PlatformServiceTest
 
         IRpcAvailableListener rpcListener2 = mock(IRpcAvailableListener.class);
         assertTrue(this.candidate.addRpcAvailableListener(EventListenerUtils.synchronizedListener(rpcListener2)));
-        verify(rpcListener2, timeout(500).times(2)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener2, timeout(500).times(3)).onRpcAvailable(any(IRpcInstance.class));
         verify(rpcListener2).onRpcAvailable(eq(rpc1));
         reset(rpcListener2);
 

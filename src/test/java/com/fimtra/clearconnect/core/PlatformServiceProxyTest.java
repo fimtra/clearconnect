@@ -426,17 +426,17 @@ public class PlatformServiceProxyTest
         // compensate for lazy loading
         IRpcAvailableListener rpcListener = mock(IRpcAvailableListener.class);
         this.candidate.addRpcAvailableListener(EventListenerUtils.synchronizedListener(rpcListener));
-        verify(rpcListener, timeout(1000).times(1)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener, timeout(1000).times(2)).onRpcAvailable(any(IRpcInstance.class));
 
-        assertEquals(1, this.candidate.getAllRpcs().size());
+        assertEquals(2, this.candidate.getAllRpcs().size());
         IRpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         assertTrue(this.service.publishRPC(rpc1));
 
         rpcListener = mock(IRpcAvailableListener.class);
         this.candidate.addRpcAvailableListener(EventListenerUtils.synchronizedListener(rpcListener));
-        verify(rpcListener, timeout(1000).times(2)).onRpcAvailable(any(IRpcInstance.class));
+        verify(rpcListener, timeout(1000).times(3)).onRpcAvailable(any(IRpcInstance.class));
 
-        assertEquals(2, this.candidate.getAllRpcs().size());
+        assertEquals(3, this.candidate.getAllRpcs().size());
         assertEquals(rpc1, this.candidate.getAllRpcs().get(RPC1));
     }
 
