@@ -101,6 +101,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
     }
 
+    private static String addProcId(String agentName)
+    {
+        final String processName = ManagementFactory.getRuntimeMXBean().getName();
+        if (!agentName.contains(processName))
+        {
+            return agentName + "_" + processName;
+        }
+        return agentName;
+    }
+
     final long startTime;
     final String agentName;
     final String hostQualifiedAgentName;
@@ -185,7 +195,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         Log.log(this, "Registry addresses: ", Arrays.toString(registryAddresses));
         this.startTime = System.currentTimeMillis();
-        this.agentName = agentName + "-" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
+        this.agentName = addProcId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
         this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
         this.createLock = new ReentrantLock();
         this.destroyCalled = new AtomicBoolean(false);
@@ -822,6 +832,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             (proxy != null ? " (proxy is inactive)" : ""));
                     return null;
                 }
+                // todo this must be an RPC
                 Map<String, IValue> serviceInfoRecord = this.registryProxy.getRemoteRecordImage(
                         ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
                         getRemoteRecordImageTimeoutMillis());
@@ -1021,6 +1032,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 Log.log(this, "Registry has no service registered for '", serviceFamily, "'");
                 return null;
             }
+            // todo we need to have a new RPC to get the record for the service
             return this.registryProxy.getRemoteRecordImage(instanceForService.textValue(),
                     getRemoteRecordImageTimeoutMillis());
         }
