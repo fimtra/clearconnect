@@ -15,9 +15,12 @@
  */
 package com.fimtra.tcpchannel;
 
+import org.junit.Ignore;
+
 /**
  * @author Ramon Servadei
  */
+@Ignore
 public class TestTcpServerWithLengthBasedFrameEncodingFormat_sendUsingApplicationThread
     extends TestTcpServerWithLengthBasedFrameEncodingFormat
 {
