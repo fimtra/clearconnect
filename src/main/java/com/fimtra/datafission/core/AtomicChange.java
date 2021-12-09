@@ -147,8 +147,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     Map<String, AtomicChange> subMapAtomicChanges;
 
     // members needed for the ISequentialRunnable use
-    volatile Context context;
-    volatile CountDownLatch latch;
+    Context context;
+    CountDownLatch latch;
 
     /**
      * Construct the atomic change to represent the record.
