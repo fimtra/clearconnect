@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * A simple logger that writes to a file and to <code>System.err</code>. Uses a
@@ -71,15 +72,23 @@ public abstract class Log
 
         final Thread t;
         final Object source;
-        final CharSequence[] messages;
+        final Supplier<String[]> messages;
         final long timeMillis;
         String formattedMessage;
 
-        LogMessage(Thread t, Object source, CharSequence... messages)
+        LogMessage(Thread t, Object source, Supplier<String[]> messages)
         {
             this.t = t;
             this.source = source;
             this.messages = messages;
+            this.timeMillis = System.currentTimeMillis();
+        }
+
+        LogMessage(Thread t, Object source, String... messages)
+        {
+            this.t = t;
+            this.source = source;
+            this.messages = () -> messages;
             this.timeMillis = System.currentTimeMillis();
         }
 
@@ -105,12 +114,14 @@ public abstract class Log
                 return this.formattedMessage;
             }
 
+            final String[] msgs = this.messages.get();
+
             int len = LOG_PREFIX_EST_SIZE;
-            for (int i = 0; i < this.messages.length; i++)
+            for (int i = 0; i < msgs.length; i++)
             {
-                if (this.messages[i] != null)
+                if (msgs[i] != null)
                 {
-                    len += this.messages[i].length();
+                    len += msgs[i].length();
                 }
             }
             final StringBuilder sb = new StringBuilder(len);
@@ -133,9 +144,9 @@ public abstract class Log
             sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(
                     classSimpleName).append(":").append(
                     Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
-            for (int i = 0; i < this.messages.length; i++)
+            for (int i = 0; i < msgs.length; i++)
             {
-                sb.append(this.messages[i]);
+                sb.append(msgs[i]);
             }
             sb.append(LINE_SEPARATOR);
 
@@ -214,6 +225,11 @@ public abstract class Log
         });
     }
 
+    public static void log(Object source, Supplier<String[]> messages)
+    {
+        log(new LogMessage(Thread.currentThread(), source, messages));
+    }
+
     public static void log(Object source, String... messages)
     {
         log(new LogMessage(Thread.currentThread(), source, messages));
@@ -271,7 +287,7 @@ public abstract class Log
         // note: use "\n" to cover unix "\n" and windows "\r\n"
         final String[] elements = message.split("\n");
         int len = elements[0].length();
-        int i = 0;
+        int i;
         for (i = 0; i < elements.length; i++)
         {
             if (len < elements[i].length())
