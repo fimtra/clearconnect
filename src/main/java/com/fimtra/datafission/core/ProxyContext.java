@@ -350,7 +350,8 @@ public final class ProxyContext implements IObserverContext
             {
                 if (!logRx)
                 {
-                    Log.log(ProxyContext.this, "(<-) RPC result ", ObjectUtils.safeToString(this.changeToApply));
+                    Log.log(ProxyContext.this, () -> new String[] { "(<-) RPC result ",
+                            ObjectUtils.safeToString(this.changeToApply) });
                 }
             }
             final IRecordListener[] subscribersFor =
@@ -1355,7 +1356,8 @@ public final class ProxyContext implements IObserverContext
 
         if (logRx)
         {
-            Log.log(ProxyContext.this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+            Log.log(ProxyContext.this,
+                    () -> new String[] { "(<-) ", ObjectUtils.safeToString(changeToApply) });
         }
 
         if (changeToApply == null)
@@ -1363,7 +1365,7 @@ public final class ProxyContext implements IObserverContext
             return false;
         }
 
-        // peek at the size before attempting the synchronize block
+        // peek at the size before attempting the synchronized block
         if (logVerboseSubscribes && this.firstUpdateExpected.size() > 0)
         {
             synchronized (this.firstUpdateExpected)
@@ -1372,8 +1374,9 @@ public final class ProxyContext implements IObserverContext
                 {
                     if (this.firstUpdateExpected.remove(changeToApply.getName()))
                     {
-                        Log.log(ProxyContext.this, "(<-) first update from [", this.channel.getEndPointDescription(),
-                            "] for [", changeToApply.getName() + "]");
+                        Log.log(ProxyContext.this, () -> new String[] { "(<-) first update from [",
+                                this.channel.getEndPointDescription(), "] for [",
+                                ObjectUtils.safeToString(changeToApply) + "]" });
                     }
                 }
             }
@@ -1413,7 +1416,7 @@ public final class ProxyContext implements IObserverContext
         {
             if (!logRx)
             {
-                Log.log(this, "(<-) ", ObjectUtils.safeToString(changeToApply));
+                Log.log(this, () -> new String[] { "(<-) ", ObjectUtils.safeToString(changeToApply) });
             }
         }
 
@@ -1533,8 +1536,18 @@ public final class ProxyContext implements IObserverContext
         if (instance == null)
         {
             instance = RpcInstance.constructInstanceFromDefinition(name, definition.textValue());
-            this.rpcTemplates.put(name, instance);
-            Log.log(this, "Created RPC template: ", instance.toString());
+            if (instance != null)
+            {
+                this.rpcTemplates.put(name, instance);
+                Log.log(this, "Created RPC template: ", instance.toString());
+            }
+            else
+            {
+                // this should never happen but we throw anyway
+                throw new IllegalStateException(
+                        ("RPC is null when constructed from name=" + name + " and definition="
+                                + definition.textValue()));
+            }
         }
 
         instance = instance.clone();
