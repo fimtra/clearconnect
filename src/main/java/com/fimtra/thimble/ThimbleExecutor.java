@@ -89,7 +89,6 @@ public final class ThimbleExecutor implements IContextExecutor
 
         Runnable task;
         boolean active = true;
-        boolean idle = true;
 
         TaskRunner(final String name, Integer number)
         {
@@ -136,7 +135,6 @@ public final class ThimbleExecutor implements IContextExecutor
                                 if (this.task == null)
                                 {
                                     // no more tasks so place back into the runners list
-                                    this.idle = true;
                                     ThimbleExecutor.this.taskRunners.offerLast(TaskRunner.this);
                                 }
                             }
@@ -166,7 +164,8 @@ public final class ThimbleExecutor implements IContextExecutor
                         final boolean destroy;
                         synchronized (ThimbleExecutor.this.taskQueue.lock)
                         {
-                            destroy = this.idle;
+                            // if we are still in the task runners collection then we are not running so can destroy
+                            destroy = ThimbleExecutor.this.taskRunners.contains(this);
                             if (destroy)
                             {
                                 // bump up the idle period
@@ -335,7 +334,6 @@ public final class ThimbleExecutor implements IContextExecutor
             else
             {
                 runner = this.taskRunners.pollLast();
-                runner.idle = false;
             }
 
             task = this.taskQueue.poll_callWhilstHoldingLock();
