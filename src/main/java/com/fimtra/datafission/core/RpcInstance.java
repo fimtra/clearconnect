@@ -29,7 +29,6 @@ import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IPublisherContext;
-import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -91,7 +90,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
      * 
      * @author Ramon Servadei
      */
-    public static interface IRpcExecutionHandler
+    public interface IRpcExecutionHandler
     {
         /**
          * Handle an invokation of an RPC.
@@ -106,8 +105,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
          * @param args
          *            the arguments to execute the RPC with - <b>Note:</b> some or all of the
          *            arguments can be <code>null</code>
-         * @return the result, can be <code>null</code>
-         * @return the response from the RPC
+         * @return the response from the RPC, can be <code>null</code>
          * @throws TimeOutException
          *             if no response is received after a time
          * @throws ExecutionException
@@ -168,8 +166,6 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         /**
          * Receives RPC calls, executes them and then sends back the result to the caller.
          * 
-         * @param T
-         *            the object protocol, see {@link ICodec}
          * @see Caller
          * @author Ramon Servadei
          */
@@ -277,8 +273,6 @@ public final class RpcInstance implements IRpcInstance, Cloneable
          * Calls an RPC on a remote receiver. This handles the necessary plumbing to send the
          * details of the RPC to the remote receiver for invoking.
          * 
-         * @param T
-         *            the object protocol, see {@link ICodec}
          * @see CallReceiver
          * @author Ramon Servadei
          */
@@ -316,21 +310,16 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         + System.identityHashCode(this) + ":" + System.currentTimeMillis() + ":"
                         + Thread.currentThread().getId();
 
-                final IRecordListener resultHandler = new IRecordListener()
-                {
-                    @Override
-                    public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+                final IRecordListener resultHandler = (imageCopy, atomicChange) -> {
+                    if (atomicChange.getPutEntries().containsKey(RESULT)
+                        || atomicChange.getPutEntries().containsKey(EXCEPTION))
                     {
-                        if (atomicChange.getPutEntries().containsKey(RESULT)
-                            || atomicChange.getPutEntries().containsKey(EXCEPTION))
-                        {
-                            result.set(atomicChange.getPutEntries());
-                            executionCompleteLatch.countDown();
-                        }
-                        else
-                        {
-                            executionStartedLatch.countDown();
-                        }
+                        result.set(atomicChange.getPutEntries());
+                        executionCompleteLatch.countDown();
+                    }
+                    else
+                    {
+                        executionStartedLatch.countDown();
                     }
                 };
 
@@ -397,14 +386,14 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                                 TimeUnit.MILLISECONDS))
                             {
                                 throw new TimeOutException("The RPC execution did not start after "
-                                    + this.remoteExecutionStartTimeoutMillis.get().longValue() + "ms");
+                                    + this.remoteExecutionStartTimeoutMillis.get() + "ms");
                             }
                             // wait for completion
                             if (!executionCompleteLatch.await(
-                                this.remoteExecutionCompletedTimeoutMillis.get().longValue(), TimeUnit.MILLISECONDS))
+                                this.remoteExecutionCompletedTimeoutMillis.get(), TimeUnit.MILLISECONDS))
                             {
                                 throw new TimeOutException("The RPC has started but has not completed after "
-                                    + this.remoteExecutionCompletedTimeoutMillis.get().longValue()
+                                    + this.remoteExecutionCompletedTimeoutMillis.get()
                                     + "ms, is more time needed to allow for completion?");
                             }
                         }
@@ -495,13 +484,13 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 }
             }
         }
-        return ARGS + args.toString() + (argNamesExist ? (ARG_NAMES + argNames.toString()) : "") + RETURNS
+        return ARGS + args + (argNamesExist ? (ARG_NAMES + argNames) : "") + RETURNS
             + instance.getReturnType().name() + CLOSE_CHAR;
     }
 
     /**
      * @return an {@link RpcInstance} representing the rpcName and definition
-     * @see #constructDefinitionFromInstance(RpcInstance)
+     * @see #constructDefinitionFromInstance(IRpcInstance)
      */
     public static RpcInstance constructInstanceFromDefinition(String name, String definition)
     {
@@ -548,8 +537,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             {
                 argNames = null;
             }
-            final RpcInstance rpcInstance = new RpcInstance(TypeEnum.valueOf(ret), name, argNames, argTypes);
-            return rpcInstance;
+            return new RpcInstance(TypeEnum.valueOf(ret), name, argNames, argTypes);
         }
         return null;
     }
@@ -716,7 +704,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         catch (Exception e)
         {
             Log.log(RpcInstance.class,
-                "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
+                "Could not execute " + this + " with arguments: " + Arrays.toString(args), e);
             if (e instanceof ExecutionException)
             {
                 throw (ExecutionException) e;
@@ -748,7 +736,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         catch (Exception e)
         {
             Log.log(RpcInstance.class,
-                "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
+                "Could not execute " + this + " with arguments: " + Arrays.toString(args), e);
             throw new ExecutionException(e.getMessage());
         }
     }
