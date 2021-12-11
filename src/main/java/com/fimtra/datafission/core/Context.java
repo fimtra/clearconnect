@@ -722,9 +722,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 return latch;
             }
 
+            final AtomicChange atomicChange;
             synchronized (record.getWriteLock())
             {
-                final AtomicChange atomicChange = this.pendingAtomicChanges.remove(name);
+                atomicChange = this.pendingAtomicChanges.remove(name);
                 // Note: theory for how atomicChange can be null here:
                 // 1. T1 created record
                 // 2. T2 calls publish atomicChange with name - publishes
@@ -744,12 +745,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 ((Record) record).setSequence(sequence);
 
                 atomicChange.preparePublish(latch, this);
-
-                // this will call doPublishChange
-                executeSequentialCoreTask(atomicChange);
-
-                return latch;
             }
+
+            // Perform after the synchronized block to ensure the atomic change write
+            // is flushed to main memory before we try to execute it.
+            // Running the atomicChange will call doPublishChange.
+            executeSequentialCoreTask(atomicChange);
+
+            return latch;
         }
         catch (RuntimeException e)
         {
