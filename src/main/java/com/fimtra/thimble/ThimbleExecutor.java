@@ -135,7 +135,7 @@ public final class ThimbleExecutor implements IContextExecutor
                                 if (this.task == null)
                                 {
                                     // no more tasks so place back into the runners list
-                                    ThimbleExecutor.this.taskRunners.offerLast(TaskRunner.this);
+                                    ThimbleExecutor.this.idleRunners.offerLast(TaskRunner.this);
                                 }
                             }
                         }
@@ -165,7 +165,7 @@ public final class ThimbleExecutor implements IContextExecutor
                         synchronized (ThimbleExecutor.this.taskQueue.lock)
                         {
                             // if we are still in the task runners collection then we are not running so can destroy
-                            destroy = ThimbleExecutor.this.taskRunners.contains(this);
+                            destroy = ThimbleExecutor.this.idleRunners.contains(this);
                             if (destroy)
                             {
                                 // bump up the idle period
@@ -174,8 +174,8 @@ public final class ThimbleExecutor implements IContextExecutor
                                 ThimbleExecutor.this.idlePeriodNanos =
                                         TimeUnit.MILLISECONDS.toNanos(ThimbleExecutor.this.idlePeriodMillis);
                                 // remove immediately to ensure no tasks given to this runner
-                                ThimbleExecutor.this.taskRunnersRef.remove(this);
-                                ThimbleExecutor.this.taskRunners.remove(this);
+                                ThimbleExecutor.this.pool.remove(this);
+                                ThimbleExecutor.this.idleRunners.remove(this);
                             }
                         }
                         if (destroy)
@@ -205,8 +205,8 @@ public final class ThimbleExecutor implements IContextExecutor
             this.active = false;
             synchronized (ThimbleExecutor.this.taskQueue.lock)
             {
-                ThimbleExecutor.this.taskRunnersRef.remove(this);
-                ThimbleExecutor.this.taskRunners.remove(this);
+                ThimbleExecutor.this.pool.remove(this);
+                ThimbleExecutor.this.idleRunners.remove(this);
                 ThimbleExecutor.this.freeNumbers.push(this.number);
             }
             // trigger to wake up and stop
@@ -216,8 +216,8 @@ public final class ThimbleExecutor implements IContextExecutor
     }
 
     final TaskQueue taskQueue;
-    final Deque<TaskRunner> taskRunners;
-    final List<TaskRunner> taskRunnersRef;
+    final Deque<TaskRunner> idleRunners;
+    final List<TaskRunner> pool;
     private final String name;
     private final int size;
     private final AtomicInteger threadCounter;
@@ -283,9 +283,9 @@ public final class ThimbleExecutor implements IContextExecutor
         this.idlePeriodMillis = IDLE_PERIOD_MILLIS;
         this.idlePeriodNanos = TimeUnit.MILLISECONDS.toNanos(this.idlePeriodMillis);
         this.stats = new TaskStatistics(this.name);
-        this.taskRunners = CollectionUtils.newDeque();
+        this.idleRunners = CollectionUtils.newDeque();
         this.taskQueue = new TaskQueue(this.name);
-        this.taskRunnersRef = new LinkedList<>();
+        this.pool = new LinkedList<>();
         EXECUTORS.add(this);
     }
 
@@ -313,9 +313,9 @@ public final class ThimbleExecutor implements IContextExecutor
                 return;
             }
 
-            if (this.taskRunners.size() == 0)
+            if (this.idleRunners.size() == 0)
             {
-                if (this.taskRunnersRef.size() < this.size)
+                if (this.pool.size() < this.size)
                 {
                     Integer number;
                     if ((number = this.freeNumbers.poll()) == null)
@@ -323,7 +323,7 @@ public final class ThimbleExecutor implements IContextExecutor
                         number = Integer.valueOf(this.threadCounter.getAndIncrement());
                     }
                     runner = new TaskRunner(this.name + "-" + number, number);
-                    this.taskRunnersRef.add(runner);
+                    this.pool.add(runner);
                 }
                 else
                 {
@@ -333,7 +333,7 @@ public final class ThimbleExecutor implements IContextExecutor
             }
             else
             {
-                runner = this.taskRunners.pollLast();
+                runner = this.idleRunners.pollLast();
             }
 
             task = this.taskQueue.poll_callWhilstHoldingLock();
@@ -385,11 +385,11 @@ public final class ThimbleExecutor implements IContextExecutor
     {
         synchronized (this.taskQueue.lock)
         {
-            for (TaskRunner taskRunner : new ArrayList<>(this.taskRunnersRef))
+            for (TaskRunner taskRunner : new ArrayList<>(this.pool))
             {
                 taskRunner.destroy();
             }
-            this.taskRunners.clear();
+            this.idleRunners.clear();
             while (this.taskQueue.poll_callWhilstHoldingLock() != null)
             {
                 // noop - drain the queue
