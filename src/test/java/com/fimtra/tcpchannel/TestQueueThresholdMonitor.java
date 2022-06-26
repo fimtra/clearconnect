@@ -39,81 +39,81 @@ public class TestQueueThresholdMonitor
     @Test
     public void testCheckQSize() throws InterruptedException
     {
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.4)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.4), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.5)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.5), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.6)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.6), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.4)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.4), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.7)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.7), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
         
         // check level 2->0,1
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8), -1));
         assertEquals(2, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8), -1));
         assertEquals(2, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.9)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.9), -1));
         assertEquals(2, candidate.thresholdWarningLevel);
 
         // check level 3->0,1,2
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95), -1));
         assertEquals(3, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95), -1));
         assertEquals(3, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95), -1));
         assertEquals(3, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.95), -1));
         assertEquals(3, candidate.thresholdWarningLevel);        
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.8), -1));
         assertEquals(3, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.79)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.79), -1));
         assertEquals(2, candidate.thresholdWarningLevel);
         
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.6)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.6), -1));
         assertEquals(2, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.59), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.50)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.50), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.40)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.40), -1));
         assertEquals(1, candidate.thresholdWarningLevel);
 
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.39), -1));
         assertEquals(0, candidate.thresholdWarningLevel);
     }
     
@@ -121,28 +121,28 @@ public class TestQueueThresholdMonitor
     public void testCheckQSize_increasing() throws InterruptedException
     {
         // check increase
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.01)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.01), -1));
         assertEquals(3, candidate.thresholdWarningLevel);
         Thread.sleep(550);
-        assertTrue(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.30)));
+        assertTrue(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.30), -1));
     }
 
     @Test
     public void testCheckQSize_increases_then_decreases() throws InterruptedException
     {
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.30)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.30), -1));
         Thread.sleep(550);
         // check decrease after breach
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.20)));
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.10)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.20), -1));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.10), -1));
         
         Thread.sleep(550);
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.5)));
-        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.1)));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 0.5), -1));
+        assertFalse(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.1), -1));
         
         // now stationary
         Thread.sleep(550);
-        assertTrue(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.1)));
+        assertTrue(candidate.checkQSize((int) (SEND_QUEUE_THRESHOLD * 1.1), -1));
     }
 
 }

@@ -19,6 +19,7 @@ import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRES
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD_BREACH_MILLIS;
 
 import java.util.Deque;
+import java.util.function.Supplier;
 
 import com.fimtra.util.Log;
 
@@ -53,73 +54,73 @@ final class QueueThresholdMonitor
      * @return <code>true</code> if the size of the combined queues has breached a maximum level for
      *         too long
      */
-    final boolean checkQueueSize(final Deque<TxByteArrayFragment> pendingTxFrames,
-        final Deque<TxByteArrayFragment> sendingTxFrames)
+    boolean checkQueueSize(final Deque<TxByteArrayFragment> pendingTxFrames,
+        final Deque<TxByteArrayFragment> sendingTxFrames, final long writeBufferToSocketCount)
     {
-        return checkQSize(pendingTxFrames.size() + sendingTxFrames.size());
+        return checkQSize(pendingTxFrames.size() + sendingTxFrames.size(), writeBufferToSocketCount);
     }
 
-    final boolean checkQSize(final int size)
+    boolean checkQSize(final int size, final long writeBufferToSocketCount)
     {
         switch(this.thresholdWarningLevel)
         {
             case 0:
                 if (size > _90_WATERMARK)
                 {
-                    upgrade(3, size);
+                    upgrade(3, size, writeBufferToSocketCount);
                 }
                 else if (size > _75_WATERMARK)
                 {
-                    upgrade(2, size);
+                    upgrade(2, size, writeBufferToSocketCount);
                 }
                 else if (size > _50_WATERMARK)
                 {
-                    upgrade(1, size);
+                    upgrade(1, size, writeBufferToSocketCount);
                 }
                 break;
             case 1:
                 if (size > _90_WATERMARK)
                 {
-                    upgrade(3, size);
+                    upgrade(3, size, writeBufferToSocketCount);
                 }
                 else if (size > _75_WATERMARK)
                 {
-                    upgrade(2, size);
+                    upgrade(2, size, writeBufferToSocketCount);
                 }
                 else if (size < _40_WATERMARK)
                 {
-                    downgrade(0, size);
+                    downgrade(0, size, writeBufferToSocketCount);
                 }
                 break;
             case 2:
                 if (size > _90_WATERMARK)
                 {
-                    upgrade(3, size);
+                    upgrade(3, size, writeBufferToSocketCount);
                 }
                 else if (size < _40_WATERMARK)
                 {
-                    downgrade(0, size);
+                    downgrade(0, size, writeBufferToSocketCount);
                 }
                 else if (size < _60_WATERMARK)
                 {
-                    downgrade(1, size);
+                    downgrade(1, size, writeBufferToSocketCount);
                 }
                 break;
             case 3:
                 if (size < _40_WATERMARK)
                 {
                     this.thresholdMaxBreachStartTimeNanos = 0;
-                    downgrade(0, size);
+                    downgrade(0, size, writeBufferToSocketCount);
                 }
                 else if (size < _60_WATERMARK)
                 {
                     this.thresholdMaxBreachStartTimeNanos = 0;
-                    downgrade(1, size);
+                    downgrade(1, size, writeBufferToSocketCount);
                 }
                 else if (size < _80_WATERMARK)
                 {
                     this.thresholdMaxBreachStartTimeNanos = 0;
-                    downgrade(2, size);
+                    downgrade(2, size, writeBufferToSocketCount);
                 }
                 break;
         }
@@ -152,17 +153,19 @@ final class QueueThresholdMonitor
         return false;
     }
 
-    private final void downgrade(final int level, final int size)
+    private void downgrade(final int level, final int size, long writeBufferToSocketCount)
     {
         Log.log(this.target, "[-] Q level ", Integer.toString(this.thresholdWarningLevel), "->",
-            Integer.toString(level), " size=", Integer.toString(size), " ", this.target.toString());
+                Integer.toString(level), " size=", Integer.toString(size), " writeBufferToSocketCount=",
+                Long.toString(writeBufferToSocketCount), " ", this.target.toString());
         this.thresholdWarningLevel = level;
     }
 
-    private final void upgrade(final int level, final int size)
+    private void upgrade(final int level, final int size, long writeBufferToSocketCount)
     {
         Log.log(this.target, "[+] Q level ", Integer.toString(this.thresholdWarningLevel), "->",
-            Integer.toString(level), " size=", Integer.toString(size), " ", this.target.toString());
+                Integer.toString(level), " size=", Integer.toString(size), " writeBufferToSocketCount=",
+                Long.toString(writeBufferToSocketCount), " ", this.target.toString());
         this.thresholdWarningLevel = level;
     }
 

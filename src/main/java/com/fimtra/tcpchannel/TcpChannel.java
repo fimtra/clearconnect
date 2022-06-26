@@ -154,7 +154,7 @@ public class TcpChannel implements ITransportChannel
          * equal-sending-opportunity mechanism. The list is traversed from start to end, each
          * channel has one frame sent, looping back to the start and continuing sending one frame
          * for each channel. If a channel has no more frames to sent, it is unlinked by
-         * {@link #unlinkChannel(TcpChannel)}
+         * {@link #unlinkChannel_callWithChainLock(TcpChannel)}
          */
         volatile TcpChannel first;
         /**
@@ -176,7 +176,7 @@ public class TcpChannel implements ITransportChannel
      * @return <code>true</code> if this is the first channel to be added into the chain - and thus
      *         the {@link SelectorProcessor} needs to be triggered for writing
      */
-    private synchronized static boolean linkChannel(TcpChannel channel)
+    private static boolean linkChannel_callWithChainLock(TcpChannel channel)
     {
         final SendChannelChain chain = channel.sendChannelChain;
         if (channel.prev == null && channel.next == null && chain.first != channel)
@@ -198,13 +198,13 @@ public class TcpChannel implements ITransportChannel
         return false;
     }
 
-    private synchronized static void unlinkChannel(TcpChannel channel)
+    private static void unlinkChannel_callWithChainLock(TcpChannel channel)
     {
         switch(channel.state)
         {
             case DESTROYED:
             case IDLE:
-                final SendChannelChain chain = channel.sendChannelChain;
+
                 if (channel.next != null)
                 {
                     channel.next.prev = channel.prev;
@@ -213,27 +213,24 @@ public class TcpChannel implements ITransportChannel
                 {
                     channel.prev.next = channel.next;
                 }
-                // defensive check if chain is null
-                if (chain != null)
+                final SendChannelChain chain = channel.sendChannelChain;
+                if (channel == chain.first)
                 {
-                    if (channel == chain.first)
-                    {
-                        chain.first = channel.next;
-                    }
-                    if (channel == chain.last)
-                    {
-                        chain.last = channel.prev;
-                    }
+                    chain.first = channel.next;
                 }
-                channel.next = null;
+                if (channel == chain.last)
+                {
+                    chain.last = channel.prev;
+                }
                 channel.prev = null;
+                channel.next = null;
                 break;
-            default :
+            default:
                 break;
         }
     }
 
-    TcpChannel next;
+    volatile TcpChannel next;
     TcpChannel prev;
 
     final SelectorProcessor reader;
@@ -348,20 +345,9 @@ public class TcpChannel implements ITransportChannel
         this.endPointSocketDescription = serverHost + ":" + serverPort;
         this.socketChannel = TcpChannelUtils.createAndConnectNonBlockingSocketChannel(serverHost, serverPort);
         this.shortSocketDescription =
-            this.socketChannel.socket().getLocalSocketAddress() + "->" + getEndPointDescription();
+                this.socketChannel.socket().getLocalSocketAddress() + "->" + getEndPointDescription();
         this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);
-
-        SendChannelChain chain;
-        synchronized (TcpChannel.class)
-        {
-            chain = sendChannelChains.get(this.writer);
-            if (chain == null)
-            {
-                chain = new SendChannelChain();
-                sendChannelChains.put(this.writer, chain);
-            }
-        }
-        this.sendChannelChain = chain;
+        this.sendChannelChain = getSendChannelChain();
 
         finishConstruction();
     }
@@ -383,20 +369,17 @@ public class TcpChannel implements ITransportChannel
         this.endPointSocketDescription = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
         this.shortSocketDescription = socket.getLocalSocketAddress() + "<-" + getEndPointDescription();
         this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);
-
-        SendChannelChain chain;
-        synchronized (TcpChannel.class)
-        {
-            chain = sendChannelChains.get(this.writer);
-            if (chain == null)
-            {
-                chain = new SendChannelChain();
-                sendChannelChains.put(this.writer, chain);
-            }
-        }
-        this.sendChannelChain = chain;
+        this.sendChannelChain = getSendChannelChain();
 
         finishConstruction();
+    }
+
+    private SendChannelChain getSendChannelChain()
+    {
+        synchronized (TcpChannel.class)
+        {
+            return sendChannelChains.computeIfAbsent(this.writer, w -> new SendChannelChain());
+        }
     }
 
     private void finishConstruction() throws ConnectException
@@ -468,7 +451,6 @@ public class TcpChannel implements ITransportChannel
             }
 
             final Deque<TxByteArrayFragment> pendingTxFrames;
-            StateEnum action = StateEnum.IDLE;
             synchronized (this.lock)
             {
                 pendingTxFrames = this.txFrames[this.pendingQueue];
@@ -477,41 +459,33 @@ public class TcpChannel implements ITransportChannel
                     pendingTxFrames.offer(byteFragmentsToSend[i]);
                 }
 
+                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)
+                {
+                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1],
+                            this.readerWriter.getWriteBufferToSocketCount()))
+                    {
+                        destroy("Queue too large");
+                    }
+                }
+
                 switch(this.state)
                 {
                     case DESTROYED:
                         throw new ClosedChannelException();
                     case IDLE:
-                        action = this.state = StateEnum.SENDING;
+                        this.state = StateEnum.SENDING;
+                        synchronized (this.sendChannelChain)
+                        {
+                            if (linkChannel_callWithChainLock(this))
+                            {
+                                this.writer.setInterest(this.writerKey);
+                            }
+                        }
                         break;
                     case SENDING:
                     default :
                         break;
                 }
-
-                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)
-                {
-                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1]))
-                    {
-                        action = this.state = StateEnum.DESTROYED;
-                    }
-                }
-            }
-
-            // do linking/destroy outside of holding the channel lock
-            switch(action)
-            {
-                case SENDING:
-                    if (linkChannel(this))
-                    {
-                        this.writer.setInterest(this.writerKey);
-                    }
-                    break;
-                case DESTROYED:
-                    destroy("Queue too large");
-                    break;
-                default :
-                    break;
             }
 
             return true;
@@ -746,7 +720,6 @@ public class TcpChannel implements ITransportChannel
                 // empty do we go into here
                 if (channel.txFrames[channel.sendingQueue].size() == 0)
                 {
-                    StateEnum action;
                     synchronized (channel.lock)
                     {
                         if (channel.state != StateEnum.DESTROYED)
@@ -762,21 +735,33 @@ public class TcpChannel implements ITransportChannel
                             }
                         }
 
-                        action = channel.state;
+                        switch(channel.state)
+                        {
+                            case DESTROYED:
+                                synchronized (channel.sendChannelChain)
+                                {
+                                    unlinkChannel_callWithChainLock(channel);
+                                }
+                                continue;
+                            case IDLE:
+                                synchronized (channel.sendChannelChain)
+                                {
+                                    unlinkChannel_callWithChainLock(channel);
+                                    try
+                                    {
+                                        SelectorProcessor.resetInterest(channel.writerKey);
+                                    }
+                                    catch (CancelledKeyException e)
+                                    {
+                                        channel.destroy("Socket has been closed", e);
+                                    }
+                                }
+                                continue;
+                            default :
+                                break;
+                        }
                     }
 
-                    // handle unlink/idle operation outside of the channel lock
-                    switch(action)
-                    {
-                        case DESTROYED:
-                            unlinkChannel(channel);
-                            continue;
-                        case IDLE:
-                            unlinkAndReset(channel);
-                            continue;
-                        default :
-                            break;
-                    }
                 }
 
                 data = channel.txFrames[channel.sendingQueue].poll();
@@ -808,22 +793,6 @@ public class TcpChannel implements ITransportChannel
                 {
                     channel.destroy("Could not write buffer to socket", e);
                 }
-            }
-        }
-    }
-
-    private synchronized static void unlinkAndReset(TcpChannel channel)
-    {
-        if (channel.state == StateEnum.IDLE)
-        {
-            unlinkChannel(channel);
-            try
-            {
-                SelectorProcessor.resetInterest(channel.writerKey);
-            }
-            catch (CancelledKeyException e)
-            {
-                channel.destroy("Socket has been closed", e);
             }
         }
     }
@@ -869,7 +838,10 @@ public class TcpChannel implements ITransportChannel
                 this.rxByteBuffer.clear();
             }
 
-            unlinkChannel(this);
+            synchronized (this.sendChannelChain)
+            {
+                unlinkChannel_callWithChainLock(this);
+            }
 
             if (this.socketChannel != null)
             {
@@ -936,6 +908,8 @@ interface IFrameReaderWriter
      * @return the frame buffer with all the decoded frames
      */
     ByteBuffer[] readFrames(ByteBuffer rxByteBuffer, byte[] rxBytes, ByteBuffer[] frames, int[] framesSize);
+
+    long getWriteBufferToSocketCount();
 }
 
 /**
@@ -956,11 +930,18 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     final ByteBuffer txBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
     boolean writeInProgress = false;
     long zeroByteWriteTimeNanos;
+    long writeBufferToSocketCount;
 
     AbstractFrameReaderWriter(TcpChannel tcpChannel)
     {
         super();
         this.tcpChannel = tcpChannel;
+    }
+
+    @Override
+    public long getWriteBufferToSocketCount()
+    {
+        return this.writeBufferToSocketCount;
     }
 
     final boolean isWriteInProgress()
@@ -975,6 +956,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
     final void writeBufferToSocket() throws IOException
     {
         long time = System.nanoTime();
+        this.writeBufferToSocketCount++;
 
         if (!this.writeInProgress)
         {
@@ -989,7 +971,7 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)
         {
             final long current = System.nanoTime();
-            if (current - this.zeroByteWriteTimeNanos > 5000000000L)
+            if (current - this.zeroByteWriteTimeNanos > 5_000_000_000L)
             {
                 this.zeroByteWriteTimeNanos = current;
                 Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",
