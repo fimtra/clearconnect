@@ -23,15 +23,13 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * A simple logger that writes to a file and to <code>System.err</code>. Uses a
- * {@link RollingFileAppender} to log to a file in the logs directory called
- * message_yyyyMMddHHmmss.log.
+ * A simple logger that writes to a file and to <code>System.err</code>. Uses a {@link RollingFileAppender} to
+ * log to a file in the logs directory called message_yyyyMMddHHmmss.log.
  *
  * @author Ramon Servadei
  * @author Paul Mackinlay
@@ -47,19 +45,25 @@ public abstract class Log
     private static final String DELIM = "|";
     private static final String MESSAGE_DELIM = DELIM + "    ";
     private static final ScheduledExecutorService FILE_APPENDER_EXECUTOR =
-            ThreadUtils.newScheduledExecutorService("Log-file-appender", 1);
+            ThreadUtils.newPermanentScheduledExecutorService("log-file-appender", 1);
     private static final Object lock = new Object();
     private static final Object qLock = new Object();
-    private static final ExecutorService CONSOLE_WRITER_EXECUTOR =
-            ThreadUtils.newSingleThreadExecutorService("console-writer");
+    private static final LazyObject<ExecutorService> CONSOLE_WRITER_EXECUTOR =
+            new LazyObject<>(() -> ThreadUtils.newPermanentScheduledExecutorService("console-writer", 1),
+                    ExecutorService::shutdown);
     private static PrintStream consoleStream = System.err;
 
     static final Queue<LogMessage> LOG_MESSAGE_QUEUE = new ArrayDeque<>();
     static final CharSequence LINE_SEPARATOR = SystemUtils.lineSeparator();
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;
-    private static boolean flushTaskPending;
-    private static final Runnable flushTask = Log::flushMessages;
+
+    static
+    {
+        final int periodMillis = UtilProperties.Values.LOG_FLUSH_PERIOD_MILLIS;
+        FILE_APPENDER_EXECUTOR.scheduleWithFixedDelay(Log::flushMessages, periodMillis, periodMillis,
+                TimeUnit.MILLISECONDS);
+    }
 
     /**
      * Encapsulates a log message with logic to print to a stream
@@ -70,7 +74,7 @@ public abstract class Log
     {
         private static final FastDateFormat fastDateFormat = new FastDateFormat();
 
-        final Thread t;
+        final String threadName;
         final Object source;
         final Supplier<String[]> messages;
         final long timeMillis;
@@ -78,7 +82,7 @@ public abstract class Log
 
         LogMessage(Thread t, Object source, Supplier<String[]> messages)
         {
-            this.t = t;
+            this.threadName = t.getName();
             this.source = source;
             this.messages = messages;
             this.timeMillis = System.currentTimeMillis();
@@ -86,7 +90,7 @@ public abstract class Log
 
         LogMessage(Thread t, Object source, String... messages)
         {
-            this.t = t;
+            this.threadName = t.getName();
             this.source = source;
             this.messages = () -> messages;
             this.timeMillis = System.currentTimeMillis();
@@ -102,9 +106,9 @@ public abstract class Log
             consoleStream.print(generateMessage());
         }
 
-        void print(RollingFileAppender fileAppender) throws IOException
+        void print() throws IOException
         {
-            fileAppender.append(generateMessage());
+            FILE_APPENDER.append(generateMessage());
         }
 
         private String generateMessage()
@@ -141,9 +145,9 @@ public abstract class Log
                 }
                 cachedSimpleNames.put(c, classSimpleName);
             }
-            sb.append(getTime()).append(DELIM).append(this.t.getName()).append(DELIM).append(
-                    classSimpleName).append(":").append(
-                    Integer.toString(System.identityHashCode(this.source))).append(MESSAGE_DELIM);
+            sb.append(getTime()).append(DELIM).append(this.threadName).append(DELIM).append(
+                    classSimpleName).append(":").append((System.identityHashCode(this.source))).append(
+                    MESSAGE_DELIM);
             for (int i = 0; i < msgs.length; i++)
             {
                 sb.append(msgs[i]);
@@ -217,7 +221,7 @@ public abstract class Log
      */
     public static void setConsoleStream(PrintStream stream)
     {
-        CONSOLE_WRITER_EXECUTOR.execute(() -> {
+        CONSOLE_WRITER_EXECUTOR.get().execute(() -> {
             synchronized (lock)
             {
                 consoleStream = stream;
@@ -238,12 +242,14 @@ public abstract class Log
     public static void log(Object source, String message, Throwable t)
     {
         final StringWriter stringWriter = new StringWriter(1024);
-        final PrintWriter pw = new PrintWriter(stringWriter);
-        pw.println();
-        t.printStackTrace(pw);
-        final LogMessage logMessage =
-                new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
-        log(logMessage);
+        try (final PrintWriter pw = new PrintWriter(stringWriter))
+        {
+            pw.println();
+            t.printStackTrace(pw);
+            final LogMessage logMessage =
+                    new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
+            log(logMessage);
+        }
     }
 
     private static void log(final LogMessage message)
@@ -252,25 +258,10 @@ public abstract class Log
         {
             LOG_MESSAGE_QUEUE.add(message);
         }
-        if (!flushTaskPending)
-        {
-            flushTaskPending = true;
-            try
-            {
-                FILE_APPENDER_EXECUTOR.schedule(flushTask, 250, TimeUnit.MILLISECONDS);
-            }
-            catch (RejectedExecutionException e)
-            {
-                if (!FILE_APPENDER_EXECUTOR.isShutdown())
-                {
-                    throw e;
-                }
-            }
-        }
 
         if (LOG_TO_STDERR)
         {
-            CONSOLE_WRITER_EXECUTOR.execute(() -> {
+            CONSOLE_WRITER_EXECUTOR.get().execute(() -> {
                 synchronized (lock)
                 {
                     message.print(consoleStream);
@@ -307,8 +298,6 @@ public abstract class Log
 
     static void flushMessages()
     {
-        flushTaskPending = false;
-
         synchronized (lock)
         {
             LogMessage message;
@@ -325,7 +314,7 @@ public abstract class Log
                 {
                     try
                     {
-                        message.print(FILE_APPENDER);
+                        message.print();
                     }
                     catch (IOException e)
                     {

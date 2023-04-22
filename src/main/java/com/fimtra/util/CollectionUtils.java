@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2015 Ramon Servadei, Fimtra
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,15 +31,15 @@ import com.fimtra.util.UtilProperties.Values;
 
 /**
  * Utility methods for working with collections
- * 
+ *
  * @author Ramon Servadei
  */
 public abstract class CollectionUtils
 {
     /**
-     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable (
-     * {@link Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
-     * 
+     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable ( {@link
+     * Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
+     *
      * @author Ramon Servadei
      */
     static final class UnmodifiableEntrySet<K, V> extends AbstractSet<Map.Entry<K, V>>
@@ -85,7 +85,8 @@ public abstract class CollectionUtils
         {
             return new Iterator<Map.Entry<K, V>>()
             {
-                final Iterator<Map.Entry<K, V>> backingIterator = UnmodifiableEntrySet.this.entrySet.iterator();
+                final Iterator<Map.Entry<K, V>> backingIterator =
+                        UnmodifiableEntrySet.this.entrySet.iterator();
 
                 @Override
                 public boolean hasNext()
@@ -122,28 +123,25 @@ public abstract class CollectionUtils
      * @return a Deque implementation
      * @see Values#USE_LOW_GC_LINKEDLIST
      */
-    public static final <T> Deque<T> newDeque()
+    public static <T> Deque<T> newDeque()
     {
         return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcLinkedList<>() : new LinkedList<>();
     }
 
     /**
-     * @return an unmodifiable Set view of the comma separated items (each item is trimmed before
-     *         adding)
-     * @deprecated Use {@link #newSetFromString(String,String)} instead
+     * @return an unmodifiable Set view of the comma separated items (each item is trimmed before adding)
+     * @deprecated Use {@link #newSetFromString(String, String)} instead
      */
-    public static final Set<String> newSetFromString(String commaSeparatedList)
+    public static Set<String> newSetFromString(String commaSeparatedList)
     {
         return newSetFromString(commaSeparatedList, ",");
     }
 
     /**
-     * @param tokenSeparator
-     *            the token that separates the items
-     * @return an unmodifiable Set view of the token separated items (each item is trimmed before
-     *         adding)
+     * @param tokenSeparator the token that separates the items
+     * @return an unmodifiable Set view of the token separated items (each item is trimmed before adding)
      */
-    public static final Set<String> newSetFromString(String tokenSeparatedList, String tokenSeparator)
+    public static Set<String> newSetFromString(String tokenSeparatedList, String tokenSeparator)
     {
         if (tokenSeparatedList == null)
         {
@@ -159,33 +157,29 @@ public abstract class CollectionUtils
     }
 
     /**
-     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in
-     *         entrySet
+     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in entrySet
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <K, V> Set<java.util.Map.Entry<K, V>> unmodifiableEntrySet(
-        final Set<java.util.Map.Entry<K, V>> entrySet)
+            final Set<java.util.Map.Entry<K, V>> entrySet)
     {
         return new UnmodifiableEntrySet(entrySet);
     }
 
     /**
      * Creates a new {@link HashSet} wrapping the collection
-     * 
-     * @param c
-     *            the collection to wrap
+     *
+     * @param c the collection to wrap
      * @return a {@link HashSet}
      */
     public static <T> Set<T> newHashSet(Collection<T> c)
     {
         return new HashSet<>(c);
     }
-    
+
     /**
      * Creates a map initialised with the default size 16
-     * 
-     * @param size
-     *            the size
+     *
      * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap()
@@ -195,9 +189,8 @@ public abstract class CollectionUtils
 
     /**
      * Creates a map initialised with the given size
-     * 
-     * @param size
-     *            the size
+     *
+     * @param size the size
      * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap(int size)
@@ -207,9 +200,8 @@ public abstract class CollectionUtils
 
     /**
      * Creates a map initialised with the given map
-     * 
-     * @param data
-     *            the map data to use for initialisation
+     *
+     * @param data the map data to use for initialisation
      * @return a {@link HashMap}
      */
     public static <K, V> Map<K, V> newMap(Map<K, V> data)

@@ -18,7 +18,8 @@ package com.fimtra.util;
 /**
  * @author Ramon Servadei
  */
-public abstract class SystemUtils {
+public abstract class SystemUtils
+{
     private static final String LINE_SEPARATOR = System.getProperty("line.separator", "\n");
 
     private SystemUtils()

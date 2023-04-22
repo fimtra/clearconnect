@@ -58,8 +58,8 @@ public abstract class StringUtils
     }
 
     /**
-     * Will return an empty string if str is null, otherwise it will return str with trailing and
-     * leading whitespace removed.
+     * Will return an empty string if str is null, otherwise it will return str with trailing and leading
+     * whitespace removed.
      */
     public static String stripToEmpty(String str)
     {
@@ -80,8 +80,8 @@ public abstract class StringUtils
     }
 
     /**
-     * Split a string into tokens identified by a delimiter character. The delimiter character is
-     * 'escaped' by a preceeding occurrence of the delimiter character, e.g:<br>
+     * Split a string into tokens identified by a delimiter character. The delimiter character is 'escaped' by
+     * a preceeding occurrence of the delimiter character, e.g:<br>
      *
      * <pre>
      * If the delimiter is ','
@@ -139,8 +139,8 @@ public abstract class StringUtils
     }
 
     /**
-     * Join the list of strings with the passed in delimiter. Any occurrence of the delimiter in the
-     * strings is escaped with the delimiter, e.g.:
+     * Join the list of strings with the passed in delimiter. Any occurrence of the delimiter in the strings
+     * is escaped with the delimiter, e.g.:
      *
      * <pre>
      * If the delimiter char is ','
@@ -149,8 +149,8 @@ public abstract class StringUtils
      *
      * @param stringsToJoin the list of strings to join
      * @param delimiter     the delimiter to use when joining the strings
-     * @return a string that represents the list of strings to join each separated by the delimiter
-     * character, <code>null</code> if stringsToJoin is <code>null</code>
+     * @return a string that represents the list of strings to join each separated by the delimiter character,
+     * <code>null</code> if stringsToJoin is <code>null</code>
      */
     public static String join(List<String> stringsToJoin, char delimiter)
     {
@@ -172,8 +172,8 @@ public abstract class StringUtils
     }
 
     /**
-     * Add the string to the builder and for any occurrence of the escapeChar, the escapeChar is
-     * doubled, e.g.:
+     * Add the string to the builder and for any occurrence of the escapeChar, the escapeChar is doubled,
+     * e.g.:
      *
      * <pre>
      * If the escape char is ','

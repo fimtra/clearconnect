@@ -30,24 +30,24 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.FieldTemplate.FieldTypeEnum;
 
 /**
- * Serializes objects using an {@link IRecord} as the transfer technology. The direct members of the
- * object (and its super-classes) are translated into fields in the record. Transient members are
- * ignored. Members that are primitive types are translated into an appropriate record field type
- * (see {@link IValue} ). Non-primitive types are transferred as a {@link BlobValue}. The
- * {@link ObjectSerializer} provides an efficient serialization mechanism for objects that have
- * primitive types as the main population of members. Additionally, for objects that change
- * frequently, using the {@link ObjectSerializer} will mean that only changing fields are sent (as
- * opposed to the full serialized version of the object using standard java serialization).
+ * Serializes objects using an {@link IRecord} as the transfer technology. The direct members of the object
+ * (and its super-classes) are translated into fields in the record. Transient members are ignored. Members
+ * that are primitive types are translated into an appropriate record field type (see {@link IValue} ).
+ * Non-primitive types are transferred as a {@link BlobValue}. The {@link ObjectSerializer} provides an
+ * efficient serialization mechanism for objects that have primitive types as the main population of members.
+ * Additionally, for objects that change frequently, using the {@link ObjectSerializer} will mean that only
+ * changing fields are sent (as opposed to the full serialized version of the object using standard java
+ * serialization).
  * <p>
  * <b>Classes must be public, non-inner types and have public no-arg constructors.<b/>
  * <p>
- * Internally this keeps a {@link ClassTemplate} per object class that is read/written. The
- * {@link ClassTemplate} instances (one per class) held internally by each instance are never
- * removed (except when an {@link ObjectSerializer} instance is garbage collected).
+ * Internally this keeps a {@link ClassTemplate} per object class that is read/written. The {@link
+ * ClassTemplate} instances (one per class) held internally by each instance are never removed (except when an
+ * {@link ObjectSerializer} instance is garbage collected).
  * <p>
- * Each instance of an {@link ObjectSerializer} keeps references to the objects that are
- * read/written. An object reference can be removed by calling {@link #recordDeleted(IRecord)} or
- * when the {@link ObjectSerializer} instance is garbage collected.
+ * Each instance of an {@link ObjectSerializer} keeps references to the objects that are read/written. An
+ * object reference can be removed by calling {@link #recordDeleted(IRecord)} or when the {@link
+ * ObjectSerializer} instance is garbage collected.
  *
  * @author Ramon Servadei
  */
@@ -72,9 +72,8 @@ public final class ObjectSerializer
     }
 
     /**
-     * Write the object member variables into the fields of the record. The same record for the
-     * object should be used to ensure that a proper delta is created for subsequent writes of the
-     * same object.
+     * Write the object member variables into the fields of the record. The same record for the object should
+     * be used to ensure that a proper delta is created for subsequent writes of the same object.
      *
      * @param o      the object to write
      * @param record the record to store the member attributes of the object
@@ -149,8 +148,8 @@ public final class ObjectSerializer
 }
 
 /**
- * Generates and holds an array of {@link FieldTemplate} objects that represent all the fields of a
- * class and its super-classes.
+ * Generates and holds an array of {@link FieldTemplate} objects that represent all the fields of a class and
+ * its super-classes.
  * <p>
  * <b>Note: a class template for a nested class is not supported.</b>
  *
@@ -219,8 +218,8 @@ final class ClassTemplate
 }
 
 /**
- * Holds a {@link Field}, the record name for the field and its type. This allows a field for an
- * object reference to be correctly written and read.
+ * Holds a {@link Field}, the record name for the field and its type. This allows a field for an object
+ * reference to be correctly written and read.
  *
  * @author Ramon Servadei
  */

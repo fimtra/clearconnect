@@ -24,12 +24,13 @@ import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 
 /**
- * This allows encryption and decryption of data between two "end points" using asymmetric
- * encryption. Each end point has an {@link AsymmetricCipher} instance. Each cipher decrypts using
- * its own private key and encrypts using the other instance's public key. In this way an encrypted
- * data exchange can be performed using the two instances as ends of a communication channel.
+ * This allows encryption and decryption of data between two "end points" using asymmetric encryption. Each
+ * end point has an {@link AsymmetricCipher} instance. Each cipher decrypts using its own private key and
+ * encrypts using the other instance's public key. In this way an encrypted data exchange can be performed
+ * using the two instances as ends of a communication channel.
  * <p>
  * See https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Cipher
+ *
  * @author Ramon Servadei
  */
 public final class AsymmetricCipher
@@ -80,8 +81,7 @@ public final class AsymmetricCipher
     }
 
     /**
-     * Set the encryption key to use. This is the public key of another {@link AsymmetricCipher}
-     * instance.
+     * Set the encryption key to use. This is the public key of another {@link AsymmetricCipher} instance.
      */
     public void setEncryptionKey(Key encryptKey) throws InvalidKeyException
     {
@@ -89,8 +89,8 @@ public final class AsymmetricCipher
     }
 
     /**
-     * @return the public key that should be used by another {@link AsymmetricCipher} instance to
-     * setup its encryption key
+     * @return the public key that should be used by another {@link AsymmetricCipher} instance to setup its
+     * encryption key
      * @see #setEncryptionKey(Key)
      */
     public Key getPubKey()

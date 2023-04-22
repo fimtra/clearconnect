@@ -26,7 +26,7 @@ import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 
 /**
- * Tests for the {@link DeadlockDetector#newDeadlockDetectorThread} method. We need a separate test
+ * Tests for the {@link DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)} method. We need a separate test
  * because there are deadlocked threads left over from the {@link DeadlockDetectorTest}!
  * 
  * @author Ramon Servadei

@@ -26,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * A generic component that manages subscription interest. Subscribers are registered with the
- * manager against a subscription key.
+ * A generic component that manages subscription interest. Subscribers are registered with the manager against
+ * a subscription key.
  * <p>
  * <b>Calls to methods that add or remove subscribers should be synchronized.</b>
  *
@@ -46,12 +46,11 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
     /**
      * tracks subscribe order
      */
-    final Set<SUBSCRIPTION_KEY> subscribeOrder =
-            Collections.synchronizedSet(new LinkedHashSet<>());
+    final Set<SUBSCRIPTION_KEY> subscribeOrder = Collections.synchronizedSet(new LinkedHashSet<>());
 
     /**
-     * Construct the subscription manager passing in the class for the subscriber. This is required
-     * to ensure correct array component type is used internall.
+     * Construct the subscription manager passing in the class for the subscriber. This is required to ensure
+     * correct array component type is used internall.
      */
     public SubscriptionManager(Class<?> subscriberClass)
     {
@@ -67,8 +66,8 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * {@link #addSubscriberFor(Object, Object)}.</b>
      *
      * @param key the subscription key
-     * @return an array of subscribers for the key. This is NOT a copy - DO NOT MESS WITH IT. Will
-     * never be <code>null</code>.
+     * @return an array of subscribers for the key. This is NOT a copy - DO NOT MESS WITH IT. Will never be
+     * <code>null</code>.
      */
     @SuppressWarnings("unchecked")
     public SUBSCRIBER[] getSubscribersFor(SUBSCRIPTION_KEY key)
@@ -167,8 +166,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
      * <b>Calls to this method should be synchronized.</b>
      *
      * @param key the subscription key
-     * @return the subscribers that were removed, <code>null</code> if there were no subscribers for
-     * this key
+     * @return the subscribers that were removed, <code>null</code> if there were no subscribers for this key
      */
     public SUBSCRIBER[] removeSubscribersFor(SUBSCRIPTION_KEY key)
     {

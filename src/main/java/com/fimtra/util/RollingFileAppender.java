@@ -25,16 +25,14 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 /**
- * An {@link Appendable} implementation that writes to a {@link File} and will roll the file when
- * the allotted number of characters has been written. The rolling convention is to name the current
- * file:
+ * An {@link Appendable} implementation that writes to a {@link File} and will roll the file when the allotted
+ * number of characters has been written. The rolling convention is to name the current file:
  *
  * <pre>
  * {filename}.{counter}.logged
  * </pre>
  * <p>
- * and then create a new file called {filename}. This all occurs in the same directory as the
- * original file.
+ * and then create a new file called {filename}. This all occurs in the same directory as the original file.
  * <p>
  * <b>This is not thread safe</b>
  *
@@ -43,19 +41,17 @@ import java.io.Writer;
 public final class RollingFileAppender implements Appendable, Closeable, Flushable
 {
     /**
-     * Create a standard {@link RollingFileAppender} allowing 1M per file, deleting older than 1
-     * day.
+     * Create a standard {@link RollingFileAppender} allowing 1M per file, deleting older than 1 day.
      *
      * @throws RuntimeException if the file cannot be created due to some {@link IOException}
      */
-    public static RollingFileAppender createStandardRollingFileAppender(String fileIdentity,
-            String directory)
+    public static RollingFileAppender createStandardRollingFileAppender(String fileIdentity, String directory)
     {
         final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-" + fileIdentity;
         final File file = FileUtils.createLogFile_yyyyMMddHHmmss(directory, filePrefix);
         try
         {
-            return new RollingFileAppender(file, 1024 * 1024);
+            return new RollingFileAppender(file, UtilProperties.Values.LOG_FILE_ROLL_SIZE_KB * 1024);
         }
         catch (IOException e)
         {
@@ -88,8 +84,8 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
     }
 
     /**
-     * An implementation of {@link AppendableFlushableCloseable} that writes to a file that will
-     * roll after it exceeds a certain size.
+     * An implementation of {@link AppendableFlushableCloseable} that writes to a file that will roll after it
+     * exceeds a certain size.
      *
      * @author Ramon Servadei
      */
@@ -288,7 +284,8 @@ public final class RollingFileAppender implements Appendable, Closeable, Flushab
      * Construct an instance writing to the given file.
      *
      * @param file              the file to write to
-     * @param maximumCharacters the maximum number of characters to write to the file before rolling to a new file
+     * @param maximumCharacters the maximum number of characters to write to the file before rolling to a new
+     *                          file
      */
     public RollingFileAppender(final File file, int maximumCharacters) throws IOException
     {

@@ -20,14 +20,14 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 
 /**
- * Represents a date in the format <code>yyyyMMdd-HH:mm:ss:SSS</code> <br>
- * E.g. 20121215-21:25:14:580 (or 15-Dec-2012 21:25:14)
+ * Represents a date in the format <code>yyyyMMdd-HH:mm:ss:SSS</code> <br> E.g. 20121215-21:25:14:580 (or
+ * 15-Dec-2012 21:25:14)
  * <p>
- * This is much faster than using a {@link SimpleDateFormat} as it simply performs integer
- * calculation to work out the hours, minutes, seconds or millis that have elapsed since the last
- * call to {@link #yyyyMMddHHmmssSSS(long)}. It relies on the caller passing in what the current
- * time in milliseconds is. However, when the day changes, a full recalculation is performed which
- * is the most expensive operation for this date formatter.
+ * This is much faster than using a {@link SimpleDateFormat} as it simply performs integer calculation to work
+ * out the hours, minutes, seconds or millis that have elapsed since the last call to {@link
+ * #yyyyMMddHHmmssSSS(long)}. It relies on the caller passing in what the current time in milliseconds is.
+ * However, when the day changes, a full recalculation is performed which is the most expensive operation for
+ * this date formatter.
  * <p>
  * <b>THIS IS NOT THREAD SAFE.</b>
  *
@@ -39,8 +39,8 @@ public final class FastDateFormat
     private final static double INVERSE_1000 = 1d / 1000;
 
     /**
-     * @return a string representing the time format <code>yyyyMMdd-HH:mm:ss:SSS</code> for the
-     * passed in arguments
+     * @return a string representing the time format <code>yyyyMMdd-HH:mm:ss:SSS</code> for the passed in
+     * arguments
      */
     static String formatDateTime(int yearsMonthsDays, int hours, int mins, int secs, int millis)
     {
@@ -75,8 +75,8 @@ public final class FastDateFormat
     final GregorianCalendar cal = new GregorianCalendar();
 
     /**
-     * @return the current time in milliseconds in the format <code>yyyyMMdd-HH:mm:ss:SSS</code>,
-     * e.g. 20121215-21:25:14:580
+     * @return the current time in milliseconds in the format <code>yyyyMMdd-HH:mm:ss:SSS</code>, e.g.
+     * 20121215-21:25:14:580
      */
     public String yyyyMMddHHmmssSSS(long currentTimeMillis)
     {

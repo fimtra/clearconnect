@@ -24,8 +24,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 /**
- * This allows encryption and decryption of data between two "end points" using a symmetrical
- * encryption mechanism.
+ * This allows encryption and decryption of data between two "end points" using a symmetrical encryption
+ * mechanism.
  * <p>
  * Thread-safe.
  *

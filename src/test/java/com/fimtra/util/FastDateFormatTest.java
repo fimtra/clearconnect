@@ -206,22 +206,25 @@ public class FastDateFormatTest
         final long calTime = c.getTimeInMillis();
         Date date = null;
         long now = System.currentTimeMillis();
-        for (int i = 0; i < testCount; i++)
+        synchronized (this) // optimise so no context switching
         {
-            getDateTime(calTime + i);
-        }
-        long sdfTime = System.currentTimeMillis() - now;
-        now = System.currentTimeMillis();
+            for (int i = 0; i < testCount; i++)
+            {
+                getDateTime(calTime + i);
+            }
+            long sdfTime = System.currentTimeMillis() - now;
+            now = System.currentTimeMillis();
 
-        for (int i = 0; i < testCount; i++)
-        {
-            date = new Date(calTime + i);
-            this.candidate.yyyyMMddHHmmssSSS(date.getTime());
+            for (int i = 0; i < testCount; i++)
+            {
+                this.candidate.yyyyMMddHHmmssSSS(calTime + i);
+            }
+            long fdfTime = System.currentTimeMillis() - now;
+            now = System.currentTimeMillis();
+            System.err.println(
+                    "Calendar with formatting took " + sdfTime + ", FastDateFormat took " + fdfTime);
+            assertTrue(fdfTime < sdfTime);
         }
-        long fdfTime = System.currentTimeMillis() - now;
-        now = System.currentTimeMillis();
-        System.err.println("Calendar with formatting took " + sdfTime + ", FastDateFormat took " + fdfTime);
-        assertTrue(fdfTime < sdfTime);
     }
 
 }

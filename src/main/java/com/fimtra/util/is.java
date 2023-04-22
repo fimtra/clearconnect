@@ -18,8 +18,8 @@ package com.fimtra.util;
 import java.util.Arrays;
 
 /**
- * A utility class for performing member comparisons within implementations of
- * the {@link Object#equals(Object)} method. Instead of the usual
+ * A utility class for performing member comparisons within implementations of the {@link
+ * Object#equals(Object)} method. Instead of the usual
  *
  * <pre>
  * if (this.name == null)
@@ -51,8 +51,8 @@ import java.util.Arrays;
 public abstract class is
 {
     /**
-     * Test if the two objects are of the same {@link Class}. <b>This assumes
-     * the first argument is not null.</b> Also checks if the second argument is
+     * Test if the two objects are of the same {@link Class}. <b>This assumes the first argument is not
+     * null.</b> Also checks if the second argument is
      * <code>null</code>.
      *
      * @param candidate the first object

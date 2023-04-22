@@ -284,7 +284,9 @@ public abstract class GZipUtils
             if ((readUInt(in) != this.crc.getValue()) ||
                     // rfc1952; ISIZE is the input size modulo 2^32
                     (readUInt(in) != (this.inf.getBytesWritten() & 0xffffffffL)))
+            {
                 throw new IOException("Corrupt GZIP trailer");
+            }
 
             // If there are more bytes available in "in" or
             // the leftover in the "inf" is > 26 bytes:
@@ -304,7 +306,9 @@ public abstract class GZipUtils
 
                 this.inf.reset();
                 if (n > m)
+                {
                     this.inf.setInput(this.buf, this.len - n + m, n - m);
+                }
                 return false;
             }
 
@@ -348,8 +352,8 @@ public abstract class GZipUtils
     }
 
     /**
-     * A copy of the {@link GZIPOutputStream} that has unsynchronized write method and is re-usable.
-     * Cannot be closed.
+     * A copy of the {@link GZIPOutputStream} that has unsynchronized write method and is re-usable. Cannot be
+     * closed.
      *
      * @author Ramon Servadei
      */
@@ -376,8 +380,8 @@ public abstract class GZipUtils
         }
 
         /**
-         * Writes array of bytes to the compressed output stream. This method will block until all
-         * the bytes are written.
+         * Writes array of bytes to the compressed output stream. This method will block until all the bytes
+         * are written.
          *
          * @param b   the data to be written
          * @param off the start offset of the data
@@ -403,9 +407,8 @@ public abstract class GZipUtils
         }
 
         /**
-         * Finishes writing compressed data to the output stream without closing the underlying
-         * stream. Use this method when applying multiple filters in succession to the same output
-         * stream.
+         * Finishes writing compressed data to the output stream without closing the underlying stream. Use
+         * this method when applying multiple filters in succession to the same output stream.
          *
          * @throws IOException if an I/O error has occurred
          */
@@ -427,7 +430,9 @@ public abstract class GZipUtils
                         return;
                     }
                     if (len > 0)
+                    {
                         this.out.write(this.buf, 0, len);
+                    }
                 }
                 // if we can't fit the trailer at the end of the last
                 // deflater buffer, we write it separately

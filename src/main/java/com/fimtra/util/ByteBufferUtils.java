@@ -54,9 +54,9 @@ public abstract class ByteBufferUtils
     }
 
     /**
-     * Copy the data into the buffer, resizing it if needed, position will be set to the end of the
-     * copied data in the buffer, the limit is either the end of the buffers internal array (if its
-     * resized) or unchanged if the copied data fitted into the buffer.
+     * Copy the data into the buffer, resizing it if needed, position will be set to the end of the copied
+     * data in the buffer, the limit is either the end of the buffers internal array (if its resized) or
+     * unchanged if the copied data fitted into the buffer.
      *
      * @return the {@link ByteBuffer} with the data added to it (resized if needed)
      */
@@ -191,8 +191,8 @@ public abstract class ByteBufferUtils
      * Join all the buffers into a single new buffer.
      *
      * @param buffers the buffers to join
-     * @return the buffer with all the buffers concatenated into it, positin 0 and limit set to the
-     * size of the concatenated buffer data
+     * @return the buffer with all the buffers concatenated into it, positin 0 and limit set to the size of
+     * the concatenated buffer data
      */
     public static ByteBuffer join(ByteBuffer... buffers)
     {

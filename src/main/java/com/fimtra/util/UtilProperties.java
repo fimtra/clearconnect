@@ -51,6 +51,17 @@ public abstract class UtilProperties
         String ARCHIVE_DIR = BASE + "archiveDir";
 
         /**
+         * The system property key that defines the polling period for log flushing.<br> E.g.
+         * <code>-Dutil.logFlushPeriodMillis=250</code>
+         */
+        String LOG_FLUSH_PERIOD_MILLIS = BASE + "logFlushPeriodMillis";
+
+        /**
+         * The system property key that defines the log file limit before it is rolled.<br> E.g.
+         * <code>-Dutil.logFileRoleSizeKb=4096</code>
+         */
+        String LOG_FILE_ROLL_SIZE_KB = BASE + "logFileRoleSizeKb";
+        /**
          * The system property name to define if log messages are written to std.err (in addition to the log
          * file). <br>
          * <b>SETTING THIS TO TRUE HAS A SEVERE PERFORMANCE IMPACT.</b><br>
@@ -152,6 +163,19 @@ public abstract class UtilProperties
         String ARCHIVE_DIR = System.getProperty(UtilProperties.Names.ARCHIVE_DIR, LOG_DIR + "/archive");
 
         /**
+         * Determines the polling period for log flushing. Default is <code>250</code>
+         *
+         * @see Names#LOG_FLUSH_PERIOD_MILLIS
+         */
+        int LOG_FLUSH_PERIOD_MILLIS = SystemUtils.getPropertyAsInt(Names.LOG_FLUSH_PERIOD_MILLIS, 250);
+
+        /**
+         * The size limit when a log file is rolled to a new one. Default is 4096<br>
+         *
+         * @see Names#LOG_FILE_ROLL_SIZE_KB
+         */
+        int LOG_FILE_ROLL_SIZE_KB = SystemUtils.getPropertyAsInt(Names.LOG_FILE_ROLL_SIZE_KB, 4096);
+        /**
          * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is
          * <code>50</code>
          *
@@ -201,16 +225,14 @@ public abstract class UtilProperties
         /**
          * Defines if rolled logs files are compressed. <br> Default is <code>true</code>.
          */
-        boolean COMPRESS_ROLLED_LOGS =
-                SystemUtils.getProperty(Names.COMPRESS_ROLLED_LOGS, true);
+        boolean COMPRESS_ROLLED_LOGS = SystemUtils.getProperty(Names.COMPRESS_ROLLED_LOGS, true);
 
         /**
          * The maximum size of each internal pool of the {@link ByteArrayPool}. Default is 1000<br>
          *
          * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
          */
-        int BYTE_ARRAY_MAX_POOL_SIZE =
-                SystemUtils.getPropertyAsInt(Names.BYTE_ARRAY_MAX_POOL_SIZE, 1000);
+        int BYTE_ARRAY_MAX_POOL_SIZE = SystemUtils.getPropertyAsInt(Names.BYTE_ARRAY_MAX_POOL_SIZE, 1000);
 
         /**
          * Defines the locking policy for the {@link NotifyingCache}.<br> Default is <code>true</code>.

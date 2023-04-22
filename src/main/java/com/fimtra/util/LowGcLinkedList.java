@@ -31,12 +31,12 @@ import java.util.NoSuchElementException;
 import com.fimtra.util.UtilProperties.Values;
 
 /**
- * A version of the standard {@link LinkedList} that uses an internal pool of objects to wrap and
- * hold entries added to the list. This technique reduces garbage churn at the expense of a higher
- * memory footprint and some extra (minor) processing.
+ * A version of the standard {@link LinkedList} that uses an internal pool of objects to wrap and hold entries
+ * added to the list. This technique reduces garbage churn at the expense of a higher memory footprint and
+ * some extra (minor) processing.
  * <p>
- * The internal pool will adapt to resize to 1/4 of the list size but has a starting limit set by
- * {@link Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}.
+ * The internal pool will adapt to resize to 1/4 of the list size but has a starting limit set by {@link
+ * Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}.
  * <p>
  * <b>This is not thread-safe.</b>
  *

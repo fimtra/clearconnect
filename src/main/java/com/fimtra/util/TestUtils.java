@@ -42,8 +42,8 @@ public abstract class TestUtils
     }
 
     /**
-     * Exposes the expected event and the current event to test during the
-     * {@link TestUtils#waitForEvent(EventChecker)} method.
+     * Exposes the expected event and the current event to test during the {@link
+     * TestUtils#waitForEvent(EventChecker)} method.
      *
      * @author Ramon Servadei
      */
@@ -64,15 +64,14 @@ public abstract class TestUtils
      *
      * @throws EventFailedException if the event fails to occur
      */
-    public static void waitForEvent(EventChecker check)
-            throws InterruptedException, EventFailedException
+    public static void waitForEvent(EventChecker check) throws InterruptedException, EventFailedException
     {
         waitForEvent(check, 30000);
     }
 
     /**
-     * Wait for the event to occur by periodically polling the event checker for the number of
-     * loops. Each loop pauses 1ms between.
+     * Wait for the event to occur by periodically polling the event checker for the number of loops. Each
+     * loop pauses 1ms between.
      *
      * @throws EventFailedException if the event fails to occur
      */

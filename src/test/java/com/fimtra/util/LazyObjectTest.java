@@ -16,6 +16,7 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
@@ -40,7 +41,7 @@ public class LazyObjectTest
     public void setUp() throws Exception
     {
         this.map = new HashMap();
-        this.candidate = new LazyObject<>(() -> this.map, (m) -> m.clear());
+        this.candidate = new LazyObject<>(() -> this.map, Map::clear);
     }
 
     @SuppressWarnings("unchecked")
@@ -48,7 +49,9 @@ public class LazyObjectTest
     public void test()
     {
         assertNull(this.candidate.ref);
+        assertNotNull(this.candidate.constructor);
         this.candidate.get().put("one", "one");
+        assertNull(this.candidate.constructor);
         assertSame(this.map, this.candidate.ref);
         assertSame(this.map, this.candidate.get());
         assertEquals(1, this.map.size());
@@ -56,5 +59,16 @@ public class LazyObjectTest
         this.candidate.destroy();
         assertEquals(0, this.map.size());
         assertNull(this.candidate.ref);
+        assertNull(this.candidate.constructor);
+        assertNull(this.candidate.destructor);
+    }
+
+    @Test
+    public void testNoUse()
+    {
+        this.candidate.destroy();
+        assertNull(this.candidate.ref);
+        assertNull(this.candidate.constructor);
+        assertNull(this.candidate.destructor);
     }
 }

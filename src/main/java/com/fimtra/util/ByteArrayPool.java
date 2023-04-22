@@ -18,10 +18,10 @@ package com.fimtra.util;
 import com.fimtra.util.UtilProperties.Names;
 
 /**
- * A pool of re-usable byte[] instances. The instances are held in pools in an internal array. Each
- * pool is at the index of the size of arrays it manages. An internal pool manages byte[] instances
- * of the same size and all sizes in the {@link ByteArrayPool} are powers of 2. Each pool of byte[]
- * is limited to a fixed maximum size.
+ * A pool of re-usable byte[] instances. The instances are held in pools in an internal array. Each pool is at
+ * the index of the size of arrays it manages. An internal pool manages byte[] instances of the same size and
+ * all sizes in the {@link ByteArrayPool} are powers of 2. Each pool of byte[] is limited to a fixed maximum
+ * size.
  *
  * @author Ramon Servadei
  * @see Names#BYTE_ARRAY_MAX_POOL_SIZE
@@ -31,15 +31,28 @@ public class ByteArrayPool
     @SuppressWarnings("unchecked")
     static final MultiThreadReusableObjectPool<byte[]>[] POOLS = new MultiThreadReusableObjectPool[2048 + 1];
 
+    static
+    {
+        int index = 1;
+        while (index < POOLS.length)
+        {
+            int finalIndex = index;
+            POOLS[index] =
+                    new MultiThreadReusableObjectPool<>("byte[" + index + "]", () -> new byte[finalIndex],
+                            instance -> { // noop
+                            }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
+            index <<= 1;
+        }
+    }
+
     /**
      * Get a byte[] that can hold at least the specified size.
      * <p>
-     * NOTE: the returned array size will be sized to a power of 2 that is enough to hold the
-     * requested size.
+     * NOTE: the returned array size will be sized to a power of 2 that is enough to hold the requested size.
      *
      * @param size the size needed for the array
-     * @return an array sized to the next power of 2 beyond the size. If requested size is beyond
-     * the limits of the pool (2048) then a new byte[] is returned with the exact size.
+     * @return an array sized to the next power of 2 beyond the size. If requested size is beyond the limits
+     * of the pool (2048) then a new byte[] is returned with the exact size.
      */
     public static byte[] get(final int size)
     {
@@ -47,20 +60,7 @@ public class ByteArrayPool
         {
             return new byte[size];
         }
-        final int index = getIndex(size);
-        MultiThreadReusableObjectPool<byte[]> pool;
-        synchronized (POOLS)
-        {
-            pool = POOLS[index];
-            if (pool == null)
-            {
-                pool = new MultiThreadReusableObjectPool<>("byte[" + index + "]", () -> new byte[index],
-                        instance -> { // noop
-                        }, UtilProperties.Values.BYTE_ARRAY_MAX_POOL_SIZE);
-                POOLS[index] = pool;
-            }
-        }
-        return pool.get();
+        return POOLS[getIndex(size)].get();
     }
 
     /**
@@ -70,11 +70,7 @@ public class ByteArrayPool
     {
         if (array.length < POOLS.length)
         {
-            final MultiThreadReusableObjectPool<byte[]> pool;
-            synchronized (POOLS)
-            {
-                pool = POOLS[array.length];
-            }
+            final MultiThreadReusableObjectPool<byte[]> pool = POOLS[array.length];
             if (pool != null)
             {
                 pool.offer(array);

@@ -54,6 +54,8 @@ public class ByteArrayPoolTest
         }
         
         assertEquals(1024, ByteArrayPool.getIndex(1024));
+
+        assertNotNull(ByteArrayPool.get(2048 + 1));
     }
 
 }

@@ -37,17 +37,16 @@ import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.util.LazyObject.IDestructor;
 
 /**
- * Utility that caches data and notifies listeners of a specific type when data is added or removed.
- * Listeners are notified asynchronously and with different threads; initial images occur on
- * separate threads to updates. There will be no concurrent or duplicate updates received.
+ * Utility that caches data and notifies listeners of a specific type when data is added or removed. Listeners
+ * are notified asynchronously and with different threads; initial images occur on separate threads to
+ * updates. There will be no concurrent or duplicate updates received.
  * <p>
- * This maintains an internal cache of the data that has been added/removed. The
- * {@link #getCacheSnapshot()} method returns a <b>clone</b> of the cache data so is expensive to
- * call.
+ * This maintains an internal cache of the data that has been added/removed. The {@link #getCacheSnapshot()}
+ * method returns a <b>clone</b> of the cache data so is expensive to call.
  * <p>
  * <b>Threading:</b> all listeners are notified with initial images using an internal
- * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the
- * cache are notified using the respective thread model used for cache construction.
+ * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the cache are
+ * notified using the respective thread model used for cache construction.
  * <p>
  * A notifying cache should be equal by object reference only.
  *
@@ -101,15 +100,15 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * This tracks the notification sequence number per data key per listener.
      * <p>
-     * This is populated when a listener is registered and prevents duplicate updates being sent to
-     * the listener during its phase of receiving initial images whilst any concurrent updates may
-     * also be occurring.
+     * This is populated when a listener is registered and prevents duplicate updates being sent to the
+     * listener during its phase of receiving initial images whilst any concurrent updates may also be
+     * occurring.
      */
     final Map<LISTENER_CLASS, Map<String, Long>> listenerSequences;
 
     /**
-     * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still
-     * not lose update order
+     * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still not lose
+     * update order
      */
     final List<Runnable> notifyTasks;
     final Runnable notifyingTasksRunner;
@@ -123,7 +122,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     final Lock imageLock;
 
     /**
-     * Standard contructor
+     * Standard constructor
      */
     @SuppressWarnings("unchecked")
     public NotifyingCache()
@@ -162,8 +161,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.notifyingTasksRunner = () -> {
             if (this.notifyTasks.size() > 0)
             {
-                // lock to ensure only 1 task runs at any time (ensures ordering if the
-                // executor is multi-threaded)
+                // lock to ensure only 1 task runs at any time
+                // (ensures ordering if the executor is multi-threaded)
                 synchronized (runnerLock)
                 {
                     final Runnable task = this.notifyTasks.remove(0);
@@ -375,8 +374,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners with the new data. The notification is done using the
-     * internal executor.
+     * Notify all registered listeners with the new data. The notification is done using the internal
+     * executor.
      *
      * @return <code>true</code> if the data was added (it was not already contained),
      * <code>false</code> if it was already in the cache (no listeners are notified in this
@@ -460,8 +459,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners that the data for this key is removed. The notification is
-     * done using the internal executor.
+     * Notify all registered listeners that the data for this key is removed. The notification is done using
+     * the internal executor.
      *
      * @param key the key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
@@ -490,8 +489,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                         {
                             try
                             {
-                                // remove the data key from all notification sequences held for all
-                                // listeners
+                                // remove the data key from all notification sequences held for all listeners
                                 final Collection<Map<String, Long>> notificationSequences;
                                 synchronized (this.listenerSequences)
                                 {
@@ -507,7 +505,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
                                 for (LISTENER_CLASS listener : listenersToNotify)
                                 {
-                                    safeNotifyRemove(key, removedData, listener, "REMOVE");
+                                    safeNotifyRemove(key, removedData, listener);
                                 }
                             }
                             finally
@@ -566,7 +564,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
     }
 
-    private void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener, String action)
+    private void safeNotifyRemove(final String key, final DATA data, LISTENER_CLASS listener)
     {
         try
         {
@@ -574,7 +572,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
         catch (Exception e)
         {
-            handleException(key, data, listener, e, action);
+            handleException(key, data, listener, e, "REMOVE");
         }
     }
 
