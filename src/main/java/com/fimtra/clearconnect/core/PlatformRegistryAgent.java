@@ -38,7 +38,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
-import com.fimtra.channel.IEndPointAddressFactory;
 import com.fimtra.channel.TransportChannelBuilderFactoryLoader;
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
@@ -239,7 +238,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy,
                         IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, this);
 
-        // "split-plane" protection
+        // "split-brain" protection
         // setup listening for services lost from the registry - we use this to detect if the
         // registry loses a service but we still have the service...
         this.serviceInstanceAvailableListeners.addListener(
@@ -922,15 +921,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
             try
             {
-                this.agentExecutor.shutdownNow();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformRegistryAgent.this, "Could not shutdown executor", e);
-            }
-
-            try
-            {
                 this.serviceAvailableListeners.destroy();
                 this.serviceInstanceAvailableListeners.destroy();
                 this.registryAvailableListeners.destroy();
@@ -993,6 +983,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             catch (Exception e)
             {
                 Log.log(PlatformRegistryAgent.this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
+            }
+
+            // shutdown the executor at the end to allow notification caches to finish cleanly
+            try
+            {
+                this.agentExecutor.shutdown();
+            }
+            catch (Exception e)
+            {
+                Log.log(PlatformRegistryAgent.this, "Could not shutdown executor", e);
             }
         }
         finally
@@ -1246,7 +1246,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             catch (Exception e)
             {
                 Log.log(PlatformRegistryAgent.this,
-                    " (" + Integer.toString(tries) + "/" + Integer.toString(maxTries) + ") Failed attempt registering "
+                    " (" + tries + "/" + maxTries + ") Failed attempt registering "
                         + ObjectUtils.safeToString(platformServiceInstance)
                         + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"), e);
             }
