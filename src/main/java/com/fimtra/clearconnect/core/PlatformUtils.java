@@ -19,7 +19,6 @@ import java.net.URL;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -312,16 +311,18 @@ public class PlatformUtils
              */
             IRecordChange changesForService;
             String serviceInstanceId;
+            Set<String> newServices;
+            Set<String> removedServices;
             for (String serviceFamily : atomicChange.getSubMapKeys())
             {
                 changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
-                Set<String> newServices = changesForService.getPutEntries().keySet();
+                newServices = changesForService.getPutEntries().keySet();
                 for (String serviceMember : newServices)
                 {
                     serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
                     serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId, serviceInstanceId);
                 }
-                Set<String> removedServices = changesForService.getRemovedEntries().keySet();
+                removedServices = changesForService.getRemovedEntries().keySet();
                 for (String serviceMember : removedServices)
                 {
                     serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
@@ -362,12 +363,12 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Set<String> newRecords = atomicChange.getPutEntries().keySet();
+            final Set<String> newRecords = atomicChange.getPutEntries().keySet();
             for (String recordName : newRecords)
             {
                 recordAvailableNotifyingCache.notifyListenersDataAdded(recordName, recordName);
             }
-            Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
+            final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
             for (String recordName : removedRecords)
             {
                 recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName);
@@ -407,10 +408,11 @@ public class PlatformUtils
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
             Log.log(logContext, "RPC change: " + atomicChange.toString());
-            Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
+            IRpcInstance rpc;
+            final Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
             for (Entry<String, IValue> newRpc : newRpcs)
             {
-                final IRpcInstance rpc = context.getRpc(newRpc.getKey());
+                rpc = context.getRpc(newRpc.getKey());
                 if (rpc != null)
                 {
                     if (rpcAvailableNotifyingCache.notifyListenersDataAdded(rpc.getName(), rpc))
@@ -425,7 +427,7 @@ public class PlatformUtils
                         ObjectUtils.safeToString(logContext));
                 }
             }
-            Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
+            final Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
             for (Entry<String, IValue> removedRpc : removedRpcs)
             {
                 if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(removedRpc.getKey()))
@@ -470,33 +472,30 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
+            final Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
+            IValue previous;
+            int previousSubscriberCount;
             for (Entry<String, IValue> subscription : subscriptions)
             {
-                IValue previous = atomicChange.getOverwrittenEntries().get(subscription.getKey());
-                int previousSubscriberCount = 0;
+                previousSubscriberCount = 0;
+                previous = atomicChange.getOverwrittenEntries().get(subscription.getKey());
                 if (previous != null)
                 {
                     previousSubscriberCount = (int) previous.longValue();
                 }
-                int currentSubscriberCount = (int) subscription.getValue().longValue();
-                SubscriptionInfo info =
-                    new SubscriptionInfo(subscription.getKey(), currentSubscriberCount, previousSubscriberCount);
-                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
+                subscriptionNotifyingCache.notifyListenersDataAdded(subscription.getKey(),
+                        new SubscriptionInfo(subscription.getKey(), (int) subscription.getValue().longValue(),
+                                previousSubscriberCount));
             }
 
-            Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
+            final Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
             for (Entry<String, IValue> removed : removedSubscriptions)
             {
-                int currentSubscriberCount = 0;
-                int previousSubscriberCount = (int) removed.getValue().longValue();
-                SubscriptionInfo info =
-                    new SubscriptionInfo(removed.getKey(), currentSubscriberCount, previousSubscriberCount);
-                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
-                if (currentSubscriberCount == 0)
-                {
-                    subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName());
-                }
+                // notify no more subscribers
+                subscriptionNotifyingCache.notifyListenersDataAdded(removed.getKey(),
+                        new SubscriptionInfo(removed.getKey(), 0, (int) removed.getValue().longValue()));
+                // notify that the data is removed from the cache
+                subscriptionNotifyingCache.notifyListenersDataRemoved(removed.getKey());
             }
             updateWaitLatch.countDown();
         };
@@ -547,16 +546,9 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Map.Entry<String, IValue> entry = null;
-            String key = null;
-            IValue value = null;
-            for (Iterator<Map.Entry<String, IValue>> it =
-                atomicChange.getPutEntries().entrySet().iterator(); it.hasNext();)
+            for (Entry<String, IValue> entry : atomicChange.getPutEntries().entrySet())
             {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                recordStatusNotifyingCache.notifyListenersDataAdded(key, value);
+                recordStatusNotifyingCache.notifyListenersDataAdded(entry.getKey(), entry.getValue());
             }
             updateWaitLatch.countDown();
         };
