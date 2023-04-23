@@ -15,19 +15,13 @@
  */
 package com.fimtra.clearconnect.core;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
@@ -35,6 +29,7 @@ import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
+import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
@@ -44,6 +39,9 @@ import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link PlatformRegistry}
@@ -144,6 +142,7 @@ public class PlatformRegistryTest
         checkEmpty();
 
         final int MAX = 2;
+
         PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
         for (int i = 0; i < MAX; i++)
         {
@@ -158,6 +157,36 @@ public class PlatformRegistryTest
             agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
                 WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
             publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
+
+            final CountDownLatch allServicesReady = new CountDownLatch(2);
+            //
+            // setup a listener to trigger when all services are ready
+            //
+            int finalI = i;
+            agents[i].addServiceInstanceAvailableListener(new IServiceInstanceAvailableListener()
+            {
+                @Override
+                public void onServiceInstanceAvailable(String serviceInstanceId)
+                {
+                    if (serviceInstanceId.equals(
+                            PlatformUtils.composePlatformServiceInstanceID("Test-FTservice-" + finalI,
+                                    suffix)) || serviceInstanceId.equals(
+                            PlatformUtils.composePlatformServiceInstanceID("Test-LBservice-" + finalI,
+                                    suffix)))
+                    {
+                        allServicesReady.countDown();
+                    }
+                }
+
+                @Override
+                public void onServiceInstanceUnavailable(String serviceInstanceId)
+                {
+
+                }
+            });
+
+
+            assertTrue("Did not get all services", allServicesReady.await(10, TimeUnit.SECONDS));
         }
 
         final CountDownLatch allConnections = new CountDownLatch(1);
@@ -188,6 +217,7 @@ public class PlatformRegistryTest
         for (int i = 0; i < MAX; i++)
         {
             agents[i].destroy();
+            Thread.sleep(100);
         }
 
         assertTrue(noConnections.await(10, TimeUnit.SECONDS));
@@ -197,8 +227,6 @@ public class PlatformRegistryTest
 
     void checkEmpty() throws InterruptedException
     {
-        Thread.sleep(2000);
-
         checkZeroSize(this.candidate.platformConnections);
         checkZeroSize(this.candidate.serviceInstancesPerAgent);
         // the platform registry adds itself as a service instance
@@ -209,11 +237,12 @@ public class PlatformRegistryTest
         checkZeroSize(this.candidate.eventHandler.monitoredServiceInstances);
         checkZeroSize(this.candidate.eventHandler.pendingMasterInstancePerFtService);
         checkZeroSize(this.candidate.eventHandler.confirmedMasterInstancePerFtService);
-        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
         checkZeroSize(this.candidate.eventHandler.connectionMonitors);
 
         // need to wait for connections to be destroyed?
         checkZeroSize(this.candidate.runtimeStatus);
+
+        checkZeroSize(this.candidate.eventHandler.pendingPlatformServices);
     }
 
     void publishRecordAndRpc(final String suffix, final IPlatformServiceInstance service)
@@ -272,9 +301,28 @@ public class PlatformRegistryTest
 
     }
 
-    private static void checkZeroSize(Map<?, ?> map)
+    private static void checkZeroSize(Map<?, ?> map) throws InterruptedException
     {
-        assertEquals(0, map.size());
+        TestUtils.waitForEvent(new EventCheckerWithFailureReason()
+        {
+            @Override
+            public Object got()
+            {
+                return map.size();
+            }
+
+            @Override
+            public Object expect()
+            {
+                return 0;
+            }
+
+            @Override
+            public String getFailureReason()
+            {
+                return map.toString();
+            }
+        }, 2000);
     }
 
     private static void checkZeroSize(IRecord record) throws EventFailedException, InterruptedException
