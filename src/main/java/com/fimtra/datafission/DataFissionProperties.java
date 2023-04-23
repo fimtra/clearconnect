@@ -43,6 +43,14 @@ public abstract class DataFissionProperties
         String BASE = "dataFission.";
 
         /**
+         * The system property name to define the number of threads used in the system record {@link ThimbleExecutor}
+         * used by all {@link Context} instances in the runtime.
+         * <br>
+         * E.g. <code>-DdataFission.systemThreadCount=2</code>
+         */
+        String SYSTEM_THREAD_COUNT = BASE + "systemThreadCount";
+
+        /**
          * The system property name to define the number of threads used in the core {@link ThimbleExecutor}
          * used by all DataFission {@link Context} instances in the runtime.
          * <br>
@@ -238,6 +246,15 @@ public abstract class DataFissionProperties
      */
     public interface Values
     {
+        /**
+         * The number of threads used in the system record {@link ThimbleExecutor} used by all DataFission {@link
+         * Context} instances in the runtime.
+         *
+         * @see Names#SYSTEM_THREAD_COUNT
+         */
+        int SYSTEM_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.SYSTEM_THREAD_COUNT,
+                2);
+
         /**
          * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission {@link
          * Context} instances in the runtime.

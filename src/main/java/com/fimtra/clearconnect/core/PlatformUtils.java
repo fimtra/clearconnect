@@ -148,10 +148,11 @@ public class PlatformUtils
 
         sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
-        sb.append("Core thread count: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
-        sb.append("RPC thread count: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(newline);
-        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
-        sb.append("TCP writer thread count: ").append(TcpChannelProperties.Values.WRITER_THREAD_COUNT);
+        sb.append("System thread limit: ").append(DataFissionProperties.Values.SYSTEM_THREAD_COUNT).append(newline);
+        sb.append("Core thread limit: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
+        sb.append("RPC thread limit: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(newline);
+        sb.append("TCP reader thread limit: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
+        sb.append("TCP writer thread limit: ").append(TcpChannelProperties.Values.WRITER_THREAD_COUNT);
         Log.banner(PlatformUtils.class, sb.toString());
 
         String versionNumber = "?.?.?";
@@ -470,17 +471,17 @@ public class PlatformUtils
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
             Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
-            for (Entry<String, IValue> subsription : subscriptions)
+            for (Entry<String, IValue> subscription : subscriptions)
             {
-                IValue previous = atomicChange.getOverwrittenEntries().get(subsription.getKey());
+                IValue previous = atomicChange.getOverwrittenEntries().get(subscription.getKey());
                 int previousSubscriberCount = 0;
                 if (previous != null)
                 {
                     previousSubscriberCount = (int) previous.longValue();
                 }
-                int currentSubscriberCount = (int) subsription.getValue().longValue();
+                int currentSubscriberCount = (int) subscription.getValue().longValue();
                 SubscriptionInfo info =
-                    new SubscriptionInfo(subsription.getKey(), currentSubscriberCount, previousSubscriberCount);
+                    new SubscriptionInfo(subscription.getKey(), currentSubscriberCount, previousSubscriberCount);
                 subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
             }
 
@@ -860,7 +861,6 @@ public class PlatformUtils
      *            the RPC name
      * @param rpcArgs
      *            the arguments for the RPC
-     * @return the return value of the RPC execution
      */
     public static void executeRpcNoResponse(IPlatformServiceComponent component, long discoveryTimeoutMillis,
         final String rpcName, final IValue... rpcArgs) throws TimeOutException, ExecutionException

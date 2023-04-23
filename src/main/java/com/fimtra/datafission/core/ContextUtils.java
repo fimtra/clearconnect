@@ -176,7 +176,7 @@ public final class ContextUtils
      * @see #SYSTEM_RECORDS
      */
     final static IContextExecutor SYSTEM_RECORD_EXECUTOR =
-            ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
+            ContextExecutorFactory.create(FISSION_SYSTEM, DataFissionProperties.Values.SYSTEM_THREAD_COUNT);
 
     /**
      * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
