@@ -26,7 +26,7 @@ import com.fimtra.util.is;
  */
 public final class DoubleValue extends AbstractValue
 {
-    private double value;
+    private final double value;
 
     /**
      * Static short-hand constructor for a {@link DoubleValue}
@@ -49,7 +49,7 @@ public final class DoubleValue extends AbstractValue
      */
     public static double get(IValue target, double defaultValue)
     {
-        return target == null || !(target instanceof DoubleValue) ? defaultValue : target.doubleValue();
+        return (target instanceof DoubleValue) ? target.doubleValue() : defaultValue;
     }
 
     /** Initialises to represent NaN. */
@@ -94,7 +94,7 @@ public final class DoubleValue extends AbstractValue
     }
     
     @Override
-    public final StringAppender toStringAppender()
+    public StringAppender toStringAppender()
     {
         return appendTo(new StringAppender());
     }

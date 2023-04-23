@@ -33,8 +33,9 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -165,8 +166,9 @@ public class TcpChannel implements ITransportChannel
         volatile TcpChannel last;
     }
 
-    /** The chain per writer - acces must be synchronized on the TcpChannel class */
-    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains = new HashMap<>();
+    /** The chain per writer  */
+    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =
+            Collections.synchronizedMap(new IdentityHashMap<>());
 
     /**
      * Add the channel into the chain. If it already there, does nothing.
@@ -243,7 +245,7 @@ public class TcpChannel implements ITransportChannel
     ByteBuffer[] resolvedFrames = new ByteBuffer[10];
     final int[] fragmentsSize = new int[1];
     @SuppressWarnings("unchecked")
-    final Deque<TxByteArrayFragment> txFrames[] =
+    final Deque<TxByteArrayFragment>[] txFrames =
         new Deque[] { CollectionUtils.newDeque(), CollectionUtils.newDeque() };
     int pendingQueue = 0;
     int sendingQueue = 1;
@@ -267,7 +269,7 @@ public class TcpChannel implements ITransportChannel
     private final Object lock = new Object();
 
     /** The channel state - always access using the {@link #lock} */
-    volatile StateEnum state = StateEnum.IDLE;
+    StateEnum state = StateEnum.IDLE;
 
     SelectionKey writerKey;
     final SendChannelChain sendChannelChain;
@@ -376,10 +378,7 @@ public class TcpChannel implements ITransportChannel
 
     private SendChannelChain getSendChannelChain()
     {
-        synchronized (TcpChannel.class)
-        {
-            return sendChannelChains.computeIfAbsent(this.writer, w -> new SendChannelChain());
-        }
+        return sendChannelChains.computeIfAbsent(this.writer, w -> new SendChannelChain());
     }
 
     private void finishConstruction() throws ConnectException
@@ -398,7 +397,7 @@ public class TcpChannel implements ITransportChannel
 
         try
         {
-            this.writer.register(this.socketChannel, () -> writeFrames(TcpChannel.this.writer));
+            this.writer.register(this.socketChannel, () -> writeFrames(this.sendChannelChain));
 
             this.writerKey = this.writer.getKeyFor(this.socketChannel);
             SelectorProcessor.resetInterest(this.writerKey);
@@ -676,7 +675,7 @@ public class TcpChannel implements ITransportChannel
         }
     }
 
-    static void writeFrames(SelectorProcessor writer)
+    static void writeFrames(SendChannelChain chain)
     {
         /*
          * This code logic will give equal opportunity for sending across all channels in the
@@ -685,17 +684,6 @@ public class TcpChannel implements ITransportChannel
          */
         TxByteArrayFragment data;
         TcpChannel channel = null;
-        final SendChannelChain chain;
-        synchronized (TcpChannel.class)
-        {
-            chain = sendChannelChains.get(writer);
-        }
-        // should never happen but do this to be defensive
-        if (chain == null)
-        {
-            return;
-        }
-
         boolean writeInProgress;
         while (chain.first != null)
         {
@@ -836,11 +824,11 @@ public class TcpChannel implements ITransportChannel
                 this.txFrames[this.pendingQueue].clear();
                 this.txFrames[this.sendingQueue].clear();
                 this.rxByteBuffer.clear();
-            }
 
-            synchronized (this.sendChannelChain)
-            {
-                unlinkChannel_callWithChainLock(this);
+                synchronized (this.sendChannelChain)
+                {
+                    unlinkChannel_callWithChainLock(this);
+                }
             }
 
             if (this.socketChannel != null)

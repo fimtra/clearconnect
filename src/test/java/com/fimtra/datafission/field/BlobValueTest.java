@@ -20,11 +20,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertTrue;
 
 import com.fimtra.datafission.IValue.TypeEnum;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link BlobValue}
@@ -68,6 +68,33 @@ public class BlobValueTest
         char[] charArray = "1a0f34160A0B0C0D0E0F".toCharArray();
         other.fromChars(charArray, 0, charArray.length);
         assertEquals(other, this.candidate);
+    }
+
+    @Test
+    public void testMod2Optimistaion()
+    {
+        int max = 100000;
+        long t;
+        t = System.nanoTime();
+        boolean res;
+        for (int i = 0; i < max; i++)
+        {
+            assertEquals("Failed at " + i, i % 2 != 0, (i & 0x1) == 1);
+        }
+        for (int i = 0; i < max; i++)
+        {
+            res = i % 2 != 0;
+        }
+        final long classic = System.nanoTime() - t;
+
+        t = System.nanoTime();
+        for (int i = 0; i < max; i++)
+        {
+            res = (i & 0x1) != 0;
+        }
+        final long mathUtils = System.nanoTime() - t;
+        assertTrue("classic=" + classic + " optimised=" + mathUtils, mathUtils <= classic);
+
     }
 
     @Test

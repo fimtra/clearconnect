@@ -114,17 +114,6 @@ public abstract class TcpChannelUtils
         return ChannelUtils.getNextAvailableServicePort();
     }
 
-    /**
-     * Handles the connection result for a call to {@link TcpChannelUtils#createAndConnectNonBlockingSocketChannel(String,
-     * int)}
-     */
-    interface IConnectionResultProcessor
-    {
-        void onConnectionSuccess();
-
-        void onConnectionFailed(Exception e);
-    }
-
     static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();
 
     /**

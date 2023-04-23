@@ -837,7 +837,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                 case CHAR_TOKEN_DELIM:
                     if (previous != CHAR_ESCAPE ||
                     // the previous was '\' and there was an even number of contiguous slashes
-                        (slashCount % 2 == 0))
+                        ((slashCount & 0x1) == 0))
                     {
                         // an unescaped "|" is a true delimiter so start a new token
                         if (bijTokenLen[0] == bijTokenOffset[0].length)

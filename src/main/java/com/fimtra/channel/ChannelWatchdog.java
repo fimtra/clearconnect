@@ -22,17 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SystemUtils;
+import com.fimtra.util.ThreadUtils;
 
 /**
  * This class checks that the {@link ITransportChannel} objects it knows about are still alive. This
@@ -67,18 +65,8 @@ public final class ChannelWatchdog implements Runnable
     final Map<ITransportChannel, Long> channelsHeartbeatArrivalTime;
     final Object lock;
 
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory()
-    {
-        private final AtomicInteger threadNumber = new AtomicInteger();
-
-        @Override
-        public Thread newThread(Runnable r)
-        {
-            Thread t = new Thread(r, "channel-watchdog-" + this.threadNumber.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        }
-    });
+    private final ScheduledExecutorService executor =
+            ThreadUtils.newScheduledExecutorService("channel-watchdog", 1);
 
     private ScheduledFuture<?> current;
 

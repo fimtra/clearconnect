@@ -26,6 +26,13 @@ public abstract class SystemUtils
     {
     }
 
+    public static int getRuntimeSupportedThreadCount()
+    {
+        return (Runtime.getRuntime().availableProcessors() < 8 ? 4 :
+                (Runtime.getRuntime().availableProcessors() < 32 ?
+                        Runtime.getRuntime().availableProcessors() / 2 : 16));
+    }
+
     public static String lineSeparator()
     {
         return LINE_SEPARATOR;

@@ -44,7 +44,7 @@ public final class BlobValue extends AbstractValue
     {
         try
         {
-            return (T) SerializationUtils.fromByteArray(value.getBytes());
+            return SerializationUtils.fromByteArray(value.getBytes());
         }
         catch (Exception e)
         {
@@ -134,7 +134,55 @@ public final class BlobValue extends AbstractValue
         }
     }
 
-    private static final byte decodeHex(char c)
+    // decode for most-significant byte (msb)
+    private static int decodeHexMsb(char c)
+    {
+        switch(c)
+        {
+            case '0':
+                return 0x0;
+            case '1':
+                return 0x10;
+            case '2':
+                return 0x20;
+            case '3':
+                return 0x30;
+            case '4':
+                return 0x40;
+            case '5':
+                return 0x50;
+            case '6':
+                return 0x60;
+            case '7':
+                return 0x70;
+            case '8':
+                return 0x80;
+            case '9':
+                return 0x90;
+            case 'a':
+            case 'A':
+                return 0xa0;
+            case 'b':
+            case 'B':
+                return 0xb0;
+            case 'c':
+            case 'C':
+                return 0xc0;
+            case 'd':
+            case 'D':
+                return 0xd0;
+            case 'e':
+            case 'E':
+                return 0xe0;
+            case 'f':
+            case 'F':
+                return 0xf0;
+        }
+        throw new IllegalArgumentException("Unhandled char:" + c);
+    }
+
+    // decode for least-significant byte (lsb)
+    private static int decodeHexLsb(char c)
     {
         switch(c)
         {
@@ -159,27 +207,21 @@ public final class BlobValue extends AbstractValue
             case '9':
                 return 0x9;
             case 'a':
-                return 0xa;
-            case 'b':
-                return 0xb;
-            case 'c':
-                return 0xc;
-            case 'd':
-                return 0xd;
-            case 'e':
-                return 0xe;
-            case 'f':
-                return 0xf;
             case 'A':
                 return 0xa;
+            case 'b':
             case 'B':
                 return 0xb;
+            case 'c':
             case 'C':
                 return 0xc;
+            case 'd':
             case 'D':
                 return 0xd;
+            case 'e':
             case 'E':
                 return 0xe;
+            case 'f':
             case 'F':
                 return 0xf;
         }
@@ -207,7 +249,7 @@ public final class BlobValue extends AbstractValue
      */
     public static byte[] get(IValue target, byte[] defaultValue)
     {
-        return target == null || !(target instanceof BlobValue) ? defaultValue : target.byteValue();
+        return (target instanceof BlobValue) ? target.byteValue() : defaultValue;
     }
 
     byte[] value;
@@ -275,25 +317,17 @@ public final class BlobValue extends AbstractValue
 
     char[] charArrValue()
     {
-        final char[] cbuf = new char[this.value.length * 2];
+        final int length = this.value.length;
+        final char[] cbuf = new char[length << 1];
         char[] code;
         byte val;
         int bufPtr = 0;
-        for (int i = 0; i < this.value.length; i++)
+        for (int i = 0; i < length; i++)
         {
             val = this.value[i];
-            if (val < 0)
-            {
-                code = NEG_HEX_CODES[val & 0x7f];
-                cbuf[bufPtr++] = code[0];
-                cbuf[bufPtr++] = code[1];
-            }
-            else
-            {
-                code = (POS_HEX_CODES[val]);
-                cbuf[bufPtr++] = code[0];
-                cbuf[bufPtr++] = code[1];
-            }
+            code = (val & 0x80) == 0x80 ? NEG_HEX_CODES[val & 0x7f] : POS_HEX_CODES[val];
+            cbuf[bufPtr++] = code[0];
+            cbuf[bufPtr++] = code[1];
         }
         return cbuf;
     }
@@ -306,16 +340,15 @@ public final class BlobValue extends AbstractValue
     
     void fromChars(char[] chars, int start, int len)
     {
-        if (len % 2 != 0)
+        if ((len & 0x1) != 0)
         {
             throw new IllegalStateException("BlobValue text length should be divisible by 2");
         }
-        this.value = new byte[len / 2];
-        final char[] hexStream = chars;
+        this.value = new byte[len >> 1];
         int j = 0;
-        for (int i = start; i < len;)
+        for (int i = start; i < len; )
         {
-            this.value[j++] = (byte) ((byte) (decodeHex(hexStream[i++]) << 4) | decodeHex(hexStream[i++]));
+            this.value[j++] = (byte) (decodeHexMsb(chars[i++]) | decodeHexLsb(chars[i++]));
         }
     }
 
