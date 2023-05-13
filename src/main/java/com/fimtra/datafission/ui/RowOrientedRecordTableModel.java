@@ -490,6 +490,18 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
         this.cellUpdateHandler.cellUpdated(row, column);
     }
 
+    void addColumnFromResolvedState(String columnName)
+    {
+        // this method preserves the order of columns added - i.e. no sort int
+        AtomicInteger index = RowOrientedRecordTableModel.this.fieldIndexLookupMap.get(columnName);
+        if (index == null)
+        {
+            this.fieldIndexes.add(columnName);
+            index = new AtomicInteger(this.fieldIndexes.size() - 1);
+            this.fieldIndexLookupMap.put(columnName, index);
+        }
+    }
+
     int checkAddColumn(String columnName, AtomicBoolean stuctureChanged)
     {
         AtomicInteger index = RowOrientedRecordTableModel.this.fieldIndexLookupMap.get(columnName);

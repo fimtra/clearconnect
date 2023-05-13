@@ -27,6 +27,10 @@ import javax.swing.JComponent;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.TableColumnModelEvent;
+import javax.swing.event.TableColumnModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -88,29 +92,49 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
     {
         try
         {
-            final AtomicBoolean stuctureChanged = new AtomicBoolean();
-            Map<String, Integer> widths = new HashMap<>();
+            final Map<String, Integer> widths = new HashMap<>();
             final String[] tokens = stateString.split(",");
             String columnName;
             for (int i = 0; i < tokens.length; i++)
             {
                 columnName = tokens[i++];
-                getModel().checkAddColumn(columnName, stuctureChanged);
+                getModel().addColumnFromResolvedState(columnName);
                 widths.put(columnName, Integer.valueOf(tokens[i]));
             }
 
-            TableColumn column;
-            Integer preferredWidth;
-            final TableColumnModel cm = getTableHeader().getColumnModel();
-            for (int i = 0; i < cm.getColumnCount(); i++)
+            getTableHeader().getColumnModel().addColumnModelListener(new TableColumnModelListener()
             {
-                column = cm.getColumn(i);
-                preferredWidth = widths.get(column.getHeaderValue());
-                if (preferredWidth != null)
+                @Override
+                public void columnSelectionChanged(ListSelectionEvent e)
                 {
-                    column.setPreferredWidth(preferredWidth.intValue());
                 }
-            }
+
+                @Override
+                public void columnRemoved(TableColumnModelEvent e)
+                {
+                }
+
+                @Override
+                public void columnMoved(TableColumnModelEvent e)
+                {
+                }
+
+                @Override
+                public void columnMarginChanged(ChangeEvent e)
+                {
+                }
+
+                @Override
+                public void columnAdded(TableColumnModelEvent e)
+                {
+                    final TableColumn column = getTableHeader().getColumnModel().getColumn(e.getToIndex());
+                    final Integer preferredWidth = widths.get(column.getHeaderValue().toString());
+                    if (preferredWidth != null)
+                    {
+                        column.setPreferredWidth(preferredWidth);
+                    }
+                }
+            });
 
             getModel().fireTableStructureChanged();
         }
@@ -123,11 +147,12 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
     public String toStateString()
     {
         StringBuilder sb = new StringBuilder();
-        final int columnCount = getColumnModel().getColumnCount();
+        final TableColumnModel headerColumnModel = getTableHeader().getColumnModel();
+        final int columnCount = headerColumnModel.getColumnCount();
         TableColumn column;
         for (int i = 0; i < columnCount; i++)
         {
-            column = getColumnModel().getColumn(i);
+            column = headerColumnModel.getColumn(i);
             if (i > 0)
             {
                 sb.append(",");
@@ -185,26 +210,14 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
         if (cellUpdate != null && cellUpdate.isActive())
         {
             prepareRenderer.setBackground(RecordTableUtils.UPDATE_COLOUR);
-            RecordTableUtils.cellUpdater.schedule(new Runnable()
-            {
-                @Override
-                public void run()
+            RecordTableUtils.cellUpdater.schedule(() -> SwingUtilities.invokeLater(() -> {
+                // trigger another render update to clear the update cell background
+                if (convertedRowIndex < getRowCount())
                 {
-                    SwingUtilities.invokeLater(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            // trigger another render update to clear the update cell background
-                            if (convertedRowIndex < getRowCount())
-                            {
-                                ((AbstractTableModel) RowOrientedRecordTable.this.getModel()).fireTableCellUpdated(
-                                    convertedRowIndex, convertedColumnIndex);
-                            }
-                        }
-                    });
+                    ((AbstractTableModel) RowOrientedRecordTable.this.getModel()).fireTableCellUpdated(
+                            convertedRowIndex, convertedColumnIndex);
                 }
-            }, 500, TimeUnit.MILLISECONDS);
+            }), 500, TimeUnit.MILLISECONDS);
         }
         else
         {
