@@ -18,6 +18,7 @@ package com.fimtra.datafission.core;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
@@ -235,7 +236,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public IRecordChange getAtomicChangeFromRxMessage(ByteBuffer data)
     {
-        return decodeAtomicChange(decode(data));
+        final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
+        return decodeAtomicChange(decode(data, decodingBuffers.getDecoder(getCharset())), decodingBuffers);
     }
 
     static class DecodingBuffers
@@ -244,6 +246,13 @@ public class StringProtocolCodec implements ICodec<char[]>
         int[][] bijTokenOffset;
         int[][] bijTokenLimit;
         int[] bijTokenLen;
+
+        final IdentityHashMap<Charset, CharsetDecoder> decoders = new IdentityHashMap<>(4);
+
+        CharsetDecoder getDecoder(Charset cs)
+        {
+            return this.decoders.computeIfAbsent(cs, Charset::newDecoder);
+        }
     }
 
     final static ThreadLocal<DecodingBuffers> DECODING_BUFFERS = ThreadLocal.withInitial(() -> {
@@ -258,9 +267,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     });
 
     @SuppressWarnings("null")
-    static IRecordChange decodeAtomicChange(char[] decodedMessage)
+    static IRecordChange decodeAtomicChange(char[] decodedMessage, DecodingBuffers decodingBuffers)
     {
-        final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
         // use bijectional arrays to track the offset+len of each token
         // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d
         // array
@@ -399,14 +407,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         CharsetEncoder getEncoder(Charset cs)
         {
-            CharsetEncoder encoder = this.encoders.get(cs);
-            if (encoder == null)
-            {
-                encoder = cs.newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(
-                    CodingErrorAction.REPLACE);
-                this.encoders.put(cs, encoder);
-            }
-            return encoder;
+            return this.encoders.computeIfAbsent(cs, Charset::newEncoder);
         }
     }
 
@@ -905,7 +906,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     @Override
     public final IRecordChange getRpcFromRxMessage(char[] decodedMessage)
     {
-        return decodeAtomicChange(decodedMessage);
+        final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
+        return decodeAtomicChange(decodedMessage, decodingBuffers);
     }
 
     @Override
@@ -933,9 +935,16 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     @Override
-    public char[] decode(ByteBuffer data)
+    public char[] decode(ByteBuffer data, CharsetDecoder charsetDecoder)
     {
-        return getCharset().decode(this.sessionSyncProtocol.decode(data)).array();
+        try
+        {
+            return charsetDecoder.decode(this.sessionSyncProtocol.decode(data)).array();
+        }
+        catch (CharacterCodingException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

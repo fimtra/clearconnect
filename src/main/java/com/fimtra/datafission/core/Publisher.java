@@ -16,11 +16,14 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +63,7 @@ import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -91,12 +95,13 @@ public class Publisher
      * This can be useful to improve performance for situations where there is high-throughput of
      * record creates
      */
-    public static boolean log = Boolean.getBoolean("log." + Publisher.class.getCanonicalName());
+    public static boolean log = SystemUtils.getProperty("log." + Publisher.class.getCanonicalName(), false);
 
     /**
      * Controls logging of outbound traffic. Only the first 200 bytes per message are logged.
      */
-    public static boolean logTx = Boolean.getBoolean("logTx." + ProxyContextPublisher.class.getCanonicalName());
+    public static boolean logTx =
+            SystemUtils.getProperty("logTx." + ProxyContextPublisher.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -106,17 +111,27 @@ public class Publisher
      * <ul>
      */
     public static boolean logVerboseSubscribes =
-        Boolean.getBoolean("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName());
-
-    /**
-     * Delimiter for statistics attributes published for each proxy context connection in the
-     * {@link ISystemRecordNames#CONTEXT_STATUS}
-     */
-    public static final String ATTR_DELIM = ",";
+            SystemUtils.getProperty("logVerboseSubscribes." + ProxyContextPublisher.class.getCanonicalName(),
+                    false);
 
     static final AtomicLong MESSAGES_PUBLISHED = new AtomicLong();
     static final AtomicLong BYTES_PUBLISHED = new AtomicLong();
 
+    static final ThreadLocal<Function<Charset, CharsetDecoder>> THREAD_LOCAL_CHARSET_DECODERS =
+            ThreadLocal.withInitial(() -> {
+                ThreadUtils.registerThreadLocalCleanup(Publisher.THREAD_LOCAL_CHARSET_DECODERS::remove);
+
+                return new Function<Charset, CharsetDecoder>()
+                {
+                    final IdentityHashMap<Charset, CharsetDecoder> decoders = new IdentityHashMap<>(4);
+
+                    @Override
+                    public CharsetDecoder apply(Charset cs)
+                    {
+                        return decoders.computeIfAbsent(cs, Charset::newDecoder);
+                    }
+                };
+            });
     /**
      * @return the field name for the transmission statistics for a connection to a single
      *         {@link ProxyContext}
@@ -969,7 +984,9 @@ public class Publisher
                                 }
                                 return;
                             }
-                            final Object decodedMessage = channelsCodec.decode(data);
+                            final CharsetDecoder charsetDecoder =
+                                    THREAD_LOCAL_CHARSET_DECODERS.get().apply(codec.getCharset());
+                            final Object decodedMessage = channelsCodec.decode(data, charsetDecoder);
                             final CommandEnum command = channelsCodec.getCommand(decodedMessage);
                             if (log)
                             {

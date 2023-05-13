@@ -15,6 +15,7 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.datafission.core.StringProtocolCodec.DECODING_BUFFERS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -226,7 +227,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         final StringProtocolCodec codec = new StringProtocolCodec();
         IRecordChange result =
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
-                StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray());
+                StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray(), DECODING_BUFFERS.get());
 
         Map<String, IValue> map1 = new HashMap<String, IValue>();
         map1.put(k1, v3);
