@@ -285,6 +285,7 @@ public class AtomicChangeTest
     @Test
     public void testApplyCompleteAtomicChangeToRecord()
     {
+        this.candidate.setSequence(24);
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
         this.candidate.mergeEntryRemovedChange(K2, V1);
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
@@ -302,6 +303,7 @@ public class AtomicChangeTest
         assertEquals(V1, target.getOrCreateSubMap(SUBMAP_KEY1).get(K1));
         assertNull(target.get(K2));
         assertNull(target.getOrCreateSubMap(SUBMAP_KEY1).get(K2));
+        assertEquals(24, target.getSequence());
     }
     
     @Test
