@@ -85,7 +85,7 @@ public class CoalescingRecordListener implements IRecordListener
      * 
      * @author Ramon Servadei
      */
-    public static interface ICoalescingStrategy
+    public interface ICoalescingStrategy
     {
 
         /**
@@ -93,7 +93,7 @@ public class CoalescingRecordListener implements IRecordListener
          * 
          * @param name
          *            the record name that has had a coalescable event
-         * @param coalescingRecordListener
+         * @param coalescingListener
          *            reference to the coalescing listener that holds pending updates for the record
          */
         void handle(String name, CoalescingRecordListener coalescingListener);
@@ -378,13 +378,7 @@ public class CoalescingRecordListener implements IRecordListener
         final String name = imageCopy.getName();
         synchronized (this.lock)
         {
-            List<IRecordChange> list = this.cachedAtomicChanges.get(name);
-            if (list == null)
-            {
-                list = new ArrayList<>(1);
-                this.cachedAtomicChanges.put(name, list);
-            }
-            list.add(atomicChange);
+            this.cachedAtomicChanges.computeIfAbsent(name, k -> new ArrayList<>(1)).add(atomicChange);
             this.cachePolicy.storeImage(this.cachedImages, name, imageCopy);
         }
         this.strategy.handle(name, this);

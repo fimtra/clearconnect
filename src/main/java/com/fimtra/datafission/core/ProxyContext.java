@@ -74,6 +74,7 @@ import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.Pair;
 import com.fimtra.util.SubscriptionManager;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 
 /**
@@ -124,7 +125,8 @@ public final class ProxyContext implements IObserverContext
      * <li>RPC call responses
      * </ul>
      */
-    public static boolean log = Boolean.getBoolean("log." + ProxyContext.class.getCanonicalName());
+    public static boolean log =
+            SystemUtils.getProperty("log." + ProxyContext.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -132,7 +134,8 @@ public final class ProxyContext implements IObserverContext
      * <li>Inbound messages
      * </ul>
      */
-    public static boolean logRx = Boolean.getBoolean("logRx." + ProxyContext.class.getCanonicalName());
+    public static boolean logRx =
+            SystemUtils.getProperty("logRx." + ProxyContext.class.getCanonicalName(), false);
 
     /**
      * Controls logging of:
@@ -142,7 +145,7 @@ public final class ProxyContext implements IObserverContext
      * <ul>
      */
     public static boolean logVerboseSubscribes =
-        Boolean.getBoolean("logVerboseSubscribes." + ProxyContext.class.getCanonicalName());
+            SystemUtils.getProperty("logVerboseSubscribes." + ProxyContext.class.getCanonicalName(), false);
 
     /**
      * The default reconnect task scheduler used by all {@link ProxyContext} instances for reconnect
@@ -446,7 +449,7 @@ public final class ProxyContext implements IObserverContext
                         }
                         catch (Exception e)
                         {
-                            channel.destroy("Could not intialise session", e);
+                            channel.destroy("Could not initialise session", e);
                         }
                     }
 
@@ -466,7 +469,6 @@ public final class ProxyContext implements IObserverContext
             // there is no alternative - a local flag is not an option - setting it
             // during onChannelConnected is not guaranteed to work as that can happen on
             // a different thread
-            // todo is this pattern still needed?
             if (this.proxyContext.channelToken == this.receiverToken)
             {
                 this.proxyContext.executeSequentialCoreTask(RX_FRAME_HANDLER_POOL.get().initialise(data, source, this));
@@ -1420,7 +1422,6 @@ public final class ProxyContext implements IObserverContext
             }
         }
 
-        // todo free up list after?
         final List<String> recordNames = new ArrayList<>(changeToApply.getPutEntries().keySet());
 
         final String action = changeName.substring(ACK_LEN);

@@ -38,6 +38,7 @@ import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.Log;
 import com.fimtra.util.SerializationUtils;
+import com.fimtra.util.SystemUtils;
 
 /**
  * The standard implementation of an {@link IRpcInstance}
@@ -60,17 +61,16 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     /**
      * Controls verbose logging of RPC responses
      */
-    public static boolean logVerbose = Boolean.getBoolean("logVerbose." + RpcInstance.class.getCanonicalName());
+    public static boolean logVerbose = SystemUtils.getProperty("logVerbose." + RpcInstance.class.getCanonicalName(), false);
 
     private static final Set<String> EXCLUDED_RPC_NAMES = new HashSet<>();
     static
     {
         if (DataFissionProperties.Values.EXCLUDE_RPC_LOGGING != null)
         {
-            final String[] split = DataFissionProperties.Values.EXCLUDE_RPC_LOGGING.split(",");
-            for (int i = 0; i < split.length; i++)
+            for (String s : DataFissionProperties.Values.EXCLUDE_RPC_LOGGING.split(","))
             {
-                EXCLUDED_RPC_NAMES.add(split[i].trim());
+                EXCLUDED_RPC_NAMES.add(s.trim());
             }
         }
         Log.log(RpcInstance.class, "RPCs excluded from logging: ", DataFissionProperties.Values.EXCLUDE_RPC_LOGGING);
