@@ -249,7 +249,9 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     {
                         // only handle service unavailable signals when the registry is connected -
                         // otherwise let the registry re-connection tasks handle this
-                        if (PlatformRegistryAgent.this.registryConnected)
+                        if (PlatformRegistryAgent.this.registryConnected
+                                // but ignore if we are destroying
+                                && !PlatformRegistryAgent.this.destroyCalled.get())
                         {
                             PlatformRegistryAgent.this.agentExecutor.execute(() -> {
                                 final PlatformServiceInstance serviceInstance =

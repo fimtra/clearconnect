@@ -110,7 +110,7 @@ public final class ShadowRegistry
         this.primaryRegistryEndPoint = primaryRegistryEndPoint;
         this.shadowRegistryEndPoint = shadowRegistryEndPoint;
 
-        this.startStopService = ThreadUtils.newSingleThreadExecutorService("start-stop-service");
+        this.startStopService = ThreadUtils.newSingleThreadExecutorService("shadow-registry-start-stop-service");
 
         startShadowRegistry();
 

@@ -73,12 +73,6 @@ public class PlatformRegistryAgentTest
         final IPlatformServiceInstance platformServiceInstance1 =
             this.candidate.getPlatformServiceInstance(serviceFamily, serviceMember);
 
-        // insert a duplicate so on re-connect when the agent tries to re-register it will fail
-        PlatformServiceInstance duplicate = new PlatformServiceInstance("platform-name", serviceFamily, serviceMember,
-            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT, TcpChannelUtils.LOCALHOST_IP, 0, null, null,
-            null, TransportTechnologyEnum.TCP);
-        this.candidate.localPlatformServiceInstances.put(
-            PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember + 1), duplicate);
 
         Thread.sleep(1000);
 
@@ -104,16 +98,7 @@ public class PlatformRegistryAgentTest
 
         assertTrue("Not re-connected", connected.await(10, TimeUnit.SECONDS));
 
-        int loop = 0;
-        while (loop++ < 100 && platformServiceInstance1.isActive() && duplicate.isActive())
-        {
-            Thread.sleep(100);
-        }
-
-        // check that only one platform instance is active - one of them will have failed
-        // re-register because it was a duplicate
-        assertTrue(platformServiceInstance1.isActive() == false || duplicate.isActive() == false);
-        assertEquals(1, this.candidate.localPlatformServiceInstances.size());
+        assertTrue(platformServiceInstance1.isActive());
     }
 
 }

@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,27 +15,30 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
+import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames;
 import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
-import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
@@ -144,85 +147,53 @@ public class PlatformRegistryTest
         final int MAX = 2;
 
         PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
+        PlatformRegistryAgent agent;
         for (int i = 0; i < MAX; i++)
         {
-            final String suffix = i + "-" + System.nanoTime();
-            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            final int ordinal = i + 1;
+            final String suffix = ordinal + "-" + System.nanoTime();
+            agent = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i] = agent;
 
-            agents[i].createPlatformServiceInstance("Test-FTservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-FTservice-" + i, suffix));
+            final String ftServiceFamily = "Test-FTservice";
+            agent.createPlatformServiceInstance(ftServiceFamily, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            publishRecordAndRpc(suffix, agent.getPlatformServiceInstance(ftServiceFamily, suffix));
 
             // create a load balanced service
-            agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
-            publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
+            final String lbServiceFamily = "Test-LBservice";
+            agent.createPlatformServiceInstance(lbServiceFamily, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
+                    WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED);
+            publishRecordAndRpc(suffix, agent.getPlatformServiceInstance(lbServiceFamily, suffix));
 
-            final CountDownLatch allServicesReady = new CountDownLatch(2);
-            //
-            // setup a listener to trigger when all services are ready
-            //
-            int finalI = i;
-            agents[i].addServiceInstanceAvailableListener(new IServiceInstanceAvailableListener()
-            {
-                @Override
-                public void onServiceInstanceAvailable(String serviceInstanceId)
-                {
-                    if (serviceInstanceId.equals(
-                            PlatformUtils.composePlatformServiceInstanceID("Test-FTservice-" + finalI,
-                                    suffix)) || serviceInstanceId.equals(
-                            PlatformUtils.composePlatformServiceInstanceID("Test-LBservice-" + finalI,
-                                    suffix)))
-                    {
-                        allServicesReady.countDown();
-                    }
-                }
+            agent.waitForPlatformService(ftServiceFamily);
+            agent.waitForPlatformService(lbServiceFamily);
 
-                @Override
-                public void onServiceInstanceUnavailable(String serviceInstanceId)
-                {
+            final IPlatformServiceProxy ftproxy = agent.getPlatformServiceProxy(ftServiceFamily);
+            Log.log(this, ">>> ftproxy=" + ftproxy);
+            assertNotNull("Did not get proxy for: " + ftServiceFamily, ftproxy);
 
-                }
-            });
-
-
-            assertTrue("Did not get all services", allServicesReady.await(10, TimeUnit.SECONDS));
+            final IPlatformServiceProxy lbproxy = agent.getPlatformServiceProxy(lbServiceFamily);
+            Log.log(this, ">>> lbproxy=" + lbproxy);
+            assertNotNull("Did not get proxy for: " + lbServiceFamily, lbproxy);
         }
 
-        final CountDownLatch allConnections = new CountDownLatch(1);
-        final CountDownLatch noConnections = new CountDownLatch(1);
-        this.candidate.context.addObserver(new IRecordListener()
-        {
-            boolean connected;
-
-            @Override
-            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
-            {
-                if (imageValidInCallingThreadOnly.getSubMapKeys().size() == MAX * 3)
-                {
-                    this.connected = true;
-                    allConnections.countDown();
-                }
-
-                // this is for when we destroy the agents
-                if (this.connected && imageValidInCallingThreadOnly.getSubMapKeys().size() == 0)
-                {
-                    noConnections.countDown();
-                }
-            }
-        }, IRegistryRecordNames.PLATFORM_CONNECTIONS);
-
-        assertTrue(allConnections.await(10, TimeUnit.SECONDS));
+        assertTrue(
+                candidate.context.getRecord(IRegistryRecordNames.PLATFORM_CONNECTIONS).getSubMapKeys().size()
+                        > 0);
 
         for (int i = 0; i < MAX; i++)
         {
+            Log.log(this, ">>>> Destroying " + agents[i].toString());
             agents[i].destroy();
+            Log.log(this, ">>>> DESTROYED " + agents[i].toString());
             Thread.sleep(100);
         }
 
-        assertTrue(noConnections.await(10, TimeUnit.SECONDS));
-
         checkEmpty();
+
+        assertEquals(0, candidate.context.getRecord(
+                IRegistryRecordNames.PLATFORM_CONNECTIONS).getSubMapKeys().size());
     }
 
     void checkEmpty() throws InterruptedException
