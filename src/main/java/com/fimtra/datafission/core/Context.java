@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
@@ -59,6 +60,7 @@ import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
+import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
@@ -94,7 +96,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * <li>notify initial image
      * </ul>
      */
-    public static boolean log = Boolean.getBoolean("log." + Context.class.getCanonicalName());
+    public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
 
     static final String GET_REMOTE_RECORD_RPC = "getRemoteRecord";
 
@@ -108,17 +110,19 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     deadlocks -> {
                         StringBuilder sb = new StringBuilder();
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                        for (int i = 0; i < deadlocks.length; i++)
+                        for (ThreadInfoWrapper deadlock : deadlocks)
                         {
-                            sb.append(deadlocks[i].toString());
+                            sb.append(deadlock.toString());
                         }
                         System.err.println(sb);
                     }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
 
+        // resolves ClassNotFoundException on shutdown
+        final DeadlockDetector deadlockDetector = new DeadlockDetector();
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Log.log(Context.class, "JVM shutting down...");
-            final DeadlockDetector deadlockDetector = new DeadlockDetector();
             final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
             final File threadDumpOnShutdownFile =
                 FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
@@ -127,16 +131,16 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 try (PrintWriter pw = new PrintWriter(threadDumpOnShutdownFile))
                 {
-                    for (int i = 0; i < threads.length; i++)
+                    for (ThreadInfoWrapper thread : threads)
                     {
-                        pw.print(threads[i].toString());
+                        pw.print(thread.toString());
                         pw.flush();
                     }
                     Log.log(Context.class, "Thread dump successful: ", threadDumpOnShutdownFile.toString());
                 }
                 catch (Exception e)
                 {
-                    Log.log(Context.class, "Could not produce threaddump file on exit", e);
+                    Log.log(Context.class, "Could not produce thread dump file on exit", e);
                 }
             }
         }, "datafission-shutdown"));
@@ -304,7 +308,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final IContextExecutor rpcExecutor;
     final IContextExecutor coreExecutor;
     final IContextExecutor systemExecutor;
-    final ScheduledExecutorService utilityExecutor;
+    final LazyObject<ScheduledExecutorService> utilityExecutor;
+    final ScheduledExecutorService sharedUtilityExecutor;
     final Object recordCreateLock;
     final IAtomicChangeManager noopChangeManager;
     /**
@@ -359,7 +364,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
         this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
-        this.utilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
+        this.sharedUtilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
+        this.utilityExecutor =
+                new LazyObject<>(() -> ThreadUtils.newScheduledExecutorService(name + "-utility", 1),
+                        ExecutorService::shutdown);
         this.recordCreateLock = new Object();
         this.recordObservers = new SubscriptionManager<>(IRecordListener.class);
         this.recordsToRemoveFromSystemRecords = new HashSet<>();
@@ -437,10 +445,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         try
         {
-            if (ContextUtils.UTILITY_SCHEDULER != this.utilityExecutor)
+            if (ContextUtils.UTILITY_SCHEDULER != this.sharedUtilityExecutor)
             {
-                this.utilityExecutor.shutdown();
+                this.sharedUtilityExecutor.shutdown();
             }
+            this.utilityExecutor.destroy();
             if (ContextUtils.CORE_EXECUTOR != this.coreExecutor)
             {
                 this.coreExecutor.destroy();
@@ -1143,10 +1152,18 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return this.rpcInstances.get(name);
     }
 
+    /**
+     * Used by internal framework components for utility operations
+     */
+    public ScheduledExecutorService getSharedUtilityExecutor()
+    {
+        return this.sharedUtilityExecutor;
+    }
+
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {
-        return this.utilityExecutor;
+        return this.utilityExecutor.get();
     }
 
     @Override
@@ -1357,7 +1374,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     // don't notify - let the initial image task do this
                     // as it will pass in a full image as the atomic change
                     // (thus simulating the initial image)
-                    continue;
                 }
                 else
                 {

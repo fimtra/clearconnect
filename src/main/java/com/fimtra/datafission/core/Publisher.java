@@ -21,6 +21,7 @@ import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -34,9 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
 import com.fimtra.channel.EndPointAddress;
@@ -150,22 +149,6 @@ public class Publisher
     }
 
     /**
-     * A single-threaded executor that is used exclusively for coalescing and publishing system
-     * record updates.
-     * 
-     * @see ISystemRecordNames
-     */
-    static final ScheduledExecutorService SYSTEM_RECORD_PUBLISHER =
-        ThreadUtils.newPermanentScheduledExecutorService("system-record-publisher", 1);
-
-    /**
-     * Single-thread executor for handling inbound subscriptions to throttle handling. This prevents
-     * flooding the network with images from a batch subscribe.
-     */
-    static final ScheduledExecutorService SUBSCRIBE_THROTTLE =
-        ThreadUtils.newPermanentScheduledExecutorService("subscribe-throttle", 1);
-
-    /**
      * Marks a runnable as a subscribe task and thus a pause is made by the subscribe throttle after
      * sending
      * 
@@ -217,7 +200,8 @@ public class Publisher
             for (String systemRecord : ContextUtils.SYSTEM_RECORDS)
             {
                 this.systemRecordSequences.put(systemRecord, new AtomicLong());
-                this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(SYSTEM_RECORD_PUBLISHER,
+                this.systemRecordPublishers.put(systemRecord, new CoalescingRecordListener(
+                        getSystemRecordPublisherExecutor(),
                     DataFissionProperties.Values.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS,
                         (imageValidInCallingThreadOnly, atomicChange) -> {
                             final AtomicLong currentSequence =
@@ -441,7 +425,7 @@ public class Publisher
                 final AtomicChange change = new AtomicChange(record);
                 if (isSystemRecordUpdateCoalesced(record.getName()))
                 {
-                    SYSTEM_RECORD_PUBLISHER.execute(() -> {
+                    getSystemRecordPublisherExecutor().execute(() -> {
                         // NOTE: sequences increment-then-get, hence
                         // to send the previous image, we need to
                         // subtract 1
@@ -479,7 +463,7 @@ public class Publisher
      * {@link ProxyContext}.
      * <p>
      * A scheduled task runs periodically to update the publishing statistics of this.
-     * 
+     *
      * @author Ramon Servadei
      */
     private final class ProxyContextPublisher implements ITransportChannel
@@ -545,7 +529,7 @@ public class Publisher
             {
                 this.statsUpdateTask.cancel(false);
             }
-            this.statsUpdateTask = Publisher.this.context.getUtilityExecutor().schedule(new Runnable()
+            this.statsUpdateTask = getSharedUtilityExecutor().schedule(new Runnable()
             {
                 long lastMessagesPublished = 0;
                 long lastBytesPublished = 0;
@@ -618,7 +602,7 @@ public class Publisher
                     if (ProxyContextPublisher.this.active)
                     {
                         ProxyContextPublisher.this.statsUpdateTask =
-                            Publisher.this.context.getUtilityExecutor().schedule(this,
+                            getSharedUtilityExecutor().schedule(this,
                                 getContextConnectionsRecordPublishPeriodMillis() / 2, TimeUnit.MILLISECONDS);
                     }
                 }
@@ -838,9 +822,7 @@ public class Publisher
     long messagesPublished;
     long bytesPublished;
 
-    final List<Runnable> subscribeTasks;
-    final Runnable throttleTask;
-    final AtomicBoolean throttleRunning;
+    final Deque<Runnable> resyncTasks;
 
     /**
      * Constructs the publisher and creates an {@link IEndPointService} to accept connections from
@@ -888,36 +870,7 @@ public class Publisher
         this.proxyContextPublishers = new ConcurrentHashMap<>();
         this.connectionsRecord = Context.getRecordInternal(this.context, ISystemRecordNames.CONTEXT_CONNECTIONS);
 
-        this.throttleRunning = new AtomicBoolean(false);
-
-        this.subscribeTasks = new LinkedList<>();
-        this.throttleTask = () -> {
-            this.throttleRunning.set(false);
-
-            Runnable task = null;
-            int size;
-            do
-            {
-                synchronized (this.subscribeTasks)
-                {
-                    size = this.subscribeTasks.size();
-                    if (size > 0)
-                    {
-                        task = this.subscribeTasks.remove(0);
-                    }
-                    size--;
-                }
-                if (task != null)
-                {
-                    task.run();
-                }
-                if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
-                {
-                    LockSupport.parkNanos(DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS * 1000);
-                }
-            }
-            while (size > 0);
-        };
+        this.resyncTasks = new LinkedList<>();
 
         this.mainCodec = codec;
         this.server = transportTechnology.constructEndPointServiceBuilder(this.mainCodec.getFrameEncodingFormat(),
@@ -1095,7 +1048,7 @@ public class Publisher
             this.contextConnectionsRecordPublishTask.cancel(false);
         }
         this.contextConnectionsRecordPublishTask =
-            this.context.getUtilityExecutor().scheduleWithFixedDelay(new Runnable()
+            getSharedUtilityExecutor().scheduleWithFixedDelay(new Runnable()
             {
                 CountDownLatch publishAtomicChange = new CountDownLatch(0);
 
@@ -1198,14 +1151,14 @@ public class Publisher
             (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : Integer.toString(recordNames.size())));
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
 
-        synchronized (this.subscribeTasks)
+        synchronized (this.resyncTasks)
         {
             for (final String name : recordNames)
             {
-                this.subscribeTasks.add((ISubscribeTask) () -> proxyContextPublisher.resync(name));
+                this.resyncTasks.add((ISubscribeTask) () -> proxyContextPublisher.resync(name));
             }
         }
-        triggerThrottle();
+        executeResync();
     }
 
     void subscribe(final List<String> recordNames, final ITransportChannel client)
@@ -1339,11 +1292,37 @@ public class Publisher
         return this.transportTechnology;
     }
 
-    private void triggerThrottle()
+    private void executeResync()
     {
-        if (!this.throttleRunning.getAndSet(true))
+        getSharedUtilityExecutor().execute(this::doResync);
+    }
+
+    private void doResync()
+    {
+        final Runnable task;
+        synchronized (this.resyncTasks)
         {
-            SUBSCRIBE_THROTTLE.execute(this.throttleTask);
+            task = this.resyncTasks.poll();
+        }
+        if (task != null)
+        {
+            try
+            {
+                task.run();
+            }
+            catch (Exception e)
+            {
+                Log.log(this, "Could not run resync " + ObjectUtils.safeToString(task), e);
+            }
+            if (task instanceof ISubscribeTask && DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS > 0)
+            {
+                getSharedUtilityExecutor().schedule(this::doResync,
+                        DataFissionProperties.Values.SUBSCRIBE_DELAY_MICROS, TimeUnit.MICROSECONDS);
+            }
+            else
+            {
+                executeResync();
+            }
         }
     }
 
@@ -1369,5 +1348,15 @@ public class Publisher
             this.bytesPublished += bytesPublished;
             BYTES_PUBLISHED.addAndGet(bytesPublished);
         }
+    }
+
+    private ScheduledExecutorService getSharedUtilityExecutor()
+    {
+        return this.context.getSharedUtilityExecutor();
+    }
+
+    private ScheduledExecutorService getSystemRecordPublisherExecutor()
+    {
+        return this.context.getSharedUtilityExecutor();
     }
 }

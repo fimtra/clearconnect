@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -47,13 +48,11 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
-import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
-import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
@@ -85,7 +84,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
      * 
      * @author Ramon Servadei
      */
-    static interface IServiceStatsRecordFields
+    interface IServiceStatsRecordFields
     {
         String SUBSCRIPTION_COUNT = "Subscriptions";
         String MESSAGE_COUNT = "Msgs published";
@@ -119,6 +118,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     final IRecord stats;
     final EndPointAddress endPointAddress;
     final ScheduledFuture<?> statsUpdateTask;
+    final Executor ftActionsExecutor;
 
     @SuppressWarnings({ "unchecked" })
     PlatformServiceInstance(String platformName, String serviceFamily, String serviceMember,
@@ -146,13 +146,28 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             new Context(PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember), coreExecutor,
                 rpcExecutor, utilityExecutor);
 
+        this.ftActionsExecutor = r -> context.executeSequentialCoreTask(new ISequentialRunnable()
+        {
+            @Override
+            public Object context()
+            {
+                return this;
+            }
+
+            @Override
+            public void run()
+            {
+                r.run();
+            }
+        });
+
         this.publisher = new Publisher(this.context, this.wireProtocol.getCodec(), host, port, transportTechnology);
 
         this.stats = this.context.getOrCreateRecord(SERVICE_STATS_RECORD_NAME);
         this.stats.put(IServiceStatsRecordFields.VERSION, TextValue.valueOf(PlatformUtils.VERSION));
 
         // update service stats periodically
-        this.statsUpdateTask = this.context.getUtilityExecutor().scheduleWithFixedDelay(
+        this.statsUpdateTask = getSharedUtilityExecutor().scheduleWithFixedDelay(
             new Runnable()
         {
             long lastMessagesPublished = 0;
@@ -225,15 +240,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
         if (redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
-            {
-                @Override
-                public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
-                {
-                    setFtState(Boolean.valueOf(args[0].textValue()));
-                    return PlatformUtils.OK;
-                }
-
+            RpcInstance rpc = new RpcInstance(args -> {
+                setFtState(Boolean.valueOf(args[0].textValue()));
+                return PlatformUtils.OK;
             }, TypeEnum.TEXT, RPC_FT_SERVICE_STATUS, TypeEnum.TEXT);
             this.context.createRpc(rpc);
         }
@@ -482,21 +491,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.redundancyMode;
     }
 
-    boolean addValidator(IValidator validator)
-    {
-        return this.context.addValidator(validator);
-    }
-
-    void updateValidator(IValidator validator)
-    {
-        this.context.updateValidator(validator);
-    }
-
-    boolean removeValidator(IValidator validator)
-    {
-        return this.context.removeValidator(validator);
-    }
-
     @Override
     public Map<String, SubscriptionInfo> getAllSubscriptions()
     {
@@ -506,24 +500,17 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void addFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(new Runnable()
-        {
-            @Override
-            public void run()
+        getFtActionsExecutor().execute(() -> {
+            this.ftStatusListeners.add(ftStatusListener);
+            if (this.isFtMasterInstance != null)
             {
-                PlatformServiceInstance.this.ftStatusListeners.add(ftStatusListener);
-                if (PlatformServiceInstance.this.isFtMasterInstance != null)
+                if (this.isFtMasterInstance)
                 {
-                    if (PlatformServiceInstance.this.isFtMasterInstance.booleanValue())
-                    {
-                        ftStatusListener.onActive(PlatformServiceInstance.this.serviceFamily,
-                            PlatformServiceInstance.this.serviceMember);
-                    }
-                    else
-                    {
-                        ftStatusListener.onStandby(PlatformServiceInstance.this.serviceFamily,
-                            PlatformServiceInstance.this.serviceMember);
-                    }
+                    ftStatusListener.onActive(this.serviceFamily, this.serviceMember);
+                }
+                else
+                {
+                    ftStatusListener.onStandby(this.serviceFamily, this.serviceMember);
                 }
             }
         });
@@ -532,14 +519,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     @Override
     public void removeFtStatusListener(final IFtStatusListener ftStatusListener)
     {
-        this.context.getUtilityExecutor().execute(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                PlatformServiceInstance.this.ftStatusListeners.remove(ftStatusListener);
-            }
-        });
+        getFtActionsExecutor().execute(() -> this.ftStatusListeners.remove(ftStatusListener));
     }
 
     @Override
@@ -555,38 +535,15 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.context.getUtilityExecutor();
     }
 
-    void updateServiceStats()
-    {
-        IRecord subscriptions = this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-
-        int subscriptionCount = 0;
-        for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
-        {
-            subscriptionCount += it.next().getValue().longValue();
-        }
-
-        this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT, subscriptionCount);
-        this.stats.put(IServiceStatsRecordFields.UPTIME, (System.currentTimeMillis() - this.startTimeMillis) / 1000);
-        this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT, this.publisher.getMessagesPublished());
-        this.stats.put(IServiceStatsRecordFields.KB_COUNT, LongValue.valueOf(this.publisher.getBytesPublished() / 1024));
-
-        this.context.publishAtomicChange(this.stats);
-    }
-
     @Override
     public void setPermissionFilter(final IPermissionFilter filter)
     {
-        this.context.setPermissionFilter(new IPermissionFilter()
-        {
-            @Override
-            public boolean accept(String permissionToken, String recordName)
+        this.context.setPermissionFilter((permissionToken, recordName) -> {
+            if (SERVICE_STATS_RECORD_NAME.equals(recordName))
             {
-                if (SERVICE_STATS_RECORD_NAME.equals(recordName))
-                {
-                    return true;
-                }
-                return filter.accept(permissionToken, recordName);
+                return true;
             }
+            return filter.accept(permissionToken, recordName);
         });
     }
 
@@ -600,14 +557,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
         {
-            this.context.getUtilityExecutor().execute(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    doSetFtState(isMaster);
-                }
-            });
+            getFtActionsExecutor().execute(() -> doSetFtState(isMaster));
         }
     }
 
@@ -654,5 +604,16 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 }
             }
         }
+    }
+
+    private ScheduledExecutorService getSharedUtilityExecutor()
+    {
+        return this.context.getSharedUtilityExecutor();
+    }
+
+    private Executor getFtActionsExecutor()
+    {
+        // execute in-order using the core executors
+        return this.ftActionsExecutor;
     }
 }
