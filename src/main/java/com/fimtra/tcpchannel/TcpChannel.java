@@ -825,9 +825,13 @@ public class TcpChannel implements ITransportChannel
                 this.txFrames[this.sendingQueue].clear();
                 this.rxByteBuffer.clear();
 
-                synchronized (this.sendChannelChain)
+                // finalizer sometimes sees this as null - its not clear why/how this can happen
+                if (this.sendChannelChain != null)
                 {
-                    unlinkChannel_callWithChainLock(this);
+                    synchronized (this.sendChannelChain)
+                    {
+                        unlinkChannel_callWithChainLock(this);
+                    }
                 }
             }
 

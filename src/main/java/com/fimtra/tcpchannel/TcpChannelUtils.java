@@ -153,7 +153,11 @@ public abstract class TcpChannelUtils
 
     static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)
     {
-        countsPerSelector.get(currentSelector).decrementAndGet();
+        final AtomicInteger count = countsPerSelector.get(currentSelector);
+        if (count != null)
+        {
+            count.decrementAndGet();
+        }
     }
 
     static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,
