@@ -481,9 +481,6 @@ public class Publisher
          */
         final ICodec codec;
         ScheduledFuture statsUpdateTask;
-        final Object statsLock = new Object();
-        long messagesPublished;
-        long bytesPublished;
         String identity;
         volatile boolean active;
         boolean codecSyncExpected;
@@ -556,13 +553,8 @@ public class Publisher
                     }
 
                     final long nanoTime = System.nanoTime();
-                    final long l_messagesPublished;
-                    final long l_bytesPublished;
-                    synchronized (ProxyContextPublisher.this.statsLock)
-                    {
-                        l_messagesPublished = ProxyContextPublisher.this.messagesPublished;
-                        l_bytesPublished = ProxyContextPublisher.this.bytesPublished;
-                    }
+                    final long l_messagesPublished = getMessagesPublished();
+                    final long l_bytesPublished = getBytesPublished();
 
                     final long intervalMessagesPublished = l_messagesPublished - this.lastMessagesPublished;
                     final long intervalBytesPublished = l_bytesPublished - this.lastBytesPublished;
@@ -614,12 +606,6 @@ public class Publisher
             if (pointToPoint)
             {
                 send(txMessage);
-            }
-
-            synchronized (this.statsLock)
-            {
-                this.bytesPublished += txMessage.length;
-                this.messagesPublished++;
             }
 
             // peek at the size before attempting the synchronize block
@@ -807,6 +793,18 @@ public class Publisher
         public int getTxQueueSize()
         {
             return this.channel.getTxQueueSize();
+        }
+
+        @Override
+        public long getMessagesPublished()
+        {
+            return this.channel.getMessagesPublished();
+        }
+
+        @Override
+        public long getBytesPublished()
+        {
+            return this.channel.getBytesPublished();
         }
     }
 

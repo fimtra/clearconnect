@@ -275,6 +275,9 @@ public class TcpChannel implements ITransportChannel
     final SendChannelChain sendChannelChain;
     final QueueThresholdMonitor sendQueueMonitor;
 
+    long messagesPublished;
+    long bytesPublished;
+
     /**
      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
      * format.
@@ -878,6 +881,18 @@ public class TcpChannel implements ITransportChannel
     {
         return this.txFrames[0].size() + this.txFrames[1].size();
     }
+
+    @Override
+    public long getMessagesPublished()
+    {
+        return this.messagesPublished;
+    }
+
+    @Override
+    public long getBytesPublished()
+    {
+        return this.bytesPublished;
+    }
 }
 
 /**
@@ -978,7 +993,10 @@ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
         {
             this.writeInProgress = false;
             this.txBuffer.compact();
+            tcpChannel.messagesPublished++;
         }
+
+        tcpChannel.bytesPublished += bytesWritten;
 
         time = System.nanoTime() - time;
         if (time > SLOW_TX_FRAME_THRESHOLD_NANOS)
