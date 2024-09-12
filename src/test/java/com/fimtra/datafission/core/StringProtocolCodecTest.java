@@ -18,9 +18,15 @@ package com.fimtra.datafission.core;
 import static com.fimtra.datafission.core.StringProtocolCodec.DECODING_BUFFERS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -70,6 +76,17 @@ public class StringProtocolCodecTest extends CodecBaseTest
         final char[] cs = new char[2];
         cs[0] = StringProtocolCodec.CHAR_ESCAPE;
         return cs;
+    }
+
+    @Test
+    public void testUnmappedChars() throws CharacterCodingException
+    {
+        final String stringWithUnmapped =
+                "bad number:" + new DecimalFormat("0.0#######").format(Double.NaN) + " something";
+        final Charset defaultCharset = Charset.defaultCharset();
+        StringProtocolCodec.ENCODING_BUFFERS.get().getEncoder(
+                defaultCharset == StandardCharsets.UTF_8 ? StandardCharsets.ISO_8859_1 :
+                        StandardCharsets.UTF_8).encode(CharBuffer.wrap(stringWithUnmapped));
     }
 
     @Test

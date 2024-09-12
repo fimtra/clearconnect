@@ -112,7 +112,7 @@ public class StringProtocolCodec implements ICodec<char[]>
      * the ASCII code for NULL=0x0 causes problems.
      */
     static final char NULL_CHAR = 0x2;
-    static final String NULL_VALUE = new String(new char[] { NULL_CHAR });
+    static final String NULL_VALUE = String.valueOf(NULL_CHAR);
     static final int DOUBLE_KEY_PREAMBLE_LENGTH = 2;
 
     final ISessionProtocol sessionSyncProtocol;
@@ -351,36 +351,38 @@ public class StringProtocolCodec implements ICodec<char[]>
                             }
                             for (j = position; j < len; j++)
                             {
-                                switch(decodedMessage[j])
+                                if (decodedMessage[j] == CHAR_KEY_VALUE_SEPARATOR)
                                 {
-                                    case CHAR_KEY_VALUE_SEPARATOR:
-                                        // find where the first non-escaped "=" is
-                                        if (previous != CHAR_ESCAPE)
+                                    // find where the first non-escaped "=" is
+                                    if (previous != CHAR_ESCAPE)
+                                    {
+                                        if (put)
                                         {
-                                            if (put)
-                                            {
-                                                target.addEntry_onlyCallFromCodec(
+                                            target.addEntry_onlyCallFromCodec(
                                                     decodeKey(decodedMessage, position, j, true,
-                                                        decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
-                                            }
-                                            else
-                                            {
-                                                target.removeEntry_onlyCallFromCodec(
-                                                    decodeKey(decodedMessage, position, j, true,
-                                                        decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len, decodingBuffers.tempArr));
-                                            }
-                                            j = decodedMessage.length;
+                                                            decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len,
+                                                            decodingBuffers.tempArr));
                                         }
-                                        break;
-                                    default :
-                                        previous = decodedMessage[j];
+                                        else
+                                        {
+                                            target.removeEntry_onlyCallFromCodec(
+                                                    decodeKey(decodedMessage, position, j, true,
+                                                            decodingBuffers.tempArr),
+                                                    decodeValue(decodedMessage, j + 1, len,
+                                                            decodingBuffers.tempArr));
+                                        }
+                                        j = decodedMessage.length;
+                                    }
+                                }
+                                else
+                                {
+                                    previous = decodedMessage[j];
                                 }
                             }
                             // remove any keys that are in put and removed - leave in removed
                             if (target.putEntries != null && target.removedEntries != null
-                                && target.removedEntries.size() > 0)
+                                && !target.removedEntries.isEmpty())
                             {
                                 target.putEntries.keySet().removeAll(target.removedEntries.keySet());
                             }
@@ -407,7 +409,9 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         CharsetEncoder getEncoder(Charset cs)
         {
-            return this.encoders.computeIfAbsent(cs, Charset::newEncoder);
+            return this.encoders.computeIfAbsent(cs,
+                    c -> c.newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(
+                            CodingErrorAction.REPLACE));
         }
     }
 
@@ -465,7 +469,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
         addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
         IRecordChange subMapAtomicChange;
-        if (subMapKeys.size() > 0)
+        if (!subMapKeys.isEmpty())
         {
             for (String subMapKey : subMapKeys)
             {
@@ -502,7 +506,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         final StringAppender txString, final CharArrayReference chars, final char[] escapedChars,
         final CharArrayReference keyChars)
     {
-        if (entries != null && entries.size() > 0)
+        if (entries != null && !entries.isEmpty())
         {
             String key;
             IValue value;
@@ -686,37 +690,37 @@ public class StringProtocolCodec implements ICodec<char[]>
         int unescapedPtr = 0;
         for (int i = start; i < end; i++)
         {
-            switch(chars[i])
+            if (chars[i] == CHAR_ESCAPE)
             {
-                case CHAR_ESCAPE:
-                    i++;
-                    if (i < chars.length)
+                i++;
+                if (i < chars.length)
+                {
+                    switch(chars[i])
                     {
-                        switch(chars[i])
-                        {
-                            case CHAR_r:
-                                dest[unescapedPtr++] = CR;
-                                break;
-                            case CHAR_n:
-                                dest[unescapedPtr++] = LF;
-                                break;
-                            case CHAR_ESCAPE:
-                                dest[unescapedPtr++] = CHAR_ESCAPE;
-                                break;
-                            case CHAR_TOKEN_DELIM:
-                                dest[unescapedPtr++] = CHAR_TOKEN_DELIM;
-                                break;
-                            case CHAR_KEY_VALUE_SEPARATOR:
-                                dest[unescapedPtr++] = CHAR_KEY_VALUE_SEPARATOR;
-                                break;
-                            case CHAR_SYMBOL_PREFIX:
-                                dest[unescapedPtr++] = CHAR_SYMBOL_PREFIX;
-                                break;
-                        }
+                        case CHAR_r:
+                            dest[unescapedPtr++] = CR;
+                            break;
+                        case CHAR_n:
+                            dest[unescapedPtr++] = LF;
+                            break;
+                        case CHAR_ESCAPE:
+                            dest[unescapedPtr++] = CHAR_ESCAPE;
+                            break;
+                        case CHAR_TOKEN_DELIM:
+                            dest[unescapedPtr++] = CHAR_TOKEN_DELIM;
+                            break;
+                        case CHAR_KEY_VALUE_SEPARATOR:
+                            dest[unescapedPtr++] = CHAR_KEY_VALUE_SEPARATOR;
+                            break;
+                        case CHAR_SYMBOL_PREFIX:
+                            dest[unescapedPtr++] = CHAR_SYMBOL_PREFIX;
+                            break;
                     }
-                    break;
-                default :
-                    dest[unescapedPtr++] = chars[i];
+                }
+            }
+            else
+            {
+                dest[unescapedPtr++] = chars[i];
             }
         }
         return unescapedPtr;
@@ -763,7 +767,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
         {
-            return AbstractValue.constructFromCharValue(null, 0);
+            return null;
         }
 
         return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
