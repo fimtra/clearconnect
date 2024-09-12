@@ -185,10 +185,10 @@ public final class ChannelWatchdog implements Runnable
                     {
                         // now check for missed heartbeat
                         Integer missedCount = this.channelsMissingHeartbeat.get(channel);
-                        if (missedCount != null && missedCount.intValue() >= this.missedHeartbeatCount)
+                        if (missedCount != null && missedCount >= this.missedHeartbeatCount)
                         {
                             channel.destroy(
-                                "Missed " + missedCount.intValue() + "/" + this.missedHeartbeatCount + " heartbeats");
+                                "Missed " + missedCount + "/" + this.missedHeartbeatCount + " heartbeats");
                             stopMonitoring(channel);
                         }
 
@@ -198,13 +198,13 @@ public final class ChannelWatchdog implements Runnable
                             Integer count = missedCount;
                             if (count == null)
                             {
-                                count = Integer.valueOf(1);
+                                count = 1;
                             }
                             else
                             {
-                                count = Integer.valueOf(count.intValue() + 1);
+                                count = count + 1;
                             }
-                            if (count.intValue() > 1)
+                            if (count > 1)
                             {
                                 Log.log(this, "Missed heartbeat ", count.toString(), "/",
                                     Integer.toString(this.missedHeartbeatCount), " from ",
@@ -249,7 +249,7 @@ public final class ChannelWatchdog implements Runnable
     {
         final long timeIn = System.nanoTime();
         // grab the previous time now, excludes latency in the executor 
-        final Long previous = this.channelsHeartbeatArrivalTime.put(channel, Long.valueOf(timeIn));
+        final Long previous = this.channelsHeartbeatArrivalTime.put(channel, timeIn);
 
         this.executor.execute(() -> {
             if (!this.channels.contains(channel))
@@ -258,10 +258,12 @@ public final class ChannelWatchdog implements Runnable
             }
             else if (previous != null)
             {
-                final long hbDelta = (long) ((timeIn - previous.longValue()) * 0.000001d);
+                final long hbDelta = (long) ((timeIn - previous) * 0.000001d);
                 if (hbDelta > this.lateHeartbeatLimit)
                 {
-                    Log.log(ChannelWatchdog.this, "LATE heartbeat ", Long.toString(hbDelta), "ms from ",
+                    // hbDelta = <hb period> + <delay>
+                    Log.log(ChannelWatchdog.this, "LATE heartbeat ",
+                            Long.toString(hbDelta - heartbeatPeriodMillis), "ms from ",
                         ObjectUtils.safeToString(channel));
                 }
 
@@ -276,7 +278,7 @@ public final class ChannelWatchdog implements Runnable
         final Integer removed = ChannelWatchdog.this.channelsMissingHeartbeat.remove(channel);
         if (removed != null)
         {
-            if (removed.intValue() > 1)
+            if (removed > 1)
             {
                 Log.log(this, "Heartbeat recovered for ", ObjectUtils.safeToString(channel));
             }
@@ -294,7 +296,7 @@ public final class ChannelWatchdog implements Runnable
         final List<Pair<Integer, String>> stats = new ArrayList<>(localChannelsRef.size());
         for (ITransportChannel channel : localChannelsRef)
         {
-            stats.add(new Pair<>(Integer.valueOf(channel.getTxQueueSize()), channel.getDescription()));
+            stats.add(new Pair<>(channel.getTxQueueSize(), channel.getDescription()));
         }
         return stats;
     }
