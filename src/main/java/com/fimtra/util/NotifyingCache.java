@@ -159,7 +159,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
         final Object runnerLock = new Object();
         this.notifyingTasksRunner = () -> {
-            if (this.notifyTasks.size() > 0)
+            if (!this.notifyTasks.isEmpty())
             {
                 // lock to ensure only 1 task runs at any time
                 // (ensures ordering if the executor is multi-threaded)

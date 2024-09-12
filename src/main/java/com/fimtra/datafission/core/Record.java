@@ -619,7 +619,7 @@ final class Record implements IRecord, Cloneable
         synchronized (this)
         {
             final Record cloneRecord;
-            if (this.subMaps.size() == 0)
+            if (this.subMaps.isEmpty())
             {
                 cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context);
             }

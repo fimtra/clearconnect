@@ -512,7 +512,7 @@ class PlatformDesktop
                                         public void run()
                                         {
                                             String message = e1.getMessage();
-                                            if (message == null || message.length() == 0)
+                                            if (message == null || message.isEmpty())
                                             {
                                                 message = e1.getClass().getSimpleName();
                                             }
@@ -752,7 +752,7 @@ class PlatformDesktop
                         {
                             final Map<String, IValue> putEntries =
                                 atomicChange.getSubMapAtomicChange(connection).getPutEntries();
-                            if (putEntries.size() > 0)
+                            if (!putEntries.isEmpty())
                             {
                                 final IValue msgsPerSec =
                                         image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.MSGS_PER_SEC);

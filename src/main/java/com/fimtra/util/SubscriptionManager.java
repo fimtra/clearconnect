@@ -141,7 +141,7 @@ public final class SubscriptionManager<SUBSCRIPTION_KEY, SUBSCRIBER>
         List<SUBSCRIBER> list = Arrays.asList(current);
         List<SUBSCRIBER> copy = new ArrayList<>(list);
         final boolean removed = copy.remove(subscriber);
-        if (copy.size() > 0)
+        if (!copy.isEmpty())
         {
             this.subscribersPerKey.put(key,
                     copy.toArray((SUBSCRIBER[]) Array.newInstance(this.subscriberClass, copy.size())));

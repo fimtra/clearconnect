@@ -122,7 +122,7 @@ public final class TextValue extends AbstractValue
         {
             throw new IllegalArgumentException("null values are not allowed");
         }
-        if (value.length() == 0)
+        if (value.isEmpty())
         {
             this.value = EMPTY;
         }

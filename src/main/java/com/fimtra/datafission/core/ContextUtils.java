@@ -106,7 +106,7 @@ public final class ContextUtils
         {
             this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
             List<String> temp = new LinkedList<>(this.subscribed);
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
                 this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }
@@ -124,7 +124,7 @@ public final class ContextUtils
                     temp.add(recordName);
                 }
             }
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
                 this.context.addObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }
@@ -137,7 +137,7 @@ public final class ContextUtils
                     temp.add(recordName);
                 }
             }
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
                 this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
             }

@@ -631,7 +631,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             Context.this.recordsToRemoveFromSystemRecords.clear();
                         }
 
-                        if (recordsToProcess.size() == 0)
+                        if (recordsToProcess.isEmpty())
                         {
                             return;
                         }
@@ -1305,7 +1305,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
     {
-        if (initialImagePending.size() == 0)
+        if (initialImagePending.isEmpty())
         {
             synchronized (this.listenersToNotifyWithInitialImages)
             {
@@ -1336,7 +1336,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return;
         }
 
-        if (this.validators.size() > 0)
+        if (!this.validators.isEmpty())
         {
             for (IValidator validator : this.validators)
             {

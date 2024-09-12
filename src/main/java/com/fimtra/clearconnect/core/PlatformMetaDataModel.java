@@ -1080,7 +1080,7 @@ public final class PlatformMetaDataModel
             statsForServiceInstance = this.serviceInstancesContext.getOrCreateRecord(serviceInstanceId);
 
             stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getPutEntries();
-            if (stats.size() > 0)
+            if (!stats.isEmpty())
             {
                 statsForServiceInstance.put(ServiceInstanceMetaDataRecordDefinition.Service.toString(),
                     PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId)[0]);
@@ -1108,7 +1108,7 @@ public final class PlatformMetaDataModel
             }
 
             stats = atomicChange.getSubMapAtomicChange(serviceInstanceId).getRemovedEntries();
-            if (stats.size() > 0)
+            if (!stats.isEmpty())
             {
                 // NOTE: fields are never removed, so any remove means the entire submap has been
                 // removed
@@ -1414,7 +1414,7 @@ public final class PlatformMetaDataModel
                     instancesPerNodeSubMap = hostRecord.getOrCreateSubMap("Instances");
                     if (instancesPerNodeSubMap.remove(platformServiceInstanceID) != null)
                     {
-                        if (instancesPerNodeSubMap.size() == 0)
+                        if (instancesPerNodeSubMap.isEmpty())
                         {
                             this.nodesContext.removeRecord(hostNode);
                         }

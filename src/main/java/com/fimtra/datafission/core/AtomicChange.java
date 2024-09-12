@@ -358,8 +358,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 newRemovedEntries = subsequentChange.getRemovedEntries();
             }
 
-            newPutEntriesSizeGreaterThan0 = newPutEntries.size() > 0;
-            newRemovedEntriesSizeGreaterThan0 = newRemovedEntries.size() > 0;
+            newPutEntriesSizeGreaterThan0 = !newPutEntries.isEmpty();
+            newRemovedEntriesSizeGreaterThan0 = !newRemovedEntries.isEmpty();
 
             // NOTE: it is not possible to optimise this by grouping by the put/remove size > 0
             // checks - the order of adding/removing must be maintained to ensure the
@@ -368,7 +368,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             {
                 putEntries.putAll(newPutEntries);
             }
-            if (newOverwrittenEntries.size() > 0)
+            if (!newOverwrittenEntries.isEmpty())
             {
                 overwrittenEntries.putAll(newOverwrittenEntries);
             }
@@ -398,7 +398,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             // build up the map of the list of sub-map changes, keyed by sub-map key
             // this VASTLY improves performance of merging
             subMapKeysToMerge = subsequentChange.getSubMapKeys();
-            if (subMapKeysToMerge.size() > 0)
+            if (!subMapKeysToMerge.isEmpty())
             {
                 if (subMapChangesToMerge == null)
                 {
@@ -415,7 +415,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
 
         // determine what keys were ultimately added - remove them from the removedEntries
-        if (ultimatelyRemovedKeys.size() > 0)
+        if (!ultimatelyRemovedKeys.isEmpty())
         {
             ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
             // remove any puts/overwritten that were ultimately removed
@@ -425,7 +425,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 overwrittenEntries.remove(removedKey);
             }
         }
-        if (ultimatelyAddedKeys.size() > 0)
+        if (!ultimatelyAddedKeys.isEmpty())
         {
             for (String addedKey : ultimatelyAddedKeys)
             {
@@ -446,7 +446,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());
 
         // now coalesce the sub-maps in each list per sub-map key
-        if (subMapChangesToMerge != null && subMapChangesToMerge.size() > 0)
+        if (subMapChangesToMerge != null && !subMapChangesToMerge.isEmpty())
         {
             for (Map.Entry<String, List<IRecordChange>> entry : subMapChangesToMerge.entrySet())
             {
@@ -697,7 +697,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 {
                     subMap = record.getOrCreateSubMap(subMapKey);
                     getSubMapAtomicChange(subMapKey).applyTo(subMap);
-                    if (subMap.size() == 0)
+                    if (subMap.isEmpty())
                     {
                         record.removeSubMap(subMapKey);
                     }

@@ -1223,7 +1223,7 @@ final class EventHandler
             if (this.registry.serviceInstancesPerServiceFamily.getSubMapKeys().contains(serviceFamily))
             {
                 serviceInstances = this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
-                if (serviceInstances.size() > 0)
+                if (!serviceInstances.isEmpty())
                 {
                     // find the instance with the earliest timestamp
                     long earliest = Long.MAX_VALUE;
@@ -1243,7 +1243,7 @@ final class EventHandler
             }
         }
 
-        if (serviceInstances.size() > 0)
+        if (!serviceInstances.isEmpty())
         {
             final Future<String> result;
             final String serviceInstanceId =
@@ -1415,7 +1415,7 @@ final class EventHandler
         {
             serviceInstances = this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
             serviceInstances.remove(serviceMember);
-            if (serviceInstances.size() == 0)
+            if (serviceInstances.isEmpty())
             {
                 this.registry.serviceInstancesPerServiceFamily.removeSubMap(serviceFamily);
                 this.registry.services.removeSubMap(serviceFamily);
@@ -1438,7 +1438,7 @@ final class EventHandler
                 // we don't know which agent has it so scan them all
                 instancesPerAgent = this.registry.serviceInstancesPerAgent.getOrCreateSubMap(agentName);
                 instancesPerAgent.remove(serviceInstanceId);
-                if (instancesPerAgent.size() == 0)
+                if (instancesPerAgent.isEmpty())
                 {
                     agentsWithNoServiceInstance.add(agentName);
                 }
@@ -1449,7 +1449,7 @@ final class EventHandler
             }
         }
 
-        if (serviceInstances.size() == 0)
+        if (serviceInstances.isEmpty())
         {
             if (this.registry.services.remove(serviceFamily) != null)
             {
@@ -2127,7 +2127,7 @@ final class EventHandler
                 final Set<String> removedKeys = new HashSet<>(removedEntryKeys);
                 for (int i = 0; i < objectsForEachServiceInstanceOfThisService.length; i++)
                 {
-                    if (removedKeys.size() > 0)
+                    if (!removedKeys.isEmpty())
                     {
                         objectsPerServiceInstance = objectsForEachServiceInstanceOfThisService[i];
                         synchronized (objectsPerServiceInstance.getWriteLock())
@@ -2142,7 +2142,7 @@ final class EventHandler
                         }
                     }
                 }
-                if (removedKeys.size() > 0)
+                if (!removedKeys.isEmpty())
                 {
                     for (String toRemove : removedKeys)
                     {

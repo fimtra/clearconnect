@@ -661,7 +661,7 @@ public final class ProxyContext implements IObserverContext
                     {
                         if (this.proxyContext.resyncs.remove(name))
                         {
-                            this.proxyContext.resyncInProgress = this.proxyContext.resyncs.size() > 0;
+                            this.proxyContext.resyncInProgress = !this.proxyContext.resyncs.isEmpty();
                         }
                     }
                 }
@@ -1076,7 +1076,7 @@ public final class ProxyContext implements IObserverContext
                 if (latch.getCount() != 0)
                 {
                     image.set(ImmutableSnapshotRecord.create(imageCopy));
-                    if (imageCopy.size() > 0)
+                    if (!imageCopy.isEmpty())
                     {
                         latch.countDown();
                     }
@@ -1336,7 +1336,7 @@ public final class ProxyContext implements IObserverContext
             }
 
             // re-subscribe
-            if (recordNames.size() > 0)
+            if (!recordNames.isEmpty())
             {
                 final String[] recordNamesToSubscribeFor = new String[recordNames.size()];
                 int i = 0;
@@ -1368,11 +1368,11 @@ public final class ProxyContext implements IObserverContext
         }
 
         // peek at the size before attempting the synchronized block
-        if (logVerboseSubscribes && this.firstUpdateExpected.size() > 0)
+        if (logVerboseSubscribes && !this.firstUpdateExpected.isEmpty())
         {
             synchronized (this.firstUpdateExpected)
             {
-                if (this.firstUpdateExpected.size() > 0)
+                if (!this.firstUpdateExpected.isEmpty())
                 {
                     if (this.firstUpdateExpected.remove(changeToApply.getName()))
                     {
@@ -1475,7 +1475,7 @@ public final class ProxyContext implements IObserverContext
         synchronized (this.resyncs)
         {
             resyncNeeded = this.resyncs.add(name);
-            this.resyncInProgress = this.resyncs.size() > 0;
+            this.resyncInProgress = !this.resyncs.isEmpty();
         }
         if (resyncNeeded)
         {
@@ -1580,7 +1580,7 @@ public final class ProxyContext implements IObserverContext
     {
         // remove RPC templates
         Map<String, IValue> entries = atomicChange.getRemovedEntries();
-        if (entries.size() > 0)
+        if (!entries.isEmpty())
         {
             for (String rpcName : entries.keySet())
             {
@@ -1590,7 +1590,7 @@ public final class ProxyContext implements IObserverContext
 
         // remove updated RPC templates (update them from the put entries)
         entries = atomicChange.getOverwrittenEntries();
-        if (entries.size() > 0)
+        if (!entries.isEmpty())
         {
             for (String rpcName : entries.keySet())
             {
@@ -1600,7 +1600,7 @@ public final class ProxyContext implements IObserverContext
 
         // add/update RPC templates
         entries = atomicChange.getPutEntries();
-        if (entries.size() > 0)
+        if (!entries.isEmpty())
         {
             for (String rpcName : entries.keySet())
             {
@@ -1638,7 +1638,7 @@ public final class ProxyContext implements IObserverContext
 
             // Remove RPCs
             final IRecord rpcRecord = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-            if (rpcRecord.size() > 0)
+            if (!rpcRecord.isEmpty())
             {
                 Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord.keySet()), " from ", getShortName());
                 synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())
@@ -1808,7 +1808,7 @@ public final class ProxyContext implements IObserverContext
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
         }
-        if (batchSubscribeRecordNames.size() > 0)
+        if (!batchSubscribeRecordNames.isEmpty())
         {
             subscribeBatch(permissionToken,
                 batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
@@ -1862,7 +1862,7 @@ public final class ProxyContext implements IObserverContext
             }
             batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
         }
-        if (batchUnsubscribeRecordNames.size() > 0)
+        if (!batchUnsubscribeRecordNames.isEmpty())
         {
             unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
                 size);

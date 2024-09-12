@@ -227,7 +227,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 		}
 		java.util.List<? extends RowSorter.SortKey> sortKeys = table
 				.getRowSorter().getSortKeys();
-		if (sortKeys.size() > 0
+		if (!sortKeys.isEmpty()
 				&& sortKeys.get(0).getColumn() == table
 						.convertColumnIndexToModel(column)) {
 			rv = sortKeys.get(0).getSortOrder();

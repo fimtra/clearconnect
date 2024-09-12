@@ -709,7 +709,7 @@ public class TcpChannel implements ITransportChannel
             {
                 // minimise locking by checking what we have grabbed previously, only if its
                 // empty do we go into here
-                if (channel.txFrames[channel.sendingQueue].size() == 0)
+                if (channel.txFrames[channel.sendingQueue].isEmpty())
                 {
                     synchronized (channel.lock)
                     {
@@ -720,7 +720,7 @@ public class TcpChannel implements ITransportChannel
                             channel.sendingQueue = channel.pendingQueue;
                             channel.pendingQueue = temp;
 
-                            if (channel.txFrames[channel.sendingQueue].size() == 0)
+                            if (channel.txFrames[channel.sendingQueue].isEmpty())
                             {
                                 channel.state = StateEnum.IDLE;
                             }

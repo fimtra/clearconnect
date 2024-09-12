@@ -214,7 +214,7 @@ public class TcpServer implements IEndPointService
                     Log.log(TcpServer.this, ObjectUtils.safeToString(TcpServer.this), " (<-) accepted inbound ",
                         ObjectUtils.safeToString(socketChannel));
                     String hostAddress = null;
-                    if (this.whitelistAclPatterns.size() > 0 || this.blacklistAclPatterns.size() > 0)
+                    if (!this.whitelistAclPatterns.isEmpty() || !this.blacklistAclPatterns.isEmpty())
                     {
                         final SocketAddress remoteAddress = socketChannel.socket().getRemoteSocketAddress();
                         if (remoteAddress instanceof InetSocketAddress)

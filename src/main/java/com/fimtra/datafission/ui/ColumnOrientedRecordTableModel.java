@@ -98,7 +98,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
 
         final ArrayList<Integer> inserts = new ArrayList<>();
         checkAddFieldRow(RecordTableUtils.CONTEXT, inserts);
-        if (inserts.size() > 0)
+        if (!inserts.isEmpty())
         {
             fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
         }
@@ -265,7 +265,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                     rowIndex = checkAddFieldRow(key, inserts);
                     cellUpdated(rowIndex, column_plus1);
                 }
-                if (inserts.size() > 0)
+                if (!inserts.isEmpty())
                 {
                     fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
                     inserts.clear();
@@ -293,7 +293,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 {
                     checkAddFieldRow(changedKey, inserts);
                 }
-                if (inserts.size() > 0)
+                if (!inserts.isEmpty())
                 {
                     fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
                     inserts.clear();
@@ -337,7 +337,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 fieldsToDelete.add(removedKey);
             }
         }
-        if (fieldsToDelete.size() > 0)
+        if (!fieldsToDelete.isEmpty())
         {
             // process deletes in a batch
             rowIndex =

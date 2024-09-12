@@ -139,7 +139,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
                     final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
-                    if (removedRecords.size() > 0)
+                    if (!removedRecords.isEmpty())
                     {
                         recordUnsubscribedBatch(new HashSet<>(removedRecords), context.getName());
                     }
@@ -306,7 +306,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                         fieldsToDelete.add(removedKey);
                     }
                 }
-                if (fieldsToDelete.size() > 0)
+                if (!fieldsToDelete.isEmpty())
                 {
                     RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes, this.fieldIndexLookupMap);
                     // NOTE: when a column is deleted, we need to process as a structure change

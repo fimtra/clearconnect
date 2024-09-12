@@ -152,7 +152,7 @@ final class AtomicChangeTeleporter
         mergeEntries(EntryEnum.OVERWRITTEN, source, receivedPart, null);
         mergeEntries(EntryEnum.REMOVED, source, receivedPart, null);
         final Set<String> subMapKeys = receivedPart.getSubMapKeys();
-        if (subMapKeys.size() > 0)
+        if (!subMapKeys.isEmpty())
         {
             AtomicChange receivedSubMap;
             for (String key : subMapKeys)
@@ -173,14 +173,14 @@ final class AtomicChangeTeleporter
         final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
         if (subMapKey == null)
         {
-            if (entriesToCopy.size() > 0)
+            if (!entriesToCopy.isEmpty())
             {
                 type.getEntriesToWrite(source).putAll(entriesToCopy);
             }
         }
         else
         {
-            if (entriesToCopy.size() > 0)
+            if (!entriesToCopy.isEmpty())
             {
                 type.getEntriesToWrite(source.internalGetSubMapAtomicChange(subMapKey)).putAll(entriesToCopy);
             }
@@ -310,7 +310,7 @@ final class AtomicChangeTeleporter
 
         // now do the submaps
         final Set<String> subMapKeys = change.getSubMapKeys();
-        if (subMapKeys.size() > 0)
+        if (!subMapKeys.isEmpty())
         {
             AtomicChange subMapChange;
             for (String key : subMapKeys)

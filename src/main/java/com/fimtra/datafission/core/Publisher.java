@@ -609,7 +609,7 @@ public class Publisher
             }
 
             // peek at the size before attempting the synchronize block
-            if (logVerboseSubscribes && this.firstPublishPending.size() > 0)
+            if (logVerboseSubscribes && !this.firstPublishPending.isEmpty())
             {
                 synchronized (this.firstPublishPending)
                 {
@@ -633,7 +633,7 @@ public class Publisher
 
         void logFirstPublishDone()
         {
-            if (this.firstPublishDone.size() > 0)
+            if (!this.firstPublishDone.isEmpty())
             {
                 Log.log(ProxyContextPublisher.this, "(->) First publish to [", this.channel.getEndPointDescription(),
                     "] done for ", this.firstPublishDone.toString());
@@ -1180,7 +1180,7 @@ public class Publisher
                 batchCounter = 0;
             }
         }
-        if (batchSubscribeRecordNames.size() > 0)
+        if (!batchSubscribeRecordNames.isEmpty())
         {
             subscribeBatch(batchSubscribeRecordNames, client, permissionToken, i, size);
         }
@@ -1225,7 +1225,7 @@ public class Publisher
     private void sendSubscribeResult(String action, List<String> recordNames, ITransportChannel client,
         ProxyContextPublisher proxyContextPublisher, String responseAction)
     {
-        if (recordNames.size() == 0)
+        if (recordNames.isEmpty())
         {
             return;
         }

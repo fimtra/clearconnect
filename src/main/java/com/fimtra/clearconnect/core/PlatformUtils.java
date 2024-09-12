@@ -248,7 +248,7 @@ public class PlatformUtils
                     toLog.add(serviceFamily);
                 }
             }
-            if (toLog.size() > 0)
+            if (!toLog.isEmpty())
             {
                 Log.log(logContext, "Services available: ", toLog.toString());
             }
@@ -265,7 +265,7 @@ public class PlatformUtils
                     toLog.add(serviceFamily);
                 }
             }
-            if (toLog.size() > 0)
+            if (!toLog.isEmpty())
             {
                 Log.log(logContext, "Services lost: ", toLog.toString());
             }
