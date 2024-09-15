@@ -312,14 +312,14 @@ public final class ThimbleExecutor implements IContextExecutor
                 return;
             }
 
-            if (this.idleRunners.size() == 0)
+            if (this.idleRunners.isEmpty())
             {
                 if (this.pool.size() < this.size)
                 {
                     Integer number;
                     if ((number = this.freeNumbers.poll()) == null)
                     {
-                        number = Integer.valueOf(this.threadCounter.getAndIncrement());
+                        number = this.threadCounter.getAndIncrement();
                     }
                     runner = new TaskRunner(this.name + "-" + number, number);
                     this.pool.add(runner);
