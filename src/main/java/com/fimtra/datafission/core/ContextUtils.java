@@ -108,7 +108,7 @@ public final class ContextUtils
             List<String> temp = new LinkedList<>(this.subscribed);
             if (!temp.isEmpty())
             {
-                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
             this.subscribed.clear();
         }
@@ -126,7 +126,7 @@ public final class ContextUtils
             }
             if (!temp.isEmpty())
             {
-                this.context.addObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.addObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
 
             temp = new LinkedList<>();
@@ -139,7 +139,7 @@ public final class ContextUtils
             }
             if (!temp.isEmpty())
             {
-                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
         }
     }

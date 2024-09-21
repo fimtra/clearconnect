@@ -43,15 +43,7 @@ import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContex
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.TX_QUEUE_SIZE;
 import static com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields.UPTIME;
 
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Frame;
-import java.awt.Graphics;
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.*;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,8 +57,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.swing.JDialog;
+import javax.swing.*;
 
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
@@ -97,8 +88,8 @@ import com.fimtra.datafission.core.session.SessionContexts;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.is;
@@ -150,7 +141,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformNodesContext()
      */
-    public static enum NodesMetaDataRecordDefinition
+    public enum NodesMetaDataRecordDefinition
     {
             InstanceCount
     }
@@ -160,7 +151,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformRegistryAgentsContext()
      */
-    public static enum AgentMetaDataRecordDefinition
+    public enum AgentMetaDataRecordDefinition
     {
             Node, UpTimeSecs, QOverFlow, QTotalSubmitted, CPUCount, MemUsedMb, MemAvailableMb, ThreadCount, GcDutyCycle,
             Runtime, User, EPS
@@ -171,7 +162,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceProxiesContext()
      */
-    public static enum ServiceProxyMetaDataRecordDefinition
+    public enum ServiceProxyMetaDataRecordDefinition
     {
             EndPoint, SubscriptionCount, MessagesReceived, LstAvgMsgSize, AvgMsgSizeBytes, DataCountKb,
             ConnectionUptime, Service, ServiceInstance, ServiceEndPoint, MsgsPerSec, KbPerSec, ClientName, TxQueue
@@ -182,7 +173,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServicesContext()
      */
-    public static enum ServiceMetaDataRecordDefinition
+    public enum ServiceMetaDataRecordDefinition
     {
             Mode, InstanceCount, RecordCount, RpcCount, ConnectionCount, SubscriptionCount, MsgsPerSec, MessagesSent,
             KbPerSec, KbSent, TxQueue
@@ -193,7 +184,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceInstancesContext()
      */
-    public static enum ServiceInstanceMetaDataRecordDefinition
+    public enum ServiceInstanceMetaDataRecordDefinition
     {
             Service, Node, Port, RecordCount, RpcCount, ConnectionCount, UpTimeSecs, Codec, Agent, SubscriptionCount,
             MessagesSent, AvgMsgSizeBytes, KbSent, MsgsPerSec, KbPerSec, Transport, Version
@@ -204,7 +195,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceRecordsContext(String)
      */
-    public static enum ServiceRecordMetaDataRecordDefinition
+    public enum ServiceRecordMetaDataRecordDefinition
     {
             SubscriptionCount
     }
@@ -214,7 +205,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceInstanceRecordsContext(String)
      */
-    public static enum ServiceInstanceRecordMetaDataRecordDefinition
+    public enum ServiceInstanceRecordMetaDataRecordDefinition
     {
             SubscriptionCount
     }
@@ -224,7 +215,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceRpcsContext(String)
      */
-    public static enum ServiceRpcMetaDataRecordDefinition
+    public enum ServiceRpcMetaDataRecordDefinition
     {
             Definition
     }
@@ -234,7 +225,7 @@ public final class PlatformMetaDataModel
      * 
      * @see PlatformMetaDataModel#getPlatformServiceInstanceRpcsContext(String)
      */
-    public static enum ServiceInstanceRpcMetaDataRecordDefinition
+    public enum ServiceInstanceRpcMetaDataRecordDefinition
     {
             Definition
     }
@@ -265,14 +256,12 @@ public final class PlatformMetaDataModel
     static void handleRecordsForContext(String contextName, ConcurrentMap<String, Context> contextsPerName,
         final Set<String> currentRecordsForContext, final Map<String, IValue> updatedRecordsForContext, String field)
     {
-        Map.Entry<String, IValue> entry;
         String recordName;
         IValue value;
         IRecord record;
         Context context = safeGetContext(contextsPerName, contextName);
-        for (Iterator<Map.Entry<String, IValue>> it = updatedRecordsForContext.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : updatedRecordsForContext.entrySet())
         {
-            entry = it.next();
             recordName = entry.getKey();
             if (ContextUtils.isSystemRecordName(recordName))
             {
@@ -288,39 +277,27 @@ public final class PlatformMetaDataModel
 
     static void updateCountsForKey(final String key, final Map<String, AtomicInteger> countsPerKey)
     {
-        AtomicInteger c = countsPerKey.get(key);
-        if (c == null)
-        {
-            c = new AtomicInteger(0);
-            countsPerKey.put(key, c);
-        }
-        c.getAndIncrement();
+        countsPerKey.computeIfAbsent(key, k -> new AtomicInteger(0))
+                .getAndIncrement();
     }
 
     static void updateRecordWithCounts(final Map<String, AtomicInteger> countsPer, Context context, String countField)
     {
-        Map.Entry<String, AtomicInteger> entry;
         IRecord record;
-        for (Iterator<Map.Entry<String, AtomicInteger>> it = countsPer.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, AtomicInteger> entry : countsPer.entrySet())
         {
-            entry = it.next();
             record = context.getRecord(entry.getKey());
             if (record != null)
             {
-                record.put(countField, entry.getValue().intValue());
+                record.put(countField, entry.getValue()
+                        .intValue());
             }
         }
     }
 
     static void removeSystemRecords(Set<String> records)
     {
-        for (Iterator<String> it = records.iterator(); it.hasNext();)
-        {
-            if (ContextUtils.isSystemRecordName(it.next()))
-            {
-                it.remove();
-            }
-        }
+        records.removeIf(ContextUtils::isSystemRecordName);
     }
 
     static void publishAtomicChangeForAllRecords(Context context)
@@ -410,113 +387,63 @@ public final class PlatformMetaDataModel
     final IContextExecutor coalescingExecutor = ContextExecutorFactory.create("meta-data-model-coalescing-executor", 1);
 
     final CoalescingRecordListener _servicesRecordListener =
-            new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-                {
-                    checkReset();
-                    handlePlatformServicesUpdate(imageCopy, atomicChange);
-                }
+            new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+                checkReset();
+                handlePlatformServicesUpdate(imageCopy, atomicChange);
             }, SERVICES);
     
     final CoalescingRecordListener _serviceStatsRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServiceStatsUpdate(imageCopy, atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handlePlatformServiceStatsUpdate(imageCopy, atomicChange);
         }, SERVICE_STATS);
 
     final CoalescingRecordListener _serviceInstancesPerAgentRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handlePlatformServiceInstancesPerAgentUpdate(atomicChange);
         }, SERVICE_INSTANCES_PER_AGENT, CachePolicyEnum.NO_IMAGE_NEEDED);
 
     final CoalescingRecordListener _serviceInstanceStatsRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleServiceInstanceStatsUpdate(atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleServiceInstanceStatsUpdate(atomicChange);
         }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED);
 
     final CoalescingRecordListener _recordsPerServiceFamilyListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRecordsPerServiceUpdate(imageCopy, atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleRecordsPerServiceUpdate(imageCopy, atomicChange);
         }, PREFIX_RECORDS_PER_SERVICE);
 
     final CoalescingRecordListener _runtimeStatusRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRuntimeStatusUpdate(imageCopy);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleRuntimeStatusUpdate(imageCopy);
         }, RUNTIME_STATUS);
 
     final CoalescingRecordListener _platformConnectionsRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleConnectionsUpdate(imageCopy);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleConnectionsUpdate(imageCopy);
         }, PLATFORM_CONNECTIONS);
 
     final CoalescingRecordListener _recordsPerServiceInstanceRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
         }, PREFIX_RECORDS_PER_INSTANCE);
 
     final CoalescingRecordListener _rpsPerServiceFamilyRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRpcsPerServiceUpdate(imageCopy, atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleRpcsPerServiceUpdate(imageCopy, atomicChange);
         }, PREFIX_RPCS_PER_SERVICE);
 
     final CoalescingRecordListener _rpcsPerServiceInstanceRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                checkReset();
-                handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
-            }
+        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
+            checkReset();
+            handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
         }, PREFIX_RPCS_PER_INSTANCE);
 
     final PlatformRegistryAgent agent;
@@ -910,14 +837,7 @@ public final class PlatformMetaDataModel
             final Point location = MouseInfo.getPointerInfo().getLocation(); 
             dialog.setLocation((int) location.getX(), (int) location.getY());
             dialog.setIconImage(PlatformDesktop.createIcon());
-            parameters.setOkButtonActionListener(new ActionListener()
-            {
-                @Override
-                public void actionPerformed(ActionEvent e)
-                {
-                    dialog.dispose();
-                }
-            });
+            parameters.setOkButtonActionListener(e -> dialog.dispose());
             dialog.getRootPane().setDefaultButton(parameters.ok);
             final Font font = parameters.getFont();
             final Graphics graphics = dialog.getGraphics();
@@ -929,14 +849,7 @@ public final class PlatformMetaDataModel
             dialog.setVisible(true);
 
             final String[] sessionAttributes = parameters.get().get("attributes").split(",");
-            final ISessionAttributesProvider provider = new ISessionAttributesProvider()
-            {
-                @Override
-                public String[] getSessionAttributes()
-                {
-                    return sessionAttributes;
-                }
-            };
+            final ISessionAttributesProvider provider = () -> sessionAttributes;
             SessionContexts.registerSessionProvider(serviceFamily, provider);
         }
     }
@@ -965,15 +878,10 @@ public final class PlatformMetaDataModel
         if (rpc == null)
         {
             final CountDownLatch latch = new CountDownLatch(1);
-            final IRecordListener observer = new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            final IRecordListener observer = (imageCopy, atomicChange) -> {
+                if (imageCopy.containsKey(rpcName))
                 {
-                    if (imageCopy.keySet().contains(rpcName))
-                    {
-                        latch.countDown();
-                    }
+                    latch.countDown();
                 }
             };
             proxyContext.addObserver(observer, ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
@@ -983,6 +891,7 @@ public final class PlatformMetaDataModel
             }
             catch (InterruptedException e)
             {
+                Thread.interrupted();
             }
             rpc = proxyContext.getRpc(rpcName);
         }
@@ -995,13 +904,11 @@ public final class PlatformMetaDataModel
 
     void handlePlatformServicesUpdate(IRecord imageCopy, IRecordChange atomicChange)
     {
-        Map.Entry<String, IValue> entry;
-        String serviceFamilyName = null;
-        IValue redundancyMode = null;
+        String serviceFamilyName;
+        IValue redundancyMode;
         IRecord serviceRecord;
-        for (Iterator<Map.Entry<String, IValue>> it = imageCopy.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : imageCopy.entrySet())
         {
-            entry = it.next();
             serviceFamilyName = entry.getKey();
             redundancyMode = entry.getValue();
             serviceRecord = this.servicesContext.getOrCreateRecord(serviceFamilyName);
@@ -1011,10 +918,10 @@ public final class PlatformMetaDataModel
         }
 
         // handle removed services
-        for (Iterator<Map.Entry<String, IValue>> it =
-            atomicChange.getRemovedEntries().entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : atomicChange.getRemovedEntries()
+                .entrySet())
         {
-            removeService(it.next().getKey());
+            removeService(entry.getKey());
         }
     }
 
@@ -1222,7 +1129,6 @@ public final class PlatformMetaDataModel
         LongValue subscriptionCount;
         LongValue kbCount;
         LongValue connectionUptime;
-        Map.Entry<String, Set<java.lang.String>> entry;
         IRecord hostRecord;
         Set<String> set;
 
@@ -1355,10 +1261,9 @@ public final class PlatformMetaDataModel
         updateRecordWithCounts(connectionsPerServiceInstance, this.serviceInstancesContext,
             ServiceInstanceMetaDataRecordDefinition.ConnectionCount.toString());
 
-        Map<String, IValue> instancesPerNodeSubMap = null;
-        for (Iterator<Map.Entry<String, Set<String>>> it = instancesPerNode.entrySet().iterator(); it.hasNext();)
+        Map<String, IValue> instancesPerNodeSubMap;
+        for (Map.Entry<String, Set<String>> entry : instancesPerNode.entrySet())
         {
-            entry = it.next();
             set = entry.getValue();
             hostRecord = this.nodesContext.getOrCreateRecord(entry.getKey());
             instancesPerNodeSubMap = hostRecord.getOrCreateSubMap("Instances");
@@ -1366,7 +1271,8 @@ public final class PlatformMetaDataModel
             {
                 instancesPerNodeSubMap.put(serviceInstanceId, BLANK_VALUE);
             }
-            hostRecord.put(NodesMetaDataRecordDefinition.InstanceCount.toString(), instancesPerNodeSubMap.size());
+            hostRecord.put(NodesMetaDataRecordDefinition.InstanceCount.toString(),
+                    instancesPerNodeSubMap.size());
         }
 
         // handle removed services and instances
@@ -1404,8 +1310,8 @@ public final class PlatformMetaDataModel
             this.serviceInstancesContext.publishAtomicChange(platformServiceInstanceID);
 
             // remove the service instance from the nodes
-            IRecord hostRecord = null;
-            Map<String, IValue> instancesPerNodeSubMap = null;
+            IRecord hostRecord;
+            Map<String, IValue> instancesPerNodeSubMap;
             for (String hostNode : this.nodesContext.getRecordNames())
             {
                 hostRecord = this.nodesContext.getRecord(hostNode);
@@ -1431,9 +1337,9 @@ public final class PlatformMetaDataModel
 
     static void handlePendingTasks(IRecord image, final ConcurrentMap<String, Runnable> pendingTasks)
     {
-        Map.Entry<String, Runnable> entry = null;
-        String key = null;
-        Runnable value = null;
+        Map.Entry<String, Runnable> entry;
+        String key;
+        Runnable value;
         for (Iterator<Map.Entry<String, Runnable>> it = pendingTasks.entrySet().iterator(); it.hasNext();)
         {
             entry = it.next();

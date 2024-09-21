@@ -192,7 +192,7 @@ final class ClassTemplate
         }
         while ((c = c.getSuperclass()) != null);
 
-        this.fields = templates.toArray(new FieldTemplate[templates.size()]);
+        this.fields = templates.toArray(new FieldTemplate[0]);
     }
 
     public void readFromRecord(Object o, IRecord record) throws Exception

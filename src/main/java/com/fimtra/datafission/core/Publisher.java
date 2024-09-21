@@ -298,7 +298,9 @@ public class Publisher
                                         // NOTE: adding the observer ends up calling
                                         // addDeltaToSubscriptionCount which publishes the image
                                         if (!Publisher.this.context.addObserver(permissionToken,
-                                            ProxyContextMultiplexer.this, name).get().get(name).booleanValue())
+                                                        ProxyContextMultiplexer.this, name)
+                                                .get()
+                                                .get(name))
                                         {
                                             throw new IllegalStateException(
                                                 "Could not add ProxyContextMultiplexer as a listener for recordName="
@@ -400,7 +402,7 @@ public class Publisher
                 }
                 Publisher.this.context.addDeltaToSubscriptionCount(-1, decrement);
                 Publisher.this.context.removeObserver(ProxyContextMultiplexer.this,
-                    remove.toArray(new String[remove.size()]));
+                    remove.toArray(new String[0]));
 
                 for (String name : remove)
                 {

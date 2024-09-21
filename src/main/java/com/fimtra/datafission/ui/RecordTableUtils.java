@@ -15,15 +15,10 @@
  */
 package com.fimtra.datafission.ui;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,16 +26,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.ListSelectionModel;
+import javax.swing.*;
 import javax.swing.RowSorter.SortKey;
-import javax.swing.SortOrder;
-import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
@@ -74,12 +61,12 @@ abstract class RecordTableUtils
     static final String CONTEXT = "Context";
     static final String FIELD = "Field";
 
-    static interface ICellUpdateHandler
+    interface ICellUpdateHandler
     {
         void cellUpdated(int row, int column);
     }
 
-    static interface ICoalescedUpdatesHandler
+    interface ICoalescedUpdatesHandler
     {
         void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
             Map<Pair<String, String>, IRecordChange> recordAtomicChanges);
@@ -196,34 +183,21 @@ abstract class RecordTableUtils
 
             if (!batchUpdateScheduled.getAndSet(true))
             {
-                cellUpdater.schedule(new Runnable()
-                {
-                    @Override
-                    public void run()
+                cellUpdater.schedule(() -> {
+                    final Map<Pair<String, String>, IRecord> recordImages;
+                    final Map<Pair<String, String>, IRecordChange> recordAtomicChanges;
+                    synchronized (pendingBatchUpdates)
                     {
-                        final Map<Pair<String, String>, IRecord> recordImages =
-                            new HashMap<>();
-                        final Map<Pair<String, String>, IRecordChange> recordAtomicChanges =
-                            new HashMap<>();
-                        synchronized (pendingBatchUpdates)
-                        {
-                            recordImages.putAll(pendingBatchUpdates);
-                            recordAtomicChanges.putAll(pendingBatchAtomicChanges);
+                        recordImages = new HashMap<>(pendingBatchUpdates);
+                        recordAtomicChanges = new HashMap<>(pendingBatchAtomicChanges);
 
-                            pendingBatchUpdates.clear();
-                            pendingBatchAtomicChanges.clear();
-                            batchUpdateScheduled.set(false);
-                        }
-
-                        SwingUtilities.invokeLater(new Runnable()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                handler.handleCoalescedUpdates(recordImages, recordAtomicChanges);
-                            }
-                        });
+                        pendingBatchUpdates.clear();
+                        pendingBatchAtomicChanges.clear();
+                        batchUpdateScheduled.set(false);
                     }
+
+                    SwingUtilities.invokeLater(
+                            () -> handler.handleCoalescedUpdates(recordImages, recordAtomicChanges));
                 }, RECORD_UPDATE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
@@ -256,15 +230,9 @@ abstract class RecordTableUtils
         model.addColumn("Value");
 
         // populate the model
-        Map.Entry<String, IValue> entry = null;
-        String key = null;
-        IValue value = null;
-        for (Iterator<Map.Entry<String, IValue>> it = subMapData.entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : subMapData.entrySet())
         {
-            entry = it.next();
-            key = entry.getKey();
-            value = entry.getValue();
-            model.addRow(new Object[] { key, value });
+            model.addRow(new Object[] { entry.getKey(), entry.getValue() });
         }
 
         JTable table = new JTable(model);
@@ -282,14 +250,9 @@ abstract class RecordTableUtils
 
         submapPopup.add(new JLabel("Submap: " + subMapKey));
         JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(new ActionListener()
-        {
-            @Override
-            public void actionPerformed(ActionEvent e)
-            {
-                submapPopup.setVisible(false);
-                submapPopup.removeAll();
-            }
+        closeButton.addActionListener(e -> {
+            submapPopup.setVisible(false);
+            submapPopup.removeAll();
         });
         submapPopup.add(closeButton);
         submapPopup.add(new JScrollPane(table));

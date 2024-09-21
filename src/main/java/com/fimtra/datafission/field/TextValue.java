@@ -141,7 +141,7 @@ public final class TextValue extends AbstractValue
     @Override
     public long longValue()
     {
-        return (this.value == NULL || this.value == EMPTY) ? 0 : Long.valueOf(this.value).longValue();
+        return (this.value == NULL || this.value == EMPTY) ? 0 : Long.parseLong(this.value);
     }
 
     @Override
@@ -149,7 +149,7 @@ public final class TextValue extends AbstractValue
     {
         try
         {
-            return (this.value == NULL || this.value == EMPTY) ? Double.NaN : Double.valueOf(this.value).doubleValue();
+            return (this.value == NULL || this.value == EMPTY) ? Double.NaN : Double.parseDouble(this.value);
         }
         catch (NumberFormatException e)
         {

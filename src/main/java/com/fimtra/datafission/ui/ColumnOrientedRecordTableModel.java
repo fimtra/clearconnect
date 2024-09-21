@@ -18,7 +18,6 @@ package com.fimtra.datafission.ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,8 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
@@ -59,13 +57,8 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
     final List<IRecord> records;
     final List<String> fieldIndexes;
     final Map<String, AtomicInteger> fieldIndexLookupMap;
-    ICellUpdateHandler cellUpdateHandler = new ICellUpdateHandler()
-    {
-        @Override
-        public void cellUpdated(int row, int column)
-        {
-            // noop
-        }
+    ICellUpdateHandler cellUpdateHandler = (row, column) -> {
+        // noop
     };
 
     // these members handle batching up of updates and removes
@@ -100,7 +93,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         checkAddFieldRow(RecordTableUtils.CONTEXT, inserts);
         if (!inserts.isEmpty())
         {
-            fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+            fireTableRowsInserted(inserts.get(0), inserts.get(inserts.size() - 1));
         }
 
     }
@@ -116,16 +109,11 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
     {
         if (!this.recordRemovedListeners.containsKey(context.getName()))
         {
-            final IRecordListener observer = new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            final IRecordListener observer = (imageCopy, atomicChange) -> {
+                final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
+                for (String removedRecordName : removedRecords)
                 {
-                    final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
-                    for (String removedRecordName : removedRecords)
-                    {
-                        recordUnsubscribed(removedRecordName, context.getName());
-                    }
+                    recordUnsubscribed(removedRecordName, context.getName());
                 }
             };
             this.recordRemovedListeners.put(context.getName(), observer);
@@ -228,10 +216,10 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
         final Set<String> fieldsToDelete = new HashSet<>();
         final List<Integer> inserts = new ArrayList<>();
 
-        Map.Entry<Pair<String, String>, IRecord> entry = null;
-        Pair<String, String> nameAndContext = null;
-        IRecord imageCopy = null;
-        int rowIndex = 0;
+        Map.Entry<Pair<String, String>, IRecord> entry;
+        Pair<String, String> nameAndContext;
+        IRecord imageCopy;
+        int rowIndex;
         IRecordChange atomicChange;
         int columnIndex;
         // we do +1 because the table always shows the field names at index 0
@@ -251,7 +239,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 column_plus1 = columnIndex + 1;
                 ColumnOrientedRecordTableModel.this.records.add(imageCopy);
                 ColumnOrientedRecordTableModel.this.recordIndexByName.put(
-                    RowOrientedRecordTableModel.getRecordLookupKey(imageCopy), Integer.valueOf(columnIndex));
+                    RowOrientedRecordTableModel.getRecordLookupKey(imageCopy), columnIndex);
                 fireTableStructureChanged();
 
                 // as its a new record, we need to add the fields (some might be new)
@@ -267,13 +255,13 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 }
                 if (!inserts.isEmpty())
                 {
-                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    fireTableRowsInserted(inserts.get(0), inserts.get(inserts.size() - 1));
                     inserts.clear();
                 }
             }
             else
             {
-                columnIndex = index.intValue();
+                columnIndex = index;
                 column_plus1 = columnIndex + 1;
 
                 // an update to an existing record
@@ -295,7 +283,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 }
                 if (!inserts.isEmpty())
                 {
-                    fireTableRowsInserted(inserts.get(0).intValue(), inserts.get(inserts.size() - 1).intValue());
+                    fireTableRowsInserted(inserts.get(0), inserts.get(inserts.size() - 1));
                     inserts.clear();
                 }
 
@@ -326,7 +314,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
             // check if the field that has been removed exists in any other records
             for (IRecord record : ColumnOrientedRecordTableModel.this.records)
             {
-                if (record.keySet().contains(removedKey))
+                if (record.containsKey(removedKey))
                 {
                     exists = true;
                     break;
@@ -370,7 +358,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
                 {
                     ColumnOrientedRecordTableModel.this.recordIndexByName.put(
                             RowOrientedRecordTableModel.getRecordLookupKey(
-                                    ColumnOrientedRecordTableModel.this.records.get(i)), Integer.valueOf(i));
+                                    ColumnOrientedRecordTableModel.this.records.get(i)), i);
                 }
                 fireTableStructureChanged();
             }
@@ -400,7 +388,7 @@ public final class ColumnOrientedRecordTableModel extends AbstractTableModel imp
             this.fieldIndexes.add(fieldName);
             index = new AtomicInteger(this.fieldIndexes.size() - 1);
             this.fieldIndexLookupMap.put(fieldName, index);
-            inserts.add(Integer.valueOf(index.intValue()));
+            inserts.add(index.intValue());
         }
         return index.intValue();
     }

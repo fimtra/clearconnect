@@ -386,7 +386,7 @@ class PlatformDesktop
                 this.table.setComponentPopupMenu(null);
                 this.context.removeObserver(this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
                 this.context.removeObserver(this.model,
-                    this.subscribedRecords.toArray(new String[this.subscribedRecords.size()]));
+                    this.subscribedRecords.toArray(new String[0]));
                 synchronized (PlatformMetaDataViewEnum.recordSubscriptionViews)
                 {
                     PlatformMetaDataViewEnum.recordSubscriptionViews.remove(this.metaDataViewKey);
@@ -1068,17 +1068,11 @@ class PlatformDesktop
                 @Override
                 public void actionPerformed(ActionEvent e)
                 {
-                    LinkedHashMap<String, String> values = new LinkedHashMap<>();
-                    Map.Entry<String, Parameter> entry = null;
-                    String key = null;
-                    Parameter value = null;
-                    for (Iterator<Map.Entry<String, Parameter>> it =
-                        ParametersPanel.this.parameters.entrySet().iterator(); it.hasNext();)
+                    final LinkedHashMap<String, String> values = new LinkedHashMap<>();
+                    for (Map.Entry<String, Parameter> entry : ParametersPanel.this.parameters.entrySet())
                     {
-                        entry = it.next();
-                        key = entry.getKey();
-                        value = entry.getValue();
-                        values.put(key, value.getValue());
+                        values.put(entry.getKey(), entry.getValue()
+                                .getValue());
                     }
                     ParametersPanel.this.result.set(values);
                     synchronized (ParametersPanel.this.result)

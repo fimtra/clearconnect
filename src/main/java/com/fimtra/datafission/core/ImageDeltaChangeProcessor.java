@@ -128,7 +128,7 @@ final class ImageDeltaChangeProcessor
                 final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
                 if (deltas != null)
                 {
-                    long deltaSequence = -1;
+                    long deltaSequence;
                     long lastSequence = changeToApply.getSequence();
                     for (IRecordChange deltaChange : deltas)
                     {

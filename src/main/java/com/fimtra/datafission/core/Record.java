@@ -52,7 +52,7 @@ final class Record implements IRecord, Cloneable
     static String toString(String contextName, String recordName, long sequence, Map<String, IValue> data,
         Map<String, Map<String, IValue>> subMaps)
     {
-        String subMapString = "";
+        String subMapString;
         if (subMaps.size() > Values.MAX_MAP_FIELDS_TO_PRINT)
         {
             subMapString = "{Too big to print, size=" + subMaps.size() + "}";
@@ -60,10 +60,9 @@ final class Record implements IRecord, Cloneable
         else
         {
             final StringBuilder sb = new StringBuilder(subMaps.size() * 100);
-            Map.Entry<String, Map<String, IValue>> entry = null;
             boolean first = true;
             sb.append("{");
-            for (Iterator<Map.Entry<String, Map<String, IValue>>> it = subMaps.entrySet().iterator(); it.hasNext();)
+            for (Entry<String, Map<String, IValue>> entry : subMaps.entrySet())
             {
                 if (first)
                 {
@@ -73,8 +72,9 @@ final class Record implements IRecord, Cloneable
                 {
                     sb.append(", ");
                 }
-                entry = it.next();
-                sb.append(entry.getKey()).append("=").append(entry.getValue());
+                sb.append(entry.getKey())
+                        .append("=")
+                        .append(entry.getValue());
             }
             sb.append("}");
             subMapString = sb.toString();
@@ -149,16 +149,15 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this)
         {
-            for (Iterator<Map.Entry<String, IValue>> it =
-                new HashMap<>(this.data).entrySet().iterator(); it.hasNext();)
+            for (Entry<String, IValue> entry : new HashMap<>(this.data).entrySet())
             {
-                remove(it.next().getKey());
+                remove(entry.getKey());
             }
 
-            for (Iterator<Map.Entry<String, Map<String, IValue>>> it =
-                this.subMaps.entrySet().iterator(); it.hasNext();)
+            for (Entry<String, Map<String, IValue>> entry : this.subMaps.entrySet())
             {
-                it.next().getValue().clear();
+                entry.getValue()
+                        .clear();
             }
             this.data = CollectionUtils.newMap(4);
             this.subMaps = EMPTY_SUBMAP;
@@ -289,9 +288,10 @@ final class Record implements IRecord, Cloneable
         synchronized (this)
         {
             final String internKey = keysPool.intern(key);
+            final IValue previous;
             if (value != null)
             {
-                final IValue previous = this.data.put(internKey, value);
+                previous = this.data.put(internKey, value);
                 // if there is no change, we perform no update
                 if (this.context != null)
                 {
@@ -300,12 +300,11 @@ final class Record implements IRecord, Cloneable
                         this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
                     }
                 }
-                return previous;
             }
             else
             {
                 // a null is treated as if it removes the key
-                final IValue previous = this.data.remove(internKey);
+                previous = this.data.remove(internKey);
                 if (this.context != null)
                 {
                     if (previous != null)
@@ -313,8 +312,8 @@ final class Record implements IRecord, Cloneable
                         this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
                     }
                 }
-                return previous;
             }
+            return previous;
         }
     }
 
@@ -351,26 +350,21 @@ final class Record implements IRecord, Cloneable
         return put(key, TextValue.valueOf(value));
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void putAll(Map<? extends String, ? extends IValue> t)
     {
         synchronized (this)
         {
-            Map.Entry<String, IValue> entry;
-            String key;
             IValue value;
             String internKey;
 
             if (this.context instanceof NoopAtomicChangeManager)
             {
-                for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
+                for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
                 {
-                    entry = (Map.Entry<String, IValue>) it.next();
-                    key = entry.getKey();
                     value = entry.getValue();
-                    internKey = keysPool.intern(key);
-                    
+                    internKey = keysPool.intern(entry.getKey());
+
                     if (value != null)
                     {
                         this.data.put(internKey, value);
@@ -388,12 +382,10 @@ final class Record implements IRecord, Cloneable
                 IValue previous;
                 int putPtr = 0;
                 int removePtr = 0;
-                for (Iterator<?> it = t.entrySet().iterator(); it.hasNext();)
+                for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
                 {
-                    entry = (Map.Entry<String, IValue>) it.next();
-                    key = entry.getKey();
                     value = entry.getValue();
-                    internKey = keysPool.intern(key);
+                    internKey = keysPool.intern(entry.getKey());
 
                     if (value != null)
                     {
@@ -581,15 +573,9 @@ final class Record implements IRecord, Cloneable
             putAll((Map<String, IValue>) demergeMaps[0]);
             Map<String, Map<String, IValue>> subMaps = (Map<String, Map<String, IValue>>) demergeMaps[1];
 
-            Map.Entry<String, Map<String, IValue>> entry = null;
-            String key = null;
-            Map<String, IValue> value = null;
-            for (Iterator<Map.Entry<String, Map<String, IValue>>> it = subMaps.entrySet().iterator(); it.hasNext();)
+            for (Entry<String, Map<String, IValue>> entry : subMaps.entrySet())
             {
-                entry = it.next();
-                key = entry.getKey();
-                value = entry.getValue();
-                getOrCreateSubMap(key).putAll(value);
+                getOrCreateSubMap(entry.getKey()).putAll(entry.getValue());
             }
         }
     }
@@ -627,11 +613,8 @@ final class Record implements IRecord, Cloneable
             {
                 final Map<String, Map<String, IValue>> cloneSubMaps = CollectionUtils.newMap(this.subMaps.size());
                 cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context, cloneSubMaps);
-                Map.Entry<String, Map<String, IValue>> entry = null;
-                for (final Iterator<Map.Entry<String, Map<String, IValue>>> it =
-                    this.subMaps.entrySet().iterator(); it.hasNext();)
+                for (Entry<String, Map<String, IValue>> entry : this.subMaps.entrySet())
                 {
-                    entry = it.next();
                     cloneSubMaps.put(entry.getKey(), ((SubMap) entry.getValue()).clone(cloneRecord));
                 }
             }
@@ -867,21 +850,21 @@ final class SubMap implements Map<String, IValue>
         synchronized (this.record)
         {
             final String internKey = Record.keysPool.intern(key);
+            final IValue previous;
             if (value != null)
             {
-                final IValue previous = this.subMap.put(internKey, value);
+                previous = this.subMap.put(internKey, value);
                 if (previous == null || !previous.equals(value))
                 {
                     this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
                 }
-                return previous;
             }
             else
             {
-                final IValue previous = this.subMap.remove(internKey);
+                previous = this.subMap.remove(internKey);
                 this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
-                return previous;
             }
+            return previous;
         }
     }
 
@@ -908,20 +891,16 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            Map.Entry<?, ?> entry;
-            String key;
             IValue value;
             String internKey;
 
             if (this.record.context instanceof NoopAtomicChangeManager)
             {
-                for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
+                for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
                 {
-                    entry = (Map.Entry<?, ?>) it.next();
-                    key = (String) entry.getKey();
-                    value = (IValue) entry.getValue();
-                    internKey = Record.keysPool.intern(key);
-                    
+                    value = entry.getValue();
+                    internKey = Record.keysPool.intern(entry.getKey());
+
                     if (value != null)
                     {
                         this.subMap.put(internKey, value);
@@ -939,12 +918,10 @@ final class SubMap implements Map<String, IValue>
                 IValue previous;
                 int putPtr = 0;
                 int removePtr = 0;
-                for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();)
+                for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
                 {
-                    entry = (Map.Entry<?, ?>) it.next();
-                    key = (String) entry.getKey();
-                    value = (IValue) entry.getValue();
-                    internKey = Record.keysPool.intern(key);
+                    value = entry.getValue();
+                    internKey = Record.keysPool.intern(entry.getKey());
 
                     if (value != null)
                     {
@@ -1157,8 +1134,7 @@ abstract class AbstractNotifyingIterator<IteratorType> implements Iterator<Itera
     @Override
     public IteratorType next()
     {
-        final Entry<String, IValue> next = this.snapshotEntryIterator.next();
-        this.current = next;
+        this.current = this.snapshotEntryIterator.next();
         return getValueForNext(this.current);
     }
 

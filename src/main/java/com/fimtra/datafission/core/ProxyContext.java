@@ -317,7 +317,7 @@ public final class ProxyContext implements IObserverContext
                 }
             }
         }
-        return records.toArray(new String[records.size()]);
+        return records.toArray(new String[0]);
     }
 
     static String[] insertPermissionToken(final String permissionToken, final String[] recordsToSubscribeFor)
@@ -895,7 +895,7 @@ public final class ProxyContext implements IObserverContext
             @Override
             protected void notifyListenerDataAdded(ISessionListener listener, String key, Pair<String, Boolean> data)
             {
-                if (data.getSecond().booleanValue())
+                if (data.getSecond())
                 {
                     listener.onSessionOpen(key, data.getFirst());
                 }
@@ -1388,8 +1388,8 @@ public final class ProxyContext implements IObserverContext
 
         if (changeName.charAt(0) == ContextUtils.PROTOCOL_PREFIX)
         {
-            final Boolean subscribeResult = Boolean.valueOf(changeName.startsWith(ACK, 0));
-            if (subscribeResult.booleanValue() || changeName.startsWith(NOK, 0))
+            final Boolean subscribeResult = changeName.startsWith(ACK, 0);
+            if (subscribeResult || changeName.startsWith(NOK, 0))
             {
                 handleSubscribeResult(changeToApply, changeName, subscribeResult);
                 
@@ -1426,7 +1426,7 @@ public final class ProxyContext implements IObserverContext
 
         final String action = changeName.substring(ACK_LEN);
         // always ensure a NOK is logged
-        if (!log && !logRx && !subscribeResult.booleanValue())
+        if (!log && !logRx && !subscribeResult)
         {
             Log.log(this, "(<-) ", SUBSCRIBE, NOK, ObjectUtils.safeToString(recordNames));
         }
@@ -1475,7 +1475,7 @@ public final class ProxyContext implements IObserverContext
         synchronized (this.resyncs)
         {
             resyncNeeded = this.resyncs.add(name);
-            this.resyncInProgress = !this.resyncs.isEmpty();
+            this.resyncInProgress = true;
         }
         if (resyncNeeded)
         {
@@ -1803,7 +1803,7 @@ public final class ProxyContext implements IObserverContext
             if (batchSubscribeRecordNames.size() == batchSize)
             {
                 subscribeBatch(permissionToken,
-                    batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                    batchSubscribeRecordNames.toArray(new String[0]), i, size);
                 batchSubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
@@ -1811,7 +1811,7 @@ public final class ProxyContext implements IObserverContext
         if (!batchSubscribeRecordNames.isEmpty())
         {
             subscribeBatch(permissionToken,
-                batchSubscribeRecordNames.toArray(new String[batchSubscribeRecordNames.size()]), i, size);
+                batchSubscribeRecordNames.toArray(new String[0]), i, size);
         }
     }
 
@@ -1856,7 +1856,7 @@ public final class ProxyContext implements IObserverContext
         {
             if (batchUnsubscribeRecordNames.size() == batchSize)
             {
-                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
+                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
                     size);
                 batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
             }
@@ -1864,7 +1864,7 @@ public final class ProxyContext implements IObserverContext
         }
         if (!batchUnsubscribeRecordNames.isEmpty())
         {
-            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[batchUnsubscribeRecordNames.size()]), i,
+            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
                 size);
         }
     }
@@ -1924,7 +1924,7 @@ public final class ProxyContext implements IObserverContext
         {
             token = entry.getKey();
             records = entry.getValue();
-            subscribe(token, records.toArray(new String[records.size()]));
+            subscribe(token, records.toArray(new String[0]));
         }
     }
 

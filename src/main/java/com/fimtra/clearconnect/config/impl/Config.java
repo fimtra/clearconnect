@@ -18,6 +18,7 @@ package com.fimtra.clearconnect.config.impl;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.FileSystems;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -142,7 +143,8 @@ final class Config implements IConfig {
 			List<String> configKeys = Collections.list(configResources.getKeys());
 			if (!configKeys.isEmpty()) {
 				Log.log(this, "Using config override file: ", ObjectUtils.safeToString(this.localConfigDir),
-						System.getProperty("file.separator"), this.localServiceInstanceIdConfig, ".properties");
+                        FileSystems.getDefault()
+                                .getSeparator(), this.localServiceInstanceIdConfig, ".properties");
 				for (String configKey : configKeys) {
 					String configValue = configResources.getString(configKey);
 					localProperties.put(configKey, TextValue.valueOf(configValue));

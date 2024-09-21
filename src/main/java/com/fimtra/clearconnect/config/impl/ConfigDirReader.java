@@ -117,7 +117,7 @@ class ConfigDirReader {
 			}
 		}
 		final Set<File> deletedFiles = setWithCachedFiles();
-		deletedFiles.removeAll(allFiles);
+		deletedFiles.removeAll(new HashSet<>(allFiles));
 		changedFiles.addAll(deletedFiles);
 		return changedFiles;
 	}

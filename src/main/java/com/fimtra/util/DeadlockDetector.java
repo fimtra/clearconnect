@@ -385,6 +385,6 @@ public final class DeadlockDetector
                 wrappers.add(new ThreadInfoWrapper(threadInfo));
             }
         }
-        return wrappers.toArray(new ThreadInfoWrapper[wrappers.size()]);
+        return wrappers.toArray(new ThreadInfoWrapper[0]);
     }
 }

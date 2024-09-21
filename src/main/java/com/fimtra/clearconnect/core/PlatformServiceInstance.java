@@ -183,15 +183,12 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 int subscriptionCount = 0;
                 for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
                 {
-                    subscriptionCount += it.next().getValue().longValue();
+                    subscriptionCount += (int) it.next().getValue().longValue();
                 }
 
                 final long nanoTime = System.nanoTime();
-                // can be null on the first call
-                final long messagesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                    : PlatformServiceInstance.this.publisher.getMessagesPublished();
-                final long bytesPublished = PlatformServiceInstance.this.publisher == null ? 0
-                    : PlatformServiceInstance.this.publisher.getBytesPublished();
+                final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
+                final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
 
                 final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
                 final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;

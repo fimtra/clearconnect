@@ -96,7 +96,7 @@ public final class FastDateFormat
                 if (diff < 1000)
                 {
                     // less than 1 sec passed
-                    this.SSS += diff;
+                    this.SSS += (int) diff;
                     if (this.SSS > 999)
                     {
                         this.SSS -= 1000;
@@ -115,7 +115,7 @@ public final class FastDateFormat
                             this.SSS -= 1000;
                             this.ss++;
                         }
-                        this.ss += (long) (diff * INVERSE_1000);
+                        this.ss += (int) (diff * INVERSE_1000);
                         updateForChangeInSeconds(currentTimeMillis);
                     }
                     else
@@ -129,13 +129,13 @@ public final class FastDateFormat
                                 this.SSS -= 1000;
                                 this.ss++;
                             }
-                            this.ss += (long) ((diff % 60000) * INVERSE_1000);
+                            this.ss += (int) ((diff % 60000) * INVERSE_1000);
                             if (this.ss > 59)
                             {
                                 this.ss -= 60;
                                 this.mm++;
                             }
-                            this.mm += (long) (diff * INVERSE_60000);
+                            this.mm += (int) (diff * INVERSE_60000);
                             if (this.mm > 59)
                             {
                                 this.mm -= 60;

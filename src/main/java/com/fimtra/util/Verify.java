@@ -51,7 +51,7 @@ public abstract class Verify
      */
     public static void isTrue(boolean condition, String msg)
     {
-        if (condition == false)
+        if (!condition)
         {
             throw new IllegalArgumentException(msg);
         }

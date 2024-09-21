@@ -66,7 +66,6 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
-import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.AtomicChange;
@@ -78,15 +77,14 @@ import com.fimtra.datafission.core.GZipProtocolCodec;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.core.RpcInstance;
-import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.ICoalescingRunnable;
+import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -178,7 +176,7 @@ public final class PlatformRegistry
      * 
      * @author Ramon Servadei
      */
-    static interface ServiceInfoRecordFields
+    interface ServiceInfoRecordFields
     {
         String PORT_FIELD = "PORT";
         String HOST_NAME_FIELD = "HOST_NAME";
@@ -189,7 +187,7 @@ public final class PlatformRegistry
         String SERVICE_INFO_RECORD_NAME_PREFIX = "ServiceInfo:";
     }
 
-    static interface IRuntimeStatusRecordFields
+    interface IRuntimeStatusRecordFields
     {
         String RUNTIME_NAME = "Agent";
         String RUNTIME_HOST = "Host";
@@ -206,7 +204,7 @@ public final class PlatformRegistry
         String UPTIME_SECS = "Uptime";
     }
 
-    static interface IPlatformSummaryRecordFields
+    interface IPlatformSummaryRecordFields
     {
         String VERSION = "Version";
         String NODES = "Nodes";
@@ -217,7 +215,7 @@ public final class PlatformRegistry
         String AGENTS = "Agents";
     }
 
-    static interface IServiceRecordFields
+    interface IServiceRecordFields
     {
         String RECORD_COUNT = "RecordCount";
         String RPC_COUNT = "RpcCount";
@@ -237,7 +235,7 @@ public final class PlatformRegistry
      * 
      * @author Ramon Servadei
      */
-    static interface IRegistryRecordNames
+    interface IRegistryRecordNames
     {
         /** Prefix for the records-per-service-family record */
         String PREFIX_RECORDS_PER_SERVICE = "Service_Records_";
@@ -347,9 +345,9 @@ public final class PlatformRegistry
     final IRecord serviceStats;
     /** @see IRegistryRecordNames#SERVICE_INSTANCES_PER_SERVICE_FAMILY */
     final IRecord serviceInstancesPerServiceFamily;
-    /** @See {@link IRegistryRecordNames#SERVICE_INSTANCES_PER_AGENT */
+    /** @see IRegistryRecordNames#SERVICE_INSTANCES_PER_AGENT */
     final IRecord serviceInstancesPerAgent;
-    /** @See {@link IRegistryRecordNames#SERVICE_INSTANCE_STATS */
+    /** @see IRegistryRecordNames#SERVICE_INSTANCE_STATS */
     final IRecord serviceInstanceStats;
     /** @see IRegistryRecordNames#PLATFORM_CONNECTIONS */
     final IRecord platformConnections;
@@ -367,7 +365,7 @@ public final class PlatformRegistry
      * Construct the platform registry using the default platform registry port.
      * 
      * @see #PlatformRegistry(String, String, int)
-     * @see PlatformCoreProperties#REGISTRY_PORT
+     * @see PlatformCoreProperties.Values#REGISTRY_PORT
      * @param platformName
      *            the platform name
      * @param node
@@ -446,25 +444,26 @@ public final class PlatformRegistry
             IRegistryRecordNames.PLATFORM_SUMMARY);
 
         // handle real-time updates for the platform summary
-        final IRecordListener platformSummaryListener = (imageCopy, atomicChange) -> {
-            PlatformRegistry.this.coalescingExecutor.execute(new ICoalescingRunnable()
-            {
-                @Override
-                public void run()
-                {
-                    PlatformRegistry.this.eventHandler.computePlatformSummary();
-                }
+        final IRecordListener platformSummaryListener =
+                (imageCopy, atomicChange) -> PlatformRegistry.this.coalescingExecutor.execute(
+                        new ICoalescingRunnable()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                PlatformRegistry.this.eventHandler.computePlatformSummary();
+                            }
 
-                @Override
-                public Object context()
-                {
-                    return IRegistryRecordNames.PLATFORM_SUMMARY;
-                }
-            });
-        };
+                            @Override
+                            public Object context()
+                            {
+                                return IRegistryRecordNames.PLATFORM_SUMMARY;
+                            }
+                        });
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.RUNTIME_STATUS);
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICES);
-        this.context.addObserver(platformSummaryListener, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+        this.context.addObserver(platformSummaryListener,
+                IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
         this.context.addObserver(platformSummaryListener, IRegistryRecordNames.PLATFORM_CONNECTIONS);
 
         // the registry's connections
@@ -500,30 +499,26 @@ public final class PlatformRegistry
     {
         final RpcInstance getServiceInfoRecordNameForServiceRpc =
             new RpcInstance(TypeEnum.TEXT, GET_SERVICE_INFO_RECORD_NAME_FOR_SERVICE, TypeEnum.TEXT);
-        getServiceInfoRecordNameForServiceRpc.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
+        getServiceInfoRecordNameForServiceRpc.setHandler(args -> {
+            try
             {
-                try
-                {
-                    final String nextInstance =
-                        PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue()).get();
+                final String nextInstance =
+                        PlatformRegistry.this.eventHandler.executeSelectNextInstance(args[0].textValue())
+                                .get();
 
-                    if (nextInstance == null)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        return TextValue.valueOf(
-                            ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
-                    }
-                }
-                catch (Exception e)
+                if (nextInstance == null)
                 {
-                    throw new ExecutionException(e);
+                    return null;
                 }
+                else
+                {
+                    return TextValue.valueOf(
+                            ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + nextInstance);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new ExecutionException(e);
             }
         });
         this.context.createRpc(getServiceInfoRecordNameForServiceRpc);
@@ -532,29 +527,16 @@ public final class PlatformRegistry
     private void createGetPlatformNameRpc()
     {
         final RpcInstance getPlatformName = new RpcInstance(TypeEnum.TEXT, GET_PLATFORM_NAME);
-        getPlatformName.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
-            {
-                return TextValue.valueOf(PlatformRegistry.this.platformName);
-            }
-        });
+        getPlatformName.setHandler(args -> TextValue.valueOf(PlatformRegistry.this.platformName));
         this.context.createRpc(getPlatformName);
     }
 
     private void createGetHeartbeatConfigRpc()
     {
         final RpcInstance getPlatformName = new RpcInstance(TypeEnum.TEXT, GET_HEARTBEAT_CONFIG);
-        getPlatformName.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
-            {
-                return TextValue.valueOf(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
-                    + ChannelUtils.WATCHDOG.getMissedHeartbeatCount());
-            }
-        });
+        getPlatformName.setHandler(
+                args -> TextValue.valueOf(ChannelUtils.WATCHDOG.getHeartbeatPeriodMillis() + ":"
+                    + ChannelUtils.WATCHDOG.getMissedHeartbeatCount()));
         this.context.createRpc(getPlatformName);
     }
 
@@ -565,59 +547,54 @@ public final class PlatformRegistry
         // redundancyMode, agentName, TransportTechnologyEnum
         final RpcInstance register = new RpcInstance(TypeEnum.TEXT, REGISTER, TypeEnum.TEXT, TypeEnum.TEXT,
             TypeEnum.TEXT, TypeEnum.LONG, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT);
-        register.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
+        register.setHandler(args -> {
+            int i = 0;
+            final String serviceFamily = args[i++].textValue();
+            final String wireProtocol = args[i++].textValue();
+            final String host = args[i++].textValue();
+            final int port = (int) args[i++].longValue();
+            final String serviceMember = args[i++].textValue();
+            final String redundancyMode = args[i++].textValue();
+            final String agentName = args[i++].textValue();
+            final String tte = args[i++].textValue();
+
+            if (serviceFamily.startsWith(PlatformRegistry.SERVICE_NAME))
             {
-                int i = 0;
-                final String serviceFamily = args[i++].textValue();
-                final String wireProtocol = args[i++].textValue();
-                final String host = args[i++].textValue();
-                final int port = (int) args[i++].longValue();
-                final String serviceMember = args[i++].textValue();
-                final String redundancyMode = args[i++].textValue();
-                final String agentName = args[i++].textValue();
-                final String tte = args[i++].textValue();
-
-                if (serviceFamily.startsWith(PlatformRegistry.SERVICE_NAME))
-                {
-                    throw new ExecutionException("Cannot create service with reserved name '" + SERVICE_NAME + "'");
-                }
-                if (serviceMember.startsWith(PlatformRegistry.SERVICE_NAME))
-                {
-                    throw new ExecutionException(
-                        "Cannot create service instance with reserved name '" + SERVICE_NAME + "'");
-                }
-
-                final String serviceInstanceId =
-                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                final RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(redundancyMode);
-                final Map<String, IValue> serviceRecordStructure = new HashMap<>();
-                serviceRecordStructure.put(ServiceInfoRecordFields.WIRE_PROTOCOL_FIELD,
-                    TextValue.valueOf(wireProtocol));
-                serviceRecordStructure.put(ServiceInfoRecordFields.HOST_NAME_FIELD, TextValue.valueOf(host));
-                serviceRecordStructure.put(ServiceInfoRecordFields.PORT_FIELD, LongValue.valueOf(port));
-                serviceRecordStructure.put(ServiceInfoRecordFields.REDUNDANCY_MODE_FIELD,
-                    TextValue.valueOf(redundancyMode));
-                serviceRecordStructure.put(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD, TextValue.valueOf(tte));
-
-                try
-                {
-                    PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(
-                        new RegistrationToken(
-                            "token#" + PlatformRegistry.this.registrationTokenCounter.incrementAndGet(),
-                            serviceInstanceId),
-                        serviceFamily, agentName, serviceInstanceId, redundancyModeEnum,
-                        TransportTechnologyEnum.valueOf(tte), serviceRecordStructure, args);
-                }
-                catch (Exception e)
-                {
-                    throw new ExecutionException(e);
-                }
-
-                return TextValue.valueOf("Registered " + serviceInstanceId);
+                throw new ExecutionException("Cannot create service with reserved name '" + SERVICE_NAME + "'");
             }
+            if (serviceMember.startsWith(PlatformRegistry.SERVICE_NAME))
+            {
+                throw new ExecutionException(
+                    "Cannot create service instance with reserved name '" + SERVICE_NAME + "'");
+            }
+
+            final String serviceInstanceId =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+            final RedundancyModeEnum redundancyModeEnum = RedundancyModeEnum.valueOf(redundancyMode);
+            final Map<String, IValue> serviceRecordStructure = new HashMap<>();
+            serviceRecordStructure.put(ServiceInfoRecordFields.WIRE_PROTOCOL_FIELD,
+                TextValue.valueOf(wireProtocol));
+            serviceRecordStructure.put(ServiceInfoRecordFields.HOST_NAME_FIELD, TextValue.valueOf(host));
+            serviceRecordStructure.put(ServiceInfoRecordFields.PORT_FIELD, LongValue.valueOf(port));
+            serviceRecordStructure.put(ServiceInfoRecordFields.REDUNDANCY_MODE_FIELD,
+                TextValue.valueOf(redundancyMode));
+            serviceRecordStructure.put(ServiceInfoRecordFields.TRANSPORT_TECHNOLOGY_FIELD, TextValue.valueOf(tte));
+
+            try
+            {
+                PlatformRegistry.this.eventHandler.executeRegisterServiceInstance(
+                    new RegistrationToken(
+                        "token#" + PlatformRegistry.this.registrationTokenCounter.incrementAndGet(),
+                        serviceInstanceId),
+                    serviceFamily, agentName, serviceInstanceId, redundancyModeEnum,
+                    TransportTechnologyEnum.valueOf(tte), serviceRecordStructure, args);
+            }
+            catch (Exception e)
+            {
+                throw new ExecutionException(e);
+            }
+
+            return TextValue.valueOf("Registered " + serviceInstanceId);
         });
         this.context.createRpc(register);
     }
@@ -625,28 +602,23 @@ public final class PlatformRegistry
     private void createDeregisterRpc()
     {
         final RpcInstance deregister = new RpcInstance(TypeEnum.TEXT, DEREGISTER, TypeEnum.TEXT, TypeEnum.TEXT);
-        deregister.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+        deregister.setHandler(args -> {
+            int i = 0;
+            final String serviceFamily = args[i++].textValue();
+            final String serviceMember = args[i++].textValue();
+            final String serviceInstanceId =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+            try
             {
-                int i = 0;
-                final String serviceFamily = args[i++].textValue();
-                final String serviceMember = args[i++].textValue();
-                final String serviceInstanceId =
-                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-                try
-                {
-                    PlatformRegistry.this.eventHandler.executeDeregisterPlatformServiceInstance(null, serviceFamily,
-                        serviceInstanceId, "RPC call");
-                }
-                catch (Exception e)
-                {
-                    throw new ExecutionException(e);
-                }
-
-                return TextValue.valueOf("Deregistered " + serviceInstanceId);
+                PlatformRegistry.this.eventHandler.executeDeregisterPlatformServiceInstance(null, serviceFamily,
+                    serviceInstanceId, "RPC call");
             }
+            catch (Exception e)
+            {
+                throw new ExecutionException(e);
+            }
+
+            return TextValue.valueOf("Deregistered " + serviceInstanceId);
         });
         this.context.createRpc(deregister);
     }
@@ -660,14 +632,9 @@ public final class PlatformRegistry
         final RpcInstance runtimeStatus = new RpcInstance(TypeEnum.TEXT, RUNTIME_STATIC, fields, TypeEnum.TEXT,
             TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.TEXT, TypeEnum.LONG);
 
-        runtimeStatus.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
-            {
-                PlatformRegistry.this.eventHandler.executeRpcRuntimeStatic(args);
-                return PlatformUtils.OK;
-            }
+        runtimeStatus.setHandler(args -> {
+            PlatformRegistry.this.eventHandler.executeRpcRuntimeStatic(args);
+            return PlatformUtils.OK;
         });
         this.context.createRpc(runtimeStatus);
     }
@@ -684,14 +651,9 @@ public final class PlatformRegistry
             new RpcInstance(TypeEnum.TEXT, RUNTIME_DYNAMIC, fields, TypeEnum.TEXT, TypeEnum.LONG, TypeEnum.LONG,
                 TypeEnum.LONG, TypeEnum.LONG, TypeEnum.LONG, TypeEnum.LONG, TypeEnum.LONG, TypeEnum.LONG);
 
-        runtimeStatus.setHandler(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(final IValue... args) throws TimeOutException, ExecutionException
-            {
-                PlatformRegistry.this.eventHandler.executeRpcRuntimeDynamic(args);
-                return PlatformUtils.OK;
-            }
+        runtimeStatus.setHandler(args -> {
+            PlatformRegistry.this.eventHandler.executeRpcRuntimeDynamic(args);
+            return PlatformUtils.OK;
         });
         this.context.createRpc(runtimeStatus);
     }
@@ -804,7 +766,7 @@ final class EventHandler
         // noop
     };
 
-    private static interface IDescriptiveRunnable extends ISequentialRunnable
+    private interface IDescriptiveRunnable extends ISequentialRunnable
     {
         String getDescription();
     }
@@ -1227,8 +1189,8 @@ final class EventHandler
                 {
                     // find the instance with the earliest timestamp
                     long earliest = Long.MAX_VALUE;
-                    String key = null;
-                    IValue value = null;
+                    String key;
+                    IValue value;
                     for (Entry<String, IValue> entry : serviceInstances.entrySet())
                     {
                         key = entry.getKey();
@@ -1321,10 +1283,10 @@ final class EventHandler
     void removeUnregisteredProxiesAndMonitors()
     {
         final Collection<RegistrationToken> registrationTokens = this.registrationTokenPerInstance.values();
-        RegistrationToken registrationToken = null;
+        RegistrationToken registrationToken;
 
         {
-            Map.Entry<RegistrationToken, ProxyContext> entry = null;
+            Map.Entry<RegistrationToken, ProxyContext> entry;
             for (Iterator<Map.Entry<RegistrationToken, ProxyContext>> it =
                 this.monitoredServiceInstances.entrySet().iterator(); it.hasNext();)
             {
@@ -1346,7 +1308,7 @@ final class EventHandler
             }
         }
         {
-            Map.Entry<RegistrationToken, PlatformServiceConnectionMonitor> entry = null;
+            Map.Entry<RegistrationToken, PlatformServiceConnectionMonitor> entry;
             for (Iterator<Map.Entry<RegistrationToken, PlatformServiceConnectionMonitor>> it =
                 this.connectionMonitors.entrySet().iterator(); it.hasNext();)
             {
@@ -1820,7 +1782,7 @@ final class EventHandler
     private void handleRpcRuntimeDynamic(final IValue... args)
     {
         final String agentName = args[0].textValue();
-        boolean publish = true;
+        boolean publish = false;
         synchronized (this.registry.runtimeStatus.getWriteLock())
         {
             if (this.registry.runtimeStatus.getSubMapKeys().contains(agentName))
@@ -1869,12 +1831,8 @@ final class EventHandler
         }
 
         // get the connections for the family
-        Set<String> connectionIds = this.connectionsPerServiceFamily.get(serviceFamily);
-        if (connectionIds == null)
-        {
-            connectionIds = new HashSet<>();
-            this.connectionsPerServiceFamily.put(serviceFamily, connectionIds);
-        }
+        final Set<String> connectionIds =
+                this.connectionsPerServiceFamily.computeIfAbsent(serviceFamily, k -> new HashSet<>());
         connectionIds.addAll(atomicChange.getSubMapKeys());
 
         long subscriptionCount = 0;
@@ -1887,7 +1845,7 @@ final class EventHandler
         synchronized (this.connectionsLock)
         {
             IValue proxyId;
-            String agent = null;
+            String agent;
             IRecordChange subMapAtomicChange;
             Map<String, IValue> connection;
             for (String connectionId : atomicChange.getSubMapKeys())
@@ -2289,131 +2247,123 @@ final class EventHandler
         final String serviceMember, final String serviceInstanceId, final ProxyContext serviceProxy)
     {
         // add a listener to get the service-level statistics
-        serviceProxy.addObserver((imageCopy, atomicChange) -> {
-            execute(new IDescriptiveRunnable()
+        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
+        {
+            @Override
+            public String getDescription()
             {
-                @Override
-                public String getDescription()
-                {
-                    return "handle service stats record change: " + serviceProxy.getName();
-                }
+                return "handle service stats record change: " + serviceProxy.getName();
+            }
 
-                @Override
-                public Object context()
-                {
-                    return serviceFamily;
-                }
+            @Override
+            public Object context()
+            {
+                return serviceFamily;
+            }
 
-                @Override
-                public void run()
+            @Override
+            public void run()
+            {
+                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                 {
-                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                    {
-                        removeServiceStats(serviceInstanceId);
-                    }
-                    else
-                    {
-                        final Map<String, IValue> statsForService =
-                            EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
-                        statsForService.putAll(imageCopy);
-                        publishTimed(EventHandler.this.registry.serviceInstanceStats);
-                    }
+                    removeServiceStats(serviceInstanceId);
                 }
-            });
-        }, PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
+                else
+                {
+                    final Map<String, IValue> statsForService =
+                        EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
+                    statsForService.putAll(imageCopy);
+                    publishTimed(EventHandler.this.registry.serviceInstanceStats);
+                }
+            }
+        }), PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
 
         // add a listener to cache the context connections record of the service locally in
         // the platformConnections record
-        serviceProxy.addObserver((imageCopy, atomicChange) -> {
-            execute(new IDescriptiveRunnable()
+        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
+        {
+            @Override
+            public String getDescription()
             {
-                @Override
-                public String getDescription()
-                {
-                    return "handleConnectionsUpdate: " + serviceProxy.getName();
-                }
+                return "handleConnectionsUpdate: " + serviceProxy.getName();
+            }
 
-                @Override
-                public Object context()
-                {
-                    return serviceFamily;
-                }
+            @Override
+            public Object context()
+            {
+                return serviceFamily;
+            }
 
-                @Override
-                public void run()
-                {
-                    handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
-                }
-            });
-        }, REMOTE_CONTEXT_CONNECTIONS);
+            @Override
+            public void run()
+            {
+                handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
+            }
+        }), REMOTE_CONTEXT_CONNECTIONS);
 
         // add listeners to handle platform objects published by this instance
-        serviceProxy.addObserver((imageCopy, atomicChange) -> {
-            execute(new IDescriptiveRunnable()
+        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
+        {
+            @Override
+            public String getDescription()
             {
-                @Override
-                public String getDescription()
-                {
-                    return "handle RemoteContextRecords record change: " + serviceProxy.getName();
-                }
+                return "handle RemoteContextRecords record change: " + serviceProxy.getName();
+            }
 
-                @Override
-                public Object context()
-                {
-                    return serviceFamily;
-                }
-
-                @Override
-                public void run()
-                {
-                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                    {
-                        removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                    }
-                    else
-                    {
-                        final IRecord serviceInstanceObjectsRecord = getRecordsPerServiceInstance(serviceInstanceId);
-                        final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
-                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                            serviceInstanceObjectsRecord, serviceObjectsRecord, true,
-                            IServiceRecordFields.RECORD_COUNT);
-                    }
-                }
-            });
-        }, REMOTE_CONTEXT_RECORDS);
-
-        serviceProxy.addObserver((imageCopy, atomicChange) -> {
-            execute(new IDescriptiveRunnable()
+            @Override
+            public Object context()
             {
-                @Override
-                public String getDescription()
-                {
-                    return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
-                }
+                return serviceFamily;
+            }
 
-                @Override
-                public Object context()
+            @Override
+            public void run()
+            {
+                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                 {
-                    return serviceFamily;
+                    removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
                 }
+                else
+                {
+                    final IRecord serviceInstanceObjectsRecord = getRecordsPerServiceInstance(serviceInstanceId);
+                    final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
+                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                        serviceInstanceObjectsRecord, serviceObjectsRecord, true,
+                        IServiceRecordFields.RECORD_COUNT);
+                }
+            }
+        }), REMOTE_CONTEXT_RECORDS);
 
-                @Override
-                public void run()
+        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
+        {
+            @Override
+            public String getDescription()
+            {
+                return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
+            }
+
+            @Override
+            public Object context()
+            {
+                return serviceFamily;
+            }
+
+            @Override
+            public void run()
+            {
+                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                 {
-                    if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                    {
-                        removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                    }
-                    else
-                    {
-                        final IRecord serviceInstanceObjectsRecord = getRpcsPerServiceInstance(serviceInstanceId);
-                        final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
-                        handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                            serviceInstanceObjectsRecord, serviceObjectsRecord, false, IServiceRecordFields.RPC_COUNT);
-                    }
+                    removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
                 }
-            });
-        }, REMOTE_CONTEXT_RPCS);
+                else
+                {
+                    final IRecord serviceInstanceObjectsRecord = getRpcsPerServiceInstance(serviceInstanceId);
+                    final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
+                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
+                        serviceInstanceObjectsRecord, serviceObjectsRecord, false, IServiceRecordFields.RPC_COUNT);
+                }
+            }
+        }), REMOTE_CONTEXT_RPCS);
         // remove the NOOP observer as we have a real listener attached to the RPC record now
         serviceProxy.removeObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
     }
@@ -2430,7 +2380,7 @@ final class EventHandler
                     this.registry.serviceInstancesPerServiceFamily.getOrCreateSubMap(serviceFamily);
 
                 serviceInstancesNamesForThisServiceArray = serviceMembersForThisService.keySet().toArray(
-                    new String[serviceMembersForThisService.keySet().size()]);
+                        new String[0]);
             }
         }
 
@@ -2446,8 +2396,7 @@ final class EventHandler
                 objectsForAllServiceInstancesOfThisService.add(objectsAreRecords
                     ? getRecordsPerServiceInstance(serviceInstanceId) : getRpcsPerServiceInstance(serviceInstanceId));
             }
-            return objectsForAllServiceInstancesOfThisService.toArray(
-                new IRecord[objectsForAllServiceInstancesOfThisService.size()]);
+            return objectsForAllServiceInstancesOfThisService.toArray(new IRecord[0]);
         }
         else
         {
