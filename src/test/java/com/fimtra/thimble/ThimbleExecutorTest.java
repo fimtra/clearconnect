@@ -21,7 +21,9 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
+import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -62,6 +64,8 @@ public class ThimbleExecutorTest
         @Override
         public void run()
         {
+            // simulate task slowness - 100us
+            LockSupport.parkNanos(100_000);
             this.runCount.incrementAndGet();
             if (this.current.get() > this.myCount)
             {
@@ -186,14 +190,20 @@ public class ThimbleExecutorTest
         final AtomicInteger runCount = new AtomicInteger();
         final AtomicInteger current = new AtomicInteger();
         final CountDownLatch latch = new CountDownLatch(1);
-        int maxCount = count - 1;
+        final int maxCount = count - 1;
 
         for (int i = 0; i < count; i++)
         {
             this.candidate.execute(new CoalescingTestingRunnable(current, i, maxCount, latch, runCount));
         }
         assertTrue("Not all coalescing runnables were run", latch.await(2, TimeUnit.SECONDS));
-        assertTrue("got: " + runCount.get(), runCount.get() < count );
+        assertTrue("got: runCount=" + runCount.get(), runCount.get() < getMaxCoalescingCount(count));
+    }
+
+    private static int getMaxCoalescingCount(int count)
+    {
+        // assume coalescing means we never execute the complete count!
+        return count - 5;
     }
 
     @Test
@@ -225,7 +235,7 @@ public class ThimbleExecutorTest
         final CountDownLatch sequentialLatch = new CountDownLatch(count);
         final AtomicInteger coalescingCounter = new AtomicInteger();
         final CountDownLatch coalesingLatch = new CountDownLatch(1);
-        int maxCount = count - 1;
+        final int maxCount = count - 1;
 
         for (int i = 0; i < count; i++)
         {
@@ -251,7 +261,7 @@ public class ThimbleExecutorTest
         assertTrue("Not all sequential runnables were run, remaining is " + sequentialLatch.getCount(),
             sequentialLatch.await(2, TimeUnit.SECONDS));
         assertTrue("Not all coalescing runnables were run", coalesingLatch.await(2, TimeUnit.SECONDS));
-        assertTrue(runCount.toString(), runCount.get() < count - 5);
+        assertTrue("got: runCount=" + runCount.get(), runCount.get() < getMaxCoalescingCount(count));
         System.err.println(this.candidate.getCoalescingTaskStatistics());
         System.err.println(this.candidate.getSequentialTaskStatistics());
         System.err.println(this.candidate.getExecutorStatistics());
