@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,6 +52,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.tcpchannel.TcpChannelUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -1862,11 +1864,13 @@ public class ProxyContextTest
     {
         createComponents();
         this.executor.shutdownNow();
+        final AtomicReference<String> callingContext = new AtomicReference<>();
         RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
         {
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
+                callingContext.set(RpcCallingContext.getCallerEndpointDescription());
                 StringBuilder sb = new StringBuilder();
                 for (IValue iValue : args)
                 {
@@ -1882,6 +1886,9 @@ public class ProxyContextTest
         IValue result = this.candidate.getRpc("concat2").execute(TextValue.valueOf("someValue1"),
             new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
+        assertTrue("Got:" + callingContext.get(), callingContext.get()
+                .startsWith(InetAddress.getByName(LOCALHOST)
+                        .getHostAddress() + ":"));
         Log.banner(this, "There should be no occurrences of rpc|concat2");
     }
 

@@ -206,7 +206,15 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         {
                             throw new NullPointerException("RPC [" + rpcName + "] does not exist");
                         }
-                        rpc.execute(args);
+                        RpcCallingContext.set(this.caller.getEndPointDescription());
+                        try
+                        {
+                            rpc.execute(args);
+                        }
+                        finally
+                        {
+                            RpcCallingContext.remove();
+                        }
                     }
                     catch (Exception e)
                     {
@@ -233,8 +241,16 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         {
                             throw new NullPointerException("RPC [" + rpcName + "] does not exist");
                         }
-                        IValue result = rpc.execute(args);
-                        resultEntries.put(RESULT, result);
+                        RpcCallingContext.set(this.caller.getEndPointDescription());
+                        try
+                        {
+                            IValue result = rpc.execute(args);
+                            resultEntries.put(RESULT, result);
+                        }
+                        finally
+                        {
+                            RpcCallingContext.remove();
+                        }
                     }
                     catch (Exception e)
                     {
@@ -304,7 +320,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 final CountDownLatch executionStartedLatch = new CountDownLatch(1);
                 final CountDownLatch executionCompleteLatch = new CountDownLatch(1);
                 final AtomicReference<Map<String, IValue>> result = new AtomicReference<>();
-                final boolean noAck = args.length == 0 ? false : args[args.length - 1] == NO_ACK;
+                final boolean noAck = args.length != 0 && args[args.length - 1] == NO_ACK;
                 final String resultMapName =
                     noAck ? NO_ACK.textValue() : RPC_RECORD_RESULT_PREFIX + this.rpcName + ":"
                         + System.identityHashCode(this) + ":" + System.currentTimeMillis() + ":"
@@ -382,7 +398,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         try
                         {
                             // wait for acknowledgement that execution has started
-                            if (!executionStartedLatch.await(this.remoteExecutionStartTimeoutMillis.get().longValue(),
+                            if (!executionStartedLatch.await(this.remoteExecutionStartTimeoutMillis.get(),
                                 TimeUnit.MILLISECONDS))
                             {
                                 throw new TimeOutException("The RPC execution did not start after "
@@ -463,8 +479,8 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     {
         final StringBuilder args = new StringBuilder();
         final StringBuilder argNames = new StringBuilder();
-        final boolean argNamesExist =
-            instance.getArgNames() == null ? false : instance.getArgNames().length == instance.getArgTypes().length;
+        final boolean argNamesExist = instance.getArgNames() != null
+                && instance.getArgNames().length == instance.getArgTypes().length;
         if (instance.getArgTypes() != null)
         {
             for (int i = 0; i < instance.getArgTypes().length; i++)
@@ -777,13 +793,13 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     @Override
     public void setRemoteExecutionStartTimeoutMillis(long remoteExecutionStartTimeoutMillis)
     {
-        this.remoteExecutionStartTimeoutMillis.set(Long.valueOf(remoteExecutionStartTimeoutMillis));
+        this.remoteExecutionStartTimeoutMillis.set(remoteExecutionStartTimeoutMillis);
     }
 
     @Override
     public void setRemoteExecutionDurationTimeoutMillis(long remoteExecutionDurationTimeoutMillis)
     {
-        this.remoteExecutionDurationTimeoutMillis.set(Long.valueOf(remoteExecutionDurationTimeoutMillis));
+        this.remoteExecutionDurationTimeoutMillis.set(remoteExecutionDurationTimeoutMillis);
     }
 
     @Override

@@ -18,12 +18,15 @@ package com.fimtra.datafission.core;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fimtra.channel.ITransportChannel;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,13 +36,12 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.datafission.core.AtomicChange;
-import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.RpcInstance.Remote;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import org.mockito.Mockito;
 
 /**
  * Tests for the {@link RpcInstance}
@@ -167,6 +169,34 @@ public class RpcInstanceTest
             }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(TextValue.valueOf(
                 "text"), new DoubleValue(Double.NaN), new DoubleValue(3));
         assertEquals("textNaN3.0", result.textValue());
+    }
+
+    @Test
+    public void testGetCaller() throws TimeOutException, ExecutionException
+    {
+        final String noCallerSet = "no caller set";
+        final RpcInstance rpcInstance = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                final String caller = RpcCallingContext.getCallerEndpointDescription();
+                return TextValue.valueOf(caller == null ? noCallerSet : caller);
+            }
+        }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE);
+
+        // check calling context is null when no context is set during execution
+        IValue result =
+            rpcInstance.execute(TextValue.valueOf(
+                "text"), new DoubleValue(Double.NaN), new DoubleValue(3));
+        assertEquals(noCallerSet, result.textValue());
+
+        final String value = "caller!";
+        RpcCallingContext.set(value);
+        result =
+                rpcInstance.execute(TextValue.valueOf(
+                        "text"), new DoubleValue(Double.NaN), new DoubleValue(3));
+        assertEquals(value, result.textValue());
     }
 
     @Test(expected = ExecutionException.class)

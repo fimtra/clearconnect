@@ -26,6 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -33,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.datafission.core.RpcCallingContext;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -404,8 +407,9 @@ public class PlatformServiceProxyTest
     }
 
     @Test
-    public void testInvokeRpc() throws TimeOutException, ExecutionException
+    public void testInvokeRpc() throws TimeOutException, ExecutionException, UnknownHostException
     {
+        final AtomicReference<String> callingContext = new AtomicReference<>();
         RpcInstance rpc1 = new RpcInstance(TypeEnum.TEXT, RPC1);
         final TextValue textValue = TextValue.valueOf("result");
         rpc1.setHandler(new IRpcExecutionHandler()
@@ -413,11 +417,15 @@ public class PlatformServiceProxyTest
             @Override
             public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
+                callingContext.set(RpcCallingContext.getCallerEndpointDescription());
                 return textValue;
             }
         });
         assertTrue(this.service.publishRPC(rpc1));
         assertEquals(textValue, this.candidate.executeRpc(1000, RPC1));
+        assertTrue("Got:" + callingContext.get(), callingContext.get()
+                .startsWith(InetAddress.getByName(hostName)
+                        .getHostAddress() + ":"));
     }
 
     @Test
