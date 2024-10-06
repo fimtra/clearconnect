@@ -16,7 +16,6 @@
 package com.fimtra.clearconnect.core;
 
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -151,7 +150,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             @Override
             public Object context()
             {
-                return this;
+                return PlatformServiceInstance.this;
             }
 
             @Override
@@ -181,9 +180,10 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
 
                 int subscriptionCount = 0;
-                for (Iterator<Map.Entry<String, IValue>> it = subscriptions.entrySet().iterator(); it.hasNext();)
+                for (Map.Entry<String, IValue> entry : subscriptions.entrySet())
                 {
-                    subscriptionCount += (int) it.next().getValue().longValue();
+                    subscriptionCount += (int) entry.getValue()
+                            .longValue();
                 }
 
                 final long nanoTime = System.nanoTime();
@@ -565,13 +565,13 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             final Boolean previousState = this.isFtMasterInstance;
             this.isFtMasterInstance = isFtMaster;
 
-            final boolean isMaster = isFtMaster.booleanValue();
+            final boolean isMaster = isFtMaster;
 
             Log.banner(this, this.toString() + " " + (isMaster ? "ACTIVE" : "STANDBY"));
 
             // if we are not the master but previously we were, we need to cut all connections so
             // proxies reconnect to the new master
-            if (!isFtMaster.booleanValue() && previousState != null)
+            if (!isFtMaster && previousState != null)
             {
                 // "->PlatformRegistry"
                 final String registryConnection =
@@ -579,7 +579,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 
                 // disconnect all clients EXCEPT the registry connection
                 this.publisher.disconnectClients("No longer master instance",
-                    (identity) -> Boolean.valueOf(!identity.contains(registryConnection)));
+                    (identity) -> !identity.contains(registryConnection));
             }
 
             for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)
