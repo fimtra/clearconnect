@@ -69,6 +69,20 @@ public abstract class TcpChannelProperties
          */
         String PROPERTY_NAME_SERVER_BLACKLIST_ACL = BASE + "serverBlacklistAcl";
         /**
+         * The system property name to define the count of connections per host that triggers suspicious
+         * connections checking (after grace period).
+         * <br> E.g. <code>-DtcpChannel.serverSuspiciousConnectionLimit=100</code>
+         */
+        String SERVER_SUSPICIOUS_CONNECTION_LIMIT = BASE + "serverSuspiciousConnectionLimit";
+        /**
+         * The system property name to define the grace period after server socket start after which
+         * suspicious connection logic is enabled (typically to accomodate server bounces and mass
+         * re-connects).
+         * <br> E.g. <code>-DtcpChannel.serverSuspiciousConnectionGracePeriodMillis=60000</code>
+         */
+        String SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS =
+                BASE + "serverSuspiciousConnectionGracePeriodMillis";
+        /**
          * The system property name to define if connections to the {@link TcpServer} instances in the runtime
          * are logged. The logging will track the number of connections attempted from each host and whether
          * the host is blacklisted or blocked.<br> E.g. <code>-DtcpChannel.serverConnectionLogging=true</code>
@@ -235,7 +249,20 @@ public abstract class TcpChannelProperties
          * @see Names#SERVER_SOCKET_REUSE_ADDR
          */
         boolean SERVER_SOCKET_REUSE_ADDR = SystemUtils.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, true);
-
+        /**
+         * The default for the server suspicious connection limit (after grace period), default is 100.
+         *
+         * @see Names#SERVER_SUSPICIOUS_CONNECTION_LIMIT
+         */
+        int SERVER_SUSPICIOUS_CONNECTION_LIMIT =
+                SystemUtils.getPropertyAsInt(Names.SERVER_SUSPICIOUS_CONNECTION_LIMIT, 100);
+        /**
+         * The default for the server suspicious connection grace period, default is 60,000 (1 min).
+         *
+         * @see Names#SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS
+         */
+        int SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS =
+                SystemUtils.getPropertyAsInt(Names.SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS, 60000);
         /**
          * The default for server connection logging, default is <code>true</code>.
          *
