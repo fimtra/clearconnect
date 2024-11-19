@@ -42,6 +42,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.clearconnect.PlatformCoreProperties;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -1633,6 +1634,11 @@ public class PlatformTest
     @Test
     public void testPlatformRpcs() throws InterruptedException, IOException
     {
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            return;
+        }
+
         final String SERVICE1 = logStart();
         final String SERVICE2 = "testPlatformRpcs_LB";
 
@@ -1856,6 +1862,11 @@ public class PlatformTest
     @Test
     public void testPlatformRecords() throws InterruptedException, IOException
     {
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            return;
+        }
+
         final String SERVICE1 = logStart();
         final String SERVICE2 = "testPlatformRecords_LB";
 
@@ -2003,6 +2014,11 @@ public class PlatformTest
     @Test
     public void testCountingRecordSubscriptionsPerService() throws InterruptedException, IOException
     {
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            return;
+        }
+
         final String SERVICE1 = logStart();
 
         createAgent();
