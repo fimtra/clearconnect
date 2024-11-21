@@ -1566,9 +1566,22 @@ public final class ProxyContext implements IObserverContext
         }
 
         instance = instance.clone();
+        setRpcHander(name, instance);
+        return instance;
+    }
+
+    private void setRpcHander(String name, RpcInstance instance)
+    {
         instance.setHandler(new RpcInstance.Remote.Caller(name, this.codec, this.channel, this.context,
             instance.remoteExecutionStartTimeoutMillis, instance.remoteExecutionDurationTimeoutMillis));
-        return instance;
+    }
+
+    /**
+     * Set this ProxyContext as the handler target for RPC
+     */
+    public void setRpcHander(RpcInstance rpcTemplate)
+    {
+        setRpcHander(rpcTemplate.getName(), rpcTemplate);
     }
 
     /**

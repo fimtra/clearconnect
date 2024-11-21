@@ -15,6 +15,8 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.core.PlatformServiceInstance.RPC_FT_SERVICE_STATUS;
+import static com.fimtra.clearconnect.core.PlatformServiceInstance.SERVICE_STATS_RECORD_NAME;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
@@ -2100,9 +2102,12 @@ final class EventHandler
 
         try
         {
-            ContextUtils.getRpc(proxy, PlatformCoreProperties.Values.REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS,
-                PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
-                    TextValue.valueOf(Boolean.valueOf(active).toString()));
+            final RpcInstance ftServiceInstanceStatus =
+                    new RpcInstance(TypeEnum.TEXT, RPC_FT_SERVICE_STATUS, TypeEnum.TEXT);
+            proxy.setRpcHander(ftServiceInstanceStatus);
+
+            ftServiceInstanceStatus.executeNoResponse(TextValue.valueOf(Boolean.valueOf(active)
+                    .toString()));
         }
         catch (Exception e)
         {
@@ -2349,7 +2354,7 @@ final class EventHandler
                     @Override
                     public void run()
                     {
-                        if (PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(imageCopy.getName()))
+                        if (SERVICE_STATS_RECORD_NAME.equals(imageCopy.getName()))
                         {
                             if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
                             {
@@ -2370,7 +2375,7 @@ final class EventHandler
                     }
                 });
             }
-        }, PlatformServiceInstance.SERVICE_STATS_RECORD_NAME, REMOTE_CONTEXT_CONNECTIONS);
+        }, SERVICE_STATS_RECORD_NAME, REMOTE_CONTEXT_CONNECTIONS);
 
         if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
         {
