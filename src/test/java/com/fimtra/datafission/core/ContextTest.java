@@ -40,8 +40,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.thimble.ISequentialRunnable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -88,6 +90,50 @@ public class ContextTest
     @After
     public void tearDown() throws Exception
     {
+    }
+
+    @Test
+    public void testExecuteSequentialCoreTask() throws InterruptedException
+    {
+        final int limit = 20;
+        final CountDownLatch latch = new CountDownLatch(limit);
+        for (int i = 0; i < limit; i++)
+        {
+            candidate.executeSequentialCoreTask(new ISequentialRunnable()
+            {
+                @Override
+                public Object context()
+                {
+                    return "testExecuteSequentialCoreTask";
+                }
+
+                @Override
+                public void run()
+                {
+                    latch.countDown();
+                }
+            });
+        }
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExecuteSequentialCoreTask_invalidContext()
+    {
+        candidate.executeSequentialCoreTask(new ISequentialRunnable()
+        {
+            @Override
+            public Object context()
+            {
+                return this;
+            }
+
+            @Override
+            public void run()
+            {
+
+            }
+        });
     }
 
     @Test

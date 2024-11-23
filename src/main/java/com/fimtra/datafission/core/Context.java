@@ -147,11 +147,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     }
 
     /**
-     * Bypass any checks and get a writable record - <b>only used for internals</b>
+     * Bypass any checks and get a writable ContextConnections record - <b>only used for internals</b>
      */
-    static IRecord getRecordInternal(IObserverContext context, String name)
+    static IRecord getContextConnectionsRecordInternal(IObserverContext context)
     {
-        return ((Context) context).records.get(name);
+        return ((Context) context).records.get(ISystemRecordNames.CONTEXT_CONNECTIONS);
     }
 
     /**
@@ -1253,6 +1253,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
+        if (sequentialRunnable.context() == sequentialRunnable)
+        {
+            throw new IllegalArgumentException(
+                    "Sequential runnable [" + sequentialRunnable + "] is coalescing on itself!");
+        }
+
         final Object context = sequentialRunnable.context();
         if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
         {
