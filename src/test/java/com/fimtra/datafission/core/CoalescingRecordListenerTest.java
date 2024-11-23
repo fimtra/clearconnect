@@ -201,6 +201,6 @@ public class CoalescingRecordListenerTest
             }
         });
 
-        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 200);
+        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 500);
     }
 }

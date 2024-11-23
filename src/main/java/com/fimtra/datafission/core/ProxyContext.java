@@ -940,15 +940,6 @@ public final class ProxyContext implements IObserverContext
         }
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
-        this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver(new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord image, IRecordChange atomicChange)
-            {
-                updateRpcTemplates(atomicChange);
-            }
-        }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -1550,7 +1541,34 @@ public final class ProxyContext implements IObserverContext
     @Override
     public IRpcInstance getRpc(final String name)
     {
-        final IValue definition = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).get(name);
+        final IRecord rpcRecord = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+        if (rpcRecord == null)
+        {
+            synchronized (this.lock)
+            {
+                // only subscribe for the RPC record "on demand"
+                this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                this.context.addObserver(new IRecordListener()
+                {
+                    @Override
+                    public void onChange(IRecord image, IRecordChange atomicChange)
+                    {
+                        updateRpcTemplates(atomicChange);
+                    }
+                }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+            }
+            try
+            {
+                return ContextUtils.getRpc(this, reconnectPeriodMillis, name);
+            }
+            catch (IRpcInstance.TimeOutException e)
+            {
+                Log.log(this, "Could not get RPC", e);
+                return null;
+            }
+        }
+
+        final IValue definition = rpcRecord.get(name);
         if (definition == null)
         {
             this.rpcTemplates.remove(name);
@@ -1665,7 +1683,7 @@ public final class ProxyContext implements IObserverContext
 
             // Remove RPCs
             final IRecord rpcRecord = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-            if (rpcRecord.size() > 0)
+            if (rpcRecord != null && rpcRecord.size() > 0)
             {
                 Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord.keySet()), " from ", getShortName());
                 synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())

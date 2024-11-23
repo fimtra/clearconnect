@@ -1598,6 +1598,7 @@ public class PlatformTest
     @Test
     public void testPlatformConnections() throws InterruptedException, IOException
     {
+
         final String SERVICE1 = logStart();
 
         Log.log(this, "START testPlatformConnections");

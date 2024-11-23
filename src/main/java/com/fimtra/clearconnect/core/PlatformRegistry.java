@@ -2330,6 +2330,11 @@ final class EventHandler
     private void registerStep5_registerListenersForServiceInstance(final String serviceFamily,
         final String serviceMember, final String serviceInstanceId, final ProxyContext serviceProxy)
     {
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            return;
+        }
+
         // add a listener to get the service-level statistics and
         // to cache the context connections record of the service locally in the platformConnections record
         serviceProxy.addObserver(new IRecordListener()
@@ -2376,11 +2381,6 @@ final class EventHandler
                 });
             }
         }, SERVICE_STATS_RECORD_NAME, REMOTE_CONTEXT_CONNECTIONS);
-
-        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
-        {
-            return;
-        }
 
         // add listeners to handle platform objects published by this instance
         serviceProxy.addObserver(new IRecordListener()

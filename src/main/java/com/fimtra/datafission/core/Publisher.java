@@ -1235,8 +1235,8 @@ public class Publisher
     {
         final String subscribeKey = Long.toString(this.subscribeCounter.incrementAndGet());
         Log.log(this, "(<-) subscribe #", subscribeKey, " (", Integer.toString(current), "/", Integer.toString(total),
-            ") from [", client.getEndPointDescription(), "]",
-            (logVerboseSubscribes || recordNames.size() == 1 ? ObjectUtils.safeToString(recordNames) : ""));
+            ") from [", client.getEndPointDescription(), "] ",
+            (logVerboseSubscribes || recordNames.size() <= 10 ? ObjectUtils.safeToString(recordNames) : ""));
 
         final ProxyContextPublisher proxyContextPublisher = getProxyContextPublisher(client);
         final List<String> ackSubscribes = new LinkedList<String>();

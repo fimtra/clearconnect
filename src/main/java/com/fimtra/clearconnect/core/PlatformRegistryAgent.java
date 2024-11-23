@@ -102,7 +102,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
         }
     }
-    
+
+    private static final IRecordListener NOOP_OBSERVER = new IRecordListener()
+    {
+        @Override
+        public void onChange(IRecord image, IRecordChange atomicChange)
+        {
+            // noop
+        }
+    };
+
     final long startTime;
     final String agentName;
     final String hostQualifiedAgentName;
@@ -226,6 +235,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     listener.onRegistryDisconnected();
                 }
             };
+
+        // bulk register (and keep the NOOP observer registered)
+        this.registryProxy.addObserver(NOOP_OBSERVER, IRegistryRecordNames.SERVICES,
+                IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY,
+                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
 
         this.serviceAvailableListeners =
             PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy, IRegistryRecordNames.SERVICES, this);

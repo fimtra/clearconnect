@@ -161,18 +161,18 @@ public class PlatformServiceProxyTest
     {
         int i = 0;
         Map<String, SubscriptionInfo> allSubscriptions;
-        while ((allSubscriptions = this.service.getAllSubscriptions()).size() != 5 && i++ < 20)
+        while ((allSubscriptions = this.service.getAllSubscriptions()).size() != 4 && i++ < 20)
         {
             Thread.sleep(100);
         }
-        assertEquals("Got: " + allSubscriptions, 5, allSubscriptions.size());
+        assertEquals("Got: " + allSubscriptions, 4, allSubscriptions.size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(6, this.service.getAllSubscriptions().size());
+        assertEquals(5, this.service.getAllSubscriptions().size());
         assertEquals(1, this.service.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.service.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -180,7 +180,7 @@ public class PlatformServiceProxyTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(5, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
         assertNull(this.service.getAllSubscriptions().get(record1));
     }
 

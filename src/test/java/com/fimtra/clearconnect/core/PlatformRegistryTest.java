@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.clearconnect.PlatformCoreProperties;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -80,49 +81,72 @@ public class PlatformRegistryTest
         final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<CountDownLatch>();
         disconnectedLatch.set(new CountDownLatch(MAX));
         PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
-        for (int i = 0; i < MAX; i++)
+        try
         {
-            final String suffix = i + "-" + System.nanoTime();
-            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
-            agents[i].setRegistryReconnectPeriodMillis(500);
-            agents[i].addRegistryAvailableListener(EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
+            for (int i = 0; i < MAX; i++)
             {
-                @Override
-                public void onRegistryDisconnected()
-                {
-                    disconnectedLatch.get().countDown();
-                }
+                final String suffix = i + "-" + System.nanoTime();
+                agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP,
+                        regPort);
+                agents[i].setRegistryReconnectPeriodMillis(500);
+                agents[i].addRegistryAvailableListener(
+                        EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
+                        {
+                            @Override
+                            public void onRegistryDisconnected()
+                            {
+                                disconnectedLatch.get()
+                                        .countDown();
+                            }
 
-                @Override
-                public void onRegistryConnected()
+                            @Override
+                            public void onRegistryConnected()
+                            {
+                                connectedLatch.get()
+                                        .countDown();
+                            }
+                        }));
+            }
+            assertTrue(connectedLatch.get()
+                    .await(5, TimeUnit.SECONDS));
+            this.candidate.destroy();
+            assertTrue(disconnectedLatch.get()
+                    .await(5, TimeUnit.SECONDS));
+
+            connectedLatch.set(new CountDownLatch(MAX));
+
+            this.candidate = null;
+            int i = 0;
+            while (this.candidate == null && i++ < 60)
+            {
+                try
                 {
-                    connectedLatch.get().countDown();
+                    this.candidate =
+                            new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP,
+                                    regPort);
                 }
-            }));
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    Thread.sleep(1000);
+                }
+            }
+
+            final boolean await = connectedLatch.get()
+                    .await(5, TimeUnit.SECONDS);
+            assertTrue("Only got: " + (MAX - connectedLatch.get()
+                    .getCount()), await);
         }
-        assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
-        this.candidate.destroy();
-        assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
-
-        connectedLatch.set(new CountDownLatch(MAX));
-
-        this.candidate = null;
-        int i = 0;
-        while (this.candidate == null && i++ < 60)
+        finally
         {
-            try
+            for (int i = 0; i < MAX; i++)
             {
-                this.candidate = new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
-                Thread.sleep(1000);
+                if (agents[i] != null)
+                {
+                    agents[i].destroy();
+                }
             }
         }
-        
-        final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
-        assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
     }
 
     @Test
@@ -145,6 +169,18 @@ public class PlatformRegistryTest
             agents[i].createPlatformServiceInstance("Test-LBservice-" + i, suffix, TcpChannelUtils.LOCALHOST_IP, port++,
                 WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
             publishRecordAndRpc(suffix, agents[i].getPlatformServiceInstance("Test-LBservice-" + i, suffix));
+        }
+
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            for (int i = 0; i < MAX; i++)
+            {
+                agents[i].destroy();
+            }
+
+            checkEmpty();
+
+            return;
         }
 
         final CountDownLatch allConnections = new CountDownLatch(1);
