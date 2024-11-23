@@ -131,8 +131,8 @@ public class EncryptedSessionSyncProtocol extends SimpleSessionProtocol
                 {
                     this.sessionContext = fromProxy.sessionContext;
                     this.sessionId = SessionContexts.getSessionManager(fromProxy.sessionContext).createSession(
-                        (String[]) SerializationUtils.fromByteArray(
-                            this.handshakeCipher.decrypt(fromProxy.sessionAttrs)));
+                            SerializationUtils.fromByteArray(
+                                this.handshakeCipher.decrypt(fromProxy.sessionAttrs)));
 
                     final FromPublisher response = new FromPublisher();
 

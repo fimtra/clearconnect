@@ -41,14 +41,7 @@ public class SessionContexts
 
     final static Map<String, ISessionAttributesProvider> providers = new HashMap<>();
 
-    public static final ISessionAttributesProvider DEFAULT_PROVIDER = new ISessionAttributesProvider()
-    {
-        @Override
-        public String[] getSessionAttributes()
-        {
-            return new String[] { "defaults" };
-        }
-    };
+    public static final ISessionAttributesProvider DEFAULT_PROVIDER = () -> new String[] { "defaults" };
     
     /**
      * The default implementation that performs no session validation and accepts all session

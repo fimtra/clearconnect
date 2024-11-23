@@ -69,7 +69,7 @@ public abstract class TcpChannelUtils
                 entry = it.next();
                 key = entry.getKey();
                 value = entry.getValue();
-                if (key.toString().startsWith("tcpchannel."))
+                if (key.toString().startsWith("tcpchannel.", 0))
                 {
                     SOCKET_OPTIONS.put(key.toString().substring("tcpchannel.".length()), value.toString());
                 }

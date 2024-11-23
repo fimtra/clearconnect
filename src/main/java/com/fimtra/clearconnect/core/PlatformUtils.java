@@ -103,7 +103,7 @@ public class PlatformUtils
                     final String[] tokens = version.split(newline);
                     for (String token : tokens)
                     {
-                        if (token.toLowerCase().startsWith("version"))
+                        if (token.toLowerCase().startsWith("version", 0))
                         {
                             version = token;
                             break;

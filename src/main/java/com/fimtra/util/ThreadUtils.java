@@ -410,7 +410,10 @@ public abstract class ThreadUtils
         }
         catch (InterruptedException e)
         {
-            Log.log(ThreadUtils.class, "interrupted during sleep", e);
+            if (Thread.interrupted())
+            {
+                Log.log(ThreadUtils.class, "interrupted during sleep", e);
+            }
         }
     }
 

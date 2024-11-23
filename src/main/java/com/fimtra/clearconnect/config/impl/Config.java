@@ -212,7 +212,7 @@ final class Config implements IConfig {
 		public void onChange(IRecord imageCopy, IRecordChange atomicChange) {
 			Log.log(this, ObjectUtils.safeToString(atomicChange));
 			IRecord memberConfig = null;
-			if (isMemberConfiCheckRequired(imageCopy)) {
+			if (isMemberConfigCheckRequired(imageCopy)) {
 				memberConfig = this.proxyForConfigService.getRecordImage(this.serviceInstanceId,
 						ConfigServiceProperties.Values.DEFAULT_CONFIG_RPC_TIMEOUT_MILLIS);
 			}
@@ -249,7 +249,7 @@ final class Config implements IConfig {
 
 		// The config change is not applicable if it is family config and it is overwritten in member config
 		private boolean isConfigChangeApplicable(IRecord record, String recordKey, IRecord memberConfig) {
-			if (isMemberConfiCheckRequired(record)) {
+			if (isMemberConfigCheckRequired(record)) {
 				if (memberConfig != null && memberConfig.containsKey(recordKey)) {
 					Log.log(this, "Family config with key [", recordKey,
 							"] is overwritten by member config, notification is not applicable.");
@@ -259,7 +259,7 @@ final class Config implements IConfig {
 			return true;
 		}
 
-		private boolean isMemberConfiCheckRequired(IRecord record) {
+		private boolean isMemberConfigCheckRequired(IRecord record) {
 			String[] instanceNameParts = PlatformUtils.decomposePlatformServiceInstanceID(this.serviceInstanceId);
 			if (record != null && record.getName().equals(instanceNameParts[0])) {
 				return true;

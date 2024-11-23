@@ -21,6 +21,7 @@ import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.util.Log;
 
 /**
  * A status attribute is held in the 'context status' record of an {@link IObserverContext} (see
@@ -84,7 +85,7 @@ public interface IStatusAttribute
             }
             catch (Exception e)
             {
-                e.printStackTrace();
+                Log.log(IStatusAttribute.class, "Could not getStatus", e);
                 return null;
             }
         }

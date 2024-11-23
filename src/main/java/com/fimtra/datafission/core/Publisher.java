@@ -1091,7 +1091,7 @@ public class Publisher
     public String toString()
     {
         return "Publisher [" + this.context.getName() + ", " + this.server + ", clients="
-            + this.proxyContextPublishers.keySet().size() + ", messages published=" + this.messagesPublished
+            + this.proxyContextPublishers.size() + ", messages published=" + this.messagesPublished
             + ", bytes published=" + this.bytesPublished + "]";
     }
 
