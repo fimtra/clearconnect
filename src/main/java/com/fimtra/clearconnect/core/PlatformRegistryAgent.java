@@ -56,6 +56,8 @@ import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
@@ -109,6 +111,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
         return agentName;
     }
+
+    private static final IRecordListener NOOP_OBSERVER = (image, atomicChange) -> {
+
+    };
 
     final long startTime;
     final String agentName;
@@ -229,6 +235,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         listener.onRegistryDisconnected();
                     }
                 };
+
+        // bulk register (and keep the NOOP oberver registered)
+        this.registryProxy.addObserver(NOOP_OBSERVER, IRegistryRecordNames.SERVICES, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY,
+                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
 
         this.serviceAvailableListeners =
                 PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy,

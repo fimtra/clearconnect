@@ -35,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.datafission.core.RpcCallingContext;
 import org.junit.After;
 import org.junit.Before;
@@ -168,14 +169,14 @@ public class PlatformServiceProxyTest
         {
             Thread.sleep(100);
         }
-        assertEquals("Got: " + allSubscriptions, 5, allSubscriptions.size());
+        assertEquals("Got: " + allSubscriptions, 4, allSubscriptions.size());
 
         IRecordListener changeListener = mock(IRecordListener.class);
         this.service.addRecordListener(changeListener, record1);
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(6, this.service.getAllSubscriptions().size());
+        assertEquals(5, this.service.getAllSubscriptions().size());
         assertEquals(1, this.service.getAllSubscriptions().get(record1).getCurrentSubscriberCount());
         assertEquals(0, this.service.getAllSubscriptions().get(record1).getPreviousSubscriberCount());
 
@@ -183,7 +184,7 @@ public class PlatformServiceProxyTest
 
         waitForContextSubscriptionsToUpdate();
 
-        assertEquals(5, this.service.getAllSubscriptions().size());
+        assertEquals(4, this.service.getAllSubscriptions().size());
         assertNull(this.service.getAllSubscriptions().get(record1));
     }
 

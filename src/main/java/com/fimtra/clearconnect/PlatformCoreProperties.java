@@ -94,6 +94,13 @@ public abstract class PlatformCoreProperties
          * publishing its "Service Stats" record.<br> E.g. <code>-Dplatform.serviceStatsRecordPublishPeriodSecs=10</code><br>
          */
         String SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS = BASE + "serviceStatsRecordPublishPeriodSecs";
+
+        /**
+         * The system property name to define the if a "simple" platform registry is used.
+         * A simple platform registry only monitors services for connection live-ness, no stats, record or RPC monitoring.
+         * <br> E.g. <code>-Dplatform.simplePlatformRegistry=true</code><br>
+         */
+        String SIMPLE_PLATFORM_REGISTRY = BASE + "simplePlatformRegistry";
     }
 
     /**
@@ -197,6 +204,14 @@ public abstract class PlatformCoreProperties
          */
         long SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS =
                 SystemUtils.getPropertyAsLong(Names.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, 10);
+
+        /**
+         * Defines if a simple platform registry is used.
+         *
+         * @see Names#SIMPLE_PLATFORM_REGISTRY
+         */
+        boolean SIMPLE_PLATFORM_REGISTRY = SystemUtils.getProperty(Names.SIMPLE_PLATFORM_REGISTRY,
+                true);
     }
 
     private PlatformCoreProperties()

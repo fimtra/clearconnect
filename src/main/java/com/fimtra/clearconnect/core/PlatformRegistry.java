@@ -15,6 +15,8 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.core.PlatformServiceInstance.RPC_FT_SERVICE_STATUS;
+import static com.fimtra.clearconnect.core.PlatformServiceInstance.SERVICE_STATS_RECORD_NAME;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS;
@@ -65,6 +67,7 @@ import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnec
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
@@ -558,11 +561,11 @@ public final class PlatformRegistry
             final String agentName = args[i++].textValue();
             final String tte = args[i++].textValue();
 
-            if (serviceFamily.startsWith(PlatformRegistry.SERVICE_NAME))
+            if (serviceFamily.startsWith(PlatformRegistry.SERVICE_NAME, 0))
             {
                 throw new ExecutionException("Cannot create service with reserved name '" + SERVICE_NAME + "'");
             }
-            if (serviceMember.startsWith(PlatformRegistry.SERVICE_NAME))
+            if (serviceMember.startsWith(PlatformRegistry.SERVICE_NAME, 0))
             {
                 throw new ExecutionException(
                     "Cannot create service instance with reserved name '" + SERVICE_NAME + "'");
@@ -761,10 +764,6 @@ final class EventHandler
             Log.log(eventHandler, "Could not log banner message: " + message, e);
         }
     }
-
-    private final static IRecordListener NOOP_OBSERVER = (imageCopy, atomicChange) -> {
-        // noop
-    };
 
     private interface IDescriptiveRunnable extends ISequentialRunnable
     {
@@ -1528,9 +1527,6 @@ final class EventHandler
 
         this.monitoredServiceInstances.put(registrationToken, serviceProxy);
 
-        // add a noop observer for the RPC record (stops subscribe-unsubscribe for RPCs)
-        serviceProxy.addObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
-
         // setup monitoring of the service instance via the proxy
         final PlatformServiceConnectionMonitor monitor = createConnectionMonitor(registrationToken, serviceFamily,
             agentName, serviceRecordStructure, serviceInstanceId, redundancyModeEnum, serviceProxy);
@@ -1854,7 +1850,7 @@ final class EventHandler
                 if ((proxyId = subMapAtomicChange.getRemovedEntries().get(
                     ISystemRecordNames.IContextConnectionsRecordFields.PROXY_ID)) != null)
                 {
-                    if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX))
+                    if (proxyId.textValue().startsWith(PlatformRegistry.AGENT_PROXY_ID_PREFIX, 0))
                     {
                         agent = proxyId.textValue().substring(PlatformRegistry.AGENT_PROXY_ID_PREFIX_LEN);
                         // purge the runtimeStatus record
@@ -2029,9 +2025,12 @@ final class EventHandler
 
         try
         {
-            ContextUtils.getRpc(proxy, PlatformCoreProperties.Values.REGISTRY_RPC_FT_SERVICE_STATUS_TIMEOUT_MILLIS,
-                PlatformServiceInstance.RPC_FT_SERVICE_STATUS).executeNoResponse(
-                    TextValue.valueOf(Boolean.valueOf(active).toString()));
+            final RpcInstance ftServiceInstanceStatus =
+                    new RpcInstance(TypeEnum.TEXT, RPC_FT_SERVICE_STATUS, TypeEnum.TEXT);
+            proxy.setRpcHander(ftServiceInstanceStatus);
+
+            ftServiceInstanceStatus.executeNoResponse(TextValue.valueOf(Boolean.valueOf(active)
+                    .toString()));
         }
         catch (Exception e)
         {
@@ -2246,13 +2245,18 @@ final class EventHandler
     private void registerStep5_registerListenersForServiceInstance(final String serviceFamily,
         final String serviceMember, final String serviceInstanceId, final ProxyContext serviceProxy)
     {
-        // add a listener to get the service-level statistics
+        if (PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            return;
+        }
+
+        // add a listeners to get service level data
         serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
         {
             @Override
             public String getDescription()
             {
-                return "handle service stats record change: " + serviceProxy.getName();
+                return "handle record change: " + serviceProxy.getName();
             }
 
             @Override
@@ -2264,108 +2268,50 @@ final class EventHandler
             @Override
             public void run()
             {
-                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                switch(imageCopy.getName())
                 {
-                    removeServiceStats(serviceInstanceId);
-                }
-                else
-                {
-                    final Map<String, IValue> statsForService =
-                        EventHandler.this.registry.serviceInstanceStats.getOrCreateSubMap(serviceInstanceId);
-                    statsForService.putAll(imageCopy);
-                    publishTimed(EventHandler.this.registry.serviceInstanceStats);
-                }
-            }
-        }), PlatformServiceInstance.SERVICE_STATS_RECORD_NAME);
-
-        // add a listener to cache the context connections record of the service locally in
-        // the platformConnections record
-        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
-        {
-            @Override
-            public String getDescription()
-            {
-                return "handleConnectionsUpdate: " + serviceProxy.getName();
-            }
-
-            @Override
-            public Object context()
-            {
-                return serviceFamily;
-            }
-
-            @Override
-            public void run()
-            {
-                handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
-            }
-        }), REMOTE_CONTEXT_CONNECTIONS);
-
-        // add listeners to handle platform objects published by this instance
-        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
-        {
-            @Override
-            public String getDescription()
-            {
-                return "handle RemoteContextRecords record change: " + serviceProxy.getName();
-            }
-
-            @Override
-            public Object context()
-            {
-                return serviceFamily;
-            }
-
-            @Override
-            public void run()
-            {
-                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                {
-                    removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                }
-                else
-                {
-                    final IRecord serviceInstanceObjectsRecord = getRecordsPerServiceInstance(serviceInstanceId);
-                    final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
-                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                        serviceInstanceObjectsRecord, serviceObjectsRecord, true,
-                        IServiceRecordFields.RECORD_COUNT);
+                    case SERVICE_STATS_RECORD_NAME:
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeServiceStats(serviceInstanceId);
+                        }
+                        break;
+                    case REMOTE_CONTEXT_CONNECTIONS:
+                        handleConnectionsUpdate_callInFamilyScope(atomicChange, serviceFamily, serviceMember);
+                        break;
+                    case REMOTE_CONTEXT_RECORDS:
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                        }
+                        else
+                        {
+                            final IRecord serviceInstanceObjectsRecord =
+                                    getRecordsPerServiceInstance(serviceInstanceId);
+                            final IRecord serviceObjectsRecord = getRecordsPerServiceFamily(serviceFamily);
+                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId,
+                                    atomicChange, serviceInstanceObjectsRecord, serviceObjectsRecord, true,
+                                    IServiceRecordFields.RECORD_COUNT);
+                        }
+                        break;
+                    case REMOTE_CONTEXT_RPCS:
+                        if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
+                        {
+                            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+                        }
+                        else
+                        {
+                            final IRecord serviceInstanceObjectsRecord =
+                                    getRpcsPerServiceInstance(serviceInstanceId);
+                            final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
+                            handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId,
+                                    atomicChange, serviceInstanceObjectsRecord, serviceObjectsRecord, false,
+                                    IServiceRecordFields.RPC_COUNT);
+                        }
+                        break;
                 }
             }
-        }), REMOTE_CONTEXT_RECORDS);
-
-        serviceProxy.addObserver((imageCopy, atomicChange) -> execute(new IDescriptiveRunnable()
-        {
-            @Override
-            public String getDescription()
-            {
-                return "handle RemoteContextRpcs record change: " + serviceProxy.getName();
-            }
-
-            @Override
-            public Object context()
-            {
-                return serviceFamily;
-            }
-
-            @Override
-            public void run()
-            {
-                if (serviceInstanceNotRegistered(serviceFamily, serviceMember))
-                {
-                    removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
-                }
-                else
-                {
-                    final IRecord serviceInstanceObjectsRecord = getRpcsPerServiceInstance(serviceInstanceId);
-                    final IRecord serviceObjectsRecord = getRpcsPerServiceFamily(serviceFamily);
-                    handleChangeForObjectsPerServiceAndInstance(serviceFamily, serviceInstanceId, atomicChange,
-                        serviceInstanceObjectsRecord, serviceObjectsRecord, false, IServiceRecordFields.RPC_COUNT);
-                }
-            }
-        }), REMOTE_CONTEXT_RPCS);
-        // remove the NOOP observer as we have a real listener attached to the RPC record now
-        serviceProxy.removeObserver(NOOP_OBSERVER, REMOTE_CONTEXT_RPCS);
+        }), SERVICE_STATS_RECORD_NAME, REMOTE_CONTEXT_CONNECTIONS, REMOTE_CONTEXT_RECORDS, REMOTE_CONTEXT_RPCS);
     }
 
     private IRecord[] getObjectsForEachServiceInstanceOfThisServiceName(final String serviceFamily,
