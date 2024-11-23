@@ -15,12 +15,7 @@
  */
 package com.fimtra.clearconnect.core;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.awt.Image;
-import java.awt.Point;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -35,39 +30,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
-
-import javax.swing.AbstractAction;
-import javax.swing.Action;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JDesktopPane;
-import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JProgressBar;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.WindowConstants;
+import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
-import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.TableModel;
 
@@ -84,7 +58,6 @@ import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames.IContextConnectionsRecordFields;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IValue;
@@ -187,7 +160,7 @@ class PlatformDesktop
             final String[] tokens = stateString.split(",");
 
             String title = tokens[indexTitle];
-            title = "null".equals(title.toLowerCase()) ? null : title;
+            title = "null".equalsIgnoreCase(title) ? null : title;
             RecordSubscriptionPlatformDesktopView view = new RecordSubscriptionPlatformDesktopView(desktop, title,
                 PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), tokens[indexViewKey]);
             try
@@ -267,33 +240,28 @@ class PlatformDesktop
             return subscriptions;
         }
 
-        final IRecordListener statusObserver = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
-            {
-                final Connection status =
-                    IStatusAttribute.Utils.getStatus(Connection.class, imageValidInCallingThreadOnly);
+        final IRecordListener statusObserver = (imageValidInCallingThreadOnly, atomicChange) -> {
+            final Connection status =
+                IStatusAttribute.Utils.getStatus(Connection.class, imageValidInCallingThreadOnly);
 
-                switch(status)
-                {
-                    case CONNECTED:
-                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(null);
-                        break;
-                    case DISCONNECTED:
-                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.orange);
-                        break;
-                    case RECONNECTING:
-                        RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.yellow);
-                        break;
-                }
+            switch(status)
+            {
+                case CONNECTED:
+                    RecordSubscriptionPlatformDesktopView.this.table.setBackground(null);
+                    break;
+                case DISCONNECTED:
+                    RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.orange);
+                    break;
+                case RECONNECTING:
+                    RecordSubscriptionPlatformDesktopView.this.table.setBackground(Color.yellow);
+                    break;
             }
         };
 
         final String title;
         final ColumnOrientedRecordTable table;
         final ColumnOrientedRecordTableModel model;
-        final List<String> subscribedRecords;
+        final Set<String> subscribedRecords;
         final String metaDataViewKey;
         final PlatformMetaDataViewEnum metaDataViewType;
         final IObserverContext context;
@@ -338,7 +306,7 @@ class PlatformDesktop
             this.model = new ColumnOrientedRecordTableModel();
             this.table = new ColumnOrientedRecordTable(this.model);
 
-            this.subscribedRecords = new CopyOnWriteArrayList<>();
+            this.subscribedRecords = new ConcurrentHashMap<String, String>().keySet();
             this.model.addRecordRemovedListener(this.context);
 
             this.context.addObserver(this.sessionId, this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
@@ -441,100 +409,71 @@ class PlatformDesktop
             result.setEditable(false);
 
             final ParametersPanel parameters = new ParametersPanel();
-            parameters.setOkButtonActionListener(new ActionListener()
-            {
-                @Override
-                public void actionPerformed(ActionEvent e)
-                {
-                    result.setText("Executing...");
-                    parameters.setEnabled(false);
+            parameters.setOkButtonActionListener(e -> {
+                result.setText("Executing...");
+                parameters.setEnabled(false);
 
-                    getExecutor().execute(new Runnable()
+                getExecutor().execute(() -> {
+                    try
                     {
-                        @Override
-                        public void run()
+                        // get the args in correct order
+                        final String[] argNames = getArgNames(instance);
+                        final TypeEnum[] argTypes = instance.getArgTypes();
+                        final IValue[] rpcArgs = new IValue[argTypes.length];
+                        final Map<String, String> map = parameters.get();
+                        for (int i = 0; i < argTypes.length; i++)
                         {
-                            try
-                            {
-                                // get the args in correct order
-                                final String[] argNames = getArgNames(instance);
-                                final TypeEnum[] argTypes = instance.getArgTypes();
-                                final IValue[] rpcArgs = new IValue[argTypes.length];
-                                final Map<String, String> map = parameters.get();
-                                for (int i = 0; i < argTypes.length; i++)
-                                {
-                                    rpcArgs[i] = argTypes[i].fromString(map.get(getParamName(argTypes, argNames, i)));
-                                }
-                                try
-                                {
-                                    final IObserverContext proxyContext;
-                                    final String textValue;
-                                    switch(parentMetaDataViewType)
-                                    {
-                                        case RPCS_PER_INSTANCE:
-                                            proxyContext =
-                                                RpcPlatformDesktopView.this.desktop.getMetaDataModel().getProxyContextForPlatformServiceInstance(
-                                                    contextName);
-                                            break;
-                                        case RPCS_PER_SERVICE:
-                                            proxyContext =
-                                                RpcPlatformDesktopView.this.desktop.getMetaDataModel().getProxyContextForPlatformService(
-                                                    contextName);
-                                            break;
-                                        default :
-                                            throw new IllegalStateException("Unsupported: " + parentMetaDataViewType);
-                                    }
-                                    final IValue executeRpcResult =
-                                        RpcPlatformDesktopView.this.desktop.getMetaDataModel().executeRpc(proxyContext,
-                                            rpcName, rpcArgs);
-                                    if (executeRpcResult != null)
-                                    {
-                                        textValue = executeRpcResult.textValue();
-                                    }
-                                    else
-                                    {
-                                        textValue = null;
-                                    }
-                                    SwingUtilities.invokeLater(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            result.setText(textValue);
-                                        }
-                                    });
-                                }
-                                catch (final Exception e1)
-                                {
-                                    SwingUtilities.invokeLater(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            String message = e1.getMessage();
-                                            if (message == null || message.isEmpty())
-                                            {
-                                                message = e1.getClass().getSimpleName();
-                                            }
-                                            result.setText(message);
-                                        }
-                                    });
-                                }
-                            }
-                            finally
-                            {
-                                SwingUtilities.invokeLater(new Runnable()
-                                {
-                                    @Override
-                                    public void run()
-                                    {
-                                        parameters.setEnabled(true);
-                                    }
-                                });
-                            }
+                            rpcArgs[i] = argTypes[i].fromString(map.get(getParamName(argTypes, argNames, i)));
                         }
-                    });
-                }
+                        try
+                        {
+                            final IObserverContext proxyContext;
+                            final String textValue;
+                            switch(parentMetaDataViewType)
+                            {
+                                case RPCS_PER_INSTANCE:
+                                    proxyContext =
+                                        RpcPlatformDesktopView.this.desktop.getMetaDataModel().getProxyContextForPlatformServiceInstance(
+                                            contextName);
+                                    break;
+                                case RPCS_PER_SERVICE:
+                                    proxyContext =
+                                        RpcPlatformDesktopView.this.desktop.getMetaDataModel().getProxyContextForPlatformService(
+                                            contextName);
+                                    break;
+                                default :
+                                    throw new IllegalStateException("Unsupported: " + parentMetaDataViewType);
+                            }
+                            final IValue executeRpcResult =
+                                RpcPlatformDesktopView.this.desktop.getMetaDataModel().executeRpc(proxyContext,
+                                    rpcName, rpcArgs);
+                            if (executeRpcResult != null)
+                            {
+                                textValue = executeRpcResult.textValue();
+                            }
+                            else
+                            {
+                                textValue = null;
+                            }
+                            SwingUtilities.invokeLater(() -> result.setText(textValue));
+                        }
+                        catch (final Exception e1)
+                        {
+                            SwingUtilities.invokeLater(() -> {
+                                String message = e1.getMessage();
+                                if (message == null || message.isEmpty())
+                                {
+                                    message = e1.getClass().getSimpleName();
+                                }
+                                result.setText(message);
+                            });
+                        }
+                    }
+                    finally
+                    {
+                        SwingUtilities.invokeLater(() -> parameters.setEnabled(true));
+                    }
+                });
             });
 
             final TypeEnum[] argTypes = instance.getArgTypes();
@@ -591,9 +530,9 @@ class PlatformDesktop
             final String[] tokens = stateString.split(",");
 
             String title = tokens[indexTitle];
-            title = "null".equals(title.toLowerCase()) ? null : title;
+            title = "null".equalsIgnoreCase(title) ? null : title;
             String viewKey = tokens[indexViewKey];
-            viewKey = "null".equals(viewKey.toLowerCase()) ? null : viewKey;
+            viewKey = "null".equalsIgnoreCase(viewKey) ? null : viewKey;
             MetaDataPlatformDesktopView view = new MetaDataPlatformDesktopView(desktop, title,
                 PlatformMetaDataViewEnum.valueOf(tokens[indexViewType]), viewKey);
             try
@@ -739,63 +678,41 @@ class PlatformDesktop
             this.msgsPerSec.setStringPainted(true);
 
             final String name = registryProxy.getName();
-            registryProxy.addObserver(new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord image, IRecordChange atomicChange)
+            registryProxy.addObserver((image, atomicChange) -> {
+                for (String connection : atomicChange.getSubMapKeys())
                 {
-                    for (String connection : atomicChange.getSubMapKeys())
+                    final IValue proxyId =
+                        image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.PROXY_ID);
+                    if (proxyId != null && proxyId.textValue().contains(name))
                     {
-                        final IValue proxyId =
-                            image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.PROXY_ID);
-                        if (proxyId != null && proxyId.textValue().contains(name))
+                        final Map<String, IValue> putEntries =
+                            atomicChange.getSubMapAtomicChange(connection).getPutEntries();
+                        if (!putEntries.isEmpty())
                         {
-                            final Map<String, IValue> putEntries =
-                                atomicChange.getSubMapAtomicChange(connection).getPutEntries();
-                            if (!putEntries.isEmpty())
+                            final IValue msgsPerSec =
+                                    image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.MSGS_PER_SEC);
+                            final IValue kbsPerSec =
+                                image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.KB_PER_SEC);
+                            if (msgsPerSec != null)
                             {
-                                final IValue msgsPerSec =
-                                        image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.MSGS_PER_SEC);
-                                final IValue kbsPerSec =
-                                    image.getOrCreateSubMap(connection).get(IContextConnectionsRecordFields.KB_PER_SEC);
-                                if (msgsPerSec != null)
-                                {
-                                    SwingUtilities.invokeLater(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            DesktopSummaryPanel.this.msgsPerSec.setValue((int) msgsPerSec.longValue());
-                                            DesktopSummaryPanel.this.msgsPerSec.setString(msgsPerSec.textValue() + " (" + kbsPerSec.textValue() + " kb/s)");
-                                        }
-                                    });
-                                }
-                                final IValue msgCountVal = image.getOrCreateSubMap(connection).get(
-                                    IContextConnectionsRecordFields.MESSAGE_COUNT);
-                                if (msgCountVal != null)
-                                {
-                                    SwingUtilities.invokeLater(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            DesktopSummaryPanel.this.msgCount.setValue(msgCountVal);
-                                        }
-                                    });
-                                }
-                                final IValue kbCountVal = image.getOrCreateSubMap(connection).get(
-                                    IContextConnectionsRecordFields.KB_COUNT);
-                                if (kbCountVal != null)
-                                {
-                                    SwingUtilities.invokeLater(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            DesktopSummaryPanel.this.dataCount.setValue(kbCountVal);
-                                        }
-                                    });
-                                }
+                                SwingUtilities.invokeLater(() -> {
+                                    DesktopSummaryPanel.this.msgsPerSec.setValue((int) msgsPerSec.longValue());
+                                    DesktopSummaryPanel.this.msgsPerSec.setString(msgsPerSec.textValue() + " (" + kbsPerSec.textValue() + " kb/s)");
+                                });
+                            }
+                            final IValue msgCountVal = image.getOrCreateSubMap(connection).get(
+                                IContextConnectionsRecordFields.MESSAGE_COUNT);
+                            if (msgCountVal != null)
+                            {
+                                SwingUtilities.invokeLater(
+                                        () -> DesktopSummaryPanel.this.msgCount.setValue(msgCountVal));
+                            }
+                            final IValue kbCountVal = image.getOrCreateSubMap(connection).get(
+                                IContextConnectionsRecordFields.KB_COUNT);
+                            if (kbCountVal != null)
+                            {
+                                SwingUtilities.invokeLater(
+                                        () -> DesktopSummaryPanel.this.dataCount.setValue(kbCountVal));
                             }
                         }
                     }
@@ -816,35 +733,19 @@ class PlatformDesktop
             add(Box.createHorizontalStrut(6));
             add(new JLabel("Mem"));
             add(this.memory);
-            this.t = ThreadUtils.newThread(new Runnable()
-            {
-                @Override
-                public void run()
+            this.t = ThreadUtils.newThread(() -> {
+                while (true)
                 {
-                    while (true)
-                    {
-                        final long used =
-                            (long) ((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())
-                                * inverse_1MB);
-                        final long max = (long) (Runtime.getRuntime().totalMemory() * inverse_1MB);
-                        final String text = used + " / " + max + "M";
-                        SwingUtilities.invokeLater(new Runnable()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                DesktopSummaryPanel.this.memory.setValue((int) (((double) used / max) * 100));
-                                DesktopSummaryPanel.this.memory.setString(text);
-                            }
-                        });
-                        try
-                        {
-                            Thread.sleep(1000);
-                        }
-                        catch (InterruptedException e)
-                        {
-                        }
-                    }
+                    final long used =
+                        (long) ((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())
+                            * inverse_1MB);
+                    final long max = (long) (Runtime.getRuntime().totalMemory() * inverse_1MB);
+                    final String text = used + " / " + max + "M";
+                    SwingUtilities.invokeLater(() -> {
+                        DesktopSummaryPanel.this.memory.setValue((int) (((double) used / max) * 100));
+                        DesktopSummaryPanel.this.memory.setString(text);
+                    });
+                    ThreadUtils.sleep(1000);
                 }
             }, "desktop-summary-panel");
             this.t.start();
@@ -917,32 +818,21 @@ class PlatformDesktop
             this.serviceInstanceCount = new SummaryField("Instances");
             this.connectionCount = new SummaryField("Connections");
 
-            registryProxy.addObserver(new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord image, IRecordChange atomicChange)
-                {
-                    final Map<String, IValue> copy = new HashMap<>(image.asFlattenedMap());
-                    SwingUtilities.invokeLater(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            PlatformSummaryPanel.this.nodeCount.setValue(copy.get(IPlatformSummaryRecordFields.NODES));
-                            PlatformSummaryPanel.this.agentCount.setValue(
-                                copy.get(IPlatformSummaryRecordFields.AGENTS));
-                            PlatformSummaryPanel.this.serviceCount.setValue(
-                                copy.get(IPlatformSummaryRecordFields.SERVICES));
-                            PlatformSummaryPanel.this.serviceInstanceCount.setValue(
-                                copy.get(IPlatformSummaryRecordFields.SERVICE_INSTANCES));
-                            PlatformSummaryPanel.this.connectionCount.setValue(
-                                copy.get(IPlatformSummaryRecordFields.CONNECTIONS));
-                            PlatformSummaryPanel.this.version.setValue(copy.get(IPlatformSummaryRecordFields.VERSION));
-                            PlatformSummaryPanel.this.uptime.setValue(copy.get(IPlatformSummaryRecordFields.UPTIME));
-                        }
-                    });
-                }
-
+            registryProxy.addObserver((image, atomicChange) -> {
+                final Map<String, IValue> copy = new HashMap<>(image.asFlattenedMap());
+                SwingUtilities.invokeLater(() -> {
+                    PlatformSummaryPanel.this.nodeCount.setValue(copy.get(IPlatformSummaryRecordFields.NODES));
+                    PlatformSummaryPanel.this.agentCount.setValue(
+                        copy.get(IPlatformSummaryRecordFields.AGENTS));
+                    PlatformSummaryPanel.this.serviceCount.setValue(
+                        copy.get(IPlatformSummaryRecordFields.SERVICES));
+                    PlatformSummaryPanel.this.serviceInstanceCount.setValue(
+                        copy.get(IPlatformSummaryRecordFields.SERVICE_INSTANCES));
+                    PlatformSummaryPanel.this.connectionCount.setValue(
+                        copy.get(IPlatformSummaryRecordFields.CONNECTIONS));
+                    PlatformSummaryPanel.this.version.setValue(copy.get(IPlatformSummaryRecordFields.VERSION));
+                    PlatformSummaryPanel.this.uptime.setValue(copy.get(IPlatformSummaryRecordFields.UPTIME));
+                });
             }, IRegistryRecordNames.PLATFORM_SUMMARY);
 
             final FlowLayout layout = new FlowLayout(FlowLayout.CENTER);
@@ -986,22 +876,17 @@ class PlatformDesktop
             add(this.rows);
             add(this.columns);
 
-            this.tableModelListener = new TableModelListener()
-            {
-                @Override
-                public void tableChanged(TableModelEvent e)
+            this.tableModelListener = e -> {
+                String text = "rows:" + TableSummaryPanel.this.model.getRowCount();
+                if (!text.equals(TableSummaryPanel.this.rows.getText()))
                 {
-                    String text = "rows:" + TableSummaryPanel.this.model.getRowCount();
-                    if (!text.equals(TableSummaryPanel.this.rows.getText()))
-                    {
-                        TableSummaryPanel.this.rows.setText(text);
-                    }
+                    TableSummaryPanel.this.rows.setText(text);
+                }
 
-                    text = "cols:" + TableSummaryPanel.this.model.getColumnCount();
-                    if (!text.equals(TableSummaryPanel.this.columns.getText()))
-                    {
-                        TableSummaryPanel.this.columns.setText(text);
-                    }
+                text = "cols:" + TableSummaryPanel.this.model.getColumnCount();
+                if (!text.equals(TableSummaryPanel.this.columns.getText()))
+                {
+                    TableSummaryPanel.this.columns.setText(text);
                 }
             };
             model.addTableModelListener(this.tableModelListener);
@@ -1063,27 +948,22 @@ class PlatformDesktop
             this.parametersPanel = new JPanel(new GridLayout(0, 2));
             this.result = new AtomicReference<>();
 
-            this.ok.addActionListener(new ActionListener()
-            {
-                @Override
-                public void actionPerformed(ActionEvent e)
+            this.ok.addActionListener(e -> {
+                final LinkedHashMap<String, String> values = new LinkedHashMap<>();
+                for (Map.Entry<String, Parameter> entry : ParametersPanel.this.parameters.entrySet())
                 {
-                    final LinkedHashMap<String, String> values = new LinkedHashMap<>();
-                    for (Map.Entry<String, Parameter> entry : ParametersPanel.this.parameters.entrySet())
-                    {
-                        values.put(entry.getKey(), entry.getValue()
-                                .getValue());
-                    }
-                    ParametersPanel.this.result.set(values);
-                    synchronized (ParametersPanel.this.result)
-                    {
-                        ParametersPanel.this.result.notify();
-                    }
+                    values.put(entry.getKey(), entry.getValue()
+                            .getValue());
+                }
+                ParametersPanel.this.result.set(values);
+                synchronized (ParametersPanel.this.result)
+                {
+                    ParametersPanel.this.result.notify();
+                }
 
-                    if (ParametersPanel.this.actionListener != null)
-                    {
-                        ParametersPanel.this.actionListener.actionPerformed(e);
-                    }
+                if (ParametersPanel.this.actionListener != null)
+                {
+                    ParametersPanel.this.actionListener.actionPerformed(e);
                 }
             });
 
@@ -1128,6 +1008,10 @@ class PlatformDesktop
                     }
                     catch (InterruptedException e)
                     {
+                        if (Thread.interrupted())
+                        {
+                            Log.log(this, "Interrupted waiting for parameters");
+                        }
                     }
                 }
                 return params;
@@ -1142,7 +1026,7 @@ class PlatformDesktop
      * 
      * @author Ramon Servadei
      */
-    static enum PlatformMetaDataViewEnum
+    enum PlatformMetaDataViewEnum
     {
             // data views
             RPC(RpcPlatformDesktopView.class, "", null),
@@ -1206,7 +1090,7 @@ class PlatformDesktop
         final Class<? extends AbstractPlatformDesktopView> viewClass;
         /** Ref to the registration manager managing the "all records listener" */
         final Map<IRecordListener, ContextUtils.AllRecordsRegistrationManager> mappedAllRecordsListeners =
-            new HashMap<IRecordListener, ContextUtils.AllRecordsRegistrationManager>();
+                new HashMap<>();
 
         PlatformMetaDataViewEnum(Class<? extends AbstractPlatformDesktopView> viewClass, String parentViewKeyField,
             String childViewKeyField, PlatformMetaDataViewEnum... childViews)
@@ -1263,27 +1147,10 @@ class PlatformDesktop
                                     final Border previousBorder = other.frame.getBorder();
                                     other.frame.setBorder(BorderFactory.createLineBorder(Color.RED, 4));
                                     final MetaDataPlatformDesktopView duplicate = other;
-                                    ThreadUtils.newThread(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            try
-                                            {
-                                                Thread.sleep(500);
-                                            }
-                                            catch (InterruptedException e)
-                                            {
-                                            }
-                                            SwingUtilities.invokeLater(new Runnable()
-                                            {
-                                                @Override
-                                                public void run()
-                                                {
-                                                    duplicate.frame.setBorder(previousBorder);
-                                                }
-                                            });
-                                        }
+                                    ThreadUtils.newThread(() -> {
+                                        ThreadUtils.sleep(500);
+                                        SwingUtilities.invokeLater(
+                                                () -> duplicate.frame.setBorder(previousBorder));
                                     }, MetaDataPlatformDesktopView.class.getSimpleName() + "-highlighter").start();
                                     create = false;
                                     break;
@@ -1318,27 +1185,10 @@ class PlatformDesktop
                                     final Border previousBorder = view.frame.getBorder();
                                     view.frame.setBorder(BorderFactory.createLineBorder(Color.RED, 4));
                                     final RecordSubscriptionPlatformDesktopView duplicate = view;
-                                    ThreadUtils.newThread(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            try
-                                            {
-                                                Thread.sleep(500);
-                                            }
-                                            catch (InterruptedException e)
-                                            {
-                                            }
-                                            SwingUtilities.invokeLater(new Runnable()
-                                            {
-                                                @Override
-                                                public void run()
-                                                {
-                                                    duplicate.frame.setBorder(previousBorder);
-                                                }
-                                            });
-                                        }
+                                    ThreadUtils.newThread(() -> {
+                                        ThreadUtils.sleep(500);
+                                        SwingUtilities.invokeLater(
+                                                () -> duplicate.frame.setBorder(previousBorder));
                                     }, MetaDataPlatformDesktopView.class.getSimpleName() + "-highlighter").start();
                                 }
                                 view.subscribeFor(parentTable.getSelectedRecord().getName());
@@ -1366,22 +1216,17 @@ class PlatformDesktop
         void register(final IObserverContext context, final IRecordListener observer, final String parentViewKey)
         {
             // listen for all records (added and removed)
-            final IRecordListener listener = new IRecordListener()
-            {
-                @Override
-                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            final IRecordListener listener = (imageCopy, atomicChange) -> {
+                if (PlatformMetaDataViewEnum.this.parentViewKeyField == null || parentViewKey == null)
                 {
-                    if (PlatformMetaDataViewEnum.this.parentViewKeyField == null || parentViewKey == null)
-                    {
-                        observer.onChange(imageCopy, atomicChange);
-                        return;
-                    }
+                    observer.onChange(imageCopy, atomicChange);
+                    return;
+                }
 
-                    IValue recordParentViewKey = imageCopy.get(PlatformMetaDataViewEnum.this.parentViewKeyField);
-                    if (recordParentViewKey != null && parentViewKey.equals(recordParentViewKey.textValue()))
-                    {
-                        observer.onChange(imageCopy, atomicChange);
-                    }
+                IValue recordParentViewKey = imageCopy.get(PlatformMetaDataViewEnum.this.parentViewKeyField);
+                if (recordParentViewKey != null && parentViewKey.equals(recordParentViewKey.textValue()))
+                {
+                    observer.onChange(imageCopy, atomicChange);
                 }
             };
             this.mappedAllRecordsListeners.put(observer, ContextUtils.addAllRecordsListener(context, listener));
@@ -1724,7 +1569,7 @@ class PlatformDesktop
 
         final String nodeArg = args.length > 0 ? args[0] : TcpChannelUtils.LOCALHOST_IP;
         final int registryPortArg =
-            args.length > 1 ? Integer.valueOf(args[1]).intValue() : PlatformCoreProperties.Values.REGISTRY_PORT;
+            args.length > 1 ? Integer.parseInt(args[1]) : PlatformCoreProperties.Values.REGISTRY_PORT;
 
         final ParametersPanel parameters = new ParametersPanel();
         parameters.addParameter(node, nodeArg);
@@ -1746,25 +1591,13 @@ class PlatformDesktop
             }
         });
 
-        parameters.setOkButtonActionListener(new ActionListener()
-        {
-            @Override
-            public void actionPerformed(ActionEvent e)
-            {
-                frame.dispose();
-            }
-        });
+        parameters.setOkButtonActionListener(e -> frame.dispose());
 
         frame.setVisible(true);
 
-        SwingUtilities.invokeLater(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                parameters.parameters.get(node).value.requestFocusInWindow();
-                parameters.parameters.get(node).value.selectAll();
-            }
+        SwingUtilities.invokeLater(() -> {
+            parameters.parameters.get(node).value.requestFocusInWindow();
+            parameters.parameters.get(node).value.selectAll();
         });
 
         Map<String, String> result = parameters.get();

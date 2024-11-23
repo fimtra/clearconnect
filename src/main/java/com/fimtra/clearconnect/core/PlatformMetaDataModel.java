@@ -54,13 +54,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformRegistryAgent;
+import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.core.PlatformDesktop.ParametersPanel;
 import com.fimtra.clearconnect.core.PlatformRegistry.IRuntimeStatusRecordFields;
 import com.fimtra.clearconnect.core.PlatformRegistry.IServiceRecordFields;
@@ -364,26 +364,6 @@ public final class PlatformMetaDataModel
         return iValue;
     }
 
-    static String removePrefixRecordsPerService(String name)
-    {
-        return name.substring(PREFIX_RECORDS_PER_SERVICE.length());
-    }
-
-    static String removePrefixRecordsPerInstance(String name)
-    {
-        return name.substring(PREFIX_RECORDS_PER_INSTANCE.length());
-    }
-
-    static String removePrefixRpcsPerService(String name)
-    {
-        return name.substring(PREFIX_RPCS_PER_SERVICE.length());
-    }
-
-    static String removePrefixRpcsPerInstance(String name)
-    {
-        return name.substring(PREFIX_RPCS_PER_INSTANCE.length());
-    }
-    
     final IContextExecutor coalescingExecutor = ContextExecutorFactory.create("meta-data-model-coalescing-executor", 1);
 
     final CoalescingRecordListener _servicesRecordListener =
@@ -410,11 +390,6 @@ public final class PlatformMetaDataModel
             handleServiceInstanceStatsUpdate(atomicChange);
         }, SERVICE_INSTANCE_STATS, CachePolicyEnum.NO_IMAGE_NEEDED);
 
-    final CoalescingRecordListener _recordsPerServiceFamilyListener =
-        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
-            checkReset();
-            handleRecordsPerServiceUpdate(imageCopy, atomicChange);
-        }, PREFIX_RECORDS_PER_SERVICE);
 
     final CoalescingRecordListener _runtimeStatusRecordListener =
         new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
@@ -428,23 +403,13 @@ public final class PlatformMetaDataModel
             handleConnectionsUpdate(imageCopy);
         }, PLATFORM_CONNECTIONS);
 
-    final CoalescingRecordListener _recordsPerServiceInstanceRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
-            checkReset();
-            handleRecordsPerServiceInstanceUpdate(imageCopy, atomicChange);
-        }, PREFIX_RECORDS_PER_INSTANCE);
+    final Map<String, CoalescingRecordListener> _recordsPerServiceFamilyListeners = new ConcurrentHashMap<>();
 
-    final CoalescingRecordListener _rpsPerServiceFamilyRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
-            checkReset();
-            handleRpcsPerServiceUpdate(imageCopy, atomicChange);
-        }, PREFIX_RPCS_PER_SERVICE);
+    final Map<String, CoalescingRecordListener> _recordsPerServiceInstanceRecordListeners = new ConcurrentHashMap<>();
 
-    final CoalescingRecordListener _rpcsPerServiceInstanceRecordListener =
-        new CoalescingRecordListener(this.coalescingExecutor, (imageCopy, atomicChange) -> {
-            checkReset();
-            handleRpcsPerServiceInstanceUpdate(imageCopy, atomicChange);
-        }, PREFIX_RPCS_PER_INSTANCE);
+    final Map<String, CoalescingRecordListener> _rpsPerServiceFamilyRecordListeners = new ConcurrentHashMap<>();
+
+    final Map<String, CoalescingRecordListener> _rpcsPerServiceInstanceRecordListeners = new ConcurrentHashMap<>();
 
     final PlatformRegistryAgent agent;
 
@@ -495,49 +460,84 @@ public final class PlatformMetaDataModel
         registerListener_PLATFORM_CONNECTIONS();
     }
 
-    Future<Map<String, Boolean>> registerListener_RUNTIME_STATUS()
+    void registerListener_RUNTIME_STATUS()
     {
-        return this.agent.registryProxy.addObserver(this._runtimeStatusRecordListener, RUNTIME_STATUS);
+        this.agent.registryProxy.addObserver(this._runtimeStatusRecordListener, RUNTIME_STATUS);
     }
 
-    Future<Map<String, Boolean>> registerListener_PLATFORM_CONNECTIONS()
+    void registerListener_PLATFORM_CONNECTIONS()
     {
-        return this.agent.registryProxy.addObserver(this._platformConnectionsRecordListener, PLATFORM_CONNECTIONS);
+        this.agent.registryProxy.addObserver(this._platformConnectionsRecordListener, PLATFORM_CONNECTIONS);
     }
 
-    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_INSTANCE(String serviceInstanceId)
+    void registerListener_RPCS_PER_SERVICE_INSTANCE(String serviceInstanceId)
     {
-        return this.agent.registryProxy.addObserver(this._rpcsPerServiceInstanceRecordListener,
-            PREFIX_RPCS_PER_INSTANCE + serviceInstanceId);
+        final String[] decomposed = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
+        final IPlatformServiceProxy platformServiceProxy =
+                this.agent.getPlatformServiceInstanceProxy(decomposed[0], decomposed[1]);
+        ((PlatformServiceProxy) platformServiceProxy).proxyContext.addObserver(
+                this._rpcsPerServiceInstanceRecordListeners.computeIfAbsent(serviceInstanceId,
+                        s -> new CoalescingRecordListener(this.coalescingExecutor,
+                                (imageCopy, atomicChange) -> {
+                                    checkReset();
+                                    handleRpcsPerServiceInstanceUpdate(serviceInstanceId, imageCopy,
+                                            atomicChange);
+                                }, PREFIX_RPCS_PER_INSTANCE)),
+                ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
     }
 
-    Future<Map<String, Boolean>> registerListener_RPCS_PER_SERVICE_FAMILY(String serviceFamily)
+    void registerListener_RPCS_PER_SERVICE_FAMILY(String serviceFamily)
     {
-        return this.agent.registryProxy.addObserver(this._rpsPerServiceFamilyRecordListener,
-            PREFIX_RPCS_PER_SERVICE + serviceFamily);
+        final IPlatformServiceProxy platformServiceProxy = this.agent.getPlatformServiceProxy(serviceFamily);
+        ((PlatformServiceProxy) platformServiceProxy).proxyContext.addObserver(
+                this._rpsPerServiceFamilyRecordListeners.computeIfAbsent(serviceFamily,
+                        s -> new CoalescingRecordListener(this.coalescingExecutor,
+                                (imageCopy, atomicChange) -> {
+                                    checkReset();
+                                    handleRpcsPerServiceUpdate(serviceFamily, imageCopy, atomicChange);
+                                }, PREFIX_RPCS_PER_SERVICE)),
+                ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
     }
 
-    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_INSTANCE(String serviceInstanceId)
+    void registerListener_RECORDS_PER_SERVICE_INSTANCE(String serviceInstanceId)
     {
-        return this.agent.registryProxy.addObserver(this._recordsPerServiceInstanceRecordListener,
-            PREFIX_RECORDS_PER_INSTANCE + serviceInstanceId);
+        final String[] decomposed = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstanceId);
+        final IPlatformServiceProxy platformServiceProxy =
+                this.agent.getPlatformServiceInstanceProxy(decomposed[0], decomposed[1]);
+        ((PlatformServiceProxy) platformServiceProxy).proxyContext.addObserver(
+                this._recordsPerServiceInstanceRecordListeners.computeIfAbsent(serviceInstanceId,
+                        s -> new CoalescingRecordListener(this.coalescingExecutor,
+                                (imageCopy, atomicChange) -> {
+                                    checkReset();
+                                    handleRecordsPerServiceInstanceUpdate(serviceInstanceId, imageCopy,
+                                            atomicChange);
+                                }, PREFIX_RECORDS_PER_INSTANCE)),
+                ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
     }
 
-    Future<Map<String, Boolean>> registerListener_RECORDS_PER_SERVICE_FAMILY(String serviceFamily)
+    void registerListener_RECORDS_PER_SERVICE_FAMILY(String serviceFamily)
     {
-        return this.agent.registryProxy.addObserver(this._recordsPerServiceFamilyListener,
-            PREFIX_RECORDS_PER_SERVICE + serviceFamily);
+        final IPlatformServiceProxy platformServiceProxy = this.agent.getPlatformServiceProxy(serviceFamily);
+        ((PlatformServiceProxy) platformServiceProxy).proxyContext.addObserver(
+                this._recordsPerServiceFamilyListeners.computeIfAbsent(serviceFamily,
+                        s -> new CoalescingRecordListener(this.coalescingExecutor,
+                                (imageCopy, atomicChange) -> {
+                                    checkReset();
+                                    handleRecordsPerServiceUpdate(serviceFamily, imageCopy, atomicChange);
+                                }, PREFIX_RECORDS_PER_SERVICE)),
+                ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
     }
 
-    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCE_STATS()
+    void registerListener_SERVICE_INSTANCE_STATS()
     {
-        return this.agent.registryProxy.addObserver(this._serviceInstanceStatsRecordListener, SERVICE_INSTANCE_STATS);
+        this.agent.registryProxy.addObserver(this._serviceInstanceStatsRecordListener,
+                SERVICE_INSTANCE_STATS);
     }
 
-    Future<Map<String, Boolean>> registerListener_SERVICE_INSTANCES_PER_AGENT()
+    void registerListener_SERVICE_INSTANCES_PER_AGENT()
     {
-        return this.agent.registryProxy.addObserver(this._serviceInstancesPerAgentRecordListener,
-            SERVICE_INSTANCES_PER_AGENT);
+        this.agent.registryProxy.addObserver(this._serviceInstancesPerAgentRecordListener,
+                SERVICE_INSTANCES_PER_AGENT);
     }
 
     void registerListener_SERVICES()
@@ -545,9 +545,9 @@ public final class PlatformMetaDataModel
         this.agent.registryProxy.addObserver(this._servicesRecordListener, SERVICES);
     }
     
-    Future<Map<String, Boolean>> registerListener_SERVICE_STATS()
+    void registerListener_SERVICE_STATS()
     {
-        return this.agent.registryProxy.addObserver(this._serviceStatsRecordListener, SERVICE_STATS);
+        this.agent.registryProxy.addObserver(this._serviceStatsRecordListener, SERVICE_STATS);
     }
 
     void checkReset()
@@ -818,7 +818,10 @@ public final class PlatformMetaDataModel
         }
         catch (InterruptedException e)
         {
-            e.printStackTrace();
+            if (Thread.interrupted())
+            {
+                Log.log(this, "Interrupted waiting for session status change for: ", serviceFamily);
+            }
         }
     }
 
@@ -1024,39 +1027,39 @@ public final class PlatformMetaDataModel
         }
     }
 
-    void handleRecordsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
+    void handleRecordsPerServiceUpdate(String serviceFamily, IRecord imageCopy, IRecordChange change)
     {
         final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
         removeSystemRecords(currentRecordNames);
 
-        handleRecordsForContext(removePrefixRecordsPerService(imageCopy.getName()), this.serviceRecordsContext,
+        handleRecordsForContext(serviceFamily, this.serviceRecordsContext,
             currentRecordNames, change.getPutEntries(),
             ServiceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
     }
 
-    void handleRecordsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
+    void handleRecordsPerServiceInstanceUpdate(String serviceInstanceId, IRecord imageCopy, IRecordChange change)
     {
         final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
         removeSystemRecords(currentRecordNames);
 
-        handleRecordsForContext(removePrefixRecordsPerInstance(imageCopy.getName()), this.serviceInstanceRecordsContext,
+        handleRecordsForContext(serviceInstanceId, this.serviceInstanceRecordsContext,
             currentRecordNames, change.getPutEntries(),
             ServiceInstanceRecordMetaDataRecordDefinition.SubscriptionCount.toString());
     }
 
-    void handleRpcsPerServiceUpdate(IRecord imageCopy, IRecordChange change)
+    void handleRpcsPerServiceUpdate(String serviceFamily, IRecord imageCopy, IRecordChange change)
     {
         final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
 
-        handleRecordsForContext(removePrefixRpcsPerService(imageCopy.getName()), this.serviceRpcsContext,
+        handleRecordsForContext(serviceFamily, this.serviceRpcsContext,
             currentRecordNames, change.getPutEntries(), ServiceRpcMetaDataRecordDefinition.Definition.toString());
     }
 
-    void handleRpcsPerServiceInstanceUpdate(IRecord imageCopy, IRecordChange change)
+    void handleRpcsPerServiceInstanceUpdate(String serviceInstanceId, IRecord imageCopy, IRecordChange change)
     {
         final Set<String> currentRecordNames = new HashSet<>(imageCopy.keySet());
 
-        handleRecordsForContext(removePrefixRpcsPerInstance(imageCopy.getName()), this.serviceInstanceRpcsContext,
+        handleRecordsForContext(serviceInstanceId, this.serviceInstanceRpcsContext,
             currentRecordNames, change.getPutEntries(),
             ServiceInstanceRpcMetaDataRecordDefinition.Definition.toString());
     }
@@ -1242,12 +1245,7 @@ public final class PlatformMetaDataModel
 
                 }
 
-                set = instancesPerNode.get(publisherNode.textValue());
-                if (set == null)
-                {
-                    set = new HashSet<>();
-                    instancesPerNode.put(publisherNode.textValue(), set);
-                }
+                set = instancesPerNode.computeIfAbsent(publisherNode.textValue(), k -> new HashSet<>());
                 set.add(platformServiceInstanceID);
             }
             catch (Exception e)
