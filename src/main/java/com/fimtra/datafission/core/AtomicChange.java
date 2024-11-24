@@ -635,18 +635,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
     }
 
-    Set<String> internalGetSubMapKeys()
-    {
-        if (this.subMapAtomicChanges != null)
-        {
-            return this.subMapAtomicChanges.keySet();
-        }
-        else
-        {
-            return ContextUtils.EMPTY_STRING_SET;
-        }
-    }
-
     @Override
     public IRecordChange getSubMapAtomicChange(String subMapKey)
     {

@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.util.CollectionUtils.emptyIfNull;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -41,6 +43,7 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
+import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringAppender;
@@ -438,22 +441,17 @@ public class StringProtocolCodec implements ICodec<char[]>
         final Map<String, IValue> putEntries;
         final Map<String, IValue> removedEntries;
         final Set<String> subMapKeys;
-        // optimise the locking for the internal getXXX methods
-        synchronized (atomicChange)
+        if (atomicChange instanceof AtomicChange)
         {
-            if (atomicChange instanceof AtomicChange)
-            {
-                putEntries = ((AtomicChange) atomicChange).internalGetPutEntries();
-                removedEntries = ((AtomicChange) atomicChange).internalGetRemovedEntries();
-                subMapKeys = ((AtomicChange) atomicChange).internalGetSubMapKeys();
-            }
-            else
-            {
-                putEntries = atomicChange.getPutEntries();
-                removedEntries = atomicChange.getRemovedEntries();
-                subMapKeys = atomicChange.getSubMapKeys();
-            }
+            putEntries = emptyIfNull(((AtomicChange) atomicChange).putEntries);
+            removedEntries = emptyIfNull(((AtomicChange) atomicChange).removedEntries);
         }
+        else
+        {
+            putEntries = atomicChange.getPutEntries();
+            removedEntries = atomicChange.getRemovedEntries();
+        }
+        subMapKeys = atomicChange.getSubMapKeys();
 
         final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
         encodingBuffers.sb.setLength(0);
@@ -480,12 +478,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                     escape(subMapKey, sb, charArrayRef, escapedChars);
                     addEntriesToTxString(DELIMITER_PUT_CODE,
                         subMapAtomicChange instanceof AtomicChange
-                            ? ((AtomicChange) subMapAtomicChange).internalGetPutEntries()
+                            ? emptyIfNull(((AtomicChange) subMapAtomicChange).putEntries)
                             : subMapAtomicChange.getPutEntries(),
                         sb, charArrayRef, escapedChars, keyCharArrayRef);
                     addEntriesToTxString(DELIMITER_REMOVE_CODE,
                         subMapAtomicChange instanceof AtomicChange
-                            ? ((AtomicChange) subMapAtomicChange).internalGetRemovedEntries()
+                            ? emptyIfNull(((AtomicChange) subMapAtomicChange).removedEntries)
                             : subMapAtomicChange.getRemovedEntries(),
                         sb, charArrayRef, escapedChars, keyCharArrayRef);
                 }

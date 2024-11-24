@@ -208,4 +208,16 @@ public abstract class CollectionUtils
     {
         return new HashMap<>(data);
     }
+
+    /**
+     * @return the map or an unmodifiable empty-map if null.
+     */
+    public static <K, V> Map<K, V> emptyIfNull(Map<K, V> map)
+    {
+        if (map == null)
+        {
+            return Collections.EMPTY_MAP;
+        }
+        return map;
+    }
 }

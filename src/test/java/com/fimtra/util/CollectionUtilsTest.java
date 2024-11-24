@@ -16,7 +16,9 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -76,4 +78,11 @@ public class CollectionUtilsTest
         assertEquals(expected, CollectionUtils.newSetFromString("1  , 2,3", ","));
     }
 
+    @Test
+    public void test_emptyIfNull()
+    {
+        final Map m = new HashMap();
+        assertSame(m, CollectionUtils.emptyIfNull(m));
+        assertSame(Collections.EMPTY_MAP, CollectionUtils.emptyIfNull(null));
+    }
 }
