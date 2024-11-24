@@ -925,8 +925,6 @@ public final class ProxyContext implements IObserverContext
         }
 
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
-        this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-        this.context.addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange), IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
         this.channelBuilderFactory = channelBuilderFactory;
@@ -1532,16 +1530,14 @@ public final class ProxyContext implements IObserverContext
         {
             synchronized (this.lock)
             {
-                // only subscribe for the RPC record "on demand"
-                this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                this.context.addObserver(new IRecordListener()
+                // nasty double-check lock idiom...
+                if (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS) == null)
                 {
-                    @Override
-                    public void onChange(IRecord image, IRecordChange atomicChange)
-                    {
-                        updateRpcTemplates(atomicChange);
-                    }
-                }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                    // only subscribe for the RPC record "on demand"
+                    this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                    this.context.addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange),
+                            IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                }
             }
             try
             {
