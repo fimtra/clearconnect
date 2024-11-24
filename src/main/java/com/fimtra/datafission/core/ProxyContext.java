@@ -1546,16 +1546,20 @@ public final class ProxyContext implements IObserverContext
         {
             synchronized (this.lock)
             {
-                // only subscribe for the RPC record "on demand"
-                this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                this.context.addObserver(new IRecordListener()
+                // nasty double-check lock idiom...
+                if (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS) == null)
                 {
-                    @Override
-                    public void onChange(IRecord image, IRecordChange atomicChange)
+                    // only subscribe for the RPC record "on demand"
+                    this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                    this.context.addObserver(new IRecordListener()
                     {
-                        updateRpcTemplates(atomicChange);
-                    }
-                }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                        @Override
+                        public void onChange(IRecord image, IRecordChange atomicChange)
+                        {
+                            updateRpcTemplates(atomicChange);
+                        }
+                    }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                }
             }
             try
             {
