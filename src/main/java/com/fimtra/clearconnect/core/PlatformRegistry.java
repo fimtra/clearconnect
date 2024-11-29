@@ -1368,7 +1368,10 @@ final class EventHandler
         }
         publishTimed(this.registry.platformConnections);
 
-        removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+        if (!PlatformCoreProperties.Values.SIMPLE_PLATFORM_REGISTRY)
+        {
+            removeRecordsAndRpcsPerServiceInstance(serviceInstanceId, serviceFamily);
+        }
 
         // remove the service instance from the instances-per-service
         Map<String, IValue> serviceInstances = Collections.emptyMap();
