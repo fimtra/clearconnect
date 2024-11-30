@@ -464,11 +464,20 @@ public class StringProtocolCodec implements ICodec<char[]>
         escape(atomicChange.getName(), sb, charArrayRef, escapedChars);
         // add the sequence
         sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-        addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
-        addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars, keyCharArrayRef);
+        if (!putEntries.isEmpty())
+        {
+            addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars,
+                    keyCharArrayRef);
+        }
+        if (!removedEntries.isEmpty())
+        {
+            addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars,
+                    keyCharArrayRef);
+        }
         IRecordChange subMapAtomicChange;
         if (!subMapKeys.isEmpty())
         {
+            Map<String, IValue> entries;
             for (String subMapKey : subMapKeys)
             {
                 subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
@@ -476,16 +485,22 @@ public class StringProtocolCodec implements ICodec<char[]>
                 {
                     sb.append(DELIMITER_SUBMAP_CODE);
                     escape(subMapKey, sb, charArrayRef, escapedChars);
-                    addEntriesToTxString(DELIMITER_PUT_CODE,
-                        subMapAtomicChange instanceof AtomicChange
-                            ? emptyIfNull(((AtomicChange) subMapAtomicChange).putEntries)
-                            : subMapAtomicChange.getPutEntries(),
-                        sb, charArrayRef, escapedChars, keyCharArrayRef);
-                    addEntriesToTxString(DELIMITER_REMOVE_CODE,
-                        subMapAtomicChange instanceof AtomicChange
-                            ? emptyIfNull(((AtomicChange) subMapAtomicChange).removedEntries)
-                            : subMapAtomicChange.getRemovedEntries(),
-                        sb, charArrayRef, escapedChars, keyCharArrayRef);
+                    entries = subMapAtomicChange instanceof AtomicChange ?
+                            emptyIfNull(((AtomicChange) subMapAtomicChange).putEntries) :
+                            subMapAtomicChange.getPutEntries();
+                    if (!entries.isEmpty())
+                    {
+                        addEntriesToTxString(DELIMITER_PUT_CODE, entries, sb, charArrayRef, escapedChars,
+                                keyCharArrayRef);
+                    }
+                    entries = subMapAtomicChange instanceof AtomicChange ?
+                            emptyIfNull(((AtomicChange) subMapAtomicChange).removedEntries) :
+                            subMapAtomicChange.getRemovedEntries();
+                    if (!entries.isEmpty())
+                    {
+                        addEntriesToTxString(DELIMITER_REMOVE_CODE, entries, sb, charArrayRef, escapedChars,
+                                keyCharArrayRef);
+                    }
                 }
             }
         }
@@ -504,116 +519,113 @@ public class StringProtocolCodec implements ICodec<char[]>
         final StringAppender txString, final CharArrayReference chars, final char[] escapedChars,
         final CharArrayReference keyChars)
     {
-        if (entries != null && !entries.isEmpty())
+        String key;
+        IValue value;
+        int i;
+        int last;
+        int length;
+        char[] cbuf;
+        escapedChars[0] = CHAR_ESCAPE;
+        boolean needToEscape;
+        txString.append(changeType);
+
+        for (Map.Entry<String, IValue> entry : entries.entrySet())
         {
-            String key;
-            IValue value;
-            int i;
-            int last;
-            int length;
-            char[] cbuf;
-            escapedChars[0] = CHAR_ESCAPE;
-            boolean needToEscape;
-            txString.append(changeType);
-
-            for (Map.Entry<String, IValue> entry : entries.entrySet())
+            key = entry.getKey();
+            value = entry.getValue();
+            txString.append(DELIMITER);
+            if (key == null)
             {
-                key = entry.getKey();
-                value = entry.getValue();
-                txString.append(DELIMITER);
-                if (key == null)
+                txString.append(NULL_CHAR);
+            }
+            else
+            {
+                length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
+                if (keyChars.ref.length < length)
                 {
-                    txString.append(NULL_CHAR);
+                    // resize
+                    keyChars.ref = new char[length];
+                    keyChars.ref[0] = NULL_CHAR;
+                    keyChars.ref[1] = NULL_CHAR;
                 }
-                else
-                {
-                    length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
-                    if (keyChars.ref.length < length)
-                    {
-                        // resize
-                        keyChars.ref = new char[length];
-                        keyChars.ref[0] = NULL_CHAR;
-                        keyChars.ref[1] = NULL_CHAR;
-                    }
-                    cbuf = keyChars.ref;
-                    key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
+                cbuf = keyChars.ref;
+                key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
 
-                    // NOTE: for efficiency, we have *almost* inlined versions of the same escape
-                    // switch statements
-                    needToEscape = false;
+                // NOTE: for efficiency, we have *almost* inlined versions of the same escape
+                // switch statements
+                needToEscape = false;
+                for (i = 0; i < length; i++)
+                {
+                    switch(cbuf[i])
+                    {
+                        case CR:
+                        case LF:
+                        case CHAR_ESCAPE:
+                        case CHAR_TOKEN_DELIM:
+                        case CHAR_KEY_VALUE_SEPARATOR:
+                            needToEscape = true;
+                            i = length;
+                    }
+                }
+                if (needToEscape)
+                {
+                    last = 0;
                     for (i = 0; i < length; i++)
                     {
                         switch(cbuf[i])
                         {
                             case CR:
+                                txString.append(cbuf, last, i - last);
+                                escapedChars[1] = CHAR_r;
+                                txString.append(escapedChars, 0, 2);
+                                last = i + 1;
+                                break;
                             case LF:
+                                txString.append(cbuf, last, i - last);
+                                escapedChars[1] = CHAR_n;
+                                txString.append(escapedChars, 0, 2);
+                                last = i + 1;
+                                break;
                             case CHAR_ESCAPE:
                             case CHAR_TOKEN_DELIM:
                             case CHAR_KEY_VALUE_SEPARATOR:
-                                needToEscape = true;
-                                i = length;
+                                txString.append(cbuf, last, i - last);
+                                escapedChars[1] = cbuf[i];
+                                txString.append(escapedChars, 0, 2);
+                                last = i + 1;
+                                break;
+                            default:
                         }
                     }
-                    if (needToEscape)
-                    {
-                        last = 0;
-                        for (i = 0; i < length; i++)
-                        {
-                            switch(cbuf[i])
-                            {
-                                case CR:
-                                    txString.append(cbuf, last, i - last);
-                                    escapedChars[1] = CHAR_r;
-                                    txString.append(escapedChars, 0, 2);
-                                    last = i + 1;
-                                    break;
-                                case LF:
-                                    txString.append(cbuf, last, i - last);
-                                    escapedChars[1] = CHAR_n;
-                                    txString.append(escapedChars, 0, 2);
-                                    last = i + 1;
-                                    break;
-                                case CHAR_ESCAPE:
-                                case CHAR_TOKEN_DELIM:
-                                case CHAR_KEY_VALUE_SEPARATOR:
-                                    txString.append(cbuf, last, i - last);
-                                    escapedChars[1] = cbuf[i];
-                                    txString.append(escapedChars, 0, 2);
-                                    last = i + 1;
-                                    break;
-                                default:
-                            }
-                        }
-                        txString.append(cbuf, last, length - last);
-                    }
-                    else
-                    {
-                        txString.append(cbuf, 0, length);
-                    }
-                }
-
-                txString.append(CHAR_KEY_VALUE_SEPARATOR);
-                if (value == null || changeType == DELIMITER_REMOVE_CODE)
-                {
-                    txString.append(NULL_CHAR);
+                    txString.append(cbuf, last, length - last);
                 }
                 else
                 {
-                    switch(value.getType())
-                    {
-                        case DOUBLE:
-                        case LONG:
-                        case BLOB:
-                            // longs, doubles and blobs do not need escaping
-                            // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
-                            value.appendTo(txString);
-                            break;
-                        case TEXT:
-                        default:
-                            txString.append(IValue.TEXT_CODE);
-                            escape(value.textValue(), txString, chars, escapedChars);
-                            break;
-                    }
+                    txString.append(cbuf, 0, length);
+                }
+            }
+
+            txString.append(CHAR_KEY_VALUE_SEPARATOR);
+            if (value == null || changeType == DELIMITER_REMOVE_CODE)
+            {
+                txString.append(NULL_CHAR);
+            }
+            else
+            {
+                switch(value.getType())
+                {
+                    case DOUBLE:
+                    case LONG:
+                    case BLOB:
+                        // longs, doubles and blobs do not need escaping
+                        // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
+                        value.appendTo(txString);
+                        break;
+                    case TEXT:
+                    default:
+                        txString.append(IValue.TEXT_CODE);
+                        escape(value.textValue(), txString, chars, escapedChars);
+                        break;
                 }
             }
         }
