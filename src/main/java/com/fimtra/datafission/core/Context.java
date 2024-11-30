@@ -63,6 +63,7 @@ import com.fimtra.util.FileUtils;
 import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.StringAppenderWriter;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
@@ -410,7 +411,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 try
                 {
-                    final StringWriter sw = new StringWriter();
+                    final StringAppenderWriter sw = new StringAppenderWriter(1024);
                     ContextUtils.serializeRecordMapToStream(sw, record.asFlattenedMap());
                     return TextValue.valueOf(sw.toString());
                 }
