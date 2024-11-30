@@ -58,7 +58,12 @@ public final class StringAppender
 
     public StringAppender append(char v)
     {
-        resize(1);
+        if (this.len + 1 > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (1 < 9 ? 16 : (1 * 2))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+        }
         this.chars[this.len++] = v;
         return this;
     }
@@ -66,7 +71,12 @@ public final class StringAppender
     public StringAppender append(char[] v)
     {
         final int length = v.length;
-        resize(length);
+        if (this.len + length > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+        }
         System.arraycopy(v, 0, this.chars, this.len, length);
         this.len += length;
         return this;
@@ -78,7 +88,12 @@ public final class StringAppender
         {
             throw new IllegalArgumentException("Negative length not allowed: " + len);
         }
-        resize(len);
+        if (this.len + len > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (len < 9 ? 16 : (len * 2))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+        }
         System.arraycopy(v, offset, this.chars, this.len, len);
         this.len += len;
         return this;
@@ -91,20 +106,15 @@ public final class StringAppender
             return append("null");
         }
         final int length = v.length();
-        resize(length);
-        v.getChars(0, length, this.chars, this.len);
-        this.len += length;
-        return this;
-    }
-
-    private void resize(int length)
-    {
         if (this.len + length > this.chars.length)
         {
             final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
         }
+        v.getChars(0, length, this.chars, this.len);
+        this.len += length;
+        return this;
     }
 
     public CharBuffer getCharBuffer()
