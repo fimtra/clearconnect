@@ -1,12 +1,13 @@
 package com.fimtra.util;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
+
 import org.junit.Test;
 
 /**
  * @author Ramon Servadei
  */
-public class PairTest extends TestCase
+public class PairTest
 {
     Pair candidate;
 
