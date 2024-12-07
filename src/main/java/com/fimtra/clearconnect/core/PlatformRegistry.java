@@ -853,7 +853,7 @@ final class EventHandler
                 }
                 finally
                 {
-                    time = (long) ((System.nanoTime() - time) * 0.000001d);
+                    time = ((System.nanoTime() - time) / 1_000_000L);
                     if (time > SLOW_EVENT_MILLIS)
                     {
                         Log.log(EventHandler.this, SLOW, runnable.getDescription(), " {",
@@ -1151,7 +1151,7 @@ final class EventHandler
             this.registry.platformSummary.put(IPlatformSummaryRecordFields.CONNECTIONS,
                 LongValue.valueOf(connectionsCount));
 
-            final long uptimeSecs = (long) ((System.currentTimeMillis() - this.startTimeMillis) * 0.001);
+            final long uptimeSecs = ((System.currentTimeMillis() - this.startTimeMillis) / 1000L);
             final int minsPerDay = 3600 * 24;
             final long days = uptimeSecs / minsPerDay;
             final long hoursMinsLeft = uptimeSecs - (days * minsPerDay);

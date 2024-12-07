@@ -212,7 +212,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     LongValue.valueOf(subscriptionCount));
                 PlatformServiceInstance.this.stats.put(
                     IServiceStatsRecordFields.UPTIME,
-                    LongValue.valueOf((long) ((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) * 0.001d)));
+                    LongValue.valueOf((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) / 1000));
                 PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
                     LongValue.valueOf(messagesPublished));
                 PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,

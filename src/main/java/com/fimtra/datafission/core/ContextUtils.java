@@ -324,10 +324,8 @@ public final class ContextUtils
                 time = this.gcTimeLastPeriod;
                 this.gcTimeLastPeriod = gcMillisInPeriod;
                 gcMillisInPeriod -= time;
-                final double inverseLoggingPeriodSecs =
-                        1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                 // this is now the "% GC duty cycle per minute"
-                gcDutyCycle = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
+                gcDutyCycle = gcMillisInPeriod / Values.STATS_LOGGING_PERIOD_SECS / 10;
 
                 sb.append(", ").append(getGcDutyCycle());
 

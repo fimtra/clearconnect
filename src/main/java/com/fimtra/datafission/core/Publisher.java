@@ -586,7 +586,7 @@ public class Publisher
                         submapConnections.put(IContextConnectionsRecordFields.SUBSCRIPTION_COUNT,
                             LongValue.valueOf(ProxyContextPublisher.this.subscriptions.size()));
                         submapConnections.put(IContextConnectionsRecordFields.UPTIME, LongValue.valueOf(
-                            (long) ((System.currentTimeMillis() - ProxyContextPublisher.this.start) * 0.001d)));
+                            ((System.currentTimeMillis() - ProxyContextPublisher.this.start) / 1000)));
                         submapConnections.put(IContextConnectionsRecordFields.TX_QUEUE_SIZE,
                             LongValue.valueOf(ProxyContextPublisher.this.channel.getTxQueueSize()));
                         submapConnections.put(IContextConnectionsRecordFields.LAST_INTERVAL_MSG_SIZE, LongValue.valueOf(
