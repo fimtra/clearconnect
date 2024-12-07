@@ -98,16 +98,12 @@ public final class DoubleValue extends AbstractValue
     {
         return appendTo(new StringAppender());
     }
-    
+
     @Override
     public int hashCode()
     {
-        final int prime = 31;
-        int result = 1;
-        long temp;
-        temp = Double.doubleToLongBits(this.value);
-        result = prime * result + (int) (temp ^ (temp >>> 32));
-        return result;
+        final long bits = Double.doubleToLongBits(this.value);
+        return (int) (bits ^ (bits >>> 32));
     }
 
     @Override

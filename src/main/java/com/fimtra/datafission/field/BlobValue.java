@@ -16,7 +16,6 @@
 package com.fimtra.datafission.field;
 
 import java.io.Serializable;
-import java.util.Arrays;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.Log;
@@ -356,9 +355,17 @@ public final class BlobValue extends AbstractValue
     @Override
     public int hashCode()
     {
-        final int prime = 31;
+        if (this.value == null)
+        {
+            return 0;
+        }
+
         int result = 1;
-        result = prime * result + ((this.value == null) ? 0 : Arrays.hashCode(this.value));
+        for (byte element : this.value)
+        {
+            result = 31 * result + element;
+        }
+
         return result;
     }
 
