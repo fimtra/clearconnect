@@ -196,6 +196,6 @@ public final class TextValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(getType().toString()).append(this.value);
+        return stringAppender.append(IValue.TEXT_CODE).append(this.value);
     }
 }

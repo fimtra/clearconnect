@@ -128,6 +128,6 @@ public final class DoubleValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(getType().toString()).append(this.value);
+        return stringAppender.append(IValue.DOUBLE_CODE).append(this.value);
     }
 }

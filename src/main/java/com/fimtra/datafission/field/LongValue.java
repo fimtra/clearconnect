@@ -246,6 +246,6 @@ public final class LongValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(getType().toString()).append(this.value);
+        return stringAppender.append(IValue.LONG_CODE).append(this.value);
     }
 }

@@ -380,8 +380,6 @@ public final class BlobValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        final String type = getType().toString();
-        final char[] charArrValue = charArrValue();
-        return stringAppender.append(type).append(charArrValue);
+        return stringAppender.append(IValue.BLOB_CODE).append(charArrValue());
     }
 }
