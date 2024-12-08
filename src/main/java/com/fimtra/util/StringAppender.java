@@ -46,6 +46,31 @@ public final class StringAppender
         this.len = len;
     }
 
+    public int getLength()
+    {
+        return len;
+    }
+
+    /**
+     * Exposed to allow direct access to the internal char[] for optimal writing directly to the char[].
+     * <b>USE WITH CARE.</b>
+     *
+     * @param sizeToReserve the length to reserve in the char[]
+     * @return the internal char[], extended to assure the reserve space exists. The internal length includes
+     * the reserved space after this method completes.
+     */
+    public char[] reserveAndGet(int sizeToReserve)
+    {
+        if (this.len + sizeToReserve > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (sizeToReserve < 9 ? 16 : (sizeToReserve * 2))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+        }
+        len += sizeToReserve;
+        return this.chars;
+    }
+
     public StringAppender append(long v)
     {
         return append(Long.toString(v));
@@ -60,7 +85,7 @@ public final class StringAppender
     {
         if (this.len + 1 > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (1 < 9 ? 16 : (1 * 2))];
+            final char[] _c = new char[this.chars.length + 16];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
         }

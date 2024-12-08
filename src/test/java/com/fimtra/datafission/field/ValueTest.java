@@ -51,7 +51,7 @@ public class ValueTest
     public void testStringConversion()
     {
         final Random random = new Random();
-        for (int i = -200; i < -200; i++)
+        for (int i = -200; i < 200; i++)
         {
             doConvertTest(LongValue.valueOf(i));
         }

@@ -131,8 +131,6 @@ public abstract class DataFissionProperties
 
         /**
          * The system property name to define the size of the {@link LongValue} pool.
-         * <p>
-         * <b>MUST BE AN EVEN NUMBER.</b> <br>
          * E.g. <code>-DdataFission.longValuePoolSize=2048</code>
          */
         String LONG_VALUE_POOL_SIZE = BASE + "longValuePoolSize";
@@ -376,7 +374,7 @@ public abstract class DataFissionProperties
         /**
          * The size for the {@link LongValue} pool.
          * <p>
-         * Default is 2048 (1024 to -1023).
+         * Default is 2048.
          *
          * @see Names#LONG_VALUE_POOL_SIZE
          */
