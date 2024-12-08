@@ -178,16 +178,15 @@ public final class TextValue extends AbstractValue
     @Override
     public boolean equals(Object obj)
     {
-        if (is.same(this, obj))
+        if (this == obj)
         {
             return true;
         }
-        if (is.differentClass(this, obj))
+        if (!(obj instanceof TextValue))
         {
             return false;
         }
-        TextValue other = (TextValue) obj;
-        return is.eq(this.value, other.value);
+        return is.eq(this.value, ((TextValue) obj).value);
     }
 
     @Override

@@ -17,7 +17,6 @@ package com.fimtra.datafission.field;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
-import com.fimtra.util.is;
 
 /**
  * The IValue for a double.
@@ -109,16 +108,15 @@ public final class DoubleValue extends AbstractValue
     @Override
     public boolean equals(Object obj)
     {
-        if (is.same(this, obj))
+        if (this == obj)
         {
             return true;
         }
-        if (is.differentClass(this, obj))
+        if (!(obj instanceof DoubleValue))
         {
             return false;
         }
-        DoubleValue other = (DoubleValue) obj;
-        return is.eq(this.value, other.value);
+        return Double.doubleToLongBits(this.value) == Double.doubleToLongBits(((DoubleValue) obj).value);
     }
 
     @Override

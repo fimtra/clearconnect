@@ -372,16 +372,15 @@ public final class BlobValue extends AbstractValue
     @Override
     public boolean equals(Object obj)
     {
-        if (is.same(this, obj))
+        if (this == obj)
         {
             return true;
         }
-        if (is.differentClass(this, obj))
+        if (!(obj instanceof BlobValue))
         {
             return false;
         }
-        BlobValue other = (BlobValue) obj;
-        return is.eq(this.value, other.value);
+        return is.eq(this.value, ((BlobValue) obj).value);
     }
 
     @Override
