@@ -16,6 +16,7 @@
 package com.fimtra.datafission.field;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.Log;
@@ -111,8 +112,6 @@ public final class BlobValue extends AbstractValue
                 case 2:
                     POS_HEX_CODES[b] = hexString.toCharArray();
                     break;
-                default :
-                    POS_HEX_CODES[b] = (hexString.substring(6)).toCharArray();
             }
         }
         int index;
@@ -120,112 +119,46 @@ public final class BlobValue extends AbstractValue
         {
             hexString = Integer.toHexString(-i);
             index = NEG_HEX_CODES.length - i;
-            switch(hexString.length())
-            {
-                case 1:
-                    NEG_HEX_CODES[index] = ("0" + hexString).toCharArray();
-                    break;
-                case 2:
-                    NEG_HEX_CODES[index] = hexString.toCharArray();
-                    break;
-                default :
-                    NEG_HEX_CODES[index] = hexString.substring(6).toCharArray();
-            }
+            // negative hex codes always start ffffff80, we want 80
+            NEG_HEX_CODES[index] = hexString.substring(6).toCharArray();
         }
     }
 
-    // decode for most-significant byte (msb)
-    private static int decodeHexMsb(char c)
+    /** maps char to hex value for the 4 least-significant bits (LSB) of a byte */
+    static final byte[] LSB_HEX_VALS = new byte[103];
+    /** decode for the 4 most-significant bits (msb) of a byte */
+    static final byte[] MSB_HEX_VALS = new byte[103];
+    static
     {
-        switch(c)
-        {
-            case '0':
-                return 0x0;
-            case '1':
-                return 0x10;
-            case '2':
-                return 0x20;
-            case '3':
-                return 0x30;
-            case '4':
-                return 0x40;
-            case '5':
-                return 0x50;
-            case '6':
-                return 0x60;
-            case '7':
-                return 0x70;
-            case '8':
-                return 0x80;
-            case '9':
-                return 0x90;
-            case 'a':
-            case 'A':
-                return 0xa0;
-            case 'b':
-            case 'B':
-                return 0xb0;
-            case 'c':
-            case 'C':
-                return 0xc0;
-            case 'd':
-            case 'D':
-                return 0xd0;
-            case 'e':
-            case 'E':
-                return 0xe0;
-            case 'f':
-            case 'F':
-                return 0xf0;
-        }
-        throw new IllegalArgumentException("Unhandled char:" + c);
-    }
+        Arrays.fill(LSB_HEX_VALS, (byte) -1);
 
-    // decode for least-significant byte (lsb)
-    private static int decodeHexLsb(char c)
-    {
-        switch(c)
+        LSB_HEX_VALS['0'] = 0x0;
+        LSB_HEX_VALS['1'] = 0x1;
+        LSB_HEX_VALS['2'] = 0x2;
+        LSB_HEX_VALS['3'] = 0x3;
+        LSB_HEX_VALS['4'] = 0x4;
+        LSB_HEX_VALS['5'] = 0x5;
+        LSB_HEX_VALS['6'] = 0x6;
+        LSB_HEX_VALS['7'] = 0x7;
+        LSB_HEX_VALS['8'] = 0x8;
+        LSB_HEX_VALS['9'] = 0x9;
+        LSB_HEX_VALS['a'] = 0xa;
+        LSB_HEX_VALS['b'] = 0xb;
+        LSB_HEX_VALS['c'] = 0xc;
+        LSB_HEX_VALS['d'] = 0xd;
+        LSB_HEX_VALS['e'] = 0xe;
+        LSB_HEX_VALS['f'] = 0xf;
+        LSB_HEX_VALS['A'] = 0xa;
+        LSB_HEX_VALS['B'] = 0xb;
+        LSB_HEX_VALS['C'] = 0xc;
+        LSB_HEX_VALS['D'] = 0xd;
+        LSB_HEX_VALS['E'] = 0xe;
+        LSB_HEX_VALS['F'] = 0xf;
+
+        for (int c = 0; c < MSB_HEX_VALS.length; c++)
         {
-            case '0':
-                return 0x0;
-            case '1':
-                return 0x1;
-            case '2':
-                return 0x2;
-            case '3':
-                return 0x3;
-            case '4':
-                return 0x4;
-            case '5':
-                return 0x5;
-            case '6':
-                return 0x6;
-            case '7':
-                return 0x7;
-            case '8':
-                return 0x8;
-            case '9':
-                return 0x9;
-            case 'a':
-            case 'A':
-                return 0xa;
-            case 'b':
-            case 'B':
-                return 0xb;
-            case 'c':
-            case 'C':
-                return 0xc;
-            case 'd':
-            case 'D':
-                return 0xd;
-            case 'e':
-            case 'E':
-                return 0xe;
-            case 'f':
-            case 'F':
-                return 0xf;
+            MSB_HEX_VALS[c] = (byte) (LSB_HEX_VALS[c] << 4);
         }
-        throw new IllegalArgumentException("Unhandled char:" + c);
     }
 
     /**
@@ -311,21 +244,17 @@ public final class BlobValue extends AbstractValue
     @Override
     public String textValue()
     {
+        final char[] cbuf = new char[this.value.length << 1];
         // note: a full array copy happens when constructing the string
-        return new String(charArrValue());
+        return new String(fillCharArray(cbuf, 0));
     }
 
-    char[] charArrValue()
+    private char[] fillCharArray(char[] cbuf, int bufPtr)
     {
-        final int length = this.value.length;
-        final char[] cbuf = new char[length << 1];
         char[] code;
-        byte val;
-        int bufPtr = 0;
-        for (int i = 0; i < length; i++)
+        for (byte b : this.value)
         {
-            val = this.value[i];
-            code = (val & 0x80) == 0x80 ? NEG_HEX_CODES[val & 0x7f] : POS_HEX_CODES[val];
+            code = (b & 0x80) == 0x80 ? NEG_HEX_CODES[b & 0x7f] : POS_HEX_CODES[b];
             cbuf[bufPtr++] = code[0];
             cbuf[bufPtr++] = code[1];
         }
@@ -335,7 +264,12 @@ public final class BlobValue extends AbstractValue
     @Override
     public StringAppender toStringAppender()
     {
-        return appendTo(new StringAppender((this.value.length * 2) + 1));
+        final int len = (this.value.length << 1);
+        final StringAppender stringAppender = new StringAppender(len + 1);
+        final char[] chars = stringAppender.reserveAndGet(len + 1);
+        chars[0] = IValue.BLOB_CODE;
+        fillCharArray(chars, 1);
+        return stringAppender;
     }
     
     void fromChars(char[] chars, int start, int len)
@@ -348,7 +282,7 @@ public final class BlobValue extends AbstractValue
         int j = 0;
         for (int i = start; i < len; )
         {
-            this.value[j++] = (byte) (decodeHexMsb(chars[i++]) | decodeHexLsb(chars[i++]));
+            this.value[j++] = (byte) (MSB_HEX_VALS[chars[i++]] | LSB_HEX_VALS[chars[i++]]);
         }
     }
 
@@ -386,6 +320,11 @@ public final class BlobValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(IValue.BLOB_CODE).append(charArrValue());
+        int start = stringAppender.getLength();
+        final int len = this.value.length << 1;
+        final char[] chars = stringAppender.reserveAndGet(len + 1);
+        chars[start++] = IValue.BLOB_CODE;
+        fillCharArray(chars, start);
+        return stringAppender;
     }
 }
