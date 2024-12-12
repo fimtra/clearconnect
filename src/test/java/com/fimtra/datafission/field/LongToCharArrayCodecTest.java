@@ -9,7 +9,7 @@ import org.junit.Test;
 /**
  * @author Ramon Servadei
  */
-public class LongValueCharArrayCodecTest
+public class LongToCharArrayCodecTest
 {
     static final int LOOPS = LongValueTest.LOOPS;
 
@@ -36,10 +36,10 @@ public class LongValueCharArrayCodecTest
 
     private static void doToFromCharArrayTest(long lVal, char[] chars)
     {
-        final int len = lVal < 0 ? LongValueCharArrayCodec.stringSize(-lVal) + 1 :
-                LongValueCharArrayCodec.stringSize(lVal);
-        LongValueCharArrayCodec.writeToCharArray(lVal, chars, 0, len);
-        assertEquals(lVal, LongValueCharArrayCodec.fromCharArray(chars, 0, len));
+        final int len = lVal < 0 ? LongToCharArrayCodec.stringSize(-lVal) + 1 :
+                LongToCharArrayCodec.stringSize(lVal);
+        LongToCharArrayCodec.writeToCharArray(lVal, chars, 0, len);
+        assertEquals(lVal, LongToCharArrayCodec.fromCharArray(chars, 0, len));
     }
 
     @Test
@@ -49,13 +49,13 @@ public class LongValueCharArrayCodecTest
         for (int i = 0; i < LOOPS; i++)
         {
             long v = 5 * (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCharArrayCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongToCharArrayCodec.stringSize(v));
         }
 
         for (int i = 0; i < LOOPS; i++)
         {
             long v = (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCharArrayCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongToCharArrayCodec.stringSize(v));
         }
     }
 
@@ -101,7 +101,7 @@ public class LongValueCharArrayCodecTest
         for (int i = 0; i < LOOPS; i++)
         {
             stringSize_loop(lVal);
-            LongValueCharArrayCodec.stringSize(lVal);
+            LongToCharArrayCodec.stringSize(lVal);
         }
 
         prepareForPerfTestRun();
@@ -118,11 +118,11 @@ public class LongValueCharArrayCodecTest
         long tArr = System.nanoTime();
         for (int i = 0; i < LOOPS; i++)
         {
-            LongValueCharArrayCodec.stringSize(lVal);
+            LongToCharArrayCodec.stringSize(lVal);
         }
         tArr = System.nanoTime() - tArr;
 
-        assertEquals(stringSize_loop(lVal), LongValueCharArrayCodec.stringSize(lVal));
+        assertEquals(stringSize_loop(lVal), LongToCharArrayCodec.stringSize(lVal));
 
         System.err.println("tLoop=" + tLoop);
         System.err.println(" tArr=" + tArr);

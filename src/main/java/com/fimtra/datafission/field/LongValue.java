@@ -105,24 +105,24 @@ public class LongValue extends AbstractValue
     @Override
     public String textValue()
     {
-        final int digitCount = value < 0 ? LongValueCharArrayCodec.stringSize(-value) + 1 :
-                LongValueCharArrayCodec.stringSize(value);
+        final int digitCount = value < 0 ? LongToCharArrayCodec.stringSize(-value) + 1 :
+                LongToCharArrayCodec.stringSize(value);
         final char[] chars = new char[digitCount];
-        LongValueCharArrayCodec.writeToCharArray(value, chars, 0, chars.length);
+        LongToCharArrayCodec.writeToCharArray(value, chars, 0, chars.length);
         return new String(chars);
     }
 
     @Override
     public final StringAppender toStringAppender()
     {
-        final int digitCount = (value < 0 ? LongValueCharArrayCodec.stringSize(-value) + 1 :
-                LongValueCharArrayCodec.stringSize(value))
+        final int digitCount = (value < 0 ? LongToCharArrayCodec.stringSize(-value) + 1 :
+                LongToCharArrayCodec.stringSize(value))
                 // plus 1 for the LONG_CODE
                 + 1;
         final StringAppender appender = new StringAppender(digitCount);
         final char[] buf = appender.reserveAndGet(digitCount);
         buf[0] = IValue.LONG_CODE;
-        LongValueCharArrayCodec.writeToCharArray(value, buf, 1, digitCount);
+        LongToCharArrayCodec.writeToCharArray(value, buf, 1, digitCount);
         return appender;
     }
 
@@ -150,21 +150,21 @@ public class LongValue extends AbstractValue
 
     public static IValue valueOf(char[] chars, int start, int len)
     {
-        return LongValue.valueOf(LongValueCharArrayCodec.fromCharArray(chars, start, len));
+        return LongValue.valueOf(LongToCharArrayCodec.fromCharArray(chars, start, len));
     }
 
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        final int digitCount = (value < 0 ? LongValueCharArrayCodec.stringSize(-value) + 1 :
-                LongValueCharArrayCodec.stringSize(value))
+        final int digitCount = (value < 0 ? LongToCharArrayCodec.stringSize(-value) + 1 :
+                LongToCharArrayCodec.stringSize(value))
                 // plus 1 for the LONG_CODE
                 + 1;
         int start = stringAppender.getLength();
         final char[] buf = stringAppender.reserveAndGet(digitCount);
         final int len = start + digitCount;
         buf[start++] = IValue.LONG_CODE;
-        LongValueCharArrayCodec.writeToCharArray(value, buf, start, len);
+        LongToCharArrayCodec.writeToCharArray(value, buf, start, len);
         return stringAppender;
     }
 }

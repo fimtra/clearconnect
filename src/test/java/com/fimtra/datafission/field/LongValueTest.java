@@ -197,7 +197,7 @@ public class LongValueTest
         {
         }
 
-        final long l = LongValueCharArrayCodec.fromCharArray(charArray, 0, charArray.length);
+        final long l = LongToCharArrayCodec.fromCharArray(charArray, 0, charArray.length);
         System.err.println("Got: " + l);
     }
 
@@ -248,7 +248,7 @@ public class LongValueTest
         for (int i = 0; i < LOOPS; i++)
         {
             Long.parseLong(sVal);
-            LongValueCharArrayCodec.fromCharArray(chars, 0, chars.length);
+            LongToCharArrayCodec.fromCharArray(chars, 0, chars.length);
         }
 
         prepareForPerfTestRun();
@@ -256,7 +256,7 @@ public class LongValueTest
         long tLongValue = System.nanoTime();
         for (int i = 0; i < LOOPS; i++)
         {
-            LongValueCharArrayCodec.fromCharArray(chars, 0, chars.length);
+            LongToCharArrayCodec.fromCharArray(chars, 0, chars.length);
         }
         tLongValue = System.nanoTime() - tLongValue;
 
@@ -269,7 +269,7 @@ public class LongValueTest
         }
         tLong = System.nanoTime() - tLong;
 
-        assertEquals(Long.parseLong(sVal), LongValueCharArrayCodec.fromCharArray(chars, 0, chars.length));
+        assertEquals(Long.parseLong(sVal), LongToCharArrayCodec.fromCharArray(chars, 0, chars.length));
 
         System.err.println("     tLong=" + tLong);
         System.err.println("tLongValue=" + tLongValue);
