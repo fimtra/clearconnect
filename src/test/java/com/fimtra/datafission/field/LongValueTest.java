@@ -41,6 +41,16 @@ public class LongValueTest
 {
     static final int LOOPS = 1_000;
 
+    private static void checkLongVsLongValueResults(long[] times)
+    {
+        final double tolerance = 1.2d;
+        final long timeWithTolerance = (long) (times[0] * tolerance);
+        final String message = "Got total times tLong=" + times[0] + " (with " + tolerance + " tolerance="
+                + timeWithTolerance + ") tLongValue=" + times[1];
+        assertTrue(message, timeWithTolerance > times[1]);
+        System.err.println(message);
+    }
+
     static void prepareForPerfTestRun()
     {
         System.gc();
@@ -226,16 +236,6 @@ public class LongValueTest
         }
 
         checkLongVsLongValueResults(times);
-    }
-
-    private static void checkLongVsLongValueResults(long[] times)
-    {
-        final double tolerance = 1.8d;
-        final long timeWithTolerance = (long) (times[0] * tolerance);
-        final String message = "Got total times tLong=" + times[0] + " (with " + tolerance + " tolerance="
-                + timeWithTolerance + ") tLongValue=" + times[1];
-        assertTrue(message, timeWithTolerance > times[1]);
-        System.err.println(message);
     }
 
     private static void doPerfTestCharsToLong(String sVal, long[] times)

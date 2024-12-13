@@ -74,8 +74,7 @@ abstract class LongToCharArrayCodec
             do
             {
                 q = i / 100;
-                // really: r = i - (q * 100);
-                r = (int) (i - ((q << 6) + (q << 5) + (q << 2)));
+                r = (int) (i - (q * 100));
                 i = q;
                 buf[--lsDigitPos] = DigitOnes[r];
                 buf[--lsDigitPos] = DigitTens[r];
@@ -89,8 +88,7 @@ abstract class LongToCharArrayCodec
         while (i2 >= 65536)
         {
             q2 = i2 / 100;
-            // really: r = i2 - (q * 100);
-            r = i2 - ((q2 << 6) + (q2 << 5) + (q2 << 2));
+            r = i2 - (q2 * 100);
             i2 = q2;
             buf[--lsDigitPos] = DigitOnes[r];
             buf[--lsDigitPos] = DigitTens[r];
@@ -100,8 +98,8 @@ abstract class LongToCharArrayCodec
         // assert(i2 <= 65536, i2);
         do
         {
-            q2 = (i2 * 52429) >>> (16 + 3);
-            r = i2 - ((q2 << 3) + (q2 << 1));  // r = i2-(q2*10) ...
+            q2 = (i2 * 52429) >>> 19;
+            r = i2 - (q2 * 10);
             buf[--lsDigitPos] = digits[r];
             i2 = q2;
         }
