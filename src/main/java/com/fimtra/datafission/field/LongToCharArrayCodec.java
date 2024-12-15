@@ -8,7 +8,7 @@ package com.fimtra.datafission.field;
  */
 abstract class LongToCharArrayCodec
 {
-    private static final char[] DigitTens = {
+    static final char[] DigitTens = {
             //
             '0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
             //
@@ -30,7 +30,7 @@ abstract class LongToCharArrayCodec
             //
             '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', };
 
-    private static final char[] DigitOnes = {
+    static final char[] DigitOnes = {
             //
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             //
@@ -52,34 +52,45 @@ abstract class LongToCharArrayCodec
             //
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', };
 
-    private static final char[] digits = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+    static final char[] digits = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+    // 48-57 is 0-9
+    static final int[] digits_from_char = {
+            // 0-9
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            // 10-19
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            // 20-29
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            // 30-39
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            // 40-49
+            -1, -1, -1, -1, -1, -1, -1, -1, 0, 1,
+            // 50-59
+            2, 3, 4, 5, 6, 7, 8, 9, -1, -1, };
 
     static void writeToCharArray(long i, char[] buf, int start, int lsDigitPos)
     {
-        int r;
-
         if (i < 0)
         {
             buf[start] = '-';
             i = -i;
         }
 
-        // NOTE: this logic works on the least significant digit to most significant
-        //       hence we start at the END of the array and work "backwards" (--lsDigitPos)
+        long q;
+        int r;
+
+        // R.S. NOTE:
+        // This logic works on the least significant digit to most significant
+        // hence we start at the END of the array and work "backwards" (--lsDigitPos)
 
         // Get 2 digits/iteration using longs until quotient fits into an int
-        if (i > Integer.MAX_VALUE)
+        while (i > Integer.MAX_VALUE)
         {
-            long q;
-            do
-            {
-                q = i / 100;
-                r = (int) (i - (q * 100));
-                i = q;
-                buf[--lsDigitPos] = DigitOnes[r];
-                buf[--lsDigitPos] = DigitTens[r];
-            }
-            while (i > Integer.MAX_VALUE);
+            q = i / 100;
+            r = (int) (i - (q * 100));
+            i = q;
+            buf[--lsDigitPos] = DigitOnes[r];
+            buf[--lsDigitPos] = DigitTens[r];
         }
 
         // Get 2 digits/iteration using ints
@@ -264,7 +275,6 @@ abstract class LongToCharArrayCodec
                         // Cannot have lone "+" or "-"
                         throw new NumberFormatException(new String(chars, start, len));
                     }
-                default:
             }
 
             // big digit count check to optimise for the majority of the time where we don't need to check
@@ -275,11 +285,12 @@ abstract class LongToCharArrayCodec
                 final long multmin = negative ? POS_MIN_MULTMIN : NEG_MAX_MULTMIN;
                 while (i < len)
                 {
-                    digit = chars[i++] - '0';
-                    if (digit < 0 || digit > 9 || (i > DIGIT_COUNT_FOR_LIMIT_CHECK && result < multmin))
+                    digit = chars[i++];
+                    if (digit < 48 || digit > 57 || (i > DIGIT_COUNT_FOR_LIMIT_CHECK && result < multmin))
                     {
                         throw new NumberFormatException(new String(chars, start, len));
                     }
+                    digit = digits_from_char[digit];
                     result *= 10;
                     if (i > DIGIT_COUNT_FOR_LIMIT_CHECK && (result < limit + digit))
                     {
@@ -296,11 +307,12 @@ abstract class LongToCharArrayCodec
                 // so we have a straight path to the finish
                 while (i < len)
                 {
-                    digit = chars[i++] - '0';
-                    if (digit < 0 || digit > 9)
+                    digit = chars[i++];
+                    if (digit < 48 || digit > 57)
                     {
                         throw new NumberFormatException(new String(chars, start, len));
                     }
+                    digit = digits_from_char[digit];
                     result *= 10;
                     // NOTE: here we accumulate positively
                     result += digit;

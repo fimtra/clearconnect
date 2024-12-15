@@ -57,11 +57,23 @@ public class ValueTest
         }
         for (int i = 0; i < 1000; i++)
         {
-            doConvertTest(LongValue.valueOf(random.nextLong()));
-            doConvertTest(new DoubleValue((random.nextBoolean() ? -random.nextDouble() : random.nextDouble())));
+            final long nextLong = random.nextLong();
+            doConvertTest(LongValue.valueOf(nextLong));
+            doConvertTest(LongValue.valueOf(-nextLong));
+            final double v = random.nextDouble();
+            doConvertTest(new DoubleValue(v));
+            doConvertTest(new DoubleValue(-v));
             // note that we do a LONG so that we can test doubleValue and longValue methods
             // with no numberFormatException
-            doConvertTest(TextValue.valueOf("" + random.nextLong()));
+            doConvertTest(TextValue.valueOf("" + nextLong));
+            if (nextLong < 0)
+            {
+                doConvertTest(TextValue.valueOf("+" + -nextLong));
+            }
+            else
+            {
+                doConvertTest(TextValue.valueOf("-" + nextLong));
+            }
         }
     }
 

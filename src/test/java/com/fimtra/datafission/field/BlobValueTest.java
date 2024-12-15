@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2014 Ramon Servadei 
- *  
+ * Copyright (c) 2014 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,7 +15,11 @@
  */
 package com.fimtra.datafission.field;
 
-import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestRun;
+import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
+import static com.fimtra.datafission.field.LongValueTest.computeStats;
+import static com.fimtra.datafission.field.LongValueTest.max_retry;
+import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
+import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -23,6 +27,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
@@ -71,7 +78,7 @@ public class BlobValueTest
         assertNull(BlobValue.fromBlob((IValue) null));
         assertNull(BlobValue.fromBlob(null));
         String s = "Lasers";
-        assertEquals(s, BlobValue.fromBlob((IValue)BlobValue.toBlob(s)));
+        assertEquals(s, BlobValue.fromBlob((IValue) BlobValue.toBlob(s)));
         assertEquals(s, BlobValue.fromBlob(BlobValue.toBlob(s)));
         assertNull(BlobValue.fromBlob(BlobValue.toBlob(null)));
     }
@@ -196,76 +203,65 @@ public class BlobValueTest
     @Test
     public void test_toStringAppender()
     {
-        assertEquals("B" + _1AF3416, candidate.toStringAppender().toString());
+        assertEquals("B" + _1AF3416, candidate.toStringAppender()
+                .toString());
     }
 
     @Test
     public synchronized void test_perf_switchVsArray()
     {
-        final long[] times = new long[3];
-
-        testPerf('0', times);
-        testPerf('1', times);
-        testPerf('2', times);
-        testPerf('3', times);
-        testPerf('4', times);
-        testPerf('5', times);
-        testPerf('6', times);
-        testPerf('7', times);
-        testPerf('8', times);
-        testPerf('9', times);
-        testPerf('a', times);
-        testPerf('b', times);
-        testPerf('c', times);
-        testPerf('d', times);
-        testPerf('e', times);
-        testPerf('f', times);
-
-        checkSwitchVsArrayTimes(times);
+        List<long[]> times;
+        int tries = 0;
+        do
+        {
+            tries++;
+            times = new ArrayList<>();
+            testPerf('0', times);
+            testPerf('1', times);
+            testPerf('2', times);
+            testPerf('3', times);
+            testPerf('4', times);
+            testPerf('5', times);
+            testPerf('6', times);
+            testPerf('7', times);
+            testPerf('8', times);
+            testPerf('9', times);
+            testPerf('a', times);
+            testPerf('b', times);
+            testPerf('c', times);
+            testPerf('d', times);
+            testPerf('e', times);
+            testPerf('f', times);
+        }
+        while (!checkNormalVsOptimisedResults(times, "test_perf_switchVsArray", tries));
     }
 
-    private static void checkSwitchVsArrayTimes(long[] times)
-    {
-        final double tolerance = 1.8d;
-        final long timeWithTolerance = (long) (times[0] * tolerance);
-        final long optimised = times[2];
-        final String message = "Got total times tSwitch=" + times[0] + " (with " + tolerance + " tolerance="
-                + timeWithTolerance + ") tArray=" + optimised;
-        assertTrue(message, timeWithTolerance > optimised);
-        System.err.println(message);
-    }
-
-    private static void testPerf(char c, long[] times)
+    private static void testPerf(char c, List<long[]> times)
     {
         long t;
         long switchTime;
-        long computeTime;
         long arrayTime;
-        final int LOOPS = 1_000;
+        int arrayVal = -1;
+        final int LOOPS = LongValueTest.LOOPS;
 
-        prepareForPerfTestRun();
+        // warmup
+        for (int i = 0; i < LOOPS; i++)
+        {
+            arrayVal = decodeHexLsb(c);
+            arrayVal = BlobValue.LSB_HEX_VALS[c];
+        }
+
+        prepareForPerfTestStep();
 
         t = System.nanoTime();
         for (int i = 0; i < LOOPS; i++)
         {
-            decodeHexLsb(c);
+            arrayVal = decodeHexLsb(c);
         }
         switchTime = System.nanoTime() - t;
-        int decodeVal = decodeHexLsb(c);
 
-        prepareForPerfTestRun();
+        prepareForPerfTestStep();
 
-        t = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
-        {
-            computeLsb(c);
-        }
-        computeTime = System.nanoTime() - t;
-        int computeVal = computeLsb(c);
-
-        prepareForPerfTestRun();
-
-        int arrayVal = -1;
         t = System.nanoTime();
         for (int i = 0; i < LOOPS; i++)
         {
@@ -274,11 +270,8 @@ public class BlobValueTest
         arrayTime = System.nanoTime() - t;
 
         assertEquals(decodeHexLsb(c), BlobValue.LSB_HEX_VALS[c]);
-        assertEquals(decodeHexLsb(c), computeLsb(c));
 
-        times[0] += switchTime;
-        times[1] += computeTime;
-        times[2] += arrayTime;
+        saveQuickestTimes(times, switchTime, arrayTime);
     }
 
     // this was the old logic to decode
@@ -326,32 +319,5 @@ public class BlobValueTest
                 return 0xf;
         }
         throw new IllegalArgumentException("Unhandled char:" + c);
-    }
-
-    // this is slower than direct array access, left here for testing comparison/history
-    private static int computeLsb(int c)
-    {
-        if (c > 47 && c < 58)
-        {
-            return c - 48;
-        }
-        else if (c > 64 && c < 71)
-        {
-            // A=ascii65=10=0xA
-            // B=ascii66=11=0xB
-            // C=ascii67=12=0xC
-            // D=ascii68=13=0xD
-            // E=ascii69=14=0xE
-            // F=ascii70=15=0xF
-            return c - 55;
-        }
-        else if (c > 96 )
-        {
-            return c - 87;
-        }
-        else
-        {
-            return 0;
-        }
     }
 }

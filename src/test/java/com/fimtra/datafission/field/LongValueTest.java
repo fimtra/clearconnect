@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,7 +23,9 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.util.concurrent.locks.LockSupport;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
@@ -39,23 +41,83 @@ import com.fimtra.datafission.IValue.TypeEnum;
  */
 public class LongValueTest
 {
-    static final int LOOPS = 1_000;
+    static final int LOOPS = 10;
+    static final int REPEAT_RUNS = 100;
+    static final double tolerance = 1.d;
+    static final int max_retry = 4;
 
-    private static void checkLongVsLongValueResults(long[] times)
+    static boolean checkNormalVsOptimisedResults(List<long[]> all_times, String context, int tries)
     {
-        final double tolerance = 1.2d;
+        final long[] times = computeStats(all_times);
         final long timeWithTolerance = (long) (times[0] * tolerance);
-        final String message = "Got total times tLong=" + times[0] + " (with " + tolerance + " tolerance="
-                + timeWithTolerance + ") tLongValue=" + times[1];
-        assertTrue(message, timeWithTolerance > times[1]);
-        System.err.println(message);
+        final String message = context + " got time t_normal=" + times[0] + " (with " + tolerance + " tolerance="
+                + timeWithTolerance + ") t_optimised=" + times[1];
+        final boolean passed = timeWithTolerance >= times[1];
+        if (passed || tries == max_retry)
+        {
+            assertTrue(message, passed);
+            System.err.println(message);
+        }
+        if (!passed)
+        {
+            System.err.println("RETRY: " + message);
+            System.gc();
+        }
+
+        return passed;
     }
 
-    static void prepareForPerfTestRun()
+    static long[] computeStats(List<long[]> allTimes)
     {
-        System.gc();
-        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
-        LockSupport.parkNanos(1_000_000);
+        final List<Long> list1 = new ArrayList<>(allTimes.size());
+        final List<Long> list2 = new ArrayList<>(allTimes.size());
+
+        for (long[] allTime : allTimes)
+        {
+            list1.add(allTime[0]);
+            list2.add(allTime[1]);
+        }
+
+        // remove min and max
+        //        list1.remove(list1.stream()
+        //                .min(Long::compare)
+        //                .get());
+        //        list2.remove(list2.stream()
+        //                .min(Long::compare)
+        //                .get());
+        //        list1.remove(list1.stream()
+        //                .max(Long::compare)
+        //                .get());
+        //        list2.remove(list2.stream()
+        //                .max(Long::compare)
+        //                .get());
+        //
+        //        return new long[] { (long) list1.stream()
+        //                .mapToLong(Long::longValue)
+        //                .average()
+        //                .getAsDouble(), (long) list2.stream()
+        //                .mapToLong(Long::longValue)
+        //                .average()
+        //                .getAsDouble() };
+
+        return new long[] {
+                //
+                list1.stream()
+                        .mapToLong(Long::longValue)
+                        .min().getAsLong(),
+                //
+                list2.stream()
+                        .mapToLong(Long::longValue)
+                        .min().getAsLong() };
+    }
+
+    static void saveQuickestTimes(List<long[]> times, long t_0, long t_1)
+    {
+        times.add(new long[] { t_0, t_1 });
+    }
+
+    static void prepareForPerfTestStep()
+    {
     }
 
     @Before
@@ -107,6 +169,7 @@ public class LongValueTest
         assertEquals("-1234567", LongValue.valueOf(-1234567)
                 .textValue());
     }
+
     @Test
     public void test_toString()
     {
@@ -214,35 +277,27 @@ public class LongValueTest
     @Test
     public synchronized void test_performance_charsToLong()
     {
-        long[] times = new long[2];
-
-        String number = "1";
-        // 19 is the max digit count for long
-        for (int i = 0; i < 19; i++)
+        List<long[]> times;
+        int tries = 0;
+        do
         {
-            doPerfTestCharsToLong(number, times);
-            number += "0";
+            tries++;
+            times = new ArrayList<>();
+            final Random random = new Random();
+            for (int i = 0; i < 5; i++)
+            {
+                doPerfTestCharsToLong("" + random.nextLong(), times);
+            }
+
         }
-
-        checkLongVsLongValueResults(times);
-
-        times = new long[2];
-        // now negative numbers
-        number = "-1";
-        for (int i = 0; i < 19; i++)
-        {
-            doPerfTestCharsToLong(number, times);
-            number += "0";
-        }
-
-        checkLongVsLongValueResults(times);
+        while (!checkNormalVsOptimisedResults(times, "test_performance_charsToLong", tries));
     }
 
-    private static void doPerfTestCharsToLong(String sVal, long[] times)
+    private static void doPerfTestCharsToLong(String sVal, List<long[]> times)
     {
         final char[] chars = sVal.toCharArray();
 
-        System.err.println("==================== " + sVal + "-toLong loops:" + LOOPS + "===============");
+        //        System.err.println("==================== " + sVal + "-toLong loops:" + LOOPS + "===============");
 
         // warmup
         for (int i = 0; i < LOOPS; i++)
@@ -251,69 +306,55 @@ public class LongValueTest
             LongToCharArrayCodec.fromCharArray(chars, 0, chars.length);
         }
 
-        prepareForPerfTestRun();
-
-        long tLongValue = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
+        for (int j = 0; j < REPEAT_RUNS; j++)
         {
-            LongToCharArrayCodec.fromCharArray(chars, 0, chars.length);
+            prepareForPerfTestStep();
+
+            long tLongValue = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                LongToCharArrayCodec.fromCharArray(chars, 0, chars.length);
+            }
+            tLongValue = System.nanoTime() - tLongValue;
+
+            prepareForPerfTestStep();
+
+            long tLong = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                Long.parseLong(sVal);
+            }
+            tLong = System.nanoTime() - tLong;
+
+            assertEquals(Long.parseLong(sVal), LongToCharArrayCodec.fromCharArray(chars, 0, chars.length));
+
+            //        System.err.println("tLong=" + tLong + " tLongValue=" + tLongValue);
+
+            saveQuickestTimes(times, tLong, tLongValue);
         }
-        tLongValue = System.nanoTime() - tLongValue;
-
-        prepareForPerfTestRun();
-
-        long tLong = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
-        {
-            Long.parseLong(sVal);
-        }
-        tLong = System.nanoTime() - tLong;
-
-        assertEquals(Long.parseLong(sVal), LongToCharArrayCodec.fromCharArray(chars, 0, chars.length));
-
-        System.err.println("     tLong=" + tLong);
-        System.err.println("tLongValue=" + tLongValue);
-
-        times[0] += tLong;
-        times[1] += tLongValue;
     }
 
     @Test
-    public synchronized void test_performance_writeToString()
+    public synchronized void test_performance_longToAppender()
     {
-        long[] times = new long[2];
-
-        long l = 1;
-        for (int i = 0; i < 19; i++)
+        List<long[]> times;
+        int tries = 0;
+        do
         {
-            doPerfTestWriteToString(l, times);
-            l *= 10;
-
-            prepareForPerfTestRun();
-            LockSupport.parkNanos(10_000_000);
+            tries++;
+            times = new ArrayList<>();
+            final Random random = new Random();
+            for (int i = 0; i < 5; i++)
+            {
+                doPerfTestWriteToAppender(random.nextLong(), times);
+            }
         }
-
-        checkLongVsLongValueResults(times);
-
-        times = new long[2];
-        // now negative numbers
-        l = -1;
-        for (int i = 0; i < 19; i++)
-        {
-            doPerfTestWriteToString(l, times);
-            l *= 10;
-
-            prepareForPerfTestRun();
-            LockSupport.parkNanos(10_000_000);
-        }
-
-        checkLongVsLongValueResults(times);
+        while (!checkNormalVsOptimisedResults(times, "test_performance_longToAppender", tries));
     }
 
-    private static void doPerfTestWriteToString(long lVal, long[] times)
+    private static void doPerfTestWriteToAppender(long lVal, List<long[]> times)
     {
-        System.err.println(
-                "==================== " + lVal + "-append-to-string loops:" + LOOPS + "===============");
+        //        System.err.println(==================== " + lVal + "-append-to-string loops:" + LOOPS + "===============");
 
         final StringAppender appender = new StringAppender();
         final LongValue longValue = LongValue.valueOf(lVal);
@@ -328,41 +369,42 @@ public class LongValueTest
                     .append(Long.toString(lVal));
         }
 
-        prepareForPerfTestRun();
-
-        long tLongValue = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
+        for (int j = 0; j < REPEAT_RUNS; j++)
         {
+            prepareForPerfTestStep();
+
+            long tLongValue = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                appender.setLength(0);
+                longValue.appendTo(appender);
+            }
+            tLongValue = System.nanoTime() - tLongValue;
+
+            prepareForPerfTestStep();
+
+            long tLong = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                appender.setLength(0);
+                appender.append(IValue.LONG_CODE)
+                        .append(Long.toString(lVal));
+            }
+            tLong = System.nanoTime() - tLong;
+
             appender.setLength(0);
-            longValue.appendTo(appender);
-        }
-        tLongValue = System.nanoTime() - tLongValue;
+            final String longValueToString = longValue.appendTo(appender)
+                    .toString();
 
-        prepareForPerfTestRun();
-
-        long tLong = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
-        {
             appender.setLength(0);
-            appender.append(IValue.LONG_CODE)
-                    .append(Long.toString(lVal));
+            final String longToString = appender.append(IValue.LONG_CODE)
+                    .append(Long.toString(lVal))
+                    .toString();
+            assertEquals(longToString, longValueToString);
+
+            //        System.err.println("tLong=" + tLong + " tLongValue=" + tLongValue);
+
+            saveQuickestTimes(times, tLong, tLongValue);
         }
-        tLong = System.nanoTime() - tLong;
-
-        appender.setLength(0);
-        final String longValueToString = longValue.appendTo(appender)
-                .toString();
-
-        appender.setLength(0);
-        final String longToString = appender.append(IValue.LONG_CODE)
-                .append(Long.toString(lVal))
-                .toString();
-        assertEquals(longToString, longValueToString);
-
-        System.err.println("     tLong=" + tLong);
-        System.err.println("tLongValue=" + tLongValue);
-
-        times[0] += tLong;
-        times[1] += tLongValue;
     }
 }

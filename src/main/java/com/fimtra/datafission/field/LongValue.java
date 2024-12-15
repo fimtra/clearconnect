@@ -105,11 +105,10 @@ public class LongValue extends AbstractValue
     @Override
     public String textValue()
     {
-        final int digitCount = value < 0 ? LongToCharArrayCodec.stringSize(-value) + 1 :
-                LongToCharArrayCodec.stringSize(value);
-        final char[] chars = new char[digitCount];
-        LongToCharArrayCodec.writeToCharArray(value, chars, 0, chars.length);
-        return new String(chars);
+        // just return Long.toString value
+        // ...hard to beat this as it uses String internal constructor to share the char[]
+        // ...any other way has a 2x char[] construction cost...
+       return Long.toString(value);
     }
 
     @Override

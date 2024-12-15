@@ -1,9 +1,16 @@
 package com.fimtra.datafission.field;
 
+import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
+import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
+import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
+import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
+import com.fimtra.util.StringAppender;
 import org.junit.Test;
 
 /**
@@ -12,6 +19,49 @@ import org.junit.Test;
 public class LongToCharArrayCodecTest
 {
     static final int LOOPS = LongValueTest.LOOPS;
+
+    @Test
+    public void test_workbench()
+    {
+        char[] charArray = ("-3455").toCharArray();
+        final long actual = LongToCharArrayCodec.fromCharArray(charArray, 0, charArray.length);
+        final long expected = Long.parseLong(new String(charArray));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_invalidInputs()
+    {
+        final List<String> invalid = new ArrayList<>();
+
+        invalid.add(null);
+        invalid.add("");
+        invalid.add(" ");
+        invalid.add("+");
+        invalid.add("-");
+        invalid.add("0..123");
+        invalid.add("1249396249097535200000000..123");
+        invalid.add("3.1415926535898E2147d483640");
+        invalid.add("3.1415926535898E ");
+        invalid.add("3.141g");
+        invalid.add("-92233720368547758099");
+        invalid.add("92233720368547758099");
+
+        char[] charArray = null;
+        for (String s : invalid)
+        {
+            charArray = s == null ? null : s.toCharArray();
+            try
+            {
+                LongToCharArrayCodec.fromCharArray(charArray, 0, charArray == null ? 0 : charArray.length);
+                fail("Expected NumberFormatException for [" + s + "]");
+            }
+            catch (NumberFormatException e)
+            {
+                // ok
+            }
+        }
+    }
 
     @Test
     public void test_to_from_charArray()
@@ -36,8 +86,8 @@ public class LongToCharArrayCodecTest
 
     private static void doToFromCharArrayTest(long lVal, char[] chars)
     {
-        final int len = lVal < 0 ? LongToCharArrayCodec.stringSize(-lVal) + 1 :
-                LongToCharArrayCodec.stringSize(lVal);
+        final int len =
+                lVal < 0 ? LongToCharArrayCodec.stringSize(-lVal) + 1 : LongToCharArrayCodec.stringSize(lVal);
         LongToCharArrayCodec.writeToCharArray(lVal, chars, 0, len);
         assertEquals(lVal, LongToCharArrayCodec.fromCharArray(chars, 0, len));
     }
@@ -62,40 +112,35 @@ public class LongToCharArrayCodecTest
     @Test
     public synchronized void test_performance_loop_vs_array()
     {
-        long[] times = new long[2];
-        doPerfTest_loop_vs_array(5, times);
-        doPerfTest_loop_vs_array(5000L, times);
-        doPerfTest_loop_vs_array(50000000000000L, times);
-        doPerfTest_loop_vs_array(1328623089214211837L, times);
-        doPerfTest_loop_vs_array(Long.MAX_VALUE, times);
-
-        final Random random = new Random();
-        for (int i = 0; i < 5; i++)
+        List<long[]> times;
+        int tries = 0;
+        do
         {
-            long lVal = random.nextLong();
-            if (lVal < 0)
+            tries++;
+            times = new ArrayList<>();
+            doPerfTest_loop_vs_array(5, times);
+            doPerfTest_loop_vs_array(5000L, times);
+            doPerfTest_loop_vs_array(50000000000000L, times);
+            doPerfTest_loop_vs_array(1328623089214211837L, times);
+            doPerfTest_loop_vs_array(Long.MAX_VALUE, times);
+
+            final Random random = new Random();
+            for (int i = 0; i < 5; i++)
             {
-                lVal = -lVal;
+                long lVal = random.nextLong();
+                if (lVal < 0)
+                {
+                    lVal = -lVal;
+                }
+                doPerfTest_loop_vs_array(lVal, times);
             }
-            doPerfTest_loop_vs_array(lVal, times);
         }
-
-        checkLoopVsArrayResults(times);
+        while (!checkNormalVsOptimisedResults(times, "test_performance_loop_vs_array", tries));
     }
 
-    private static void checkLoopVsArrayResults(long[] times)
+    private static void doPerfTest_loop_vs_array(long lVal, List<long[]> times)
     {
-        final double tolerance = 1.8d;
-        final long timeWithTolerance = (long) (times[0] * tolerance);
-        final String message = "Got total times tLoop=" + times[0] + " (with " + tolerance + " tolerance="
-                + timeWithTolerance + ") tArr=" + times[1];
-        assertTrue(message, timeWithTolerance > times[1]);
-        System.err.println(message);
-    }
-
-    private static void doPerfTest_loop_vs_array(long lVal, long[] times)
-    {
-        System.err.println("============== " + lVal + "-stringSize loops:" + LOOPS + "=============");
+        //        System.err.println("============== " + lVal + "-stringSize loops:" + LOOPS + "=============");
 
         // warmup
         for (int i = 0; i < LOOPS; i++)
@@ -104,37 +149,33 @@ public class LongToCharArrayCodecTest
             LongToCharArrayCodec.stringSize(lVal);
         }
 
-        prepareForPerfTestRun();
-
-        long tLoop = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
+        for (int j = 0; j < REPEAT_RUNS; j++)
         {
-            stringSize_loop(lVal);
+            prepareForPerfTestStep();
+
+            long tLoop = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                stringSize_loop(lVal);
+            }
+            tLoop = System.nanoTime() - tLoop;
+
+            prepareForPerfTestStep();
+
+            long tArr = System.nanoTime();
+            for (int i = 0; i < LOOPS; i++)
+            {
+                LongToCharArrayCodec.stringSize(lVal);
+            }
+            tArr = System.nanoTime() - tArr;
+
+            assertEquals(stringSize_loop(lVal), LongToCharArrayCodec.stringSize(lVal));
+
+            //        System.err.println("tLoop=" + tLoop + " tArr=" + tArr);
+
+            saveQuickestTimes(times, tLoop, tArr);
         }
-        tLoop = System.nanoTime() - tLoop;
 
-        prepareForPerfTestRun();
-
-        long tArr = System.nanoTime();
-        for (int i = 0; i < LOOPS; i++)
-        {
-            LongToCharArrayCodec.stringSize(lVal);
-        }
-        tArr = System.nanoTime() - tArr;
-
-        assertEquals(stringSize_loop(lVal), LongToCharArrayCodec.stringSize(lVal));
-
-        System.err.println("tLoop=" + tLoop);
-        System.err.println(" tArr=" + tArr);
-
-        times[0] += tLoop;
-        times[1] += tArr;
-
-    }
-
-    private static void prepareForPerfTestRun()
-    {
-        LongValueTest.prepareForPerfTestRun();
     }
 
     // taken from source code for Long.stringSize
