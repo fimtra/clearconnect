@@ -10,13 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import com.fimtra.util.StringAppender;
 import org.junit.Test;
 
 /**
  * @author Ramon Servadei
  */
-public class LongToCharArrayCodecTest
+public class LongValueCodecTest
 {
     static final int LOOPS = LongValueTest.LOOPS;
 
@@ -24,7 +23,7 @@ public class LongToCharArrayCodecTest
     public void test_workbench()
     {
         char[] charArray = ("-3455").toCharArray();
-        final long actual = LongToCharArrayCodec.fromCharArray(charArray, 0, charArray.length);
+        final long actual = LongValueCodec.fromCharArray(charArray, 0, charArray.length);
         final long expected = Long.parseLong(new String(charArray));
         assertEquals(expected, actual);
     }
@@ -53,7 +52,7 @@ public class LongToCharArrayCodecTest
             charArray = s == null ? null : s.toCharArray();
             try
             {
-                LongToCharArrayCodec.fromCharArray(charArray, 0, charArray == null ? 0 : charArray.length);
+                LongValueCodec.fromCharArray(charArray, 0, charArray == null ? 0 : charArray.length);
                 fail("Expected NumberFormatException for [" + s + "]");
             }
             catch (NumberFormatException e)
@@ -87,9 +86,9 @@ public class LongToCharArrayCodecTest
     private static void doToFromCharArrayTest(long lVal, char[] chars)
     {
         final int len =
-                lVal < 0 ? LongToCharArrayCodec.stringSize(-lVal) + 1 : LongToCharArrayCodec.stringSize(lVal);
-        LongToCharArrayCodec.writeToCharArray(lVal, chars, 0, len);
-        assertEquals(lVal, LongToCharArrayCodec.fromCharArray(chars, 0, len));
+                lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal);
+        LongValueCodec.writeToCharArray(lVal, chars, 0, len);
+        assertEquals(lVal, LongValueCodec.fromCharArray(chars, 0, len));
     }
 
     @Test
@@ -99,13 +98,13 @@ public class LongToCharArrayCodecTest
         for (int i = 0; i < LOOPS; i++)
         {
             long v = 5 * (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongToCharArrayCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
         }
 
         for (int i = 0; i < LOOPS; i++)
         {
             long v = (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongToCharArrayCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
         }
     }
 
@@ -146,7 +145,7 @@ public class LongToCharArrayCodecTest
         for (int i = 0; i < LOOPS; i++)
         {
             stringSize_loop(lVal);
-            LongToCharArrayCodec.stringSize(lVal);
+            LongValueCodec.stringSize(lVal);
         }
 
         for (int j = 0; j < REPEAT_RUNS; j++)
@@ -165,11 +164,11 @@ public class LongToCharArrayCodecTest
             long tArr = System.nanoTime();
             for (int i = 0; i < LOOPS; i++)
             {
-                LongToCharArrayCodec.stringSize(lVal);
+                LongValueCodec.stringSize(lVal);
             }
             tArr = System.nanoTime() - tArr;
 
-            assertEquals(stringSize_loop(lVal), LongToCharArrayCodec.stringSize(lVal));
+            assertEquals(stringSize_loop(lVal), LongValueCodec.stringSize(lVal));
 
             //        System.err.println("tLoop=" + tLoop + " tArr=" + tArr);
 

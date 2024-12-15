@@ -6,7 +6,7 @@ package com.fimtra.datafission.field;
  *
  * @author Ramon Servadei
  */
-abstract class LongToCharArrayCodec
+abstract class LongValueCodec
 {
     static final char[] DigitTens = {
             //
@@ -326,7 +326,7 @@ abstract class LongToCharArrayCodec
         }
     }
 
-    private LongToCharArrayCodec()
+    private LongValueCodec()
     {
         // not for construction
     }
