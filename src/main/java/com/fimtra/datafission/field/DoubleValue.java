@@ -15,6 +15,9 @@
  */
 package com.fimtra.datafission.field;
 
+import static com.fimtra.datafission.field.CachedDoubleValue.NEG_INTEGRAL_POOL;
+import static com.fimtra.datafission.field.CachedDoubleValue.POS_INTEGRAL_POOL;
+
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
 
@@ -23,7 +26,7 @@ import com.fimtra.util.StringAppender;
  * 
  * @author Ramon Servadei
  */
-public final class DoubleValue extends AbstractValue
+public class DoubleValue extends AbstractValue
 {
     private final double value;
 
@@ -32,6 +35,20 @@ public final class DoubleValue extends AbstractValue
      */
     public static DoubleValue valueOf(double value)
     {
+        if (((long) value) == value)
+        {
+            if (value >= 0)
+            {
+                if (value < POS_INTEGRAL_POOL.length)
+                {
+                    return POS_INTEGRAL_POOL[(int) value];
+                }
+            }
+            else if (-value < NEG_INTEGRAL_POOL.length)
+            {
+                return NEG_INTEGRAL_POOL[(int) -value];
+            }
+        }
         return new DoubleValue(value);
     }
 
@@ -65,23 +82,23 @@ public final class DoubleValue extends AbstractValue
 
     DoubleValue(char[] chars, int start, int len)
     {
-        this.value = Double.parseDouble(new String(chars, start, len));
+        this.value = DoubleValueCodec.fromCharArray(chars, start, len);
     }
 
     @Override
-    public TypeEnum getType()
+    public final TypeEnum getType()
     {
         return TypeEnum.DOUBLE;
     }
 
     @Override
-    public long longValue()
+    public final long longValue()
     {
         return (long) this.value;
     }
 
     @Override
-    public double doubleValue()
+    public final double doubleValue()
     {
         return this.value;
     }
@@ -89,24 +106,26 @@ public final class DoubleValue extends AbstractValue
     @Override
     public String textValue()
     {
-        return Double.toString(this.value);
+        final StringAppender stringAppender = new StringAppender(28);
+        DoubleValueCodec.writeToCharArray(this.value, stringAppender);
+        return stringAppender.toString();
     }
     
     @Override
-    public StringAppender toStringAppender()
+    public final StringAppender toStringAppender()
     {
-        return appendTo(new StringAppender());
+        return appendTo(new StringAppender(28));
     }
 
     @Override
-    public int hashCode()
+    public final int hashCode()
     {
         final long bits = Double.doubleToLongBits(this.value);
         return (int) (bits ^ (bits >>> 32));
     }
 
     @Override
-    public boolean equals(Object obj)
+    public final boolean equals(Object obj)
     {
         if (this == obj)
         {
@@ -122,6 +141,8 @@ public final class DoubleValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(IValue.DOUBLE_CODE).append(this.value);
+        final StringAppender appender = stringAppender.append(IValue.DOUBLE_CODE);
+        DoubleValueCodec.writeToCharArray(this.value, appender);
+        return stringAppender;
     }
 }
