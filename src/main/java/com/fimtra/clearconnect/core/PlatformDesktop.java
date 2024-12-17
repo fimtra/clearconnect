@@ -75,6 +75,7 @@ import com.fimtra.datafission.ui.RowOrientedRecordTable;
 import com.fimtra.datafission.ui.RowOrientedRecordTableModel;
 import com.fimtra.lf.FimtraTableHeaderUI;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ThreadUtils;
@@ -1008,10 +1009,8 @@ class PlatformDesktop
                     }
                     catch (InterruptedException e)
                     {
-                        if (Thread.interrupted())
-                        {
-                            Log.log(this, "Interrupted waiting for parameters");
-                        }
+                        ExceptionUtils.handleInterruptedException(this, e,
+                                "Interrupted waiting for parameters");
                     }
                 }
                 return params;

@@ -69,6 +69,7 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -324,8 +325,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 }
                 catch (InterruptedException e)
                 {
-                    throw new RuntimeException(
-                            "Interrupted whilst waiting for registry name from " + registryAddresses[0], e);
+                    ExceptionUtils.handleInterruptedException(this, e,
+                            "Interrupted whilst waiting for registry name from " + registryAddresses[0]);
                 }
             }
         }
@@ -531,8 +532,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (InterruptedException e)
             {
-                throw new RuntimeException(
-                        "Interrupted whilst waiting for " + serviceFamily + " to be available", e);
+                if (Thread.interrupted())
+                {
+                    throw new RuntimeException(
+                            "Interrupted whilst waiting for " + serviceFamily + " to be available", e);
+                }
             }
         }
         finally
@@ -730,8 +734,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (InterruptedException e)
             {
-                throw new ExecutionException(
-                        "Interrupted whilst waiting for registration confirmation of " + serviceInstance);
+                if (Thread.interrupted())
+                {
+                    throw new ExecutionException(
+                            "Interrupted whilst waiting for registration confirmation of " + serviceInstance);
+                }
             }
         }
         finally

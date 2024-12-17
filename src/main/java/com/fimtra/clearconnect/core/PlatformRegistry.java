@@ -88,6 +88,7 @@ import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
@@ -1108,7 +1109,8 @@ final class EventHandler
         }
         catch (InterruptedException e)
         {
-            Log.log(this, "Interrupted waiting on latch for selectNextInstance: '" + serviceFamily + "'", e);
+            ExceptionUtils.handleInterruptedException(this, e,
+                    "Interrupted waiting on latch for selectNextInstance: '" + serviceFamily + "'");
         }
         return result.get();
     }

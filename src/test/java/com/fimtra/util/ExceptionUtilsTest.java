@@ -17,6 +17,7 @@ package com.fimtra.util;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
@@ -46,5 +47,26 @@ public class ExceptionUtilsTest {
 			assertTrue(stack.contains("Caused by " + IllegalArgumentException.class.getCanonicalName() + ": " + e.getMessage()));
 			System.out.println(stack);
 		}
+	}
+
+	@Test
+	public void test_handleInterruptedException()
+	{
+		try
+		{
+			Thread.currentThread()
+					.interrupt();
+			assertTrue(Thread.interrupted());
+			assertFalse(Thread.interrupted());
+
+			Thread.currentThread()
+					.interrupt();
+			throw new InterruptedException();
+		}
+		catch (InterruptedException e)
+		{
+			ExceptionUtils.handleInterruptedException(ExceptionUtilsTest.class, e, "interrupted");
+		}
+		assertFalse(Thread.interrupted());
 	}
 }

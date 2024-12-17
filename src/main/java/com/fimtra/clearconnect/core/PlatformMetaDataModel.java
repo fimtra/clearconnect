@@ -90,6 +90,7 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.thimble.ContextExecutorFactory;
 import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.is;
@@ -818,10 +819,8 @@ public final class PlatformMetaDataModel
         }
         catch (InterruptedException e)
         {
-            if (Thread.interrupted())
-            {
-                Log.log(this, "Interrupted waiting for session status change for: ", serviceFamily);
-            }
+            ExceptionUtils.handleInterruptedException(this, e,
+                    "Interrupted waiting for session status change for: " + serviceFamily);
         }
     }
 
@@ -894,7 +893,9 @@ public final class PlatformMetaDataModel
             }
             catch (InterruptedException e)
             {
-                Thread.interrupted();
+                ExceptionUtils.handleInterruptedException(this, e,
+                        "Interrupted waiting for record subscription: "
+                                + ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
             }
             rpc = proxyContext.getRpc(rpcName);
         }

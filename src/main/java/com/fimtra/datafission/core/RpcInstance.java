@@ -415,7 +415,10 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         }
                         catch (InterruptedException e)
                         {
-                            throw new ExecutionException("Local thread interrupted: " + e.getMessage());
+                            if (Thread.interrupted())
+                            {
+                                throw new ExecutionException("Local thread interrupted: " + e.getMessage());
+                            }
                         }
 
                         if (result.get() == null)

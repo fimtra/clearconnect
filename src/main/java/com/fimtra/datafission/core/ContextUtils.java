@@ -58,6 +58,7 @@ import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.TaskStatistics;
 import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CharBufferUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
@@ -956,7 +957,8 @@ public final class ContextUtils
             }
             catch (InterruptedException e)
             {
-                // we don't care!
+                ExceptionUtils.handleInterruptedException(ContextUtils.class, e,
+                        "Interrupted getting RPC: " + rpcName);
             }
         }
         finally

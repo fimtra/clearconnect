@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.LowGcLinkedList;
 import com.fimtra.util.ObjectUtils;
@@ -154,7 +155,7 @@ public final class ThimbleExecutor implements IContextExecutor
                             }
                             catch (InterruptedException e)
                             {
-                                // don't care
+                                ExceptionUtils.handleInterruptedException(ThimbleExecutor.this, e, null);
                             }
                             idleTimeNanos = (System.nanoTime() - idleTimeNanos);
                         }

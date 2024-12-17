@@ -67,6 +67,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.ByteArrayPool;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.IReusableObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.MultiThreadReusableObjectPool;
@@ -1091,7 +1092,8 @@ public final class ProxyContext implements IObserverContext
             }
             catch (InterruptedException e)
             {
-                Log.log(this, "Got interrupted whilst waiting for record: " + recordName, e);
+                ExceptionUtils.handleInterruptedException(this, e,
+                        "Interrupted whilst waiting for record: " + recordName);
             }
             finally
             {

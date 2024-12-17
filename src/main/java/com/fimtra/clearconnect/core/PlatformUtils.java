@@ -70,6 +70,7 @@ import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.LazyObject.IDestructor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -922,7 +923,8 @@ public class PlatformUtils
             }
             catch (InterruptedException e)
             {
-                // we don't care!
+                ExceptionUtils.handleInterruptedException(PlatformUtils.class, e,
+                        "Interrupted waiting for RPC: " + rpcName);
             }
         }
         finally
@@ -964,7 +966,8 @@ public class PlatformUtils
         }
         catch (InterruptedException e)
         {
-            // ignore
+            ExceptionUtils.handleInterruptedException(logContext, e,
+                    "Interrupted waiting for update latch: " + recordName);
         }
     }
 

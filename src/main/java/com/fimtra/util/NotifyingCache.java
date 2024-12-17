@@ -342,7 +342,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
         catch (InterruptedException e)
         {
-            // ignored
+            ExceptionUtils.handleInterruptedException(NotifyingCache.this, e,
+                    "Interrupted waiting for initial image");
         }
         return result.get();
     }
