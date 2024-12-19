@@ -957,6 +957,12 @@ public final class ContextUtils
             return rpc;
         }
 
+        return getRpcWithSubscribeCheck(proxy, discoveryTimeoutMillis, rpcName);
+    }
+
+    static IRpcInstance getRpcWithSubscribeCheck(final ProxyContext proxy, long discoveryTimeoutMillis,
+            final String rpcName) throws TimeOutException
+    {
         // NOTE: even though the ProxyContext subscribes for the ContextRpcs record on construction,
         // race conditions may mean that the record has not been fully received yet, hence if the
         // record does not have the rpc name we add our own listener (then remove it).

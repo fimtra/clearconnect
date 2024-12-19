@@ -1551,7 +1551,7 @@ public final class ProxyContext implements IObserverContext
                 {
                     // only subscribe for the RPC record "on demand"
                     this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                    this.context.addObserver(new IRecordListener()
+                    addObserver(new IRecordListener()
                     {
                         @Override
                         public void onChange(IRecord image, IRecordChange atomicChange)
@@ -1563,7 +1563,7 @@ public final class ProxyContext implements IObserverContext
             }
             try
             {
-                return ContextUtils.getRpc(this, reconnectPeriodMillis, name);
+                return ContextUtils.getRpcWithSubscribeCheck(this, reconnectPeriodMillis * 2L, name);
             }
             catch (IRpcInstance.TimeOutException e)
             {
