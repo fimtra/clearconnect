@@ -15,7 +15,6 @@
  */
 package com.fimtra.tcpchannel;
 
-import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 
 /**

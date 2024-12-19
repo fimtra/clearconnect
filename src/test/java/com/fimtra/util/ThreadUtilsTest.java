@@ -19,11 +19,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.lang.ref.PhantomReference;
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -80,14 +75,9 @@ public class ThreadUtilsTest
         ThreadFactory factory = ThreadUtils.newDaemonThreadFactory("test");
         final AtomicBoolean started = new AtomicBoolean(false);
         final CountDownLatch latch = new CountDownLatch(1);
-        Runnable r = new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                started.set(true);
-                latch.countDown();
-            }
+        Runnable r = () -> {
+            started.set(true);
+            latch.countDown();
         };
         Thread thread1 = factory.newThread(r);
         Thread thread2 = factory.newThread(r);
@@ -105,7 +95,7 @@ public class ThreadUtilsTest
         String threadName = "test-thread";
         Thread thread = ThreadUtils.newThread(new TestRunnable(), threadName);
         assertEquals(threadName, thread.getName());
-        assertEquals(false, thread.isDaemon());
+        assertFalse(thread.isDaemon());
     }
 
     @Test
@@ -113,7 +103,7 @@ public class ThreadUtilsTest
 		String threadName = "test-daemon-thread";
 		Thread thread = ThreadUtils.newDaemonThread(new TestRunnable(), threadName);
 		assertEquals(threadName, thread.getName());
-		assertEquals(true, thread.isDaemon());
+        assertTrue(thread.isDaemon());
 	}
 
     private class TestRunnable implements Runnable

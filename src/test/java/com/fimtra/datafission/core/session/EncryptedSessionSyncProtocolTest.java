@@ -28,16 +28,15 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
-
 import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromProxy;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncProtocol.FromPublisher;
 import com.fimtra.util.SerializationUtils;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
 
 /**
  * Tests for the {@link EncryptedSessionSyncProtocol}
@@ -176,7 +175,7 @@ public class EncryptedSessionSyncProtocolTest
     {
         // simulate failed sync
         ISessionManager manager = mock(ISessionManager.class);
-        when(manager.createSession((String[]) any())).thenReturn(null);
+        when(manager.createSession(any())).thenReturn(null);
 
         SessionContexts.registerSessionManager(this.name.getMethodName(), manager);
 

@@ -4,7 +4,8 @@ import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
 import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
 import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
 import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.List;

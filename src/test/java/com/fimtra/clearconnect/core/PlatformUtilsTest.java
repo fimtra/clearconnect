@@ -24,10 +24,6 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
 import com.fimtra.clearconnect.IPlatformServiceComponent;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -36,6 +32,8 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.field.TextValue;
+import org.junit.Test;
+import org.mockito.stubbing.Answer;
 
 /**
  * Tests for {@link PlatformUtils}
@@ -79,16 +77,11 @@ public class PlatformUtilsTest
         final TextValue result = TextValue.valueOf("result!");
         when(rpc.execute()).thenReturn(result);
 
-        when(component.addRpcAvailableListener(any(IRpcAvailableListener.class))).then(new Answer<Boolean>()
-        {
-
-            @Override
-            public Boolean answer(InvocationOnMock invocation) throws Throwable
-            {
-                ((IRpcAvailableListener) invocation.getArguments()[0]).onRpcAvailable(rpc);
-                return Boolean.TRUE;
-            }
-        });
+        when(component.addRpcAvailableListener(any(IRpcAvailableListener.class))).then(
+                (Answer<Boolean>) invocation -> {
+                    ((IRpcAvailableListener) invocation.getArguments()[0]).onRpcAvailable(rpc);
+                    return Boolean.TRUE;
+                });
 
         assertEquals(result, PlatformUtils.executeRpc(component, 10, "rpc1"));
     }

@@ -8,16 +8,15 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
+import static org.mockito.Mockito.mock;
 
 import com.fimtra.clearconnect.IPlatformServiceProxy;
 import com.fimtra.clearconnect.config.IConfigManager;
-
-import static org.mockito.Mockito.mock;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 public class ConfigServiceProxyTest {
 
@@ -38,13 +37,13 @@ public class ConfigServiceProxyTest {
 		IConfigManager configManager1 = this.configServiceProxy.getConfigManager(SERVICE_FAMILY_A, SERVICE_MEMBER_1);
 		assertNotNull(configManager1);
 		IConfigManager configManager2 = this.configServiceProxy.getConfigManager(SERVICE_FAMILY_A, SERVICE_MEMBER_1);
-		assertTrue(configManager1 == configManager2);
+        assertSame(configManager1, configManager2);
 		IConfigManager configManager3 = this.configServiceProxy.getConfigManager(SERVICE_FAMILY_B, SERVICE_MEMBER_1);
 		assertNotNull(configManager3);
-		assertTrue(configManager1 != configManager3);
+        assertNotSame(configManager1, configManager3);
 		IConfigManager configManager4 = this.configServiceProxy.getConfigManager(SERVICE_FAMILY_B, SERVICE_MEMBER_2);
 		assertNotNull(configManager4);
-		assertTrue(configManager3 != configManager4);
+        assertNotSame(configManager3, configManager4);
 	}
 
 }

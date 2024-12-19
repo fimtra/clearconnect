@@ -15,8 +15,8 @@
  */
 package com.fimtra.tcpchannel;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -188,7 +188,7 @@ public class TestTcpChannelUtils
         byte[] expected = new byte[2];
         expected[0] = (byte) 5;
         expected[1] = (byte) 6;
-        assertTrue(Arrays.equals(expected, ByteBufferUtils.asBytes(decode[0])));
+        assertArrayEquals(expected, ByteBufferUtils.asBytes(decode[0]));
         buffer.compact();
 
         i = 0;
@@ -201,7 +201,7 @@ public class TestTcpChannelUtils
         expectedRemainder[i++] = (byte) 8;
         final byte[] remainder = new byte[buffer.position()];
         System.arraycopy(buffer.array(), 0, remainder, 0, remainder.length);
-        assertTrue("Got " + Arrays.toString(remainder), Arrays.equals(expectedRemainder, remainder));
+        assertArrayEquals("Got " + Arrays.toString(remainder), expectedRemainder, remainder);
     }
 
     @Test(expected = BufferOverflowException.class)

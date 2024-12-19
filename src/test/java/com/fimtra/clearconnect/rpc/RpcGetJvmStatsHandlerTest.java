@@ -15,15 +15,13 @@
  */
 package com.fimtra.clearconnect.rpc;
 
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertFalse;
 
-import com.fimtra.clearconnect.rpc.RpcGetJvmStatsHandler;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
-
-import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay
@@ -40,7 +38,8 @@ public class RpcGetJvmStatsHandlerTest {
 	@Test
 	public void shouldGetJvmStats() throws TimeOutException, ExecutionException {
 		IValue value = this.rpcGetJvmStatsHandler.execute();
-		assertTrue(!value.textValue().isEmpty());
+        assertFalse(value.textValue()
+                .isEmpty());
 		System.out.println(value.textValue());
 	}
 }

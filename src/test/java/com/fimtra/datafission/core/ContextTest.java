@@ -22,12 +22,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atMost;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,14 +37,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import com.fimtra.thimble.ISequentialRunnable;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
 
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IPermissionFilter;
@@ -62,7 +52,12 @@ import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.TestUtils.EventChecker;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * @author Ramon Servadei
@@ -286,7 +281,7 @@ public class ContextTest
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
         
         // check image notified to observer added after creation
-        Map<String, IValue> expectedImage = new HashMap<String, IValue>();
+        Map<String, IValue> expectedImage = new HashMap<>();
         expectedImage.put(K1, V1);
         expectedImage.put(K2, V2);
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
@@ -313,7 +308,7 @@ public class ContextTest
         assertTrue(countDownLatch.await(1, TimeUnit.SECONDS));
         
         // check both observers have the same image
-        Map<String, IValue> putEntries = new HashMap<String, IValue>();
+        Map<String, IValue> putEntries = new HashMap<>();
         putEntries.put(K1, V1n);
         putEntries.put(K5, V5);
         assertEquals(expectedImage, observer.images.get(0));
@@ -324,7 +319,7 @@ public class ContextTest
         
         assertEquals(expectedImage, observer2.images.get(0));
         assertEquals("changes: " + observer2.changes, 1, observer2.changes.size());
-        assertEquals(new HashMap<String, IValue>(instance), observer2.changes.get(0).getPutEntries());
+        assertEquals(new HashMap<>(instance), observer2.changes.get(0).getPutEntries());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
         assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
@@ -347,7 +342,7 @@ public class ContextTest
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
 
         // check image notified to observer added after creation
-        Map<String, IValue> expectedImage = new HashMap<String, IValue>();
+        Map<String, IValue> expectedImage = new HashMap<>();
         expectedImage.put(K1, V1);
         expectedImage.put(K2, V2);
         assertEquals("changes: " + observer.changes, 1, observer.changes.size());
@@ -373,7 +368,7 @@ public class ContextTest
         assertTrue(countDownLatch.await(1, TimeUnit.SECONDS));
 
         // check both observers have the same image
-        Map<String, IValue> putEntries = new HashMap<String, IValue>();
+        Map<String, IValue> putEntries = new HashMap<>();
         putEntries.put(K1, V1n);
         putEntries.put(K5, V5);
         assertEquals(expectedImage, observer.images.get(0));
@@ -394,7 +389,7 @@ public class ContextTest
         this.candidate.addObserver(observer, name);
         this.candidate.addObserver(observer2, name);
 
-        Map<String, IValue> expectedMap = new HashMap<String, IValue>();
+        Map<String, IValue> expectedMap = new HashMap<>();
         expectedMap.put(K1, V1);
         expectedMap.put(K2, V2);
         Map<String, IValue> instance = createRecordWaitForUpdate(name, expectedMap);
@@ -428,7 +423,7 @@ public class ContextTest
 
         assertEquals(1, size);
         assertEquals(expectedMap, observer.images.get(0));
-        Map<String, IValue> expectedPuts = new HashMap<String, IValue>();
+        Map<String, IValue> expectedPuts = new HashMap<>();
         expectedPuts.put(K2, V2p);
         assertEquals(expectedPuts, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
@@ -543,8 +538,9 @@ public class ContextTest
         final TestCachingAtomicChangeObserver registryObserver = new TestCachingAtomicChangeObserver(true);
         this.candidate.addObserver(registryObserver, ISystemRecordNames.CONTEXT_RECORDS);
 
-        final Set<String> expected = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
-            "ContextRecords", "ContextRpcs", "ContextStatus", "test"));
+        final Set<String> expected = new HashSet<>(
+                Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords", "ContextRpcs",
+                        "ContextStatus", "test"));
         waitForEvent(new EventChecker()
         {
             @Override
@@ -567,8 +563,9 @@ public class ContextTest
 
         // remove the instance
         this.candidate.removeRecord(name);
-        final Set<String> expected2 = new HashSet<String>(Arrays.asList("ContextConnections", "ContextSubscriptions",
-            "ContextRecords", "ContextRpcs", "ContextStatus"));
+        final Set<String> expected2 = new HashSet<>(
+                Arrays.asList("ContextConnections", "ContextSubscriptions", "ContextRecords", "ContextRpcs",
+                        "ContextStatus"));
         waitForEvent(new EventChecker()
         {
             @Override
@@ -799,7 +796,7 @@ public class ContextTest
     @Test
     public void testCreateInstanceStringMapOfStringIValue()
     {
-        final HashMap<String, IValue> record = new HashMap<String, IValue>();
+        final HashMap<String, IValue> record = new HashMap<>();
         final Map<String, IValue> createInstance = createRecordWaitForUpdate(name, record);
         assertNotNull(createInstance);
         assertNotSame(record, ((Record) createInstance).data);
@@ -843,7 +840,7 @@ public class ContextTest
         final String name2 = name + "1";
         createRecordWaitForUpdate(name);
         createRecordWaitForUpdate(name2);
-        Set<String> expected = new HashSet<String>();
+        Set<String> expected = new HashSet<>();
         expected.add(name);
         expected.add(name2);
         expected.add(ISystemRecordNames.CONTEXT_RECORDS);
@@ -888,15 +885,10 @@ public class ContextTest
         }
 
         // notify ALL every 10ms
-        executor.scheduleAtFixedRate(new Runnable()
-        {
-            @Override
-            public void run()
+        executor.scheduleAtFixedRate(() -> {
+            for (int i = 0; i < instanceCount; i++)
             {
-                for (int i = 0; i < instanceCount; i++)
-                {
-                    ContextTest.this.candidate.publishAtomicChange(name + i);
-                }
+                ContextTest.this.candidate.publishAtomicChange(name + i);
             }
         }, 0, 10, TimeUnit.MILLISECONDS);
 
@@ -999,7 +991,7 @@ public class ContextTest
         assertNull(this.candidate.pendingAtomicChanges.get(name));
 
         // now we only have observer2
-        Map<String, IValue> record = new HashMap<String, IValue>();
+        Map<String, IValue> record = new HashMap<>();
         record.put(K1, V1);
         record.put(K2, V2);
         assertNotNull(createRecordWaitForUpdate(name, record));
@@ -1128,11 +1120,11 @@ public class ContextTest
         final CountDownLatch validator1OnDeregistration = new CountDownLatch(1);
         final CountDownLatch validator2OnDeregistration = new CountDownLatch(1);
 
-        final AtomicReference<CountDownLatch> validate1 = new AtomicReference<CountDownLatch>();
-        final AtomicReference<CountDownLatch> validate2 = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> validate1 = new AtomicReference<>();
+        final AtomicReference<CountDownLatch> validate2 = new AtomicReference<>();
 
-        final List<IRecord> validateCalls1 = new ArrayList<IRecord>();
-        final List<IRecord> validateCalls2 = new ArrayList<IRecord>();
+        final List<IRecord> validateCalls1 = new ArrayList<>();
+        final List<IRecord> validateCalls2 = new ArrayList<>();
 
         IValidator validator1 = new IValidator()
         {

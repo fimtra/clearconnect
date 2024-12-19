@@ -15,9 +15,6 @@
  */
 package com.fimtra.datafission.core;
 
-import com.fimtra.datafission.core.GZipProtocolCodec;
-import com.fimtra.datafission.core.StringProtocolCodec;
-
 /**
  * Tests using the {@link GZipProtocolCodec}
  * 

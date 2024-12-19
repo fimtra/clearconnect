@@ -39,7 +39,7 @@ public class StringAppenderWriterTest
     public void test_nulls() throws IOException
     {
         candidate.write((String)null);
-        candidate.append((String)null);
+        candidate.append(null);
         final String result = candidate.toString();
         assertEquals("nullnull", result);
     }

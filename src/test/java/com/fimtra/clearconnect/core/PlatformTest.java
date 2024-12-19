@@ -57,7 +57,6 @@ import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 import com.fimtra.tcpchannel.TcpChannelUtils;
@@ -155,7 +154,7 @@ public class PlatformTest
 
         synchronized void verifyNoMoreInteractions()
         {
-            assertTrue("Got: " + this, this.unavailable.size() == 0 && this.available.size() == 0);
+            assertTrue("Got: " + this, this.unavailable.isEmpty() && this.available.isEmpty());
         }
 
         private synchronized void checkContains(long timeout, List<String> list, String... availableOrder)
@@ -231,7 +230,7 @@ public class PlatformTest
 
         void verifyNoMoreInteractions()
         {
-            assertTrue("Got: " + this, this.unavailable.size() == 0 && this.available.size() == 0);
+            assertTrue("Got: " + this, this.unavailable.isEmpty() && this.available.isEmpty());
         }
 
         private synchronized void checkContains(long timeout, List<String> list, String... availableOrder)
@@ -317,24 +316,19 @@ public class PlatformTest
     {
         Log.log(this, "============== START TEAR DOWN " + this.name.getMethodName() + " =============================");
 
-        ThreadUtils.newThread(new Runnable()
-        {
-            @Override
-            public void run()
+        ThreadUtils.newThread(() -> {
+            PlatformTest.this.registry.destroy();
+            if (PlatformTest.this.agent != null)
             {
-                PlatformTest.this.registry.destroy();
-                if (PlatformTest.this.agent != null)
-                {
-                    PlatformTest.this.agent.destroy();
-                }
-                if (PlatformTest.this.agent008 != null)
-                {
-                    PlatformTest.this.agent008.destroy();
-                }
-
-                Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName()
-                        + " =============================");
+                PlatformTest.this.agent.destroy();
             }
+            if (PlatformTest.this.agent008 != null)
+            {
+                PlatformTest.this.agent008.destroy();
+            }
+
+            Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName()
+                    + " =============================");
         }, "tearDown-" + this.name.getMethodName()).start();
 
         ChannelUtils.WATCHDOG.configure(5000);
@@ -491,28 +485,18 @@ public class PlatformTest
 
         final CountDownLatch s1latch = new CountDownLatch(1);
         IRecordSubscriptionListener s1recordListener =
-                EventListenerUtils.synchronizedListener((new IRecordSubscriptionListener()
-                {
-                    @Override
-                    public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+                EventListenerUtils.synchronizedListener((subscriptionInfo -> {
+                    if (subscriptionInfo.equals(expectedSubscriptionInfo))
                     {
-                        if (subscriptionInfo.equals(expectedSubscriptionInfo))
-                        {
-                            s1latch.countDown();
-                        }
+                        s1latch.countDown();
                     }
                 }));
         final CountDownLatch s2latch = new CountDownLatch(1);
         IRecordSubscriptionListener s2recordListener =
-                EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
-                {
-                    @Override
-                    public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+                EventListenerUtils.synchronizedListener(subscriptionInfo -> {
+                    if (subscriptionInfo.equals(expectedSubscriptionInfo))
                     {
-                        if (subscriptionInfo.equals(expectedSubscriptionInfo))
-                        {
-                            s2latch.countDown();
-                        }
+                        s2latch.countDown();
                     }
                 });
 
@@ -921,11 +905,13 @@ public class PlatformTest
         // check the RPC for the service appears
         int i = 0;
         int maxCheckCount = 300;
-        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs().size() == 0) && i++ < maxCheckCount)
+        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs()
+                .isEmpty()) && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
-        assertTrue("Got: " + proxy.getAllRpcs(), proxy.getAllRpcs().size() > 0);
+        assertTrue("Got: " + proxy.getAllRpcs(), !proxy.getAllRpcs()
+                .isEmpty());
 
         // this simulates a 'dirty' shutdown
         this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
@@ -935,7 +921,8 @@ public class PlatformTest
 
         // check the RPC disappears
         i = 0;
-        while (proxy.getAllRpcs().size() > 0 && i++ < maxCheckCount)
+        while (!proxy.getAllRpcs()
+                .isEmpty() && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
@@ -957,7 +944,8 @@ public class PlatformTest
 
         // check the RPC for the service appears again
         i = 0;
-        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs().size() == 0) && i++ < maxCheckCount)
+        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs()
+                .isEmpty()) && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
@@ -1505,14 +1493,9 @@ public class PlatformTest
 
         final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<>(new CountDownLatch(1));
         final AtomicReference<IRecord> serviceRecordImage = new AtomicReference<>();
-        IRecordListener serviceListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                serviceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
-                serviceLatch.get().countDown();
-            }
+        IRecordListener serviceListener = (imageCopy, atomicChange) -> {
+            serviceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
+            serviceLatch.get().countDown();
         };
         this.agent.registryProxy.addObserver(serviceListener, PlatformRegistry.IRegistryRecordNames.SERVICES);
 
@@ -1525,14 +1508,9 @@ public class PlatformTest
 
         final AtomicReference<CountDownLatch> serviceInstanceLatch = new AtomicReference<>(new CountDownLatch(2));
         final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<>();
-        IRecordListener serviceInstanceListener = new IRecordListener()
-        {
-            @Override
-            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
-            {
-                serviceInstanceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
-                serviceInstanceLatch.get().countDown();
-            }
+        IRecordListener serviceInstanceListener = (imageCopy, atomicChange) -> {
+            serviceInstanceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
+            serviceInstanceLatch.get().countDown();
         };
         this.agent.registryProxy.addObserver(serviceInstanceListener,
                 PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);

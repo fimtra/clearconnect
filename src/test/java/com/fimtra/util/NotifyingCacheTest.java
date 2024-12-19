@@ -19,31 +19,27 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.util.Vector;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Observable;
 import java.util.Observer;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.TestUtils.EventChecker;
 import com.fimtra.util.TestUtils.EventCheckerWithFailureReason;
 import com.fimtra.util.TestUtils.EventFailedException;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link NotifyingCache}
@@ -109,7 +105,7 @@ public class NotifyingCacheTest
     {
         final CyclicBarrier barrier = new CyclicBarrier(2);
         final CountDownLatch latch = new CountDownLatch(2);
-        final List<List<String>> listeners = new Vector<List<String>>();
+        final List<List<String>> listeners = new Vector<>();
         final int COUNT = 100;
         for (int i = 0; i < COUNT; i++)
         {
@@ -130,25 +126,20 @@ public class NotifyingCacheTest
             });
         }
 
-        new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        new Thread(() -> {
+            try
             {
-                try
-                {
-                    barrier.await();
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-                for (int i = 0; i < COUNT; i++)
-                {
-                    NotifyingCacheTest.this.candidate.addListener(listeners.get(i));
-                }
-                latch.countDown();
+                barrier.await();
             }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+            for (int i = 0; i < COUNT; i++)
+            {
+                NotifyingCacheTest.this.candidate.addListener(listeners.get(i));
+            }
+            latch.countDown();
         }).start();
 
         new Thread(new Runnable()
@@ -208,7 +199,7 @@ public class NotifyingCacheTest
 
         TestUtils.waitForEvent(new EventCheckerWithFailureReason()
         {
-            Map<Integer, Integer> fails = new HashMap<Integer, Integer>();
+            final Map<Integer, Integer> fails = new HashMap<>();
 
             @Override
             public Object got()
@@ -254,7 +245,7 @@ public class NotifyingCacheTest
         assertEquals("1", this.candidate.get("1"));
         assertNull(this.candidate.get("11"));
         assertFalse(this.candidate.containsKey("11"));
-        Set<String> expected = new HashSet<String>();
+        Set<String> expected = new HashSet<>();
         expected.add("2");
         expected.add("1");
         assertEquals(expected, this.candidate.keySet());
@@ -336,7 +327,7 @@ public class NotifyingCacheTest
     public void testNotifiedOnDestroy() throws EventFailedException, InterruptedException
     {
         this.candidate.notifyListenersDataAdded("key1", "data1");
-        final List<String> listener = new Vector<String>();
+        final List<String> listener = new Vector<>();
         this.candidate.addListener(listener);
         TestUtils.waitForEvent(new EventChecker()
         {
@@ -382,8 +373,8 @@ public class NotifyingCacheTest
     @Test
     public void testListenerCache() throws InterruptedException
     {
-        final AtomicReference<CountDownLatch> removed1 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> added1 = new AtomicReference<CountDownLatch>(new CountDownLatch(2));
+        final AtomicReference<CountDownLatch> removed1 = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> added1 = new AtomicReference<>(new CountDownLatch(2));
         List<String> listener1 = new Vector<String>()
         {
             @Override
@@ -417,8 +408,8 @@ public class NotifyingCacheTest
         assertTrue(this.candidate.addListener(listener1));
         assertTrue(this.candidate.notifyListenersDataAdded("1", "1"));
         assertTrue(this.candidate.notifyListenersDataAdded("2", "2"));
-        final AtomicReference<CountDownLatch> removed2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> added2 = new AtomicReference<CountDownLatch>(new CountDownLatch(2));
+        final AtomicReference<CountDownLatch> removed2 = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> added2 = new AtomicReference<>(new CountDownLatch(2));
         List<String> listener2 = new Vector<String>()
         {
 
@@ -451,7 +442,7 @@ public class NotifyingCacheTest
             }
 
         };
-        Vector<String> currentData = new Vector<String>();
+        Vector<String> currentData = new Vector<>();
         currentData.add("1");
         currentData.add("2");
         assertTrue(this.candidate.addListener(listener2));
@@ -591,8 +582,8 @@ public class NotifyingCacheTest
     @Test
     public void testListenerNotificationOrder() throws InterruptedException
     {
-        final List<Object> notifiedAdded = new Vector<Object>();
-        final List<Object> notifiedRemoved = new Vector<Object>();
+        final List<Object> notifiedAdded = new Vector<>();
+        final List<Object> notifiedRemoved = new Vector<>();
         Object o1 = "o1";
         Object o2 = "o2";
         NotifyingCache<Object, String> candidate = new NotifyingCache<Object, String>()
@@ -609,8 +600,8 @@ public class NotifyingCacheTest
                 notifiedAdded.add(listener);
             }
         };
-        final List<Object> expectedNotifiedAdded = new Vector<Object>();
-        final List<Object> expectedNotifiedRemoved = new Vector<Object>();
+        final List<Object> expectedNotifiedAdded = new Vector<>();
+        final List<Object> expectedNotifiedRemoved = new Vector<>();
         expectedNotifiedAdded.add(o1);
         expectedNotifiedAdded.add(o2);
         expectedNotifiedRemoved.add(o1);

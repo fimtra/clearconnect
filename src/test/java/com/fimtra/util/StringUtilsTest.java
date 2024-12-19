@@ -58,7 +58,7 @@ public class StringUtilsTest {
 	@Test 
 	public void testSplitJoin()
 	{
-	    List<String> strings = new LinkedList<String>();
+	    List<String> strings = new LinkedList<>();
 	    strings.add("string1");
 	    strings.add("st,ri,ng2");
 	    strings.add("string3");

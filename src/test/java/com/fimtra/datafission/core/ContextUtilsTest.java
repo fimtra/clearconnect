@@ -42,26 +42,21 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IObserverContext;
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IPermissionFilter;
 import com.fimtra.datafission.IPublisherContext;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.core.ContextUtils;
-import com.fimtra.datafission.core.ProxyContext;
-import com.fimtra.datafission.core.Record;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.SubscriptionManager;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for {@link ContextUtils}
@@ -102,7 +97,7 @@ public class ContextUtilsTest
     {
         Context c = new Context("ContextUtilsTest");
         final IRecord record = c.createRecord("fieldCopy");
-        Map<String, IValue> source = new HashMap<String, IValue>();
+        Map<String, IValue> source = new HashMap<>();
         ContextUtils.fieldCopy(source, "lasers", record, "lasers");
         assertNull(record.get("lasers"));
         TextValue value = TextValue.valueOf("firing");
@@ -205,14 +200,14 @@ public class ContextUtilsTest
     @Test
     public void testMergeDemergeMaps()
     {
-        Map<String, IValue> map = new HashMap<String, IValue>();
+        Map<String, IValue> map = new HashMap<>();
         map.put("KEY1", TextValue.valueOf("Value1"));
         map.put("KEY2", new DoubleValue(0.1324d));
-        map.put("KEY3", LongValue.valueOf(543285734l));
+        map.put("KEY3", LongValue.valueOf(543285734L));
 
-        Map<String, Map<String, IValue>> subMaps = new HashMap<String, Map<String, IValue>>();
-        subMaps.put("subMap1", new HashMap<String, IValue>(map));
-        subMaps.put("subMap2", new HashMap<String, IValue>(map));
+        Map<String, Map<String, IValue>> subMaps = new HashMap<>();
+        subMaps.put("subMap1", new HashMap<>(map));
+        subMaps.put("subMap2", new HashMap<>(map));
 
         final Map<?, ?>[] result = ContextUtils.demergeMaps(ContextUtils.mergeMaps(map, subMaps));
 
@@ -224,7 +219,7 @@ public class ContextUtilsTest
     {
         record.put("KEY1", TextValue.valueOf("Value1"));
         record.put("KEY2", new DoubleValue(0.1324d));
-        record.put("KEY3", LongValue.valueOf(543285734l));
+        record.put("KEY3", LongValue.valueOf(543285734L));
 
         final Map<String, IValue> subMap = record.getOrCreateSubMap("busmap");
         subMap.put("KEY!", TextValue.valueOf("Value1"));
@@ -248,7 +243,7 @@ public class ContextUtilsTest
     {
         record.put("KEY1", TextValue.valueOf("Value1"));
         record.put("KEY2", new DoubleValue(0.1324d));
-        record.put("KEY3", LongValue.valueOf(543285734l));
+        record.put("KEY3", LongValue.valueOf(543285734L));
 
         Random rnd = new Random();
         final int limit = rnd.nextInt(200);
@@ -283,8 +278,7 @@ public class ContextUtilsTest
     @Test
     public void testResubscribeRecordsForContext()
     {
-        SubscriptionManager<String, IRecordListener> recordSubscribers =
-            new SubscriptionManager<String, IRecordListener>(IRecordListener.class);
+        SubscriptionManager<String, IRecordListener> recordSubscribers = new SubscriptionManager<>(IRecordListener.class);
         final String rec1 = "record1";
         final String rec2 = "record2";
         IRecordListener listener1 = mock(IRecordListener.class);
@@ -294,7 +288,7 @@ public class ContextUtilsTest
         recordSubscribers.addSubscriberFor(rec2, listener2);
 
         IObserverContext context = mock(IObserverContext.class);
-        ContextUtils.resubscribeRecordsForContext(context, recordSubscribers, new ConcurrentHashMap<String, String>(),
+        ContextUtils.resubscribeRecordsForContext(context, recordSubscribers, new ConcurrentHashMap<>(),
             rec2, rec1);
 
         verify(context).removeObserver(eq(listener1), eq(rec1));
@@ -310,7 +304,7 @@ public class ContextUtilsTest
     public void testClearNonSystemRecords()
     {
         IPublisherContext context = mock(IPublisherContext.class);
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         names.add(ISystemRecordNames.CONTEXT_CONNECTIONS);
         names.add(ISystemRecordNames.CONTEXT_RECORDS);
         names.add(ISystemRecordNames.CONTEXT_RPCS);
@@ -353,24 +347,19 @@ public class ContextUtilsTest
     @Test
     public void testFrameworkThreads() throws InterruptedException
     {
-        final AtomicReference<CountDownLatch> specificLatch = new AtomicReference<CountDownLatch>();
-        final AtomicReference<CountDownLatch> frameworkLatch = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> specificLatch = new AtomicReference<>();
+        final AtomicReference<CountDownLatch> frameworkLatch = new AtomicReference<>();
 
         specificLatch.set(new CountDownLatch(1));
         frameworkLatch.set(new CountDownLatch(1));
-        ContextUtils.CORE_EXECUTOR.execute(new Runnable()
-        {
-            @Override
-            public void run()
+        ContextUtils.CORE_EXECUTOR.execute(() -> {
+            if (ContextUtils.isCoreThread())
             {
-                if (ContextUtils.isCoreThread())
-                {
-                    specificLatch.get().countDown();
-                }
-                if (ContextUtils.isFrameworkThread())
-                {
-                    frameworkLatch.get().countDown();
-                }
+                specificLatch.get().countDown();
+            }
+            if (ContextUtils.isFrameworkThread())
+            {
+                frameworkLatch.get().countDown();
             }
         });
         assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));
@@ -378,19 +367,14 @@ public class ContextUtilsTest
 
         specificLatch.set(new CountDownLatch(1));
         frameworkLatch.set(new CountDownLatch(1));
-        ContextUtils.RPC_EXECUTOR.execute(new Runnable()
-        {
-            @Override
-            public void run()
+        ContextUtils.RPC_EXECUTOR.execute(() -> {
+            if (ContextUtils.isRpcThread())
             {
-                if (ContextUtils.isRpcThread())
-                {
-                    specificLatch.get().countDown();
-                }
-                if (ContextUtils.isFrameworkThread())
-                {
-                    frameworkLatch.get().countDown();
-                }
+                specificLatch.get().countDown();
+            }
+            if (ContextUtils.isFrameworkThread())
+            {
+                frameworkLatch.get().countDown();
             }
         });
         assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));
@@ -398,19 +382,14 @@ public class ContextUtilsTest
         
         specificLatch.set(new CountDownLatch(1));
         frameworkLatch.set(new CountDownLatch(1));
-        ContextUtils.SYSTEM_RECORD_EXECUTOR.execute(new Runnable()
-        {
-            @Override
-            public void run()
+        ContextUtils.SYSTEM_RECORD_EXECUTOR.execute(() -> {
+            if (ContextUtils.isSystemThread())
             {
-                if (ContextUtils.isSystemThread())
-                {
-                    specificLatch.get().countDown();
-                }
-                if (ContextUtils.isFrameworkThread())
-                {
-                    frameworkLatch.get().countDown();
-                }
+                specificLatch.get().countDown();
+            }
+            if (ContextUtils.isFrameworkThread())
+            {
+                frameworkLatch.get().countDown();
             }
         });
         assertTrue(specificLatch.get().await(1, TimeUnit.SECONDS));

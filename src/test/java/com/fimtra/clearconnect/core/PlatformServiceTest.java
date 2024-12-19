@@ -22,7 +22,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
@@ -32,10 +31,6 @@ import static org.mockito.Mockito.verify;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.RedundancyModeEnum;
@@ -52,6 +47,9 @@ import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.RpcInstance;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.ThreadUtils;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link PlatformServiceInstance}
@@ -88,14 +86,7 @@ public class PlatformServiceTest
     @After
     public void tearDown()
     {
-        ThreadUtils.newThread(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                PlatformServiceTest.this.candidate.destroy();
-            }
-        }, "tearDown").start();
+        ThreadUtils.newThread(() -> PlatformServiceTest.this.candidate.destroy(), "tearDown").start();
     }
 
     @Test
@@ -128,10 +119,9 @@ public class PlatformServiceTest
         assertTrue(this.candidate.createRecord(record1));
         assertFalse(this.candidate.createRecord(record1));
 
-        final AtomicReference<String> expected = new AtomicReference<String>(record1);
-        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> unavailableLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<String> expected = new AtomicReference<>(record1);
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> unavailableLatch = new AtomicReference<>(new CountDownLatch(1));
         IRecordAvailableListener recordListener1 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
@@ -160,9 +150,8 @@ public class PlatformServiceTest
         assertTrue(unavailableLatch.get().await(1, TimeUnit.SECONDS));
 
         // add a second listener
-        final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(5));
-        final AtomicReference<CountDownLatch> unavailableLatch2 =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> latch2 = new AtomicReference<>(new CountDownLatch(5));
+        final AtomicReference<CountDownLatch> unavailableLatch2 = new AtomicReference<>(new CountDownLatch(1));
         IRecordAvailableListener recordListener2 = EventListenerUtils.synchronizedListener(new IRecordAvailableListener()
         {
             @Override
@@ -346,28 +335,22 @@ public class PlatformServiceTest
         IRecordListener changeListener = mock(IRecordListener.class);
         this.candidate.addRecordListener(changeListener, record1);
 
-        final AtomicReference<String> expect = new AtomicReference<String>();
-        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> noMoreListenersLatch =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
-        {
-            @Override
-            public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+        final AtomicReference<String> expect = new AtomicReference<>();
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> noMoreListenersLatch = new AtomicReference<>(new CountDownLatch(1));
+        IRecordSubscriptionListener listener = EventListenerUtils.synchronizedListener(subscriptionInfo -> {
+            if (expect.get().equals(subscriptionInfo.getRecordName()))
             {
-                if (expect.get().equals(subscriptionInfo.getRecordName()))
+                if (subscriptionInfo.getCurrentSubscriberCount() > 0)
                 {
-                    if (subscriptionInfo.getCurrentSubscriberCount() > 0)
+                    latch.get().countDown();
+                }
+                else
+                {
+                    if (subscriptionInfo.getCurrentSubscriberCount() == 0
+                        && subscriptionInfo.getPreviousSubscriberCount() != 0)
                     {
-                        latch.get().countDown();
-                    }
-                    else
-                    {
-                        if (subscriptionInfo.getCurrentSubscriberCount() == 0
-                            && subscriptionInfo.getPreviousSubscriberCount() != 0)
-                        {
-                            noMoreListenersLatch.get().countDown();
-                        }
+                        noMoreListenersLatch.get().countDown();
                     }
                 }
             }
@@ -378,27 +361,21 @@ public class PlatformServiceTest
         assertFalse(this.candidate.addRecordSubscriptionListener(listener));
 
         // add the second listener (which we will use as the remove test)
-        final AtomicReference<CountDownLatch> latch2 = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> noMoreListenersLatch2 =
-            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
-        IRecordSubscriptionListener listener2 = EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
-        {
-            @Override
-            public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+        final AtomicReference<CountDownLatch> latch2 = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> noMoreListenersLatch2 = new AtomicReference<>(new CountDownLatch(1));
+        IRecordSubscriptionListener listener2 = EventListenerUtils.synchronizedListener(subscriptionInfo -> {
+            if (expect.get().equals(subscriptionInfo.getRecordName()))
             {
-                if (expect.get().equals(subscriptionInfo.getRecordName()))
+                if (subscriptionInfo.getCurrentSubscriberCount() > 0)
                 {
-                    if (subscriptionInfo.getCurrentSubscriberCount() > 0)
+                    latch2.get().countDown();
+                }
+                else
+                {
+                    if (subscriptionInfo.getCurrentSubscriberCount() == 0
+                        && subscriptionInfo.getPreviousSubscriberCount() != 0)
                     {
-                        latch2.get().countDown();
-                    }
-                    else
-                    {
-                        if (subscriptionInfo.getCurrentSubscriberCount() == 0
-                            && subscriptionInfo.getPreviousSubscriberCount() != 0)
-                        {
-                            noMoreListenersLatch2.get().countDown();
-                        }
+                        noMoreListenersLatch2.get().countDown();
                     }
                 }
             }

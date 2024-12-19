@@ -16,17 +16,16 @@
 package com.fimtra.datafission.field;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import com.fimtra.datafission.IValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IValue;
 
 /**
  * Tests for the {@link IValue} implementations.
@@ -119,20 +118,20 @@ public class ValueTest
         assertEquals(t1, t3);
         assertEquals(t1, t1);
 
-        assertFalse(l1.equals(l2));
-        assertFalse(l1.equals(t1));
-        assertFalse(l1.equals(t2));
-        assertFalse(l1.equals(t3));
-        assertFalse(l1.equals(d1));
-        assertFalse(l1.equals(d2));
-        assertFalse(l1.equals(d3));
+        assertNotEquals(l1, l2);
+        assertNotEquals(l1, t1);
+        assertNotEquals(l1, t2);
+        assertNotEquals(l1, t3);
+        assertNotEquals(l1, d1);
+        assertNotEquals(l1, d2);
+        assertNotEquals(l1, d3);
 
-        assertFalse(d1.equals(d2));
-        assertFalse(d1.equals(t1));
-        assertFalse(d1.equals(t2));
-        assertFalse(d1.equals(t3));
+        assertNotEquals(d1, d2);
+        assertNotEquals(d1, t1);
+        assertNotEquals(d1, t2);
+        assertNotEquals(d1, t3);
 
-        assertFalse(t1.equals(t2));
+        assertNotEquals(t1, t2);
     }
 
     @Test
@@ -209,7 +208,7 @@ public class ValueTest
         TextValue val;
         ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
         byte[] bytes;
-        val = TextValue.valueOf("" + System.currentTimeMillis() + "-" + new Random().nextDouble());
+        val = TextValue.valueOf(System.currentTimeMillis() + "-" + new Random().nextDouble());
         bytes = val.byteValue();
         assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
         reuse8ByteBuffer.clear();

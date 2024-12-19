@@ -22,9 +22,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.core.Publisher;
-import com.fimtra.datafission.core.StringProtocolCodec;
 import com.fimtra.datafission.field.LongValue;
 
 /**
@@ -56,15 +53,10 @@ public class RemoteContextTelnetServer
         createMapAndStartUpdating(record2);
         createMapAndStartUpdating(record3);
 
-        executor.scheduleAtFixedRate(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                context.publishAtomicChange(record1);
-                context.publishAtomicChange(record2);
-                context.publishAtomicChange(record3);
-            }
+        executor.scheduleAtFixedRate(() -> {
+            context.publishAtomicChange(record1);
+            context.publishAtomicChange(record2);
+            context.publishAtomicChange(record3);
         }, 0, ATOMIC_CHANGE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
 
         System.in.read();
@@ -79,7 +71,7 @@ public class RemoteContextTelnetServer
         }
         executor.scheduleAtFixedRate(new Runnable()
         {
-            Random random = new Random();
+            final Random random = new Random();
 
             @Override
             public void run()

@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
-import com.fimtra.datafission.core.AtomicChange;
 import com.fimtra.util.Log;
 
 /**
@@ -35,8 +34,8 @@ public class TestCachingAtomicChangeObserver implements IRecordListener
 {
     public boolean log;
     public CountDownLatch latch;
-    List<IRecord> images = new CopyOnWriteArrayList<IRecord>();
-    List<IRecordChange> changes = new CopyOnWriteArrayList<IRecordChange>();
+    List<IRecord> images = new CopyOnWriteArrayList<>();
+    List<IRecordChange> changes = new CopyOnWriteArrayList<>();
 
     public TestCachingAtomicChangeObserver()
     {
@@ -74,7 +73,7 @@ public class TestCachingAtomicChangeObserver implements IRecordListener
 
     public IRecord getLatestImage()
     {
-        if (this.images.size() == 0)
+        if (this.images.isEmpty())
         {
             return null;
         }

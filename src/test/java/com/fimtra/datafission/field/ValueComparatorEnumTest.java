@@ -21,12 +21,6 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fimtra.datafission.field.BlobValue;
-import com.fimtra.datafission.field.DoubleValue;
-import com.fimtra.datafission.field.LongValue;
-import com.fimtra.datafission.field.TextValue;
-import com.fimtra.datafission.field.ValueComparatorEnum;
-
 /**
  * Tests for the {@link ValueComparatorEnum}
  * 

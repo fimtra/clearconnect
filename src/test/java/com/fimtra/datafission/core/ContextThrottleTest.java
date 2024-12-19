@@ -23,10 +23,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 
 /**
  * Tests for the {@link ContextThrottle}
@@ -74,22 +73,17 @@ public class ContextThrottleTest
         }
              
         final CountDownLatch latch = new CountDownLatch(5);
-        final Thread t2 = new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        final Thread t2 = new Thread(() -> {
+            while (ContextThrottleTest.this.candidate.eventCount.get() > 0)
             {
-                while (ContextThrottleTest.this.candidate.eventCount.get() > 0)
+                ContextThrottleTest.this.candidate.eventFinish();
+                latch.countDown();
+                try
                 {
-                    ContextThrottleTest.this.candidate.eventFinish();
-                    latch.countDown();
-                    try
-                    {
-                        Thread.sleep(1);
-                    }
-                    catch (InterruptedException e)
-                    {
-                    }
+                    Thread.sleep(1);
+                }
+                catch (InterruptedException e)
+                {
                 }
             }
         });
@@ -106,15 +100,10 @@ public class ContextThrottleTest
     @Test
     public void testUnderLimitNoThrottle() throws InterruptedException
     {
-        Runnable task = new Runnable()
-        {
-            @Override
-            public void run()
+        Runnable task = () -> {
+            for (int i = 0; i < LIMIT; i++)
             {
-                for (int i = 0; i < LIMIT; i++)
-                {
-                    ContextThrottleTest.this.candidate.eventStart("some record name", false);
-                }
+                ContextThrottleTest.this.candidate.eventStart("some record name", false);
             }
         };
         Thread t = new Thread(task);
@@ -127,15 +116,10 @@ public class ContextThrottleTest
     @Test
     public void testSystemRecordSkipsThrottle() throws InterruptedException
     {
-        Runnable task = new Runnable()
-        {
-            @Override
-            public void run()
+        Runnable task = () -> {
+            for (int i = 0; i < LIMIT * 2; i++)
             {
-                for (int i = 0; i < LIMIT * 2; i++)
-                {
-                    ContextThrottleTest.this.candidate.eventStart(ISystemRecordNames.CONTEXT_CONNECTIONS, false);
-                }
+                ContextThrottleTest.this.candidate.eventStart(ISystemRecordNames.CONTEXT_CONNECTIONS, false);
             }
         };
         Thread t = new Thread(task);
@@ -148,15 +132,10 @@ public class ContextThrottleTest
     @Test
     public void testForceFlagSkipsThrottle() throws InterruptedException
     {
-        Runnable task = new Runnable()
-        {
-            @Override
-            public void run()
+        Runnable task = () -> {
+            for (int i = 0; i < LIMIT * 2; i++)
             {
-                for (int i = 0; i < LIMIT * 2; i++)
-                {
-                    ContextThrottleTest.this.candidate.eventStart("some record name", true);
-                }
+                ContextThrottleTest.this.candidate.eventStart("some record name", true);
             }
         };
         Thread t = new Thread(task);
@@ -170,17 +149,12 @@ public class ContextThrottleTest
     public void testFrameworkThreadSkipsThrottle() throws InterruptedException
     {
         final CountDownLatch latch = new CountDownLatch(1);
-        Runnable task = new Runnable()
-        {
-            @Override
-            public void run()
+        Runnable task = () -> {
+            for (int i = 0; i < LIMIT * 2; i++)
             {
-                for (int i = 0; i < LIMIT * 2; i++)
-                {
-                    ContextThrottleTest.this.candidate.eventStart("some record name", false);
-                }
-                latch.countDown();
+                ContextThrottleTest.this.candidate.eventStart("some record name", false);
             }
+            latch.countDown();
         };
         ContextUtils.CORE_EXECUTOR.execute(task);
 

@@ -16,12 +16,9 @@
 package com.fimtra.datafission.field;
 
 import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
-import static com.fimtra.datafission.field.LongValueTest.computeStats;
-import static com.fimtra.datafission.field.LongValueTest.max_retry;
 import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
 import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -89,7 +86,7 @@ public class BlobValueTest
         assertEquals(new BlobValue(this.bytes).hashCode(), new BlobValue(this.bytes).hashCode());
         assertNotEquals(new BlobValue().hashCode(), new BlobValue(this.bytes).hashCode());
         assertEquals(new BlobValue(this.bytes), new BlobValue(this.bytes));
-        assertFalse(new BlobValue().equals(new BlobValue(this.bytes)));
+        assertNotEquals(new BlobValue(), new BlobValue(this.bytes));
     }
 
     @Test

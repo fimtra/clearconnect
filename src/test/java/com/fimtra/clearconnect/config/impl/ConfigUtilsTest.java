@@ -15,23 +15,19 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.config.ConfigProperties;
 import com.fimtra.clearconnect.config.IConfig;
-import com.fimtra.clearconnect.config.impl.ConfigUtils;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay
@@ -79,7 +75,7 @@ public class ConfigUtilsTest {
 		String host = null;
 		String configPort = "112233";
 		// default port is 0 (use ephemeral port)
-		assertTrue(ConfigUtils.getPort(this.config, host) == 0);
+        assertEquals(0, ConfigUtils.getPort(this.config, host));
 		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT)).thenReturn(TextValue.valueOf(configPort));
 		assertEquals(Integer.parseInt(configPort), ConfigUtils.getPort(this.config, host));
 	}
@@ -96,7 +92,7 @@ public class ConfigUtilsTest {
 	public void shouldGetPropertyAsInt() {
 		String testPropertyKey = "propertyKey";
 		int defaultValue = 11;
-		long numericConfigValue = 12l;
+		long numericConfigValue = 12L;
 		String stringConfigValue = "" + numericConfigValue;
 		assertEquals(defaultValue, ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));
 		when(this.config.getProperty(testPropertyKey)).thenReturn(TextValue.valueOf("not an int"));

@@ -17,7 +17,7 @@ package com.fimtra.datafission.field;
 
 import static com.fimtra.datafission.DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -28,11 +28,10 @@ import java.util.List;
 import java.util.Random;
 
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.util.StringAppender;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IValue.TypeEnum;
 
 /**
  * Tests for the {@link LongValue}
@@ -129,8 +128,7 @@ public class LongValueTest
     public void testEquals()
     {
         assertEquals(LongValue.valueOf(1), LongValue.valueOf(1));
-        assertFalse(LongValue.valueOf(1)
-                .equals(LongValue.valueOf(11)));
+        assertNotEquals(LongValue.valueOf(1), LongValue.valueOf(11));
     }
 
     @Test

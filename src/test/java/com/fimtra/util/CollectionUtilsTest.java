@@ -41,37 +41,37 @@ public class CollectionUtilsTest
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetIterator()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
+        Map<Long, Long> m = new HashMap<>();
         CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().remove();
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetAdd()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
+        Map<Long, Long> m = new HashMap<>();
         CollectionUtils.unmodifiableEntrySet(m.entrySet()).add(null);
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetIteratorSetValue()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
-        m.put(1l, 1l);
-        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().next().setValue(2l);
+        Map<Long, Long> m = new HashMap<>();
+        m.put(1L, 1L);
+        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().next().setValue(2L);
     }
     
     @Test
     public void testNewSetFromString()
     {
-        HashSet<String> expected = new HashSet<String>();
+        HashSet<String> expected = new HashSet<>();
         assertEquals(expected, CollectionUtils.newSetFromString(null, ","));
         
-        expected = new HashSet<String>();
+        expected = new HashSet<>();
         expected.add("");
         assertEquals(expected, CollectionUtils.newSetFromString("", ","));
         assertEquals(expected, CollectionUtils.newSetFromString(" ", ","));
         
-        expected = new HashSet<String>();
+        expected = new HashSet<>();
         expected.add("1");
         expected.add("2");
         expected.add("3");

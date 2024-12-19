@@ -23,15 +23,15 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-
-import org.junit.Test;
 
 import com.fimtra.tcpchannel.ByteArrayFragment.ByteArrayFragmentUtils;
 import com.fimtra.tcpchannel.ByteArrayFragment.IncorrectSequenceException;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.RawByteHeaderByteArrayFragmentResolver;
 import com.fimtra.tcpchannel.ByteArrayFragmentResolver.UTF8HeaderByteArrayFragmentResolver;
 import com.fimtra.util.ByteBufferUtils;
+import org.junit.Test;
 
 /**
  * Tests for the {@link ByteArrayFragment}
@@ -277,7 +277,7 @@ public class ByteArrayFragmentTest
 
         final int messageCount = 5000;
         int i = 0;
-        List<TxByteArrayFragment> fragments = new ArrayList<TxByteArrayFragment>(messageCount);
+        List<TxByteArrayFragment> fragments = new ArrayList<>(messageCount);
         while (i < messageCount)
         {
             TxByteArrayFragment[] fragmentsForTxData = TxByteArrayFragment.getFragmentsForTxData(("" + ++i).getBytes(),
@@ -288,10 +288,7 @@ public class ByteArrayFragmentTest
 
                 // add interleaved data that is not part of our check
                 final TxByteArrayFragment[] hbs = TxByteArrayFragment.getFragmentsForTxData(new byte[] { 0x3 }, 65535);
-                for (TxByteArrayFragment byteArrayFragment2 : hbs)
-                {
-                    fragments.add(byteArrayFragment2);
-                }
+                Collections.addAll(fragments, hbs);
             }
         }
         int last = 0;
@@ -306,7 +303,7 @@ public class ByteArrayFragmentTest
                 {
                     current = Integer.parseInt(
                         new String(resolved.array(), resolved.position(), resolved.limit() - resolved.position()));
-                    assertTrue("current=" + current + ", last=" + last, current == (++last));
+                    assertEquals("current=" + current + ", last=" + last, current, (++last));
                 }
                 catch (NumberFormatException e)
                 {

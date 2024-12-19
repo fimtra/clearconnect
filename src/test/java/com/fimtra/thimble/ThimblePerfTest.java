@@ -86,7 +86,7 @@ public class ThimblePerfTest
     {
         long start;
         // final BlockingQueue<AtomicLong> queue = new ArrayBlockingQueue<AtomicLong>(1000);
-        final BlockingDeque<AtomicLong> queue = new LinkedBlockingDeque<AtomicLong>();
+        final BlockingDeque<AtomicLong> queue = new LinkedBlockingDeque<>();
         final CountDownLatch queueLatch = new CountDownLatch(eventCount);
         ExecutorService threadPool = Executors.newCachedThreadPool();
         for (int i = 0; i < procCount; i++)
@@ -170,23 +170,18 @@ public class ThimblePerfTest
 
     private static Runnable createQueueConsumer(final BlockingQueue<AtomicLong> queue, final CountDownLatch queueLatch)
     {
-        return new Runnable()
-        {
-            @Override
-            public void run()
+        return () -> {
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
-                    {
-                        queue.take();
-                        doSomething();
-                        queueLatch.countDown();
-                    }
-                    catch (InterruptedException e)
-                    {
-                        e.printStackTrace();
-                    }
+                    queue.take();
+                    doSomething();
+                    queueLatch.countDown();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
                 }
             }
         };
@@ -194,15 +189,10 @@ public class ThimblePerfTest
 
     private static Runnable createRunnableConsumer(final CountDownLatch queueLatch, final AtomicLong atomicLong)
     {
-        return new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                doSomething();
-                queueLatch.countDown();
-                // System.err.println(queueLatch.getCount() + " for sequence:" + atomicLong);
-            }
+        return () -> {
+            doSomething();
+            queueLatch.countDown();
+            // System.err.println(queueLatch.getCount() + " for sequence:" + atomicLong);
         };
     }
 

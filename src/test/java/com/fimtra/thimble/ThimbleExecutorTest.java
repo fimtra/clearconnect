@@ -23,15 +23,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
-import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
 
 /**
  * Tests for the {@link ThimbleExecutor}
@@ -244,12 +239,7 @@ public class ThimbleExecutorTest
                 runCount));
             for (int j = 0; j < SIZE; j++)
             {
-                this.candidate.execute(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                    }
+                this.candidate.execute(() -> {
                 });
             }
             if ((i % 1000) == 0)
@@ -279,12 +269,7 @@ public class ThimbleExecutorTest
             this.candidate.execute(new SequentialTestingRunnable(counter, i, latch));
             for (int j = 0; j < SIZE; j++)
             {
-                this.candidate.execute(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                    }
+                this.candidate.execute(() -> {
                 });
             }
         }

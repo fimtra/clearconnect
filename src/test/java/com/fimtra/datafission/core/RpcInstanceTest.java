@@ -18,30 +18,24 @@ package com.fimtra.datafission.core;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.fimtra.channel.ITransportChannel;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
+import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.RpcInstance.Remote;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import org.mockito.Mockito;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link RpcInstance}
@@ -67,7 +61,7 @@ public class RpcInstanceTest
     @Test
     public void testDecodeArgs()
     {
-        Map<String, IValue> args = new HashMap<String, IValue>();
+        Map<String, IValue> args = new HashMap<>();
         args.put(RpcInstance.Remote.ARGS_COUNT, LongValue.valueOf(2));
         args.put(RpcInstance.Remote.ARG_ + "0", LongValue.valueOf(0));
         args.put(RpcInstance.Remote.ARG_ + "1", LongValue.valueOf(1));
@@ -159,14 +153,8 @@ public class RpcInstanceTest
     public void testExecute() throws TimeOutException, ExecutionException
     {
         IValue result =
-            new RpcInstance(new IRpcExecutionHandler()
-            {
-                @Override
-                public IValue execute(IValue... args) throws TimeOutException, ExecutionException
-                {
-                    return TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue());
-                }
-            }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(TextValue.valueOf(
+            new RpcInstance(
+                    args -> TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue()), TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(TextValue.valueOf(
                 "text"), new DoubleValue(Double.NaN), new DoubleValue(3));
         assertEquals("textNaN3.0", result.textValue());
     }
@@ -175,14 +163,9 @@ public class RpcInstanceTest
     public void testGetCaller() throws TimeOutException, ExecutionException
     {
         final String noCallerSet = "no caller set";
-        final RpcInstance rpcInstance = new RpcInstance(new IRpcExecutionHandler()
-        {
-            @Override
-            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
-            {
-                final String caller = RpcCallingContext.getCallerEndpointDescription();
-                return TextValue.valueOf(caller == null ? noCallerSet : caller);
-            }
+        final RpcInstance rpcInstance = new RpcInstance(args -> {
+            final String caller = RpcCallingContext.getCallerEndpointDescription();
+            return TextValue.valueOf(caller == null ? noCallerSet : caller);
         }, TypeEnum.TEXT, "getSomething", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE);
 
         // check calling context is null when no context is set during execution
@@ -203,14 +186,8 @@ public class RpcInstanceTest
     public void testExecuteIncorrectTypes() throws TimeOutException, ExecutionException
     {
         IValue result =
-            new RpcInstance(new IRpcExecutionHandler()
-            {
-                @Override
-                public IValue execute(IValue... args) throws TimeOutException, ExecutionException
-                {
-                    return TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue());
-                }
-            }, TypeEnum.TEXT, "getSomething", ARG_NAMES, TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(
+            new RpcInstance(
+                    args -> TextValue.valueOf(args[0].textValue() + args[1].textValue() + args[2].textValue()), TypeEnum.TEXT, "getSomething", ARG_NAMES, TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.DOUBLE).execute(
                 TextValue.valueOf("text"), new DoubleValue(Double.NaN), LongValue.valueOf(3));
     }
 }

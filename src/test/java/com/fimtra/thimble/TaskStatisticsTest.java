@@ -19,8 +19,6 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import com.fimtra.thimble.TaskStatistics;
-
 /**
  * Tests for {@link TaskStatistics}
  * 

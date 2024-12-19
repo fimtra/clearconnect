@@ -17,6 +17,7 @@ package com.fimtra.datafission.core;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -30,16 +31,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.fimtra.datafission.IRecordChange;
+import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.field.DoubleValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.fimtra.datafission.IRecordChange;
-import com.fimtra.datafission.IValue;
-import com.fimtra.datafission.core.Context;
-import com.fimtra.datafission.core.Record;
-import com.fimtra.datafission.core.SubMap;
-import com.fimtra.datafission.field.DoubleValue;
 
 /**
  * Test cases for the record
@@ -73,7 +70,7 @@ public class RecordTest
         this.listener = new TestCachingAtomicChangeObserver();
         this.context.addObserver(this.listener, name);
         // wait for the listener to be triggered
-        while (this.listener.changes.size() == 0)
+        while (this.listener.changes.isEmpty())
         {
 
         }
@@ -104,7 +101,7 @@ public class RecordTest
         this.candidate.put(K2, V2);
         this.candidate.put(K5, V5);
 
-        assertFalse(this.candidate.equals(snapshot1));
+        assertNotEquals(this.candidate, snapshot1);
     }
 
     @Test
@@ -274,7 +271,7 @@ public class RecordTest
     @Test
     public void testPutAll() throws InterruptedException
     {
-        Map<String, IValue> record = new HashMap<String, IValue>();
+        Map<String, IValue> record = new HashMap<>();
         record.put(K1, V1);
         record.put(K2, V2);
         this.candidate.putAll(record);
@@ -294,7 +291,7 @@ public class RecordTest
             getLatestChange().getOverwrittenEntries().get(K2));
 
         // check previous values get updated
-        record = new HashMap<String, IValue>();
+        record = new HashMap<>();
         record.put(K1, V1); // duplicate
         record.put(K2, V1); // change
         this.candidate.putAll(record);
@@ -361,7 +358,7 @@ public class RecordTest
 
     private static Map<String, IValue> createMap(String string, IValue two2)
     {
-        Map<String, IValue> record = new HashMap<String, IValue>();
+        Map<String, IValue> record = new HashMap<>();
         record.put(string, two2);
         return record;
     }
@@ -448,7 +445,7 @@ public class RecordTest
     {
         addK1K2ToCandidate();
 
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
         m.put(K1, V1);
         m.put(K2, V2);
 
@@ -630,7 +627,7 @@ public class RecordTest
         subMap.put(K1, V5);
         subMap.put(K2, V2);
 
-        Set<IValue> expected = new HashSet<IValue>();
+        Set<IValue> expected = new HashSet<>();
         expected.add(V5);
         expected.add(V2);
         int entrycount = 0;
@@ -670,7 +667,7 @@ public class RecordTest
         subMap.put(K1, V5);
         subMap.put(K2, V2);
 
-        Set<String> expected = new HashSet<String>();
+        Set<String> expected = new HashSet<>();
         expected.add(K1);
         expected.add(K2);
         int entrycount = 0;
@@ -726,7 +723,7 @@ public class RecordTest
     public void testPutClearThenPut() throws InterruptedException
     {
         addK1K2ToCandidate();
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
 
         this.context.publishAtomicChange(name).await();
         verifyImageSizes(2, 0);
@@ -745,7 +742,7 @@ public class RecordTest
     public void testClearRecordAndSubMap() throws InterruptedException
     {
         addK1K2ToCandidate();
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
         m.put(K1, V1);
         m.put(K2, V2);
         Map<String, IValue> subMap = this.candidate.getOrCreateSubMap(SUBMAP_KEY);
@@ -764,7 +761,7 @@ public class RecordTest
     public void testCloneRecord() throws InterruptedException
     {
         addK1K2ToCandidate();
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
         m.put(K1, V1);
         m.put(K2, V2);
         
@@ -782,7 +779,7 @@ public class RecordTest
     public void testCloneRecordAndSubMap() throws InterruptedException
     {
         addK1K2ToCandidate();
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
         m.put(K1, V1);
         m.put(K2, V2);
         Map<String, IValue> subMap = this.candidate.getOrCreateSubMap(SUBMAP_KEY);
@@ -809,7 +806,7 @@ public class RecordTest
     {
         addK1K2ToCandidate();
 
-        Map<String, IValue> m = new HashMap<String, IValue>();
+        Map<String, IValue> m = new HashMap<>();
         m.put(K1, V1);
         m.put(K2, V2);
 

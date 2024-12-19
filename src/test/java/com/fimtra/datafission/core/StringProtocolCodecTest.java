@@ -18,7 +18,6 @@ package com.fimtra.datafission.core;
 import static com.fimtra.datafission.core.StringProtocolCodec.DECODING_BUFFERS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 import java.nio.ByteBuffer;
@@ -32,8 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Test;
-
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
@@ -43,6 +40,7 @@ import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.StringAppender;
+import org.junit.Test;
 
 /**
  * Tests for the {@link StringProtocolCodec}
@@ -198,7 +196,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
         IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
 
-        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        Map<String, IValue> map1 = new HashMap<>();
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
@@ -246,7 +244,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
                 StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray(), DECODING_BUFFERS.get());
 
-        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        Map<String, IValue> map1 = new HashMap<>();
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
@@ -370,7 +368,6 @@ public class StringProtocolCodecTest extends CodecBaseTest
         )
         {
             sb.append(valueToSend);
-            return;
         }
     }
 }

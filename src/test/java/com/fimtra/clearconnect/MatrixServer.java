@@ -19,8 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.fimtra.clearconnect.IPlatformServiceInstance;
-import com.fimtra.clearconnect.PlatformServiceAccess;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
@@ -83,38 +81,32 @@ public class MatrixServer
     private void startUpdating(final IRecord matrix01, final int ROW_MAX, final int COL_MAX, final int PERIOD)
     {
         final ScheduledExecutorService updater = ThreadUtils.newScheduledExecutorService("updater", 1);
-        updater.scheduleWithFixedDelay(new Runnable()
-        {
-            @SuppressWarnings("boxing")
-            @Override
-            public void run()
+        updater.scheduleWithFixedDelay(() -> {
+            String key;
+            IValue value;
+            Map<String, IValue> row;
+            final long start = System.currentTimeMillis();
+
+            // only update 1/4 the matrix
+            int count = ROW_MAX / 10;
+
+            for (int x = 0; x < count; x++)
             {
-                String key;
-                IValue value;
-                Map<String, IValue> row;
-                final long start = System.currentTimeMillis();
-
-                // only update 1/4 the matrix
-                int count = ROW_MAX / 10;
-
-                for (int x = 0; x < count; x++)
+                int r =(int)( Math.random() * ROW_MAX);
+                row = matrix01.getOrCreateSubMap("ROW_" + r);
+                for (int y = 0; y < COL_MAX; y++)
                 {
-                	int r =(int)( Math.random() * ROW_MAX);
-                    row = matrix01.getOrCreateSubMap("ROW_" + r);
-                    for (int y = 0; y < COL_MAX / 1; y++)
-                    {
-                        key = "COL_" + y;
-                        value = row.get(key);
-                        row.put(key, new DoubleValue(value.doubleValue() + 1));
-                    }
+                    key = "COL_" + y;
+                    value = row.get(key);
+                    row.put(key, new DoubleValue(value.doubleValue() + 1));
                 }
-                final long end = System.currentTimeMillis();
-                matrix01.put("START", Long.valueOf(start));
-                matrix01.put("END", Long.valueOf(end));
-                matrix01.put("CALC_LATENCY", Long.valueOf(end - start));
-                MatrixServer.this.matrixEngine.publishRecord(matrix01);
-                matrix01.put("UPDATE_LATENCY", Long.valueOf(System.currentTimeMillis() - start));
             }
+            final long end = System.currentTimeMillis();
+            matrix01.put("START", Long.valueOf(start));
+            matrix01.put("END", Long.valueOf(end));
+            matrix01.put("CALC_LATENCY", Long.valueOf(end - start));
+            MatrixServer.this.matrixEngine.publishRecord(matrix01);
+            matrix01.put("UPDATE_LATENCY", Long.valueOf(System.currentTimeMillis() - start));
         }, PERIOD, PERIOD, TimeUnit.MILLISECONDS);
     }
 }

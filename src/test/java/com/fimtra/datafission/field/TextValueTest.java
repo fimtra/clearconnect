@@ -23,10 +23,8 @@ import static org.junit.Assert.fail;
 
 import java.util.Random;
 
-import org.junit.Test;
-
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.datafission.field.TextValue;
+import org.junit.Test;
 
 /**
  * Tests {@link TextValue}
@@ -75,7 +73,7 @@ public class TextValueTest
     @Test(expected=IllegalArgumentException.class)
     public void testFromCharsWithNull()
     {
-        TextValue.valueOf((char[]) null, 0, 1);
+        TextValue.valueOf(null, 0, 1);
     }
 
     @Test

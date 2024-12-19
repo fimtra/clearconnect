@@ -43,7 +43,7 @@ public class SubscriptionManagerTest
     @Before
     public void setUp() throws Exception
     {
-        this.candidate = new SubscriptionManager<Integer, String>(String.class);
+        this.candidate = new SubscriptionManager<>(String.class);
     }
 
     @After

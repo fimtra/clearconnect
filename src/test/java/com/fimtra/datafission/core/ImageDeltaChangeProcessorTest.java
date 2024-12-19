@@ -24,12 +24,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.util.LowGcLinkedList;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests the {@link ImageDeltaChangeProcessor}
@@ -65,8 +64,8 @@ public class ImageDeltaChangeProcessorTest
     @Test
     public void testProcessRxChange_Image_SequenceOK()
     {
-        when(this.changeToApply.getSequence()).thenReturn(2l);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.changeToApply.getSequence()).thenReturn(2L);
+        when(this.record.getSequence()).thenReturn(1L);
 
         assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
         verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
@@ -77,8 +76,8 @@ public class ImageDeltaChangeProcessorTest
     @Test
     public void testProcessRxChange_Image_Sequence_SAME()
     {
-        when(this.changeToApply.getSequence()).thenReturn(1l);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.changeToApply.getSequence()).thenReturn(1L);
+        when(this.record.getSequence()).thenReturn(1L);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
 
         assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
@@ -92,8 +91,8 @@ public class ImageDeltaChangeProcessorTest
     @Test
     public void testProcessRxChange_Image_Sequence_Behind()
     {
-        when(this.changeToApply.getSequence()).thenReturn(23l);
-        when(this.record.getSequence()).thenReturn(26l);
+        when(this.changeToApply.getSequence()).thenReturn(23L);
+        when(this.record.getSequence()).thenReturn(26L);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
         
         assertEquals(ImageDeltaChangeProcessor.RESYNC, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
@@ -105,8 +104,8 @@ public class ImageDeltaChangeProcessorTest
     @Test
     public void testProcessRxChange_Image_Sequence_Ahead()
     {
-        when(this.changeToApply.getSequence()).thenReturn(23l);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.changeToApply.getSequence()).thenReturn(23L);
+        when(this.record.getSequence()).thenReturn(1L);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
 
         assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
@@ -124,7 +123,7 @@ public class ImageDeltaChangeProcessorTest
         // image) BUT the delta sequences are wrong - expect a resync
         
         this.candidate.imageReceived.clear();
-        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
@@ -133,13 +132,13 @@ public class ImageDeltaChangeProcessorTest
         // add 25 before 24
         deltas.add(change25);
         deltas.add(change24);
-        when(change20.getSequence()).thenReturn(20l);
-        when(change24.getSequence()).thenReturn(24l);
-        when(change25.getSequence()).thenReturn(25l);
+        when(change20.getSequence()).thenReturn(20L);
+        when(change24.getSequence()).thenReturn(24L);
+        when(change25.getSequence()).thenReturn(25L);
         
-        final long changeSeq = 23l;
+        final long changeSeq = 23L;
         when(this.changeToApply.getSequence()).thenReturn(changeSeq);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.record.getSequence()).thenReturn(1L);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
         
         assertEquals(ImageDeltaChangeProcessor.RESYNC, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
@@ -167,7 +166,7 @@ public class ImageDeltaChangeProcessorTest
         // image)
         
         this.candidate.imageReceived.clear();
-        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
@@ -175,13 +174,13 @@ public class ImageDeltaChangeProcessorTest
         deltas.add(change20);
         deltas.add(change24);
         deltas.add(change25);
-        when(change20.getSequence()).thenReturn(20l);
-        when(change24.getSequence()).thenReturn(24l);
-        when(change25.getSequence()).thenReturn(25l);
+        when(change20.getSequence()).thenReturn(20L);
+        when(change24.getSequence()).thenReturn(24L);
+        when(change25.getSequence()).thenReturn(25L);
 
-        final long changeSeq = 23l;
+        final long changeSeq = 23L;
         when(this.changeToApply.getSequence()).thenReturn(changeSeq);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.record.getSequence()).thenReturn(1L);
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.IMAGE_SCOPE);
 
         assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
@@ -206,9 +205,9 @@ public class ImageDeltaChangeProcessorTest
     {
         this.candidate.imageReceived.clear();
         
-        final long changeSeq = 23l;
+        final long changeSeq = 23L;
         when(this.changeToApply.getSequence()).thenReturn(changeSeq);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.record.getSequence()).thenReturn(1L);
         
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.DELTA_SCOPE);
         
@@ -227,9 +226,9 @@ public class ImageDeltaChangeProcessorTest
     @Test
     public void testProcessRxChange_Delta_Sequence_Wrong_image_received()
     {
-        final long changeSeq = 23l;
+        final long changeSeq = 23L;
         when(this.changeToApply.getSequence()).thenReturn(changeSeq);
-        when(this.record.getSequence()).thenReturn(1l);
+        when(this.record.getSequence()).thenReturn(1L);
 
         when(this.changeToApply.getScope()).thenReturn(IRecordChange.DELTA_SCOPE);
 

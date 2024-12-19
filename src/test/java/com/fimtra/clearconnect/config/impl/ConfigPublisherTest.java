@@ -15,18 +15,17 @@
  */
 package com.fimtra.clearconnect.config.impl;
 
-import java.util.Arrays;
-
-import org.junit.Before;
-import org.junit.Test;
-
-import com.fimtra.clearconnect.IPlatformServiceInstance;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+
+import com.fimtra.clearconnect.IPlatformServiceInstance;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * @author Paul Mackinlay
@@ -53,7 +52,7 @@ public class ConfigPublisherTest {
 	@Test
 	public void shouldTryToPublishRecord() {
 		String recordName = "test";
-		when(this.configPersist.getChangedRecordNames()).thenReturn(Arrays.asList(recordName));
+		when(this.configPersist.getChangedRecordNames()).thenReturn(Collections.singletonList(recordName));
 		this.configPublisher.run();
 		verify(this.platformServiceInstance, times(1)).getOrCreateRecord(recordName);
 	}

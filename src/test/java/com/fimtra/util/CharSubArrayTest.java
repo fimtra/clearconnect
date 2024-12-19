@@ -15,7 +15,8 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -43,15 +44,15 @@ public class CharSubArrayTest
         assertEquals(candidate.hashCode(), new CharSubArray("bye-world!".toCharArray(), 4, 5).hashCode());
         assertEquals(candidate.hashCode(), new CharSubArray("world".toCharArray(), 0, 5).hashCode());
 
-        assertFalse(candidate.hashCode() == (new CharSubArray("world!".toCharArray(), 1, 5)).hashCode());
-        
-        assertFalse(candidate.equals(new CharSubArray("world!".toCharArray(), 1, 5)));
+        assertNotEquals(candidate.hashCode(), (new CharSubArray("world!".toCharArray(), 1, 5)).hashCode());
+
+        assertNotEquals(candidate, new CharSubArray("world!".toCharArray(), 1, 5));
         assertEquals(candidate, candidate);
         assertEquals(candidate, new CharSubArray("hello-world!".toCharArray(), 6, 5));
         assertEquals(candidate, new CharSubArray("bye-world!".toCharArray(), 4, 5));
         assertEquals(candidate, new CharSubArray("world".toCharArray(), 0, 5));
-        
-        assertFalse(candidate.equals(new CharSubArray("world!".toCharArray(), 1, 5)));
+
+        assertNotEquals(candidate, new CharSubArray("world!".toCharArray(), 1, 5));
     }
 
 }

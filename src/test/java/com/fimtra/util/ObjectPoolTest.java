@@ -15,7 +15,9 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -32,7 +34,7 @@ public class ObjectPoolTest
     @Before
     public void setUp() throws Exception
     {
-        this.candidate = new ObjectPool<String>("unit-test", 2);
+        this.candidate = new ObjectPool<>("unit-test", 2);
     }
 
     @Test

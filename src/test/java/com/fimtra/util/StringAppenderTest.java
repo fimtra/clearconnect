@@ -15,7 +15,7 @@
  */
 package com.fimtra.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -37,7 +37,7 @@ public class StringAppenderTest
     {
         final StringAppender candidate = new StringAppender(0);
         candidate.append('c')
-                .append(1l)
+                .append(1L)
                 .append(0.1d)
                 .append("string")
                 .append("string".toCharArray())

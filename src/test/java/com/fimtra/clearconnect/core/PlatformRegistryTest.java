@@ -20,8 +20,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -76,11 +74,11 @@ public class PlatformRegistryTest
     public void testMultipleConnectionsRestart() throws IOException, InterruptedException
     {
         final int MAX = 100;
-        final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<>();
         connectedLatch.set(new CountDownLatch(MAX));
-        final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<CountDownLatch>();
+        final AtomicReference<CountDownLatch> disconnectedLatch = new AtomicReference<>();
         disconnectedLatch.set(new CountDownLatch(MAX));
-        PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
+        PlatformRegistryAgent[] agents = new PlatformRegistryAgent[MAX];
         for (int i = 0; i < MAX; i++)
         {
             final String suffix = i + "-" + System.nanoTime();
@@ -146,7 +144,7 @@ public class PlatformRegistryTest
 
         final int MAX = 2;
 
-        PlatformRegistryAgent agents[] = new PlatformRegistryAgent[MAX];
+        PlatformRegistryAgent[] agents = new PlatformRegistryAgent[MAX];
         PlatformRegistryAgent agent;
         for (int i = 0; i < MAX; i++)
         {
@@ -178,15 +176,15 @@ public class PlatformRegistryTest
             assertNotNull("Did not get proxy for: " + lbServiceFamily, lbproxy);
         }
 
-        assertTrue(
-                candidate.context.getRecord(IRegistryRecordNames.PLATFORM_CONNECTIONS).getSubMapKeys().size()
-                        > 0);
+        assertTrue(!candidate.context.getRecord(IRegistryRecordNames.PLATFORM_CONNECTIONS)
+                .getSubMapKeys()
+                .isEmpty());
 
         for (int i = 0; i < MAX; i++)
         {
-            Log.log(this, ">>>> Destroying " + agents[i].toString());
+            Log.log(this, ">>>> Destroying " + agents[i]);
             agents[i].destroy();
-            Log.log(this, ">>>> DESTROYED " + agents[i].toString());
+            Log.log(this, ">>>> DESTROYED " + agents[i]);
             Thread.sleep(100);
         }
 

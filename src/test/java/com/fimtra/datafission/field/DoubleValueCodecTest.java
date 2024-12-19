@@ -1,12 +1,11 @@
 package com.fimtra.datafission.field;
 
-import static com.fimtra.datafission.field.DoubleValueCodec.MAX_NDIGITS;
 import static com.fimtra.datafission.field.DoubleValueCodec.MAX_SMALL_TEN;
 import static com.fimtra.datafission.field.DoubleValueCodec.writeToCharArray;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -129,7 +128,7 @@ public class DoubleValueCodecTest
         assertEquals(expected, actual, delta);
         final StringAppender stringAppender = new StringAppender();
         writeToCharArray(expected, stringAppender);
-        System.err.println("test_workbench stringAppender.toString()=" + stringAppender.toString());
+        System.err.println("test_workbench stringAppender.toString()=" + stringAppender);
     }
 
     @Test

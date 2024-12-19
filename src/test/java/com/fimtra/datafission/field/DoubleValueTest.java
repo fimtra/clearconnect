@@ -23,7 +23,7 @@ import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -93,7 +93,7 @@ public class DoubleValueTest
     public void testEquals()
     {
         assertEquals(new DoubleValue(1.2), new DoubleValue(1.2));
-        assertFalse(new DoubleValue(1.2).equals(new DoubleValue(1.21)));
+        assertNotEquals(new DoubleValue(1.2), new DoubleValue(1.21));
     }
 
     @Test

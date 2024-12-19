@@ -20,13 +20,12 @@ import static org.junit.Assert.assertNull;
 
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
 import com.fimtra.datafission.field.TextValue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests for the {@link AtomicChangeTeleporter}

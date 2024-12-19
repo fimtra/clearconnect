@@ -39,22 +39,21 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.fimtra.util.Pair;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
-
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.IReceiver;
 import com.fimtra.channel.ITransportChannel;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.ByteBufferUtils;
 import com.fimtra.util.Log;
+import com.fimtra.util.Pair;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
 
 /**
  * Tests the {@link TcpServer} and {@link TcpChannel}
@@ -252,7 +251,7 @@ public class TestTcpServer
                 : FrameEncodingFormatEnum.LENGTH_BASED;
 
         this.server = new TcpServer(LOCALHOST, PORT, new EchoReceiver(), this.frameEncodingFormat);
-        List<TcpChannel> clients = new ArrayList<TcpChannel>();
+        List<TcpChannel> clients = new ArrayList<>();
         for (int i = 0; i < 20; i++)
         {
             final TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver(), inverseFrameEncodingFormat);
@@ -284,10 +283,10 @@ public class TestTcpServer
         // attempt connection
 
         final CountDownLatch latch = new CountDownLatch(4);
-        final List<String> expected1 = new ArrayList<String>();
-        final List<String> received1 = new ArrayList<String>();
-        final List<String> expected2 = new ArrayList<String>();
-        final List<String> received2 = new ArrayList<String>();
+        final List<String> expected1 = new ArrayList<>();
+        final List<String> received1 = new ArrayList<>();
+        final List<String> expected2 = new ArrayList<>();
+        final List<String> received2 = new ArrayList<>();
         final String message1 = "hello1";
         final String message2 = "hello2";
         expected1.add(message1);
@@ -461,8 +460,8 @@ public class TestTcpServer
     public void testVerySimpleClientServerMessageSending() throws IOException, InterruptedException
     {
         final CountDownLatch latch = new CountDownLatch(1);
-        final List<String> expected1 = new ArrayList<String>();
-        final List<String> received1 = new ArrayList<String>();
+        final List<String> expected1 = new ArrayList<>();
+        final List<String> received1 = new ArrayList<>();
         final String message1 = "hello1";
         expected1.add(message1);
         this.server = new TcpServer(LOCALHOST, PORT, new EchoReceiver(), this.frameEncodingFormat);
@@ -486,10 +485,10 @@ public class TestTcpServer
     public void testSimpleClientServerMessageSending() throws IOException, InterruptedException
     {
         final CountDownLatch latch = new CountDownLatch(4);
-        final List<String> expected1 = new ArrayList<String>();
-        final List<String> received1 = new ArrayList<String>();
-        final List<String> expected2 = new ArrayList<String>();
-        final List<String> received2 = new ArrayList<String>();
+        final List<String> expected1 = new ArrayList<>();
+        final List<String> received1 = new ArrayList<>();
+        final List<String> expected2 = new ArrayList<>();
+        final List<String> received2 = new ArrayList<>();
         final String message1 = "hello1";
         final String message2 = "hello2";
         expected1.add(message1);
@@ -531,10 +530,10 @@ public class TestTcpServer
     public void testBigMessageClientServerMessageSending() throws IOException, InterruptedException
     {
         final CountDownLatch latch = new CountDownLatch(4);
-        final List<String> expected1 = new ArrayList<String>();
-        final List<String> received1 = new ArrayList<String>();
-        final List<String> expected2 = new ArrayList<String>();
-        final List<String> received2 = new ArrayList<String>();
+        final List<String> expected1 = new ArrayList<>();
+        final List<String> received1 = new ArrayList<>();
+        final List<String> expected2 = new ArrayList<>();
+        final List<String> received2 = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 1000; i++)
         {
@@ -616,7 +615,7 @@ public class TestTcpServer
         final int clientCount = 50;
         final CountDownLatch channelConnectedLatch = new CountDownLatch(clientCount);
         final CountDownLatch closedLatch = new CountDownLatch(clientCount);
-        List<TcpChannel> clients = new ArrayList<TcpChannel>(clientCount);
+        List<TcpChannel> clients = new ArrayList<>(clientCount);
         for (int i = 0; i < clientCount; i++)
         {
             final int count = i;
@@ -639,7 +638,7 @@ public class TestTcpServer
         }
         boolean result = channelConnectedLatch.await(STD_TIMEOUT, TimeUnit.SECONDS);
         assertTrue("Only connected " + ((clientCount) - channelConnectedLatch.getCount()) + " clients", result);
-        assertTrue(closedLatch.getCount() == clientCount);
+        assertEquals(clientCount, closedLatch.getCount());
 
         // Don't destroy the server just yet, give things time to settle - don't remove this!
         Thread.sleep(1000);
@@ -660,7 +659,7 @@ public class TestTcpServer
                 connected |= tcpChannel.isConnected();
                 if (j == MAX_TRIES)
                 {
-                    assertFalse("Not CLOSED at index " + i + ", " + tcpChannel.toString(), connected);
+                    assertFalse("Not CLOSED at index " + i + ", " + tcpChannel, connected);
                 }
             }
             if (!connected)
@@ -680,7 +679,7 @@ public class TestTcpServer
 
         this.server = new TcpServer(LOCALHOST, PORT, new NoopReceiver()
         {
-            Map<ITransportChannel, Integer> lastValue = new HashMap<ITransportChannel, Integer>();
+            final Map<ITransportChannel, Integer> lastValue = new HashMap<>();
 
             @Override
             public void onDataReceived(ByteBuffer data, ITransportChannel source)
@@ -704,7 +703,7 @@ public class TestTcpServer
             }
         }, this.frameEncodingFormat);
 
-        List<TcpChannel> clients = new ArrayList<TcpChannel>(clientCount);
+        List<TcpChannel> clients = new ArrayList<>(clientCount);
         for (int i = 0; i < clientCount; i++)
         {
             clients.add(new TcpChannel(LOCALHOST, PORT, noopReceiver, this.frameEncodingFormat));
@@ -864,7 +863,7 @@ public class TestTcpServer
         ChannelUtils.WATCHDOG.configure(1000);
         final CountDownLatch channelConnectedLatch = new CountDownLatch(1);
         final CountDownLatch dataLatch = new CountDownLatch(1);
-        final AtomicReference<byte[]> dataRef = new AtomicReference<byte[]>();
+        final AtomicReference<byte[]> dataRef = new AtomicReference<>();
         EchoReceiver clientSocketReceiver = new EchoReceiver();
         this.server = new TcpServer(LOCALHOST, PORT, clientSocketReceiver, this.frameEncodingFormat);
         TcpChannel client = new TcpChannel(LOCALHOST, PORT, new NoopReceiver()
@@ -949,8 +948,8 @@ public class TestTcpServer
         assertTrue(connectionHistogram1.get(0L) > 1);
         assertTrue(connectionHistogram1.get(10L) > 1);
         assertTrue(connectionHistogram1.get(20L) > 1);
-        assertTrue(connectionHistogram1.get(30L) == 1);
-        assertTrue(connectionHistogram1.get(3600L) == 1);
+        assertEquals(1, (long) connectionHistogram1.get(30L));
+        assertEquals(1, (long) connectionHistogram1.get(3600L));
 
         // check the grace period filter
         final Map<Long, Long> connectionHistogram2 = TcpServer.getConnectionHistogram(
@@ -963,7 +962,7 @@ public class TestTcpServer
         assertTrue(connectionHistogram1.get(0L) > connectionHistogram2.get(0L));
         assertTrue(connectionHistogram1.get(10L) > connectionHistogram2.get(10L));
         assertTrue(connectionHistogram1.get(20L) > connectionHistogram2.get(20L));
-        assertTrue(connectionHistogram1.get(30L) == 1);
-        assertTrue(connectionHistogram1.get(3600L) == 1);
+        assertEquals(1, (long) connectionHistogram1.get(30L));
+        assertEquals(1, (long) connectionHistogram1.get(3600L));
     }
 }
