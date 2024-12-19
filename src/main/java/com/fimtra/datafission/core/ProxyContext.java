@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1039,68 +1038,38 @@ public final class ProxyContext implements IObserverContext
      */
     public IRecord getRemoteRecordImage(final String recordName, long timeoutMillis)
     {
-        /*
-         * A more efficient way to get a remote record image, this uses an RPC to get the image as a map,
-         * the benefit here is that the RPC will return almost immediately if there is no record.
-         * The original way (still supported) suffers from a timeout that has to be absorbed if there is
-         *  no record that exists.
-         */
-        final IRpcInstance rpc = getRpc(Context.GET_REMOTE_RECORD_RPC);
-        if (rpc != null)
+         // use record image subscribe - has drawbacks of a long timeout if there is no record...
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicReference<IRecord> image = new AtomicReference<>();
+        final IRecordListener observer = (imageCopy, atomicChange) -> {
+            if (latch.getCount() != 0)
+            {
+                image.set(ImmutableSnapshotRecord.create(imageCopy));
+                if (!imageCopy.isEmpty())
+                {
+                    latch.countDown();
+                }
+            }
+        };
+        addObserver(observer, recordName);
+        try
         {
-            try
+            if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS))
             {
-                rpc.setRemoteExecutionStartTimeoutMillis(timeoutMillis);
-                rpc.setRemoteExecutionDurationTimeoutMillis(timeoutMillis);
-                final IValue info = rpc.execute(TextValue.valueOf(recordName));
-                if (info != null)
-                {
-                    final Record template = new Record(recordName, new HashMap<>(), this.context.noopChangeManager);
-                    template.resolveFromStream(new StringReader(info.textValue()));
-                    return new ImmutableRecord(template);
-                }
+                Log.log(this, "Got no response to getRemoteRecordImage for: ", recordName,
+                        " after waiting ", Long.toString(timeoutMillis), "ms");
             }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not get record image for " + recordName, e);
-            }
-            return null;
         }
-        else
+        catch (InterruptedException e)
         {
-            // its pre 3.16.4 - use old record image subscribe (which has drawbacks of a long timeout if there is no service info record)
-            final CountDownLatch latch = new CountDownLatch(1);
-            final AtomicReference<IRecord> image = new AtomicReference<>();
-            final IRecordListener observer = (imageCopy, atomicChange) -> {
-                if (latch.getCount() != 0)
-                {
-                    image.set(ImmutableSnapshotRecord.create(imageCopy));
-                    if (!imageCopy.isEmpty())
-                    {
-                        latch.countDown();
-                    }
-                }
-            };
-            addObserver(observer, recordName);
-            try
-            {
-                if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS))
-                {
-                    Log.log(this, "Got no response to getRemoteRecordImage for: ", recordName,
-                            " after waiting ", Long.toString(timeoutMillis), "ms");
-                }
-            }
-            catch (InterruptedException e)
-            {
-                ExceptionUtils.handleInterruptedException(this, e,
-                        "Interrupted whilst waiting for record: " + recordName);
-            }
-            finally
-            {
-                removeObserver(observer, recordName);
-            }
-            return image.get();
+            ExceptionUtils.handleInterruptedException(this, e,
+                    "Interrupted whilst waiting for record: " + recordName);
         }
+        finally
+        {
+            removeObserver(observer, recordName);
+        }
+        return image.get();
     }
 
     @Override
@@ -1388,7 +1357,7 @@ public final class ProxyContext implements IObserverContext
 
         if (changeName.charAt(0) == ContextUtils.PROTOCOL_PREFIX)
         {
-            final Boolean subscribeResult = changeName.startsWith(ACK, 0);
+            final boolean subscribeResult = changeName.startsWith(ACK, 0);
             if (subscribeResult || changeName.startsWith(NOK, 0))
             {
                 handleSubscribeResult(changeToApply, changeName, subscribeResult);
@@ -1497,7 +1466,7 @@ public final class ProxyContext implements IObserverContext
                 }
             }
             finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
-                new String[] { substituteRemoteNameWithLocalName(name) }));
+                    substituteRemoteNameWithLocalName(name)));
 
             return true;
         }
@@ -1537,13 +1506,14 @@ public final class ProxyContext implements IObserverContext
                 {
                     // only subscribe for the RPC record "on demand"
                     this.context.createRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                    this.context.addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange),
+                    addObserver((image, atomicChange) -> updateRpcTemplates(atomicChange),
                             IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
                 }
             }
             try
             {
-                return ContextUtils.getRpc(this, reconnectPeriodMillis, name);
+                return ContextUtils.getRpcWithSubscribeCheck(this,
+                        DataFissionProperties.Values.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, name);
             }
             catch (IRpcInstance.TimeOutException e)
             {

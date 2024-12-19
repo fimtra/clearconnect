@@ -16,9 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -63,7 +61,6 @@ import com.fimtra.util.FileUtils;
 import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
-import com.fimtra.util.StringAppenderWriter;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
@@ -98,8 +95,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * </ul>
      */
     public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
-
-    static final String GET_REMOTE_RECORD_RPC = "getRemoteRecord";
 
     static final AtomicInteger eventCount = new AtomicInteger();
 
@@ -396,33 +391,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         createSystemRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         this.active = true;
-
-        // create AFTER setting active
-        createGetRemoteRecordImageAsMapRpc();
-    }
-
-    private void createGetRemoteRecordImageAsMapRpc()
-    {
-        final RpcInstance rpc =
-                new RpcInstance(IValue.TypeEnum.TEXT, GET_REMOTE_RECORD_RPC, IValue.TypeEnum.TEXT);
-        rpc.setHandler(args -> {
-            IRecord record = getRecord(args[0].textValue());
-            if (record != null)
-            {
-                try
-                {
-                    final StringAppenderWriter sw = new StringAppenderWriter(1024);
-                    ContextUtils.serializeRecordMapToStream(sw, record.asFlattenedMap());
-                    return TextValue.valueOf(sw.toString());
-                }
-                catch (IOException e)
-                {
-                    throw new IRpcInstance.ExecutionException(e);
-                }
-            }
-            return null;
-        });
-        createRpc(rpc);
     }
 
     private Record createSystemRecord(String recordName)
