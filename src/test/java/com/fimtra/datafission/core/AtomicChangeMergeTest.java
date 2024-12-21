@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -128,6 +129,31 @@ public class AtomicChangeMergeTest
         assertEquals(this.put1, result.getPutEntries());
         assertEquals(this.overwritten1, result.getOverwrittenEntries());
         assertEquals(this.removed1, result.getRemovedEntries());
+    }
+
+    @Test
+    public void testMergeAtomicChanges_allRemoves()
+    {
+        HashMap<String, IValue> removedEntries = new HashMap<>();
+        removedEntries.put(k[0], v[0]);
+        this.changes.add(new AtomicChange(this.name, this.put1, this.overwritten1, removedEntries));
+
+        removedEntries = new HashMap<>();
+        removedEntries.put(k[1], v[1]);
+        this.changes.add(new AtomicChange(this.name, this.put1, this.overwritten1, removedEntries));
+
+        // blank change
+        AtomicChange result = createCandidate(this.name);
+
+        result.coalesce(this.changes);
+
+        this.removed1.put(k[0], v[0]);
+        this.removed1.put(k[1], v[1]);
+
+        assertEquals(this.name, result.getName());
+        assertNull(result.putEntries);
+        assertNull(result.overwrittenEntries);
+        assertEquals(this.removed1, result.removedEntries);
     }
 
     @Test

@@ -16,7 +16,9 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,5 +86,23 @@ public class CollectionUtilsTest
         final Map m = new HashMap();
         assertSame(m, CollectionUtils.emptyIfNull(m));
         assertSame(Collections.EMPTY_MAP, CollectionUtils.emptyIfNull(null));
+    }
+
+    @Test
+    public void noopMap()
+    {
+        final Map<String, String> m = CollectionUtils.noopMap();
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
+
+        assertNull(m.put("one", "two"));
+        assertNull(m.put("one", "two"));
+        // will still be empty
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
+
+        assertNull(m.remove("one"));
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
     }
 }

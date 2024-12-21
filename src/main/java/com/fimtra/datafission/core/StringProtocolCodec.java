@@ -43,7 +43,6 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
-import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringAppender;
@@ -340,7 +339,8 @@ public class StringProtocolCodec implements ICodec<char[]>
                                         stringFromCharBuffer(decodedMessage, bijTokenOffset[0][i], bijTokenLimit[0][i]);
                                     break;
                                 default :
-                                    break;
+                                    throw new IllegalArgumentException(
+                                            "Unknown code: " + decodedMessage[bijTokenOffset[0][i]]);
                             }
                         }
                         else
@@ -361,7 +361,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     {
                                         if (put)
                                         {
-                                            target.addEntry_onlyCallFromCodec(
+                                            target.putEntries.put(
                                                     decodeKey(decodedMessage, position, j, true,
                                                             decodingBuffers.tempArr),
                                                     decodeValue(decodedMessage, j + 1, len,
@@ -369,7 +369,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                                         }
                                         else
                                         {
-                                            target.removeEntry_onlyCallFromCodec(
+                                            target.removedEntries.put(
                                                     decodeKey(decodedMessage, position, j, true,
                                                             decodingBuffers.tempArr),
                                                     decodeValue(decodedMessage, j + 1, len,

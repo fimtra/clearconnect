@@ -15,10 +15,12 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.util.CollectionUtils.newMap;
+import static com.fimtra.util.CollectionUtils.newSet;
+import static com.fimtra.util.CollectionUtils.noopMap;
+
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -39,11 +41,12 @@ import com.fimtra.util.is;
  */
 public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
-    private static final Long SEQ_INIT = Long.valueOf(-1);
+    private static final Long SEQ_INIT = (long) -1;
 
-    static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(new HashMap<>(0));
+    private static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(newMap(0));
+    private static final Map<String, IValue> NOOP_MAP = noopMap();
 
-    final static IRecordChange NULL_CHANGE = new IRecordChange()
+    private static final IRecordChange NULL_CHANGE = new IRecordChange()
     {
         @Override
         public boolean isEmpty()
@@ -131,11 +134,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
     };
 
-    static <K, V> Map<K, V> newMap()
-    {
-        return new HashMap<>();
-    }
-
     final String name;
     AtomicReference<Character> scope = new AtomicReference<>(DELTA_SCOPE);
     AtomicReference<Long> sequence = new AtomicReference<>(SEQ_INIT);
@@ -160,14 +158,17 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         this(image.getName());
         synchronized (image.getWriteLock())
         {
-            internalGetPutEntries().putAll(image);
+            if (!image.isEmpty())
+            {
+                internalGetPutEntries().putAll(image);
+            }
             for (String subMapKey : image.getSubMapKeys())
             {
                 internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
                         image.getOrCreateSubMap(subMapKey));
             }
             this.scope.set(IMAGE_SCOPE);
-            this.sequence.set(Long.valueOf(image.getSequence()));
+            this.sequence.set(image.getSequence());
         }
     }
 
@@ -199,7 +200,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         try
         {
-            this.context.doPublishChange(this.name, this, this.sequence.get().longValue());
+            this.context.doPublishChange(this.name, this, this.sequence.get());
         }
         finally
         {
@@ -229,7 +230,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(internalGetPutEntries());
+        return Collections.unmodifiableMap(putEntries);
     }
 
     @Override
@@ -239,7 +240,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(internalGetOverwrittenEntries());
+        return Collections.unmodifiableMap(overwrittenEntries);
     }
 
     @Override
@@ -249,7 +250,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(internalGetRemovedEntries());
+        return Collections.unmodifiableMap(removedEntries);
     }
 
     @Override
@@ -310,11 +311,11 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     @Override
     public void coalesce(List<IRecordChange> subsequentChanges)
     {
-        final Map<String, IValue> putEntries = newMap();
-        final Map<String, IValue> overwrittenEntries = newMap();
-        final Map<String, IValue> removedEntries = newMap();
-        final Set<String> ultimatelyRemovedKeys = new HashSet<>();
-        final Set<String> ultimatelyAddedKeys = new HashSet<>();
+        Map<String, IValue> putEntries = null;
+        Map<String, IValue> overwrittenEntries = null;
+        Map<String, IValue> removedEntries = null;
+        Set<String> ultimatelyRemovedKeys = null;
+        Set<String> ultimatelyAddedKeys = null;
         Map<String, IValue> newPutEntries;
         Map<String, IValue> newOverwrittenEntries;
         Map<String, IValue> newRemovedEntries;
@@ -330,8 +331,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         subsequentChanges.add(0, this);
 
         boolean isImage = false;
-        boolean newPutEntriesSizeGreaterThan0;
-        boolean newRemovedEntriesSizeGreaterThan0;
+        boolean newPutEntriesExist;
         // process the changes in order, building up an aggregated atomic change
         for (IRecordChange subsequentChange : subsequentChanges)
         {
@@ -347,9 +347,13 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 
             if (subsequentChange instanceof AtomicChange)
             {
-                newPutEntries = ((AtomicChange) subsequentChange).internalGetPutEntries();
-                newOverwrittenEntries = ((AtomicChange) subsequentChange).internalGetOverwrittenEntries();
-                newRemovedEntries = ((AtomicChange) subsequentChange).internalGetRemovedEntries();
+                // on-demand assignment of collections
+                final AtomicChange atomicChange = (AtomicChange) subsequentChange;
+                newPutEntries = atomicChange.putEntries == null ? NOOP_MAP : atomicChange.putEntries;
+                newOverwrittenEntries =
+                        atomicChange.overwrittenEntries == null ? NOOP_MAP : atomicChange.overwrittenEntries;
+                newRemovedEntries =
+                        atomicChange.removedEntries == null ? NOOP_MAP : atomicChange.removedEntries;
             }
             else
             {
@@ -358,41 +362,47 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 newRemovedEntries = subsequentChange.getRemovedEntries();
             }
 
-            newPutEntriesSizeGreaterThan0 = !newPutEntries.isEmpty();
-            newRemovedEntriesSizeGreaterThan0 = !newRemovedEntries.isEmpty();
+            newPutEntriesExist = !newPutEntries.isEmpty();
 
-            // NOTE: it is not possible to optimise this by grouping by the put/remove size > 0
-            // checks - the order of adding/removing must be maintained to ensure the
-            // ultimatelyAdded/Removed keys are correct
-            if (newPutEntriesSizeGreaterThan0)
+            // NOTE: it is NOT possible to optimise this by grouping all the put/remove size > 0 checks as
+            //       the order of adding/removing must be maintained to ensure the ultimatelyAdded/Removed
+            //       keys are correct
+            if (newPutEntriesExist)
             {
-                putEntries.putAll(newPutEntries);
-            }
-            if (!newOverwrittenEntries.isEmpty())
-            {
-                overwrittenEntries.putAll(newOverwrittenEntries);
-            }
-            if (newRemovedEntriesSizeGreaterThan0)
-            {
-                removedEntries.putAll(newRemovedEntries);
-            }
+                // on-demand assignment of collections
+                (putEntries == null ? (putEntries = newMap()) : putEntries).putAll(newPutEntries);
+                (ultimatelyAddedKeys == null ? (ultimatelyAddedKeys = newSet()) : ultimatelyAddedKeys).addAll(
+                        newPutEntries.keySet());
 
-            if (newPutEntriesSizeGreaterThan0)
-            {
-                ultimatelyAddedKeys.addAll(newPutEntries.keySet());
+                // overwritten entries cannot exist if there is no put so we only check for new put entries
+                if (!newOverwrittenEntries.isEmpty())
+                {
+                    (overwrittenEntries == null ? (overwrittenEntries = newMap()) : overwrittenEntries).putAll(
+                            newOverwrittenEntries);
+                }
             }
-            if (newRemovedEntriesSizeGreaterThan0)
+            // handle any newly removed entries
+            if (!newRemovedEntries.isEmpty())
             {
-                ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
-            }
+                // on-demand assignment of collections
+                (removedEntries == null ? (removedEntries = newMap()) : removedEntries).putAll(
+                        newRemovedEntries);
+                (ultimatelyRemovedKeys == null ? (ultimatelyRemovedKeys = newSet()) :
+                        ultimatelyRemovedKeys).addAll(newRemovedEntries.keySet());
 
-            if (newRemovedEntriesSizeGreaterThan0)
-            {
-                ultimatelyRemovedKeys.addAll(newRemovedEntries.keySet());
+                // remove new removed entries from ultimatelyAddedKeys
+                if (ultimatelyAddedKeys != null)
+                {
+                    ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
+                }
             }
-            if (newPutEntriesSizeGreaterThan0)
+            // remove new put entries from ultimatelyRemovedKeys - MUST do this AFTER checking new removes
+            if (newPutEntriesExist)
             {
-                ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
+                if (ultimatelyRemovedKeys != null)
+                {
+                    ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
+                }
             }
 
             // build up the map of the list of sub-map changes, keyed by sub-map key
@@ -415,21 +425,31 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
 
         // determine what keys were ultimately added - remove them from the removedEntries
-        if (!ultimatelyRemovedKeys.isEmpty())
+        if (ultimatelyAddedKeys != null )
         {
-            ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
-            // remove any puts/overwritten that were ultimately removed
-            for (String removedKey : ultimatelyRemovedKeys)
+            if (ultimatelyRemovedKeys != null)
             {
-                putEntries.remove(removedKey);
-                overwrittenEntries.remove(removedKey);
+                ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
+
+                // remove any puts/overwritten that were ultimately removed
+                for (String removedKey : ultimatelyRemovedKeys)
+                {
+                    putEntries.remove(removedKey);
+                }
+                if (overwrittenEntries != null)
+                {
+                    for (String removedKey : ultimatelyRemovedKeys)
+                    {
+                        overwrittenEntries.remove(removedKey);
+                    }
+                }
             }
-        }
-        if (!ultimatelyAddedKeys.isEmpty())
-        {
-            for (String addedKey : ultimatelyAddedKeys)
+            if (removedEntries != null)
             {
-                removedEntries.remove(addedKey);
+                for (String addedKey : ultimatelyAddedKeys)
+                {
+                    removedEntries.remove(addedKey);
+                }
             }
         }
 
@@ -458,53 +478,65 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     @Override
     public void setScope(char scope)
     {
-        this.scope.set(Character.valueOf(scope));
+        this.scope.set(scope);
     }
 
     @Override
     public void setSequence(long sequence)
     {
-        this.sequence.set(Long.valueOf(sequence));
+        this.sequence.set(sequence);
     }
 
     @Override
     public char getScope()
     {
-        return this.scope.get().charValue();
+        return this.scope.get();
     }
 
     @Override
     public long getSequence()
     {
-        return this.sequence.get().longValue();
+        return this.sequence.get();
     }
 
     void mergeBulkChanges(ThreadLocalBulkChanges changes)
     {
-        final Map<String, IValue> internalPutEntries = internalGetPutEntries();
-        final Map<String, IValue> internalOverwrittenEntries = internalGetOverwrittenEntries();
-        final Map<String, IValue> internalRemovedEntries = internalGetRemovedEntries();
-
-        for (int i = 0; i < changes.putSize; i++)
+        synchronized (this)
         {
-            internalPutEntries.put(changes.putKeys[i], changes.putValues[i][0]);
-            if (changes.putValues[i][1] != null)
+            // on-demand assignment of collections
+            final Map<String, IValue> _putEntries = noPutEntries() ?
+                    (changes.putSize > 0 ? (putEntries = newMap()) : NOOP_MAP) : putEntries;
+            final Map<String, IValue> _removedEntries = noRemovedEntries() ?
+                    (changes.removedSize > 0 ? (removedEntries = newMap()) : NOOP_MAP) :
+                    removedEntries;
+
+            for (int i = 0; i < changes.putSize; i++)
             {
-                internalOverwrittenEntries.put(changes.putKeys[i], changes.putValues[i][1]);
+                _putEntries.put(changes.putKeys[i], changes.putValues[i][0]);
+                if (changes.putValues[i][1] != null)
+                {
+                    if (overwrittenEntries == null)
+                    {
+                        overwrittenEntries = newMap();
+                    }
+                    overwrittenEntries.put(changes.putKeys[i], changes.putValues[i][1]);
+                }
+                // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
+                // a put MUST overrule any previous remove, otherwise the atomic change has a put +
+                // remove which can cause problems if the put vs removes are applied in different
+                // orders
+                _removedEntries.remove(changes.putKeys[i]);
             }
-            // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
-            // a put MUST overrule any previous remove, otherwise the atomic change has a put +
-            // remove which can cause problems if the put vs removes are applied in different
-            // orders
-            internalRemovedEntries.remove(changes.putKeys[i]);
-        }
 
-        // now do removes
-        for (int i = 0; i < changes.removedSize; i++)
-        {
-            internalPutEntries.remove(changes.removedKeys[i]);
-            internalOverwrittenEntries.remove(changes.removedKeys[i]);
-            internalRemovedEntries.put(changes.removedKeys[i], changes.removedValues[i]);
+            // now do removes
+            final Map<String, IValue> _overwrittenEntries =
+                    noOverwrittenEntries() ? NOOP_MAP : overwrittenEntries;
+            for (int i = 0; i < changes.removedSize; i++)
+            {
+                _putEntries.remove(changes.removedKeys[i]);
+                _overwrittenEntries.remove(changes.removedKeys[i]);
+                _removedEntries.put(changes.removedKeys[i], changes.removedValues[i]);
+            }
         }
     }
 
@@ -523,24 +555,24 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         // VERY IMPORTANT: when adding a field, if the atomic change has not been completed, a put
         // MUST overrule any previous remove, otherwise the atomic change has a put + remove which
         // can cause problems if the put vs removes are applied in different orders
-        internalGetRemovedEntries().remove(key);
-    }
-
-    void addEntry_onlyCallFromCodec(String key, IValue current)
-    {
-        this.putEntries.put(key, current);
+        if (removedEntries != null)
+        {
+            removedEntries.remove(key);
+        }
     }
 
     void mergeEntryRemovedChange(String key, IValue value)
     {
-        internalGetPutEntries().remove(key);
-        internalGetOverwrittenEntries().remove(key);
+        if (putEntries != null)
+        {
+            putEntries.remove(key);
+        }
+        if (overwrittenEntries != null)
+        {
+            overwrittenEntries.remove(key);
+        }
+        // putting needs the map to exist!
         internalGetRemovedEntries().put(key, value);
-    }
-
-    void removeEntry_onlyCallFromCodec(String key, IValue value)
-    {
-        this.removedEntries.put(key, value);
     }
 
     void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
@@ -561,11 +593,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
         synchronized (this)
         {
-            if (this.putEntries == null)
-            {
-                this.putEntries = newMap();
-            }
-            return this.putEntries;
+            return (putEntries == null ? (putEntries = newMap()) : putEntries);
         }
     }
 
@@ -577,11 +605,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
         synchronized (this)
         {
-            if (this.removedEntries == null)
-            {
-                this.removedEntries = newMap();
-            }
-            return this.removedEntries;
+            return (removedEntries == null ? (removedEntries = newMap()) : removedEntries);
         }
     }
 
@@ -593,11 +617,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
         synchronized (this)
         {
-            if (this.overwrittenEntries == null)
-            {
-                this.overwrittenEntries = newMap();
-            }
-            return this.overwrittenEntries;
+            return (overwrittenEntries == null ? (overwrittenEntries = newMap()) : overwrittenEntries);
         }
     }
 
@@ -673,7 +693,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             // user code should not be able to set sequences, hence the instance-of check
             if (record instanceof Record)
             {
-                ((Record) record).setSequence(this.sequence.get().longValue());
+                ((Record) record).setSequence(this.sequence.get());
             }
 
             applyTo(record);

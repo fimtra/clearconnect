@@ -216,8 +216,97 @@ public abstract class CollectionUtils
     {
         if (map == null)
         {
-            return Collections.EMPTY_MAP;
+            return Collections.emptyMap();
         }
         return map;
+    }
+
+    /**
+     * A {@link Map} implementation that does not throw exceptions for mutation operations. Returns true for
+     * {@link Map#isEmpty()}
+     *
+     * @return A "noop" map implementation
+     */
+    public static <K, V> Map<K, V> noopMap()
+    {
+        return new Map<K, V>()
+        {
+            @Override
+            public int size()
+            {
+                return 0;
+            }
+
+            @Override
+            public boolean isEmpty()
+            {
+                return true;
+            }
+
+            @Override
+            public boolean containsKey(Object key)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean containsValue(Object value)
+            {
+                return false;
+            }
+
+            @Override
+            public V get(Object key)
+            {
+                return null;
+            }
+
+            @Override
+            public V put(K key, V value)
+            {
+                return null;
+            }
+
+            @Override
+            public V remove(Object key)
+            {
+                return null;
+            }
+
+            @Override
+            public void putAll(Map<? extends K, ? extends V> m)
+            {
+                // noop
+            }
+
+            @Override
+            public void clear()
+            {
+                // noop
+            }
+
+            @Override
+            public Set<K> keySet()
+            {
+                return Collections.emptySet();
+            }
+
+            @Override
+            public Collection<V> values()
+            {
+                return Collections.emptyList();
+            }
+
+            @Override
+            public Set<Entry<K, V>> entrySet()
+            {
+                return Collections.emptySet();
+            }
+        };
+    }
+
+    public static <T> Set<T> newSet()
+    {
+        return new HashSet<>();
     }
 }
