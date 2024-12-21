@@ -144,7 +144,7 @@ public class ProxyContextTest
         doSetup();
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        this.candidate.setReconnectPeriodMillis(200);
+        setupTimeoutPeriods();
         // wait for connection
         int i = 0;
         while (!this.candidate.isConnected() && i++ < 200)
@@ -297,7 +297,7 @@ public class ProxyContextTest
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
 
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        this.candidate.setReconnectPeriodMillis(200);
+        setupTimeoutPeriods();
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         Future<Map<String, Boolean>> addObserverLatch =
@@ -315,6 +315,13 @@ public class ProxyContextTest
 
         assertEquals(1, addObserverLatch.get(10, TimeUnit.SECONDS)
                 .size());
+    }
+
+    private void setupTimeoutPeriods()
+    {
+        final int timoutMilli = 100;
+        this.candidate.setReconnectPeriodMillis(timoutMilli);
+        this.candidate.setRpcSubscribeTimeoutMillis(timoutMilli);
     }
 
     private void revivePublisher() throws InterruptedException
@@ -1057,7 +1064,7 @@ public class ProxyContextTest
 
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        this.candidate.setReconnectPeriodMillis(200);
+        setupTimeoutPeriods();
         
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
@@ -1934,7 +1941,7 @@ public class ProxyContextTest
         final String rpcName = "RPC_FOR_testPublisherBounced";
         this.context.createRpc(new RpcInstance(TypeEnum.TEXT, rpcName));
 
-        this.candidate.setReconnectPeriodMillis(100);
+        setupTimeoutPeriods();
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(UPDATE_COUNT);
         this.candidate.addObserver(observer, record1);

@@ -770,6 +770,11 @@ public final class ProxyContext implements IObserverContext
      */
     int reconnectPeriodMillis = DataFissionProperties.Values.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS;
     /**
+     * Period for waiting for RPC subscribe results, default is
+     * {@link Values#RPC_EXECUTION_DURATION_TIMEOUT_MILLIS}
+     */
+    long rpcSubscribeTimeoutMillis = DataFissionProperties.Values.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS;
+    /**
      * A flag that allows receivers to know whether their channel is still valid for the context;
      * when a socket disconnects, the receiver is still attached to the socket and the proxy - we
      * don't want this receiver to invoke events on the proxy as they are no longer valid.
@@ -994,6 +999,17 @@ public final class ProxyContext implements IObserverContext
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
     {
         this.reconnectPeriodMillis = Math.max(reconnectPeriodMillis, MINIMUM_RECONNECT_PERIOD_MILLIS);
+    }
+
+    /**
+     * Set the period to wait for RPC subscribe responses.
+     *
+     * @param rpcSubscribeTimeoutMillis the period in millis to wait for a RPC subscribe response
+     * @see #getRpc(String)
+     */
+    public void setRpcSubscribeTimeoutMillis(int rpcSubscribeTimeoutMillis)
+    {
+        this.rpcSubscribeTimeoutMillis = rpcSubscribeTimeoutMillis;
     }
 
     /**
@@ -1512,8 +1528,7 @@ public final class ProxyContext implements IObserverContext
             }
             try
             {
-                return ContextUtils.getRpcWithSubscribeCheck(this,
-                        DataFissionProperties.Values.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, name);
+                return ContextUtils.getRpcWithSubscribeCheck(this, rpcSubscribeTimeoutMillis, name);
             }
             catch (IRpcInstance.TimeOutException e)
             {
