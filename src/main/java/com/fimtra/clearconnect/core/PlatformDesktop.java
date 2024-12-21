@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -307,7 +308,7 @@ class PlatformDesktop
             this.model = new ColumnOrientedRecordTableModel();
             this.table = new ColumnOrientedRecordTable(this.model);
 
-            this.subscribedRecords = new ConcurrentHashMap<String, String>().keySet();
+            this.subscribedRecords = Collections.synchronizedSet(new HashSet<>());
             this.model.addRecordRemovedListener(this.context);
 
             this.context.addObserver(this.sessionId, this.statusObserver, ISystemRecordNames.CONTEXT_STATUS);
