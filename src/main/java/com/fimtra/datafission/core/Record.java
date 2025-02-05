@@ -293,24 +293,18 @@ final class Record implements IRecord, Cloneable
             {
                 previous = this.data.put(internKey, value);
                 // if there is no change, we perform no update
-                if (this.context != null)
+                if (previous == null || !previous.equals(value))
                 {
-                    if (previous == null || !previous.equals(value))
-                    {
-                        this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
-                    }
+                    this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
                 }
             }
             else
             {
                 // a null is treated as if it removes the key
                 previous = this.data.remove(internKey);
-                if (this.context != null)
+                if (previous != null)
                 {
-                    if (previous != null)
-                    {
-                        this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
-                    }
+                    this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
                 }
             }
             return previous;
@@ -391,29 +385,23 @@ final class Record implements IRecord, Cloneable
                     {
                         previous = this.data.put(internKey, value);
                         // if there is no change, we perform no update
-                        if (this.context != null)
+                        if (previous == null || !previous.equals(value))
                         {
-                            if (previous == null || !previous.equals(value))
-                            {
-                                changes.putKeys[putPtr] = internKey;
-                                changes.putValues[putPtr][0] = value;
-                                changes.putValues[putPtr][1] = previous;
-                                putPtr++;
-                            }
+                            changes.putKeys[putPtr] = internKey;
+                            changes.putValues[putPtr][0] = value;
+                            changes.putValues[putPtr][1] = previous;
+                            putPtr++;
                         }
                     }
                     else
                     {
                         // a null is treated as if it removes the key
                         previous = this.data.remove(internKey);
-                        if (this.context != null)
+                        if (previous != null)
                         {
-                            if (previous != null)
-                            {
-                                changes.removedKeys[removePtr] = internKey;
-                                changes.removedValues[removePtr] = previous;
-                                removePtr++;
-                            }
+                            changes.removedKeys[removePtr] = internKey;
+                            changes.removedValues[removePtr] = previous;
+                            removePtr++;
                         }
                     }
                 }
@@ -497,11 +485,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public String getContextName()
     {
-        if (this.context != null)
-        {
-            return this.context.getName();
-        }
-        return "";
+        return this.context.getName();
     }
 
     @Override
@@ -648,26 +632,17 @@ final class Record implements IRecord, Cloneable
 
     void addEntryRemovedToAtomicChange(String key, final IValue value)
     {
-        if (this.context != null)
-        {
-            this.context.addEntryRemovedToAtomicChange(this, key, value);
-        }
+        this.context.addEntryRemovedToAtomicChange(this, key, value);
     }
 
     void addSubMapEntryUpdatedToAtomicChange(String subMapKey, String key, final IValue current, IValue previous)
     {
-        if (this.context != null)
-        {
-            this.context.addSubMapEntryUpdatedToAtomicChange(this, subMapKey, key, current, previous);
-        }
+        this.context.addSubMapEntryUpdatedToAtomicChange(this, subMapKey, key, current, previous);
     }
 
     void addSubMapEntryRemovedToAtomicChange(String subMapKey, String key, final IValue value)
     {
-        if (this.context != null)
-        {
-            this.context.addSubMapEntryRemovedToAtomicChange(this, subMapKey, key, value);
-        }
+        this.context.addSubMapEntryRemovedToAtomicChange(this, subMapKey, key, value);
     }
 
     void setSequence(long sequence)
