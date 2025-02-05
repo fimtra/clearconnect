@@ -95,6 +95,17 @@ public class ValueTest
         doConvertTest(new TextValue(TextValue.NULL));
     }
 
+    @Test
+    public void test_constructFromCharValue()
+    {
+        assertEquals(DoubleValue.valueOf(Double.POSITIVE_INFINITY),
+                AbstractValue.constructFromCharValue("DInfinity".toCharArray(), 9));
+        assertEquals(DoubleValue.valueOf(Double.NEGATIVE_INFINITY),
+                AbstractValue.constructFromCharValue("D-Infinity".toCharArray(), 10));
+        assertEquals(DoubleValue.valueOf(Double.NaN),
+                AbstractValue.constructFromCharValue("DNaN".toCharArray(), 4));
+    }
+
     public void doConvertTest(IValue v)
     {
         final char[] chars = v.toString().toCharArray();

@@ -84,15 +84,16 @@ class DoubleValueCodec
     private static final double[] BIG_10_POW = { 1e16, 1e32, 1e64, 1e128, 1e256 };
     private static final double[] TINY_10_POW = { 1e-16, 1e-32, 1e-64, 1e-128, 1e-256 };
 
-    private static final char[] INFINITY_REP = "Infinity".toCharArray();
-    private static final char[] NEG_INFINITY = ("-" + new String(INFINITY_REP)).toCharArray();
-    private static final int INFINITY_LENGTH = INFINITY_REP.length;
-    private static final char[] NAN_REP = "NaN".toCharArray();
-    private static final int NAN_LENGTH = NAN_REP.length;
+    private static final char[] INFINITY = "Infinity".toCharArray();
+    private static final char[] NEG_INFINITY = ("-" + new String(INFINITY)).toCharArray();
+    private static final int INFINITY_LENGTH = INFINITY.length;
+    private static final int NEG_INFINITY_LENGTH = NEG_INFINITY.length;
+    private static final char[] NAN = "NaN".toCharArray();
+    private static final int NAN_LENGTH = NAN.length;
 
-    private static final Consumer<StringAppender> D2S_POSITIVE_INFINITY = sa -> sa.append(INFINITY_REP);
+    private static final Consumer<StringAppender> D2S_POSITIVE_INFINITY = sa -> sa.append(INFINITY);
     private static final Consumer<StringAppender> D2S_NEGATIVE_INFINITY = sa -> sa.append(NEG_INFINITY);
-    private static final Consumer<StringAppender> D2S_NOT_A_NUMBER = sa -> sa.append(NAN_REP);
+    private static final Consumer<StringAppender> D2S_NOT_A_NUMBER = sa -> sa.append(NAN);
     private static final Consumer<StringAppender> D2S_POSITIVE_ZERO = new DoubleToString(false, new char[] { '0' });
     private static final Consumer<StringAppender> D2S_NEGATIVE_ZERO = new DoubleToString(true, new char[] { '0' });
 
@@ -823,9 +824,9 @@ class DoubleValueCodec
             }
             else if (c == 'I')
             {
-                // Check for Infinity
-                if ((len - i) == INFINITY_LENGTH && in[i + 1] == 'n' && in[i + 2] == 'f' && in[i + 3] == 'i'
-                        && in[i + 4] == 'n' && in[i + 5] == 'i' && in[i + 6] == 't' && in[i + 7] == 'y')
+                if ((isNegative ? len == NEG_INFINITY_LENGTH : len == INFINITY_LENGTH) && in[i + 1] == 'n'
+                        && in[i + 2] == 'f' && in[i + 3] == 'i' && in[i + 4] == 'n' && in[i + 5] == 'i'
+                        && in[i + 6] == 't' && in[i + 7] == 'y')
                 {
                     return isNegative ? S2D_NEGATIVE_INFINITY.get() : S2D_POSITIVE_INFINITY.get();
                 }
@@ -1258,7 +1259,7 @@ class DoubleValueCodec
                 if (Double.isInfinite(t))
                 {
                     // todo not executed in unit tests
-                    
+
                     //
                     // It did overflow.
                     // Look more closely at the result.
@@ -1465,7 +1466,7 @@ class DoubleValueCodec
                 if ((bigIntNBits == 1) && (bigIntExp > -DoubleConsts.EXP_BIAS + 1))
                 {
                     // todo not executed in unit tests
-                    
+
                     // candidate is a normalized exact power of 2 and
                     // is too big (larger than Double.MIN_NORMAL). We will be subtracting.
                     // For our purposes, ulp is the ulp of the
@@ -1501,7 +1502,7 @@ class DoubleValueCodec
             else if (cmpResult == 0)
             {
                 // todo not executed in unit tests
-                
+
                 // difference is exactly half an ULP
                 // round to some other value maybe, then finish
                 if ((ieeeBits & 1) != 0)

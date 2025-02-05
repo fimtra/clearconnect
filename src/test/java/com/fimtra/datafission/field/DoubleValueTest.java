@@ -20,6 +20,7 @@ import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
 import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
 import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
 import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
+import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
 import static org.junit.Assert.assertEquals;
@@ -129,6 +130,8 @@ public class DoubleValueTest
         }
 
         assertEquals("Infinity", DoubleValue.valueOf(POSITIVE_INFINITY)
+                .textValue());
+        assertEquals("-Infinity", DoubleValue.valueOf(NEGATIVE_INFINITY)
                 .textValue());
         assertEquals("NaN", DoubleValue.valueOf(NaN)
                 .textValue());
