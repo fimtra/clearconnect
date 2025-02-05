@@ -77,9 +77,9 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
      * Defines the fields for the service stats record.
      * <p>
      * This is different to the statistics in the {@link IContextConnectionsRecordFields}. The
-     * context connects record shows statistics about the individual connection between a Context
-     * (service) and ProxyContext (service proxy). The Service stats record shows the <b>overall</b>
-     * statistics for the service (Context).
+     * context-connections-record shows statistics about the individual connection between a Context (service)
+     * and ProxyContext (service proxy). The service-stats-record shows the <b>overall</b> statistics for the
+     * service instance (Context).
      * 
      * @author Ramon Servadei
      */
@@ -100,7 +100,6 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     static final String RPC_FT_SERVICE_STATUS = "ftServiceInstanceStatus";
 
     boolean active;
-    final long startTimeMillis;
     final Context context;
     Boolean isFtMasterInstance;
     final String platformName;
@@ -125,7 +124,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor, ScheduledExecutorService utilityExecutor,
         TransportTechnologyEnum transportTechnology)
     {
-        this.startTimeMillis = System.currentTimeMillis();
+        final long startTimeMillis = System.currentTimeMillis();
 
         this.platformName = platformName;
         this.serviceFamily = serviceFamily;
@@ -176,8 +175,7 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
             @Override
             public void run()
             {
-                IRecord subscriptions =
-                    PlatformServiceInstance.this.context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+                IRecord subscriptions = context.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
 
                 int subscriptionCount = 0;
                 for (Map.Entry<String, IValue> entry : subscriptions.entrySet())
@@ -187,8 +185,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 }
 
                 final long nanoTime = System.nanoTime();
-                final long messagesPublished = PlatformServiceInstance.this.publisher.getMessagesPublished();
-                final long bytesPublished = PlatformServiceInstance.this.publisher.getBytesPublished();
+                final long messagesPublished = publisher.getMessagesPublished();
+                final long bytesPublished = publisher.getBytesPublished();
 
                 final long msgsPublishedInPeriod = messagesPublished - this.lastMessagesPublished;
                 final long bytesPublishedInPeriod = bytesPublished - this.lastBytesPublished;
@@ -200,29 +198,26 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                 this.lastTimeNanos = nanoTime;
                 final double inverse_1K = 1 / 1024d;
 
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
-                    DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_PER_SEC,
-                    DoubleValue.valueOf((((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
-                    // use the period stats for calculating the average message size
-                    LongValue.valueOf(
-                        msgsPublishedInPeriod == 0 ? 0 : (bytesPublishedInPeriod / msgsPublishedInPeriod)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT,
-                    LongValue.valueOf(subscriptionCount));
-                PlatformServiceInstance.this.stats.put(
-                    IServiceStatsRecordFields.UPTIME,
-                    LongValue.valueOf((System.currentTimeMillis() - PlatformServiceInstance.this.startTimeMillis) / 1000));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.MESSAGE_COUNT,
-                    LongValue.valueOf(messagesPublished));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.KB_COUNT,
-                    LongValue.valueOf((long) (bytesPublished * inverse_1K)));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RECORD_COUNT,
-                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
-                PlatformServiceInstance.this.stats.put(IServiceStatsRecordFields.RPC_COUNT,
-                    LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
+                stats.put(IServiceStatsRecordFields.MSGS_PER_SEC,
+                        DoubleValue.valueOf(((long) ((msgsPublishedInPeriod * perSec) * 10)) / 10d));
+                stats.put(IServiceStatsRecordFields.KB_PER_SEC, DoubleValue.valueOf(
+                        (((long) ((bytesPublishedInPeriod * inverse_1K * perSec) * 10)) / 10d)));
+                stats.put(IServiceStatsRecordFields.AVG_MSG_SIZE,
+                        // use the period stats for calculating the average message size
+                        LongValue.valueOf(msgsPublishedInPeriod == 0 ? 0 :
+                                (bytesPublishedInPeriod / msgsPublishedInPeriod)));
+                stats.put(IServiceStatsRecordFields.SUBSCRIPTION_COUNT, LongValue.valueOf(subscriptionCount));
+                stats.put(IServiceStatsRecordFields.UPTIME,
+                        LongValue.valueOf((System.currentTimeMillis() - startTimeMillis) / 1000));
+                stats.put(IServiceStatsRecordFields.MESSAGE_COUNT, LongValue.valueOf(messagesPublished));
+                stats.put(IServiceStatsRecordFields.KB_COUNT,
+                        LongValue.valueOf((long) (bytesPublished * inverse_1K)));
+                stats.put(IServiceStatsRecordFields.RECORD_COUNT,
+                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RECORDS).size()));
+                stats.put(IServiceStatsRecordFields.RPC_COUNT,
+                        LongValue.valueOf(getRecord(ISystemRecordNames.CONTEXT_RPCS).size()));
 
-                PlatformServiceInstance.this.context.publishAtomicChange(PlatformServiceInstance.this.stats);
+                context.publishAtomicChange(stats);
             }
         }, 1, PlatformCoreProperties.Values.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, TimeUnit.SECONDS);
 
@@ -404,17 +399,20 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
      */
     public void destroy()
     {
-        Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-        this.statsUpdateTask.cancel(false);
-        this.publisher.destroy();
-        this.context.destroy();
+        if (this.active)
+        {
+            Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+            this.statsUpdateTask.cancel(false);
+            this.publisher.destroy();
+            this.context.destroy();
 
-        this.recordAvailableNotifyingCache.destroy();
-        this.rpcAvailableNotifyingCache.destroy();
-        this.subscriptionNotifyingCache.destroy();
-        this.proxyConnectionListenerCache.destroy();
+            this.recordAvailableNotifyingCache.destroy();
+            this.rpcAvailableNotifyingCache.destroy();
+            this.subscriptionNotifyingCache.destroy();
+            this.proxyConnectionListenerCache.destroy();
 
-        this.active = false;
+            this.active = false;
+        }
     }
 
     @Override
@@ -449,7 +447,8 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
     public String toString()
     {
         return "PlatformServiceInstance [platform{" + this.platformName + "} service{" + this.serviceFamily
-            + "} member{" + this.serviceMember + "}] " + getEndPointAddress();
+                + "} member{" + this.serviceMember + "}] " + getEndPointAddress() + " " + (this.active ?
+                "ACTIVE" : "DEAD");
     }
 
     @Override
@@ -550,6 +549,19 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
         return this.context.getName();
     }
 
+    void initialiseFtState()
+    {
+        if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
+        {
+            getFtActionsExecutor().execute(() -> {
+                if (isFtMasterInstance == null)
+                {
+                    doSetFtState(Boolean.FALSE);
+                }
+            });
+        }
+    }
+
     void setFtState(final Boolean isMaster)
     {
         if (this.redundancyMode == RedundancyModeEnum.FAULT_TOLERANT)
@@ -560,14 +572,14 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
 
     void doSetFtState(final Boolean isFtMaster)
     {
-        if (!isFtMaster.equals(PlatformServiceInstance.this.isFtMasterInstance))
+        if (!isFtMaster.equals(this.isFtMasterInstance))
         {
             final Boolean previousState = this.isFtMasterInstance;
             this.isFtMasterInstance = isFtMaster;
 
             final boolean isMaster = isFtMaster;
 
-            Log.banner(this, this.toString() + " " + (isMaster ? "ACTIVE" : "STANDBY"));
+            Log.banner(this, this + " " + (isMaster ? "MASTER" : "STANDBY"));
 
             // if we are not the master but previously we were, we need to cut all connections so
             // proxies reconnect to the new master
@@ -578,8 +590,12 @@ final class PlatformServiceInstance implements IPlatformServiceInstance
                     PlatformUtils.SERVICE_CLIENT_DELIMITER + PlatformRegistry.SERVICE_NAME;
                 
                 // disconnect all clients EXCEPT the registry connection
-                this.publisher.disconnectClients("No longer master instance",
-                    (identity) -> !identity.contains(registryConnection));
+                final String instanceMsg =
+                        "no longer the master instance {" + this.serviceFamily + ":" + this.serviceMember
+                                + "}";
+                Log.log(this, "Disconnecting proxy connections, ", instanceMsg);
+                this.publisher.disconnectClients("Closing proxy connection: " + instanceMsg,
+                        (identity) -> !identity.contains(registryConnection));
             }
 
             for (IFtStatusListener iFtStatusListener : this.ftStatusListeners)

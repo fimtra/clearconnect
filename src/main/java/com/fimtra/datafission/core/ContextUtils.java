@@ -261,9 +261,9 @@ public final class ContextUtils
                     final Map<Object, TaskStatistics> coalescingTaskStatistics =
                             thimbleExecutor.getCoalescingTaskStatistics();
                     stats = coalescingTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
-                    overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
-                    qOverflow += (overflow < 0 ? 0 : overflow);
-                    qSubmitted += stats.getIntervalSubmitted();
+                    // we do not calculate overflow for coalescing and we ignore coalesced counts
+                    // otherwise we get skewed stats (ie. looks like a slow consumer)
+                    qSubmitted += stats.getIntervalExecuted();
 
                     final Map<Object, TaskStatistics> sequentialTaskStatistics =
                             thimbleExecutor.getSequentialTaskStatistics();
