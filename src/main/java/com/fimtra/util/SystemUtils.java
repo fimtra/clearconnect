@@ -79,7 +79,7 @@ public abstract class SystemUtils
     {
         try
         {
-            return Boolean.valueOf(System.getProperty(propertyKey, "" + defaultValue)).booleanValue();
+            return Boolean.parseBoolean(System.getProperty(propertyKey, "" + defaultValue));
         }
         catch (Exception e)
         {

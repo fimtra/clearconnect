@@ -32,6 +32,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
@@ -141,6 +142,38 @@ public class DoubleValueTest
                 .textValue());
         assertEquals("99.0001", DoubleValue.valueOf(99.0001)
                 .textValue());
+    }
+
+    @Test
+    public void testStringToDouble_largeDecimal()
+    {
+        assertEquals(Double.parseDouble("0.12345678901234567890"),
+                DoubleValueCodec.fromCharArray("0.12345678901234567890".toCharArray(), 0, 22),
+                DoubleValueCodecTest.delta);
+    }
+
+    @Test
+    public void test_copilot_bitwiseChar09()
+    {
+        for (int i = 0; i < 128; i++)
+        {
+            char c = (char) i;
+            if (c >= '0' && c <= '9')
+            {
+                assertEquals("Char '" + c + "'", 0, getIsDigitIb(c));
+            }
+            else
+            {
+                assertEquals("Char '" + c + "' code=" + i, 1, getIsDigitIb(c));
+            }
+        }
+
+    }
+
+    private static int getIsDigitIb(char c)
+    {
+        final int x = (c - '0');
+        return ((x | (~(x - 10))) >>> 31);
     }
 
     @Test
@@ -278,8 +311,7 @@ public class DoubleValueTest
             }
             tDouble = System.nanoTime() - tDouble;
 
-            assertEquals(Double.parseDouble(sVal),
-                    DoubleValueCodec.fromCharArray(chars, 0, chars.length),
+            assertEquals(Double.parseDouble(sVal), DoubleValueCodec.fromCharArray(chars, 0, chars.length),
                     DoubleValueCodecTest.delta);
 
             //        System.err.println(" tDouble=" + tDouble + " tDoubleValue=" + tDoubleValue);

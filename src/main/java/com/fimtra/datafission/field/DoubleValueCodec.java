@@ -183,8 +183,8 @@ class DoubleValueCodec
             // NOTE: this logic works on the least significant digit to most significant
             //       hence we start at the END of the array and work "backwards" (--lsDigitPos)
 
-            // Get 2 digits/iteration using longs until quotient fits into an int
-            while (lValue > Integer.MAX_VALUE) {
+            // Get 2 digits/iteration using longs until quotient fits into a short
+            while (lValue >= 65536) {
                 q = lValue / 100;
                 r = (int) (lValue - (q * 100));
                 lValue = q;
@@ -193,18 +193,8 @@ class DoubleValueCodec
                 decExponent+=2;
             }
 
-            // Get 2 digits/iteration using ints
             int q2;
             int i2 = (int)lValue;
-            while (i2 >= 65536) {
-                q2 = i2 / 100;
-                r = i2 - (q2 * 100);
-                i2 = q2;
-                digits[--lsDigitPos] = DigitOnes[r];
-                digits[--lsDigitPos] = DigitTens[r];
-                decExponent+=2;
-            }
-
             // Fall thru to fast mode for smaller numbers
             do
             {
@@ -215,6 +205,7 @@ class DoubleValueCodec
                 i2 = q2;
             }
             while (i2 != 0);
+
             this.decExponent = decExponent;
             this.firstDigitIndex = lsDigitPos;
             this.nDigits = this.digits.length - lsDigitPos - 1;
@@ -370,6 +361,7 @@ class DoubleValueCodec
                 {
                     high = low = false;
                 }
+                boolean mZeroOrLess;
                 while (!low && !high)
                 {
                     q = (int) (b / s);
@@ -377,21 +369,10 @@ class DoubleValueCodec
                     m *= 10;
                     // todo ignore asserts?
                     //assert q < 10 : q;  // excessively large digit
-                    if (m > 0L)
-                    {
-                        low = (b < m);
-                        high = (b + m > tens);
-                    }
-                    else
-                    {
-                        // hack -- m might overflow!
-                        // in this case, it is certainly > b,
-                        // which won't
-                        // and b+m > tens, too, since that has overflowed
-                        // either!
-                        low = true;
-                        high = true;
-                    }
+                    mZeroOrLess = m <= 0L;
+                    low = mZeroOrLess | (b < m);
+                    high = mZeroOrLess | (b + m > tens);
+
                     digits[ndigit++] = LongValueCodec.digits[q];
                 }
                 lowDigitDifference = (b << 1) - tens;
@@ -400,7 +381,7 @@ class DoubleValueCodec
             {
                 //
                 // We really must do FDBigInteger arithmetic.
-                // Fist, construct our FDBigInteger initial values.
+                // First, construct our FDBigInteger initial values.
                 //
                 FDBigInteger Sval = FDBigInteger.valueOfPow52(S5, S2);
                 final int shiftBias = Sval.getNormalizationBias();
@@ -663,6 +644,7 @@ class DoubleValueCodec
             }
             stringAppender.setLength(i);
         }
+
     }
 
     private static final ThreadLocal<DoubleToString> DOUBLE_TO_STRING_THREAD_LOCAL =
@@ -842,8 +824,10 @@ class DoubleValueCodec
 
             final int end = start + len;
             // loop to find leading zeros and decimal
-            while (true)
+            do
             {
+                c = in[i];
+
                 if (c == '0')
                 {
                     nLeadZero++;
@@ -866,79 +850,20 @@ class DoubleValueCodec
                 {
                     break;
                 }
-                // loop control
-                if (++i < end)
-                {
-                    // next inspection
-                    c = in[i];
-                }
-                else
-                {
-                    break;
-                }
             }
+            while(++i < end);
 
             final int _start = i;
-
-            // integer reading
-            int iValue = 0;
-            do
-            {
-                if (c >= '1' && c <= '9')
-                {
-                    iValue = iValue * 10 + LongValueCodec.digits_from_char[c];
-                    nDigits++;
-                }
-                else if (c == '0')
-                {
-                    iValue = iValue * 10;
-                    nDigits++;
-                }
-                else if (c == '.')
-                {
-                    if (decSeen)
-                    {
-                        // already saw one ., this is the 2nd.
-                        throw new NumberFormatException("multiple points");
-                    }
-                    decPt = i;
-                    if (signSeen)
-                    {
-                        decPt -= 1;
-                    }
-                    decSeen = true;
-                }
-                else
-                {
-                    break;
-                }
-                // loop control
-                if (++i < end)
-                {
-                    // next inspection
-                    c = in[i];
-                }
-                else
-                {
-                    break;
-                }
-            }
-            while (nDigits < INT_DECIMAL_DIGITS);
-
-            // we are in long territory now, nDigits >= INT_DECIMAL_DIGITS
-            long lValue = iValue;
+            long lValue = 0;
             if (i < end)
             {
                 do
                 {
-                    if (c >= '1' && c <= '9')
+                    c = in[i];
+
+                    if (c >= '0' && c <= '9')
                     {
                         lValue = lValue * 10L + (long) LongValueCodec.digits_from_char[c];
-                        nDigits++;
-                    }
-                    else if (c == '0')
-                    {
-                        lValue = lValue * 10L;
                         nDigits++;
                     }
                     else if (c == '.')
@@ -959,18 +884,8 @@ class DoubleValueCodec
                     {
                         break;
                     }
-                    // loop control
-                    if (++i < end)
-                    {
-                        // next inspection
-                        c = in[i];
-                    }
-                    else
-                    {
-                        break;
-                    }
                 }
-                while (nDigits < MAX_DECIMAL_DIGITS + 1);
+                while ((++i < end) && nDigits < MAX_DECIMAL_DIGITS + 1);
 
                 // process overspill
                 while (i < end)

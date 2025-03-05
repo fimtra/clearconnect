@@ -43,8 +43,8 @@ public abstract class DataFissionProperties
         String BASE = "dataFission.";
 
         /**
-         * The system property name to define the number of threads used in the system record {@link ThimbleExecutor}
-         * used by all {@link Context} instances in the runtime.
+         * The system property name to define the number of threads used in the system record
+         * {@link ThimbleExecutor} used by all {@link Context} instances in the runtime.
          * <br>
          * E.g. <code>-DdataFission.systemThreadCount=2</code>
          */
@@ -111,7 +111,8 @@ public abstract class DataFissionProperties
 
         /**
          * The system property name to define the threshold, in nanos, for defining a slow task (and thus
-         * logging a message indicating the task was slow).<br> E.g. <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
+         * logging a message indicating the task was slow).<br> E.g.
+         * <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
          */
         String SLOW_TASK_THRESHOLD_NANOS = BASE + "slowTaskThresholdNanos";
 
@@ -130,8 +131,8 @@ public abstract class DataFissionProperties
         String KEYS_POOL_MAX = BASE + "keysPoolMaxSize";
 
         /**
-         * The system property name to define the size of the {@link LongValue} pool.
-         * E.g. <code>-DdataFission.longValuePoolSize=2048</code>
+         * The system property name to define the size of the {@link LongValue} pool. E.g.
+         * <code>-DdataFission.longValuePoolSize=2048</code>
          */
         String LONG_VALUE_POOL_SIZE = BASE + "longValuePoolSize";
 
@@ -150,7 +151,8 @@ public abstract class DataFissionProperties
         /**
          * The system property name to define the estimated maximum number of concurrent threads that will
          * access {@link IRecord} objects in the runtime. This is used to specify the concurrency of the
-         * {@link ConcurrentHashMap} components backing the records.<br> E.g. <code>-DdataFission.maxRecordConcurrency=2</code>
+         * {@link ConcurrentHashMap} components backing the records.<br> E.g.
+         * <code>-DdataFission.maxRecordConcurrency=2</code>
          */
         String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
 
@@ -184,9 +186,10 @@ public abstract class DataFissionProperties
         String SUBSCRIBE_BATCH_SIZE = BASE + "subscribeBatchSize";
 
         /**
-         * The maximum pending event queue size before a thread will wait in {@link
-         * IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value. Only
-         * affects application threads. <br> E.g. <code>-DdataFission.pendingEventThrottleThreshold=200</code>
+         * The maximum pending event queue size before a thread will wait in
+         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.
+         * Only affects application threads. <br> E.g.
+         * <code>-DdataFission.pendingEventThrottleThreshold=200</code>
          */
         String PENDING_EVENT_THROTTLE_THRESHOLD = BASE + "pendingEventThrottleThreshold";
 
@@ -235,6 +238,12 @@ public abstract class DataFissionProperties
          * <br> E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>
          */
         String EXCLUDE_RPC_LOGGING = BASE + "excludeRpcLogging";
+
+        /**
+         * The name of the system property to define using the classic double value codec.
+         * <br> E.g. <code>-DdataFission.useClassicDoubleValueCodec=true</code>
+         */
+        String USE_CLASSIC_DOUBLE_VALUE_CODEC = BASE + "useClassicDoubleValueCodec";
     }
 
     /**
@@ -245,17 +254,16 @@ public abstract class DataFissionProperties
     public interface Values
     {
         /**
-         * The number of threads used in the system record {@link ThimbleExecutor} used by all DataFission {@link
-         * Context} instances in the runtime.
+         * The number of threads used in the system record {@link ThimbleExecutor} used by all DataFission
+         * {@link Context} instances in the runtime.
          *
          * @see Names#SYSTEM_THREAD_COUNT
          */
-        int SYSTEM_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.SYSTEM_THREAD_COUNT,
-                2);
+        int SYSTEM_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.SYSTEM_THREAD_COUNT, 2);
 
         /**
-         * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission {@link
-         * Context} instances in the runtime.
+         * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
+         * {@link Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:
          * <ul>
@@ -270,8 +278,8 @@ public abstract class DataFissionProperties
                 SystemUtils.getRuntimeSupportedThreadCount());
 
         /**
-         * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all DataFission {@link
-         * Context} instances in the runtime.
+         * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all DataFission
+         * {@link Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:
          * <ul>
@@ -353,8 +361,8 @@ public abstract class DataFissionProperties
                 SystemUtils.getPropertyAsLong(Names.SLOW_TASK_THRESHOLD_NANOS, 50_000_000);
 
         /**
-         * The number of threads used in the shared reconnect task scheduler used by all DataFission {@link
-         * ProxyContext} instances in the runtime.
+         * The number of threads used in the shared reconnect task scheduler used by all DataFission
+         * {@link ProxyContext} instances in the runtime.
          * <p>
          * Default is 2.
          *
@@ -448,9 +456,9 @@ public abstract class DataFissionProperties
         int SUBSCRIBE_BATCH_SIZE = SystemUtils.getPropertyAsInt(Names.SUBSCRIBE_BATCH_SIZE, 50);
 
         /**
-         * The maximum pending event queue size before a thread will wait in {@link
-         * IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value. Only
-         * affects application threads.
+         * The maximum pending event queue size before a thread will wait in
+         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.
+         * Only affects application threads.
          * <p>
          * Default is 200.
          *
@@ -460,8 +468,8 @@ public abstract class DataFissionProperties
                 SystemUtils.getPropertyAsInt(Names.PENDING_EVENT_THROTTLE_THRESHOLD, 200);
 
         /**
-         * The period, in milliseconds, for a {@link Publisher} to publish updates to the {@link
-         * ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
+         * The period, in milliseconds, for a {@link Publisher} to publish updates to the
+         * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
          * <p>
          * Default is 30000.
          *
@@ -488,11 +496,11 @@ public abstract class DataFissionProperties
          *
          * @see Names#ENABLE_THREAD_DEADLOCK_CHECK
          */
-        boolean ENABLE_THREAD_DEADLOCK_CHECK = Boolean.getBoolean(Names.ENABLE_THREAD_DEADLOCK_CHECK);
+        boolean ENABLE_THREAD_DEADLOCK_CHECK = SystemUtils.getProperty(Names.ENABLE_THREAD_DEADLOCK_CHECK, false);
 
         /**
-         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if {@link
-         * #ENABLE_THREAD_DEADLOCK_CHECK} is true.
+         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if
+         * {@link #ENABLE_THREAD_DEADLOCK_CHECK} is true.
          * <p>
          * Default is 300000 (5 mins).
          *
@@ -507,7 +515,7 @@ public abstract class DataFissionProperties
          * <p>
          * Default is false
          */
-        boolean ENABLE_Q_STATS_LOGGING = Boolean.getBoolean(Names.ENABLE_Q_STATS_LOGGING);
+        boolean ENABLE_Q_STATS_LOGGING = SystemUtils.getProperty(Names.ENABLE_Q_STATS_LOGGING, false);
 
         /**
          * Defines the transformation string for encrypted sessions.
@@ -524,6 +532,14 @@ public abstract class DataFissionProperties
          */
         String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,
                 "runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister");
+
+        /**
+         * Defines if the classic double value codec is used.
+         * <p>
+         * Default is false.
+         */
+        boolean USE_CLASSIC_DOUBLE_VALUE_CODEC =
+                SystemUtils.getProperty(Names.USE_CLASSIC_DOUBLE_VALUE_CODEC, false);
     }
 
     private DataFissionProperties()

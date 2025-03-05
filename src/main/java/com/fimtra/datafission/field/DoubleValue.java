@@ -35,16 +35,15 @@ public class DoubleValue extends AbstractValue
      */
     public static DoubleValue valueOf(double value)
     {
-        if (((long) value) == value)
+        if (((long) value) == value
+                && value < POS_INTEGRAL_POOL.length
+                && -value < NEG_INTEGRAL_POOL.length)
         {
             if (value >= 0)
             {
-                if (value < POS_INTEGRAL_POOL.length)
-                {
-                    return POS_INTEGRAL_POOL[(int) value];
-                }
+                return POS_INTEGRAL_POOL[(int) value];
             }
-            else if (-value < NEG_INTEGRAL_POOL.length)
+            else
             {
                 return NEG_INTEGRAL_POOL[(int) -value];
             }
@@ -82,7 +81,7 @@ public class DoubleValue extends AbstractValue
 
     DoubleValue(char[] chars, int start, int len)
     {
-        this.value = DoubleValueCodec.fromCharArray(chars, start, len);
+        this.value = DoubleValueCodeAdapter.fromCharArray(chars, start, len);
     }
 
     @Override
@@ -106,9 +105,7 @@ public class DoubleValue extends AbstractValue
     @Override
     public String textValue()
     {
-        final StringAppender stringAppender = new StringAppender(28);
-        DoubleValueCodec.writeToCharArray(this.value, stringAppender);
-        return stringAppender.toString();
+        return DoubleValueCodeAdapter.textValue(value);
     }
     
     @Override
@@ -141,8 +138,6 @@ public class DoubleValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        final StringAppender appender = stringAppender.append(IValue.DOUBLE_CODE);
-        DoubleValueCodec.writeToCharArray(this.value, appender);
-        return stringAppender;
+        return DoubleValueCodeAdapter.appendTo(stringAppender, this.value);
     }
 }
