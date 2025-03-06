@@ -171,6 +171,33 @@ public class StringProtocolCodecTest extends CodecBaseTest
     }
 
     @Test
+    public void testEncodeDecodeAtomicChange_simple()
+    {
+        final String k1 = "k1";
+        final TextValue v1 = TextValue.valueOf("val1");
+
+        AtomicChange change = new AtomicChange("chg");
+        change.mergeEntryUpdatedChange(k1, v1, null);
+
+        byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
+        IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+
+        Map<String, IValue> map1 = new HashMap<>();
+        map1.put(k1, v1);
+
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        rec1.putAll(map1);
+
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+        rec2.putAll(map1);
+
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+    }
+
+    @Test
     public void testEncodeDecodeAtomicChange()
     {
         final String k1 = "one$£";

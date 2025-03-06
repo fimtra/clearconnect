@@ -66,6 +66,7 @@ public final class StringAppender
             final char[] _c = new char[this.chars.length + (sizeToReserve < 9 ? 16 : (sizeToReserve * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
+            this.charBuffer = null;
         }
         len += sizeToReserve;
         return this.chars;
@@ -88,6 +89,7 @@ public final class StringAppender
             final char[] _c = new char[this.chars.length + 16];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
+            this.charBuffer = null;
         }
         this.chars[this.len++] = v;
         return this;
@@ -101,6 +103,7 @@ public final class StringAppender
             final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
+            this.charBuffer = null;
         }
         System.arraycopy(v, 0, this.chars, this.len, length);
         this.len += length;
@@ -109,18 +112,35 @@ public final class StringAppender
 
     public StringAppender append(char[] v, int offset, int len)
     {
-        if (len < 0)
-        {
-            throw new IllegalArgumentException("Negative length not allowed: " + len);
-        }
         if (this.len + len > this.chars.length)
         {
             final char[] _c = new char[this.chars.length + (len < 9 ? 16 : (len * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
+            this.charBuffer = null;
         }
         System.arraycopy(v, offset, this.chars, this.len, len);
         this.len += len;
+        return this;
+    }
+
+    /**
+     * Appends the two char[] c1 and c2 together using the offsets and lengths provided
+     */
+    public StringAppender append(char[] c1, int offset1, int len1, char[] c2, int offset2, int len2)
+    {
+        final int combined = len1 + len2;
+        if (this.len + combined > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (combined < 9 ? 16 : (combined * 2))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+            this.charBuffer = null;
+        }
+        System.arraycopy(c1, offset1, this.chars, this.len, len1);
+        this.len += len1;
+        System.arraycopy(c2, offset2, this.chars, this.len, len2);
+        this.len += len2;
         return this;
     }
 
@@ -136,15 +156,26 @@ public final class StringAppender
             final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
+            this.charBuffer = null;
         }
         v.getChars(0, length, this.chars, this.len);
         this.len += length;
         return this;
     }
 
+    CharBuffer charBuffer;
+
     public CharBuffer getCharBuffer()
     {
-        return CharBuffer.wrap(this.chars, 0, this.len);
+        if (charBuffer == null)
+        {
+            charBuffer = CharBuffer.wrap(this.chars, 0, this.len);
+        }
+        else
+        {
+            charBuffer.clear().limit(this.len);
+        }
+        return charBuffer;
     }
 
     @Override

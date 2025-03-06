@@ -275,6 +275,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         // NOTE: uses a 2d array to as a pointer to a 1d array, this allows methods to resize the 1d
         // array
         final int[][] bijTokenOffset = decodingBuffers.bijTokenOffset;
+        // todo limit is redundant, this can be computed from the offsets
         final int[][] bijTokenLimit = decodingBuffers.bijTokenLimit;
         final int[] bijTokenLen = decodingBuffers.bijTokenLen;
 
@@ -292,9 +293,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                 atomicChange.setSequence(LongValue.valueOf(decodedMessage, bijTokenOffset[0][2] + 1,
                     bijTokenLimit[0][2] - bijTokenOffset[0][2] - 1).longValue());
 
-                boolean put = true;
                 String subMapName = null;
                 AtomicChange target = null;
+                Map<String, IValue> targetMap = null;
                 int position;
                 int len;
                 if (bijTokenLen[0] > 2)
@@ -310,7 +311,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                             switch(decodedMessage[bijTokenOffset[0][i]])
                             {
                                 case PUT_CODE:
-                                    put = true;
                                     if (subMapName == null)
                                     {
                                         target = atomicChange;
@@ -319,10 +319,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     {
                                         target = atomicChange.internalGetSubMapAtomicChange(subMapName);
                                     }
-                                    target.internalGetPutEntries();
+                                    targetMap = target.internalGetPutEntries();
                                     break;
                                 case REMOVE_CODE:
-                                    put = false;
                                     if (subMapName == null)
                                     {
                                         target = atomicChange;
@@ -331,7 +330,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     {
                                         target = atomicChange.internalGetSubMapAtomicChange(subMapName);
                                     }
-                                    target.internalGetRemovedEntries();
+                                    targetMap = target.internalGetRemovedEntries();
                                     break;
                                 case SUBMAP_CODE:
                                     ++i;
@@ -359,23 +358,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                                     // find where the first non-escaped "=" is
                                     if (previous != CHAR_ESCAPE)
                                     {
-                                        if (put)
-                                        {
-                                            target.putEntries.put(
-                                                    decodeKey(decodedMessage, position, j, true,
-                                                            decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len,
-                                                            decodingBuffers.tempArr));
-                                        }
-                                        else
-                                        {
-                                            target.removedEntries.put(
-                                                    decodeKey(decodedMessage, position, j, true,
-                                                            decodingBuffers.tempArr),
-                                                    decodeValue(decodedMessage, j + 1, len,
-                                                            decodingBuffers.tempArr));
-                                        }
-                                        j = decodedMessage.length;
+                                        targetMap.put(
+                                                decodeKey(decodedMessage, position, j, true,
+                                                        decodingBuffers.tempArr),
+                                                decodeValue(decodedMessage, j + 1, len,
+                                                        decodingBuffers.tempArr));
+                                        break;
                                     }
                                 }
                                 else
@@ -526,7 +514,6 @@ public class StringProtocolCodec implements ICodec<char[]>
         int length;
         char[] cbuf;
         escapedChars[0] = CHAR_ESCAPE;
-        boolean needToEscape;
         txString.append(changeType);
 
         for (Map.Entry<String, IValue> entry : entries.entrySet())
@@ -551,58 +538,32 @@ public class StringProtocolCodec implements ICodec<char[]>
                 cbuf = keyChars.ref;
                 key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
 
-                // NOTE: for efficiency, we have *almost* inlined versions of the same escape
-                // switch statements
-                needToEscape = false;
+                last = 0;
                 for (i = 0; i < length; i++)
                 {
                     switch(cbuf[i])
                     {
                         case CR:
+                            escapedChars[1] = CHAR_r;
+                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                            last = i + 1;
+                            break;
                         case LF:
+                            escapedChars[1] = CHAR_n;
+                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                            last = i + 1;
+                            break;
                         case CHAR_ESCAPE:
                         case CHAR_TOKEN_DELIM:
                         case CHAR_KEY_VALUE_SEPARATOR:
-                            needToEscape = true;
-                            i = length;
+                            escapedChars[1] = cbuf[i];
+                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                            last = i + 1;
+                            break;
+                        default:
                     }
                 }
-                if (needToEscape)
-                {
-                    last = 0;
-                    for (i = 0; i < length; i++)
-                    {
-                        switch(cbuf[i])
-                        {
-                            case CR:
-                                txString.append(cbuf, last, i - last);
-                                escapedChars[1] = CHAR_r;
-                                txString.append(escapedChars, 0, 2);
-                                last = i + 1;
-                                break;
-                            case LF:
-                                txString.append(cbuf, last, i - last);
-                                escapedChars[1] = CHAR_n;
-                                txString.append(escapedChars, 0, 2);
-                                last = i + 1;
-                                break;
-                            case CHAR_ESCAPE:
-                            case CHAR_TOKEN_DELIM:
-                            case CHAR_KEY_VALUE_SEPARATOR:
-                                txString.append(cbuf, last, i - last);
-                                escapedChars[1] = cbuf[i];
-                                txString.append(escapedChars, 0, 2);
-                                last = i + 1;
-                                break;
-                            default:
-                        }
-                    }
-                    txString.append(cbuf, last, length - last);
-                }
-                else
-                {
-                    txString.append(cbuf, 0, length);
-                }
+                txString.append(cbuf, last, length - last);
             }
 
             txString.append(CHAR_KEY_VALUE_SEPARATOR);
@@ -657,24 +618,21 @@ public class StringProtocolCodec implements ICodec<char[]>
                 switch(charAt)
                 {
                     case CR:
-                        dest.append(chars, last, i - last);
                         escapedChars[1] = CHAR_r;
-                        dest.append(escapedChars, 0, 2);
+                        dest.append(chars, last, i - last, escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     case LF:
-                        dest.append(chars, last, i - last);
                         escapedChars[1] = CHAR_n;
-                        dest.append(escapedChars, 0, 2);
+                        dest.append(chars, last, i - last, escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     case CHAR_ESCAPE:
                     case CHAR_TOKEN_DELIM:
                     case CHAR_KEY_VALUE_SEPARATOR:
                     case CHAR_SYMBOL_PREFIX:
-                        dest.append(chars, last, i - last);
                         escapedChars[1] = charAt;
-                        dest.append(escapedChars, 0, 2);
+                        dest.append(chars, last, i - last, escapedChars, 0, 2);
                         last = i + 1;
                         break;
                     default :
@@ -698,13 +656,13 @@ public class StringProtocolCodec implements ICodec<char[]>
     static int doUnescape(char[] chars, int start, int end, final char[] dest)
     {
         int unescapedPtr = 0;
-        for (int i = start; i < end; i++)
+        if (end <= chars.length)
         {
-            if (chars[i] == CHAR_ESCAPE)
+            for (int i = start; i < end; i++)
             {
-                i++;
-                if (i < chars.length)
+                if (chars[i] == CHAR_ESCAPE)
                 {
+                    i++;
                     switch(chars[i])
                     {
                         case CHAR_r:
@@ -727,10 +685,10 @@ public class StringProtocolCodec implements ICodec<char[]>
                             break;
                     }
                 }
-            }
-            else
-            {
-                dest[unescapedPtr++] = chars[i];
+                else
+                {
+                    dest[unescapedPtr++] = chars[i];
+                }
             }
         }
         return unescapedPtr;
