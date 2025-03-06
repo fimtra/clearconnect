@@ -86,8 +86,7 @@ public class LongValueCodecTest
 
     private static void doToFromCharArrayTest(long lVal, char[] chars)
     {
-        final int len =
-                lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal);
+        final int len = lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal);
         LongValueCodec.writeToCharArray(lVal, chars, 0, len);
         assertEquals(lVal, LongValueCodec.fromCharArray(chars, 0, len));
     }
@@ -191,6 +190,203 @@ public class LongValueCodecTest
             p = 10 * p;
         }
         return 19;
+    }
+
+    // ====================
+    @Test
+    public void compare_stringSize_implementations()
+    {
+        long[] testValues = { 0L, 1L,
+
+                9L, 10L,
+
+                99L, 100L,
+
+                999L, 1000L,
+
+                9999L, 10_000L,
+
+                99_999L, 100_000L,
+
+                999_999L, 1_000_000L,
+
+                9_999_999L, 10_000_000L,
+
+                99_999_999L, 100_000_000L,
+
+                999_999_999L, 1_000_000_000L,
+
+                9_999_999_999L, 10_000_000_000L,
+
+                99_999_999_999L, 100_000_000_000L,
+
+                999_999_999_999L, 1_000_000_000_000L,
+
+                9_999_999_999_999L, 10_000_000_000_000L,
+
+                99_999_999_999_999L, 100_000_000_000_000L,
+
+                999_999_999_999_999L, 1_000_000_000_000_000L,
+
+                9_999_999_999_999_999L, 10_000_000_000_000_000L,
+
+                99_999_999_999_999_999L, 100_000_000_000_000_000L,
+
+                999_999_999_999_999_999L, 1_000_000_000_000_000_000L };
+
+        int iterations = 10_000_000;
+        int warmupIterations = iterations;
+
+        // Warmup
+        for (int i = 0; i < warmupIterations; i++)
+        {
+            for (long value : testValues)
+            {
+                stringSize(value);
+                stringSize_classic(value);
+                stringSize_copilot(value);
+            }
+        }
+
+        // Timing
+        long startOriginal = System.nanoTime();
+        for (int i = 0; i < iterations; i++)
+        {
+            for (long value : testValues)
+            {
+                stringSize(value);
+            }
+        }
+        long timeOriginal = System.nanoTime() - startOriginal;
+
+        long startClassic = System.nanoTime();
+        for (int i = 0; i < iterations; i++)
+        {
+            for (long value : testValues)
+            {
+                stringSize_classic(value);
+            }
+        }
+        long timeClassic = System.nanoTime() - startClassic;
+
+        long startCopilot = System.nanoTime();
+        for (int i = 0; i < iterations; i++)
+        {
+            for (long value : testValues)
+            {
+                stringSize_copilot(value);
+            }
+        }
+        long timeCopilot = System.nanoTime() - startCopilot;
+
+        // Verify results
+        for (long value : testValues)
+        {
+            int sizeOriginal = stringSize(value);
+            int sizeClassic = stringSize_classic(value);
+            int sizeCopilot = stringSize_copilot(value);
+
+            assertEquals("Classic implementation mismatch for value " + value, sizeOriginal, sizeClassic);
+            assertEquals("Copilot implementation mismatch for value " + value, sizeOriginal, sizeCopilot);
+        }
+
+        // Report average time per operation
+        long opsCount = (long) iterations * testValues.length;
+        System.out.printf(
+                "Average time per operation (ns):%n" + "Original: %.2f%nClassic: %.2f%nCopilot: %.2f%n",
+                (double) timeOriginal / opsCount, (double) timeClassic / opsCount,
+                (double) timeCopilot / opsCount);
+    }
+
+    static int stringSize_classic(long x)
+    {
+        long p = 10;
+        for (int i = 1; i < 19; i++)
+        {
+            if (x < p)
+            {
+                return i;
+            }
+            p = (p << 3) + (p << 1);
+        }
+        return 19;
+    }
+
+    static int stringSize_copilot(long x)
+    {
+        if (x < 100000)
+        {
+            if (x < 100)
+            {
+                return x < 10 ? 1 : 2;
+            }
+            if (x < 10000)
+            {
+                return x < 1000 ? 3 : 4;
+            }
+            return 5;
+        }
+
+        if (x < 10000000000L)
+        {
+            if (x < 10000000)
+            {
+                if (x < 1000000)
+                {
+                    return 6;
+                }
+                return 7;
+            }
+            if (x < 1000000000)
+            {
+                if (x < 100000000)
+                {
+                    return 8;
+                }
+                return 9;
+            }
+            return 10;
+        }
+
+        if (x < 1000000000000000L)
+        {
+            if (x < 1000000000000L)
+            {
+                if (x < 100000000000L)
+                {
+                    return 11;
+                }
+                return 12;
+            }
+            if (x < 100000000000000L)
+            {
+                if (x < 10000000000000L)
+                {
+                    return 13;
+                }
+                return 14;
+            }
+            return 15;
+        }
+
+        if (x < 100000000000000000L)
+        {
+            if (x < 10000000000000000L)
+            {
+                return 16;
+            }
+            return 17;
+        }
+        if (x < 1000000000000000000L)
+        {
+            return 18;
+        }
+        return 19;
+    }
+
+    static int stringSize(long x)
+    {
+        return LongValueCodec.stringSize(x);
     }
 
 }

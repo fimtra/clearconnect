@@ -175,7 +175,7 @@ class DoubleValueCodec
 
             //
             // R.S. NOTE:
-            // I'm using the same algorithm for long-to-string (see LongToCharrArrayCodec)
+            // I'm using the same algorithm for long-to-string (see LongValueCodec.writeToCharArray)
             // This long-to-string logic comes from the java.lang.Long class and seems to
             // be much faster than the equivalent logic in Double/FloatingDecimal...
             // different authors on the original java code maybe?
@@ -861,7 +861,10 @@ class DoubleValueCodec
                 {
                     c = in[i];
 
-                    if (c >= '0' && c <= '9')
+                    // old:  if (c >= '0' && c <= '9')
+                    // Uses one subtraction, one bitwise AND, and one comparison
+                    // Avoids two comparisons and two branches
+                    if (((c - 48) & 0xFFFF) <= 9)
                     {
                         lValue = lValue * 10L + (long) LongValueCodec.digits_from_char[c];
                         nDigits++;
@@ -891,7 +894,7 @@ class DoubleValueCodec
                 while (i < end)
                 {
                     c = in[i];
-                    if (c >= '0' && c <= '9')
+                    if (((c - 48) & 0xFFFF) <= 9)
                     {
                         nDigits++;
                     }
@@ -986,7 +989,7 @@ class DoubleValueCodec
                         expOverflow = true;
                     }
                     c = in[i++];
-                    if (c >= '0' && c <= '9')
+                    if (((c - 48) & 0xFFFF) <= 9)
                     {
                         expVal = expVal * 10 + LongValueCodec.digits_from_char[c];
                     }

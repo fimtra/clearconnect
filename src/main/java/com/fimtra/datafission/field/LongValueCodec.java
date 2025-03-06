@@ -83,8 +83,8 @@ abstract class LongValueCodec
         // This logic works on the least significant digit to most significant
         // hence we start at the END of the array and work "backwards" (--lsDigitPos)
 
-        // Get 2 digits/iteration using longs until quotient fits into an int
-        while (i > Integer.MAX_VALUE)
+        // Get 2 digits/iteration using longs until quotient fits into a short
+        while (i > 65536)
         {
             q = i / 100;
             r = (int) (i - (q * 100));
@@ -96,14 +96,6 @@ abstract class LongValueCodec
         // Get 2 digits/iteration using ints
         int q2;
         int i2 = (int) i;
-        while (i2 >= 65536)
-        {
-            q2 = i2 / 100;
-            r = i2 - (q2 * 100);
-            i2 = q2;
-            buf[--lsDigitPos] = DigitOnes[r];
-            buf[--lsDigitPos] = DigitTens[r];
-        }
 
         // Fall thru to fast mode for smaller numbers
         // assert(i2 <= 65536, i2);
@@ -128,44 +120,26 @@ abstract class LongValueCodec
             {
                 if (x < 100L) //2
                 {
-                    if (x < 10L) //1
-                    {
-                        return 1;
-                    }
-                    return 2;
+                    //1
+                    return x < 10L ? 1 : 2;
                 }
                 else
                 {
-                    if (x < 1000L) //3
-                    {
-                        return 3;
-                    }
-                    return 4;
+                    //3
+                    return x < 1000L ? 3 : 4;
                 }
             }
             else
             {
                 if (x < 1000000L) //6
                 {
-                    if (x < 100000L) //5
-                    {
-                        return 5;
-                    }
-                    else
-                    {
-                        return 6;
-                    }
+                    //5
+                    return x < 100000L ? 5 : 6;
                 }
                 else
                 {
-                    if (x < 10000000L) //7
-                    {
-                        return 7;
-                    }
-                    else
-                    {
-                        return 8;
-                    }
+                    //7
+                    return x < 10000000L ? 7 : 8;
                 }
             }
         }
@@ -175,52 +149,28 @@ abstract class LongValueCodec
             {
                 if (x < 10000000000L) //10
                 {
-                    if (x < 1000000000L) //9
-                    {
-                        return 9;
-                    }
-                    else
-                    {
-                        return 10;
-                    }
+                    //9
+                    return x < 1000000000L ? 9 : 10;
                 }
                 else
                 {
-                    if (x < 100000000000L) //11
-                    {
-                        return 11;
-                    }
-                    else
-                    {
-                        return 12;
-                    }
+                    //11
+                    return x < 100000000000L ? 11 : 12;
                 }
             }
             else
             {
                 if (x < 100000000000000L) //14
                 {
-                    if (x < 10000000000000L) //13
-                    {
-                        return 13;
-                    }
-                    else
-                    {
-                        return 14;
-                    }
+                    //13
+                    return x < 10000000000000L ? 13 : 14;
                 }
                 else
                 {
                     if (x < 10000000000000000L) //16
                     {
-                        if (x < 1000000000000000L) //15
-                        {
-                            return 15;
-                        }
-                        else
-                        {
-                            return 16;
-                        }
+                        //15
+                        return x < 1000000000000000L ? 15 : 16;
                     }
                     else
                     {
@@ -230,11 +180,8 @@ abstract class LongValueCodec
                         }
                         else
                         {
-                            if (x < 1000000000000000000L) //18
-                            {
-                                return 18;
-                            }
-                            return 19;
+                            //18
+                            return x < 1000000000000000000L ? 18 : 19;
                         }
                     }
                 }
@@ -283,16 +230,29 @@ abstract class LongValueCodec
             {
                 final long limit = negative ? Long.MIN_VALUE : -Long.MAX_VALUE;
                 final long multmin = negative ? POS_MIN_MULTMIN : NEG_MAX_MULTMIN;
-                while (i < len)
+                while (i <= DIGIT_COUNT_FOR_LIMIT_CHECK)
                 {
                     digit = chars[i++];
-                    if (digit < 48 || digit > 57 || (i > DIGIT_COUNT_FOR_LIMIT_CHECK && result < multmin))
+                    // (old: if (digit < 48 || digit > 57))
+                    // This is typically faster as it uses only two operations and one branch instead of two comparisons and two branches
+                    if (((digit - 48) & 0xFFFF) > 9)
                     {
                         throw new NumberFormatException(new String(chars, start, len));
                     }
-                    digit = digits_from_char[digit];
                     result *= 10;
-                    if (i > DIGIT_COUNT_FOR_LIMIT_CHECK && (result < limit + digit))
+                    // Accumulating negatively avoids surprises near MAX_VALUE
+                    result -= digits_from_char[digit];
+                }
+                while (i < len)
+                {
+                    digit = chars[i++];
+                    if (((digit - 48) & 0xFFFF) > 9 || result < multmin)
+                    {
+                        throw new NumberFormatException(new String(chars, start, len));
+                    }
+                    result *= 10;
+                    digit = digits_from_char[digit];
+                    if (result < limit + digit)
                     {
                         throw new NumberFormatException(new String(chars, start, len));
                     }
@@ -308,14 +268,15 @@ abstract class LongValueCodec
                 while (i < len)
                 {
                     digit = chars[i++];
-                    if (digit < 48 || digit > 57)
+                    // (old: if (digit < 48 || digit > 57))
+                    // This is typically faster as it uses only two operations and one branch instead of two comparisons and two branches
+                    if (((digit - 48) & 0xFFFF) > 9)
                     {
                         throw new NumberFormatException(new String(chars, start, len));
                     }
-                    digit = digits_from_char[digit];
                     result *= 10;
                     // NOTE: here we accumulate positively
-                    result += digit;
+                    result += digits_from_char[digit];
                 }
                 return negative ? -result : result;
             }
