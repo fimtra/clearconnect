@@ -614,8 +614,8 @@ public final class ContextUtils
                     break;
                 case ContextUtils.LINE_SEPARATOR:
                     // we have a line - escaped(key)=escaped(value)
-                    key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
-                    value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+                    key = decodeKey(cbuf.array(), index, new char[index]);
+                    value = decodeValue(cbuf.array(), index + 1, cbuf.position(),
                             new char[cbuf.position() - (index + 1)]);
                     map.put(key, value);
                     cbuf.position(0);
@@ -636,11 +636,23 @@ public final class ContextUtils
         // need to do the final one
         if (index > 0 && indexFound)
         {
-            key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
-            value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+            key = decodeKey(cbuf.array(), index, new char[index]);
+            value = decodeValue(cbuf.array(), index + 1, cbuf.position(),
                     new char[cbuf.position() - (index + 1)]);
             map.put(key, value);
         }
+    }
+
+    private static String decodeKey(char[] escaped, int end, char[] output)
+    {
+        return StringProtocolCodec.resolvePooledStringNoPreamble(output,
+                StringProtocolCodec.unescape(escaped, 0, end, output));
+    }
+
+    private static IValue decodeValue(char[] escaped, int start, int end, char[] output)
+    {
+        return StringProtocolCodec.resolveValue(output,
+                StringProtocolCodec.unescape(escaped, start, end, output));
     }
 
     public static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException

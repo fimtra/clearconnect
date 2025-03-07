@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.ISessionProtocol;
@@ -115,7 +116,6 @@ public class StringProtocolCodec implements ICodec<char[]>
      * the ASCII code for NULL=0x0 causes problems.
      */
     static final char NULL_CHAR = 0x2;
-    static final String NULL_VALUE = String.valueOf(NULL_CHAR);
     static final int DOUBLE_KEY_PREAMBLE_LENGTH = 2;
 
     final ISessionProtocol sessionSyncProtocol;
@@ -245,7 +245,9 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static class DecodingBuffers
     {
-        char[] tempArr;
+        char[] keyArr;
+        char[] valArr;
+        char[] dataArr;
 
         final IdentityHashMap<Charset, CharsetDecoder> decoders = new IdentityHashMap<>(4);
 
@@ -259,7 +261,8 @@ public class StringProtocolCodec implements ICodec<char[]>
         ThreadUtils.registerThreadLocalCleanup(StringProtocolCodec.DECODING_BUFFERS::remove);
 
         final DecodingBuffers instance = new DecodingBuffers();
-        instance.tempArr = new char[50];
+        instance.keyArr = new char[50];
+        instance.valArr = new char[50];
         return instance;
     });
 
@@ -277,13 +280,24 @@ public class StringProtocolCodec implements ICodec<char[]>
         boolean expectingSubmapName = false;
         char previous = 0;
         int slashCount = 0;
-        int dataCount = 0;
-        int zeros = 0;
 
+        int keyPtr = 0;
+        int dataPtr = 0;
         int sectionStart = -1;
-        int keyValueDelim = -1;
-        int len;
         int i = 0;
+
+        // todo this can resolve to rather large arrays being kept - need to optimise somehow
+        // belt-n-braces buffer resizing - we assume worst case scenario for the buffer sizes
+        if (decodingBuffers.keyArr.length < decodedMessage.length)
+        {
+            decodingBuffers.keyArr = new char[decodedMessage.length];
+        }
+        if (decodingBuffers.valArr.length < decodedMessage.length)
+        {
+            decodingBuffers.valArr = new char[decodedMessage.length];
+        }
+
+        decodingBuffers.dataArr = decodingBuffers.keyArr;
 
         // Brief description:
         // handle the header and data in dedicated for-loops, breaking when the relevant attributes are complete
@@ -294,7 +308,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         // preamble
         for (; i < decodedMessage.length; i++)
         {
-            if (isUnescapedChar(CHAR_TOKEN_DELIM, decodedMessage[i], previous, slashCount))
+            if (isTokenDelim(decodedMessage[i], previous, slashCount))
             {
                 i++;
                 sectionStart = i;
@@ -307,15 +321,23 @@ public class StringProtocolCodec implements ICodec<char[]>
         // name
         for (; i < decodedMessage.length; i++)
         {
-            if (isUnescapedChar(CHAR_TOKEN_DELIM, decodedMessage[i], previous, slashCount))
+            if (decodedMessage[i] == CHAR_TOKEN_DELIM)
             {
-                atomicChange = new AtomicChange(stringFromCharBuffer(decodedMessage, sectionStart, i));
+                // record names will be resolved multiple times, so use a pool to reduce memory churn
+                atomicChange = new AtomicChange(resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr));
                 i++;
                 sectionStart = i;
                 break;
             }
-            slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
-            previous = decodedMessage[i];
+            else if (decodedMessage[i] == CHAR_ESCAPE)
+            {
+                i++;
+                dataPtr = handleEscapeChar(decodedMessage[i], decodingBuffers.dataArr, dataPtr);
+            }
+            else if (decodedMessage[i] != 0)
+            {
+                decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
+            }
         }
 
         // optimise the locking for the internal getXXX methods
@@ -324,7 +346,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             // scope and sequence
             for (; i < decodedMessage.length; i++)
             {
-                if (isUnescapedChar(CHAR_TOKEN_DELIM, decodedMessage[i], previous, slashCount))
+                if (isTokenDelim(decodedMessage[i], previous, slashCount))
                 {
                     atomicChange.setScope(decodedMessage[sectionStart++]);
                     atomicChange.setSequence(
@@ -339,14 +361,16 @@ public class StringProtocolCodec implements ICodec<char[]>
                 previous = decodedMessage[i];
             }
 
+            decodingBuffers.dataArr = decodingBuffers.keyArr;
+            dataPtr = 0;
+
             // data
             for (; i < decodedMessage.length; i++)
             {
-                if (isUnescapedChar(CHAR_TOKEN_DELIM, decodedMessage[i], previous, slashCount))
+                if (decodedMessage[i] == CHAR_TOKEN_DELIM)
                 {
                     // its the end of a token section "|"
-                    len = i - sectionStart;
-                    if (len == 1)
+                    if (i - sectionStart == 1)
                     {
                         switch(decodedMessage[i - 1])
                         {
@@ -372,74 +396,54 @@ public class StringProtocolCodec implements ICodec<char[]>
                     {
                         if (expectingSubmapName)
                         {
-                            subMapName = stringFromCharBuffer(decodedMessage, sectionStart, i);
+                            subMapName = resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr);
                             expectingSubmapName = false;
                         }
                         else
                         {
                             // key=value
-                            if (dataCount > 0)
-                            {
-                                if (decodingBuffers.tempArr.length < len)
-                                {
-                                    decodingBuffers.tempArr = new char[len];
-                                }
-                                final String key =
-                                        decodeKey(decodedMessage, sectionStart, keyValueDelim, true,
-                                                decodingBuffers.tempArr);
-                                if (key != null)
-                                {
-                                    targetMap.put(key, decodeValue(decodedMessage, keyValueDelim + 1, i,
-                                            decodingBuffers.tempArr));
-                                }
-                            }
+                            targetMap.put(resolvePooledStringWithPreamble(decodingBuffers.keyArr, keyPtr),
+                                    resolveValue(decodingBuffers.dataArr, dataPtr));
+
+                            decodingBuffers.dataArr = decodingBuffers.keyArr;
                         }
                     }
                     sectionStart = i + 1;
-                    dataCount = slashCount = 0;
+                    dataPtr = 0;
                 }
-                else if (isUnescapedChar(CHAR_KEY_VALUE_SEPARATOR, decodedMessage[i], previous, slashCount))
+                else if (decodedMessage[i] == CHAR_KEY_VALUE_SEPARATOR)
                 {
-                    keyValueDelim = i;
+                    decodingBuffers.dataArr = decodingBuffers.valArr;
+                    keyPtr = dataPtr;
+                    dataPtr = 0;
                 }
-                else if (decodedMessage[i] == 0)
+                else if (decodedMessage[i] == CHAR_ESCAPE)
+                {
+                    i++;
+                    dataPtr = handleEscapeChar(decodedMessage[i], decodingBuffers.dataArr, dataPtr);
+                }
+                else if (decodedMessage[i] != 0)
                 {
                     // when decoding a byte[] into a char[], the byte[] and char[] lengths are the
                     // same BUT characters taking up 2 bytes for encoding only take up 1 char so we
                     // end up with trailing 0 in the char[], e.g. '£' = [-62][-93] for bytes but is
                     // 1 char in a char[]
-                    zeros++;
+                    decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
                 }
-                else
-                {
-                    dataCount++;
-                }
-                slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
-                previous = decodedMessage[i];
             }
 
             // process the last one
-            if (dataCount == 0)
+            // could be an empty change, e.g. "|record1|i0"
+            if (!sequenceAndScopeSet)
             {
-                // could be an empty change, e.g. "|record1|i0"
-                if (!sequenceAndScopeSet)
-                {
-                    atomicChange.setScope(decodedMessage[sectionStart++]);
-                    atomicChange.setSequence(
-                            LongValue.valueOf(decodedMessage, sectionStart, i - (sectionStart))
-                                    .longValue());
-                }
+                atomicChange.setScope(decodedMessage[sectionStart++]);
+                atomicChange.setSequence(LongValue.valueOf(decodedMessage, sectionStart, i - (sectionStart))
+                        .longValue());
             }
             else
             {
-                // check size for the entire key=value
-                if (decodingBuffers.tempArr.length < i - sectionStart)
-                {
-                    decodingBuffers.tempArr = new char[i - sectionStart];
-                }
-                targetMap.put(
-                        decodeKey(decodedMessage, sectionStart, keyValueDelim, true, decodingBuffers.tempArr),
-                        decodeValue(decodedMessage, keyValueDelim + 1, i - zeros, decodingBuffers.tempArr));
+                targetMap.put(resolvePooledStringWithPreamble(decodingBuffers.keyArr, keyPtr),
+                        resolveValue(decodingBuffers.dataArr, dataPtr));
             }
 
             // remove any keys that are in put and removed - leave in removed
@@ -453,9 +457,35 @@ public class StringProtocolCodec implements ICodec<char[]>
         return atomicChange;
     }
 
-    private static boolean isUnescapedChar(char tokenChar, char current, char previous, int slashCount)
+    private static int handleEscapeChar(char current, char[] data, int dataPtr)
     {
-        return current == tokenChar && (previous != CHAR_ESCAPE ||
+        switch(current)
+        {
+            case CHAR_r:
+                data[dataPtr++] = CR;
+                break;
+            case CHAR_n:
+                data[dataPtr++] = LF;
+                break;
+            case CHAR_ESCAPE:
+                data[dataPtr++] = CHAR_ESCAPE;
+                break;
+            case CHAR_TOKEN_DELIM:
+                data[dataPtr++] = CHAR_TOKEN_DELIM;
+                break;
+            case CHAR_KEY_VALUE_SEPARATOR:
+                data[dataPtr++] = CHAR_KEY_VALUE_SEPARATOR;
+                break;
+            case CHAR_SYMBOL_PREFIX:
+                data[dataPtr++] = CHAR_SYMBOL_PREFIX;
+                break;
+        }
+        return dataPtr;
+    }
+
+    private static boolean isTokenDelim(char current, char previous, int slashCount)
+    {
+        return current == StringProtocolCodec.CHAR_TOKEN_DELIM && (previous != CHAR_ESCAPE ||
                 // the previous was '\' and there was an even number of contiguous slashes
                 ((slashCount & 0x1) == 0));
     }
@@ -601,7 +631,6 @@ public class StringProtocolCodec implements ICodec<char[]>
                 length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
                 if (keyChars.ref.length < length)
                 {
-                    // resize
                     keyChars.ref = new char[length];
                     keyChars.ref[0] = NULL_CHAR;
                     keyChars.ref[1] = NULL_CHAR;
@@ -674,7 +703,6 @@ public class StringProtocolCodec implements ICodec<char[]>
             final int length = valueToSend.length();
             if (charsRef.ref.length < length)
             {
-                // resize
                 charsRef.ref = new char[length];
             }
 
@@ -718,51 +746,32 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     /**
-     * Parse the chars and performs unescaping copying into the destination char[]
+     * Performs unescaping of the chars from start to end, copying the unescaped chars into the output.
      * <p>
-     * This assumes the destination has sufficient space to accept the chars between start and end.
+     * This assumes the output has sufficient space to accept the chars between start and end.
+     * <p>
+     * Note that this is not very efficient as this can only be called AFTER parsing the escaped array to find
+     * the length to process. Effectively, this resolves to a double-pass operation over the start to end
+     * range when you include the calling code.
      *
      * @return the index in the destination where the unescaped sequence ends
      */
-    static int doUnescape(char[] chars, int start, int end, final char[] dest)
+    static int unescape(char[] escaped, int start, int end, char[] output)
     {
-        int unescapedPtr = 0;
-        if (end <= chars.length)
+        int outPtr = 0;
+        for (int i = start; i < end; i++)
         {
-            for (int i = start; i < end; i++)
+            if (escaped[i] == CHAR_ESCAPE)
             {
-                if (chars[i] == CHAR_ESCAPE)
-                {
-                    i++;
-                    switch(chars[i])
-                    {
-                        case CHAR_r:
-                            dest[unescapedPtr++] = CR;
-                            break;
-                        case CHAR_n:
-                            dest[unescapedPtr++] = LF;
-                            break;
-                        case CHAR_ESCAPE:
-                            dest[unescapedPtr++] = CHAR_ESCAPE;
-                            break;
-                        case CHAR_TOKEN_DELIM:
-                            dest[unescapedPtr++] = CHAR_TOKEN_DELIM;
-                            break;
-                        case CHAR_KEY_VALUE_SEPARATOR:
-                            dest[unescapedPtr++] = CHAR_KEY_VALUE_SEPARATOR;
-                            break;
-                        case CHAR_SYMBOL_PREFIX:
-                            dest[unescapedPtr++] = CHAR_SYMBOL_PREFIX;
-                            break;
-                    }
-                }
-                else
-                {
-                    dest[unescapedPtr++] = chars[i];
-                }
+                i++;
+                outPtr = handleEscapeChar(escaped[i], output, outPtr);
+            }
+            else if (escaped[i] != 0)
+            {
+                output[outPtr++] = escaped[i];
             }
         }
-        return unescapedPtr;
+        return outPtr;
     }
 
     static final CharSubArrayKeyedPool<String> decodedKeysPool =
@@ -776,73 +785,93 @@ public class StringProtocolCodec implements ICodec<char[]>
         };
 
     /**
-     * Performs unescaping and decoding of a key
+     * Creates a string from the chars (already unescaped) from position 0 to end
      */
-    static String decodeKey(char[] chars, int start, int end, boolean hasPreamble, char[] unescaped)
+    static String createString(char[] chars, int end)
     {
-        final int unescapedPtr = doUnescape(chars, start, end, unescaped);
-
-        if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
+        if (end == 1 && chars[0] == NULL_CHAR)
         {
             return null;
         }
-
-        return hasPreamble
-            ? decodedKeysPool.get(unescaped, DOUBLE_KEY_PREAMBLE_LENGTH, unescapedPtr - DOUBLE_KEY_PREAMBLE_LENGTH)
-            : decodedKeysPool.get(unescaped, 0, unescapedPtr);
-    }
-
-    static String encodeValue(IValue value)
-    {
-        return value == null ? NULL_VALUE : value.toString();
+        // note: this does an array copy when constructing the string...no way to prevent this
+        final String s = new String(chars, 0, end);
+        return end < DataFissionProperties.Values.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL ? s.intern() : s;
     }
 
     /**
-     * Performs unescaping and decoding of a value
+     * Performs decoding of a string key with preamble using already unescaped chars
      */
-    static IValue decodeValue(char[] chars, int start, int end, char[] unescaped)
+    static String resolvePooledStringWithPreamble(char[] chars, int end)
     {
-        final int unescapedPtr = doUnescape(chars, start, end, unescaped);
-
-        if (unescapedPtr == 1 && unescaped[0] == NULL_CHAR)
+        if (end == 1 && chars[0] == NULL_CHAR)
         {
             return null;
         }
 
-        return AbstractValue.constructFromCharValue(unescaped, unescapedPtr);
+        return decodedKeysPool.get(chars, DOUBLE_KEY_PREAMBLE_LENGTH, end - DOUBLE_KEY_PREAMBLE_LENGTH);
     }
 
-    static String stringFromCharBuffer(char[] chars, int offset, int limit)
+    /**
+     * Performs decoding of a string key using already unescaped chars with no preamble
+     */
+    static String resolvePooledStringNoPreamble(char[] chars, int end)
     {
-        final char[] unescaped = new char[limit - offset];
-        final int unescapedPtr = doUnescape(chars, offset, limit, unescaped);
-        // note: this does an array copy when constructing the string
-        return new String(unescaped, 0, unescapedPtr);
+        if (end == 1 && chars[0] == NULL_CHAR)
+        {
+            return null;
+        }
+
+        return decodedKeysPool.get(chars, 0, end);
+    }
+
+    /**
+     * Performs decoding of an already unescaped value
+     */
+    static IValue resolveValue(char[] chars, int end)
+    {
+        if (end == 1 && chars[0] == NULL_CHAR)
+        {
+            return null;
+        }
+
+        return AbstractValue.constructFromCharValue(chars, end);
     }
 
     static List<String> getNamesFromCommandMessage(char[] decodedMessage)
     {
-        char previous = 0;
-        int slashCount = 0;
         // the first token will be the command - we ignore this, e.g. [s, |, o, n, e, |, t, w, o, |, t, h, r, e, e]
         int i = 2;
-        int sectionStart = i;
+        int keyPtr = 0;
+
         final List<String> names = new ArrayList<>();
+        final DecodingBuffers decodingBuffers = DECODING_BUFFERS.get();
+
+        if (decodingBuffers.keyArr.length < decodedMessage.length)
+        {
+            decodingBuffers.keyArr = new char[decodedMessage.length];
+        }
+
         for (; i < decodedMessage.length; i++)
         {
-            if (isUnescapedChar(CHAR_TOKEN_DELIM, decodedMessage[i], previous, slashCount))
+            if (decodedMessage[i] == CHAR_TOKEN_DELIM)
             {
-                names.add(stringFromCharBuffer(decodedMessage, sectionStart, i));
-                i++;
-                sectionStart = i;
+                names.add((createString(decodingBuffers.keyArr, keyPtr)));
+                keyPtr = 0;
             }
-            slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
-            previous = decodedMessage[i];
+            else if (decodedMessage[i] == CHAR_ESCAPE)
+            {
+                i++;
+                keyPtr = handleEscapeChar(decodedMessage[i], decodingBuffers.keyArr, keyPtr);
+            }
+            else if (decodedMessage[i] != 0)
+            {
+                decodingBuffers.keyArr[keyPtr++] = decodedMessage[i];
+            }
         }
         // process the last one
-        if (sectionStart < i)
+        if (keyPtr > 0)
         {
-            names.add(stringFromCharBuffer(decodedMessage, sectionStart, i));
+            names.add((createString(decodingBuffers.keyArr, keyPtr)));
         }
         return names;
     }
