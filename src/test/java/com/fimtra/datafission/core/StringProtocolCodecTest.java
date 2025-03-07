@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,7 +44,7 @@ import org.junit.Test;
 
 /**
  * Tests for the {@link StringProtocolCodec}
- * 
+ *
  * @author Ramon Servadei
  */
 public class StringProtocolCodecTest extends CodecBaseTest
@@ -171,19 +171,84 @@ public class StringProtocolCodecTest extends CodecBaseTest
     }
 
     @Test
-    public void testEncodeDecodeAtomicChange_simple()
+    public void testEncodeDecodeAtomicChange_emptyImage()
     {
-        final String k1 = "k1";
-        final TextValue v1 = TextValue.valueOf("val1");
+        AtomicChange change = new AtomicChange("empty");
+        change.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
+        change.setSequence(0);
 
+        final IRecordChange result = getRecordChange(change);
+
+        assertEquals(IRecordChange.IMAGE_SCOPE_CHAR, result.getScope());
+        assertEquals(0, result.getSequence());
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleTextValue()
+    {
+        doSingleValueTest("k1", TextValue.valueOf("val1"));
+    }
+    @Test
+    public void testEncodeDecodeAtomicChange_singleTextValue_specialChars()
+    {
+        doSingleValueTest("k1\\", TextValue.valueOf("val1"));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleBlobValue()
+    {
+        doSingleValueTest("k1", BlobValue.valueOf("val1".getBytes()));
+    }
+
+    private void doSingleValueTest(String k1, IValue v1)
+    {
         AtomicChange change = new AtomicChange("chg");
         change.mergeEntryUpdatedChange(k1, v1, null);
 
-        byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
-        IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+        final IRecordChange result = getRecordChange(change);
+
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        System.err.println(rec2);
+        assertEquals(1, rec2.size());
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+    }
+
+    private IRecordChange getRecordChange(AtomicChange change)
+    {
+        byte[] txMessageForChange =
+                this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
+        return this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange()
+    {
+        final String k1 = "one$£";
+        final String k2 = "two$£";
+        final String k3 = "three$£";
+        final String k4 = "four$£";
+        final LongValue v1 = LongValue.valueOf(1);
+        final DoubleValue v2 = DoubleValue.valueOf(2);
+        final BlobValue v3 = BlobValue.valueOf("$£some value \\|| with \\r\\n | delimiters \\/ |\\ |/".getBytes());
+        final TextValue v4 = TextValue.valueOf("$£23456789-10-0123456789-20-$£23456789-30-0123456789-40-0123456789");
+
+        AtomicChange change = new AtomicChange("change-$£");
+        change.mergeEntryUpdatedChange(k1, v1, null);
+        change.mergeEntryUpdatedChange(k2, v2, null);
+        change.mergeEntryRemovedChange(k3, v3);
+        change.mergeEntryRemovedChange(k4, v4);
+
+        final IRecordChange result = getRecordChange(change);
 
         Map<String, IValue> map1 = new HashMap<>();
-        map1.put(k1, v1);
+        map1.put(k1, v3);
+        map1.put(k3, v3);
+        map1.put(k4, v4);
 
         Context c = new Context("test");
         IRecord rec1 = c.getOrCreateRecord("rec1");
@@ -195,10 +260,11 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.applyTo(rec1);
         result.applyTo(rec2);
         assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+        assertFalse(rec1.containsKey(k3));
     }
 
     @Test
-    public void testEncodeDecodeAtomicChange()
+    public void testEncodeDecodeAtomicChange_withSubmap()
     {
         final String k1 = "one$£";
         final String k2 = "two$£";
@@ -220,8 +286,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange(subMapKey, k3, v3);
         change.mergeSubMapEntryRemovedChange(subMapKey, k4, v4);
 
-        byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
-        IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+        final IRecordChange result = getRecordChange(change);
 
         Map<String, IValue> map1 = new HashMap<>();
         map1.put(k1, v3);
