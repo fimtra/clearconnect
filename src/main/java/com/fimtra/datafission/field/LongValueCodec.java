@@ -84,7 +84,7 @@ abstract class LongValueCodec
         // hence we start at the END of the array and work "backwards" (--lsDigitPos)
 
         // Get 2 digits/iteration using longs until quotient fits into a short
-        while (i > 65536)
+        while (i > 65535)
         {
             q = i / 100;
             r = (int) (i - (q * 100));

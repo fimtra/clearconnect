@@ -184,7 +184,8 @@ class DoubleValueCodec
             //       hence we start at the END of the array and work "backwards" (--lsDigitPos)
 
             // Get 2 digits/iteration using longs until quotient fits into a short
-            while (lValue >= 65536) {
+            while (lValue > 65535)
+            {
                 q = lValue / 100;
                 r = (int) (lValue - (q * 100));
                 lValue = q;
