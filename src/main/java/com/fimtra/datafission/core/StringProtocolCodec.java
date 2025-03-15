@@ -306,7 +306,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         // we break out of the for-loop, this is a bit like a goto but not as bad
 
         // preamble
-        for (; i < decodedMessage.length; i++)
+        while (i < decodedMessage.length)
         {
             if (isTokenDelim(decodedMessage[i], previous, slashCount))
             {
@@ -316,10 +316,11 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
             previous = decodedMessage[i];
+            i++;
         }
 
         // name
-        for (; i < decodedMessage.length; i++)
+        while (i < decodedMessage.length)
         {
             if (decodedMessage[i] == CHAR_TOKEN_DELIM)
             {
@@ -338,13 +339,14 @@ public class StringProtocolCodec implements ICodec<char[]>
             {
                 decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
             }
+            i++;
         }
 
         // optimise the locking for the internal getXXX methods
         synchronized (atomicChange)
         {
             // scope and sequence
-            for (; i < decodedMessage.length; i++)
+            while(i < decodedMessage.length)
             {
                 if (isTokenDelim(decodedMessage[i], previous, slashCount))
                 {
@@ -359,13 +361,14 @@ public class StringProtocolCodec implements ICodec<char[]>
                 }
                 slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
                 previous = decodedMessage[i];
+                i++;
             }
 
             decodingBuffers.dataArr = decodingBuffers.keyArr;
             dataPtr = 0;
 
             // data
-            for (; i < decodedMessage.length; i++)
+            while (i < decodedMessage.length)
             {
                 if (decodedMessage[i] == CHAR_TOKEN_DELIM)
                 {
@@ -430,6 +433,7 @@ public class StringProtocolCodec implements ICodec<char[]>
                     // 1 char in a char[]
                     decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
                 }
+                i++;
             }
 
             // process the last one
@@ -439,6 +443,12 @@ public class StringProtocolCodec implements ICodec<char[]>
                 atomicChange.setScope(decodedMessage[sectionStart++]);
                 atomicChange.setSequence(LongValue.valueOf(decodedMessage, sectionStart, i - (sectionStart))
                         .longValue());
+            }
+            // could be a fragmented change, ending with a submap name, e.g. |record1|i0|p|key=value|:|submap
+            else if (expectingSubmapName)
+            {
+                subMapName = resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr);
+                target.getSubMapAtomicChange(subMapName);
             }
             else
             {
@@ -622,6 +632,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             key = entry.getKey();
             value = entry.getValue();
             txString.append(DELIMITER);
+            // todo can we ensure no null keys ever?
             if (key == null)
             {
                 txString.append(NULL_CHAR);
@@ -673,6 +684,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             else
             {
+                // todo optimise to just if(TEXT)-else
                 switch(value.getType())
                 {
                     case DOUBLE:

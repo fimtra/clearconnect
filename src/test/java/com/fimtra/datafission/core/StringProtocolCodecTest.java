@@ -336,6 +336,17 @@ public class StringProtocolCodecTest extends CodecBaseTest
     }
 
     @Test
+    public void testFragmentedAtomicChange()
+    {
+        final String encoded = "|record|d123|:|submap1|p|k1=L0|:|submap2";
+        final IRecordChange change =
+                StringProtocolCodec.decodeAtomicChange(encoded.toCharArray(), DECODING_BUFFERS.get());
+        assertEquals(
+                "AtomicChange [name=record, d123 subMapAtomicChanges={submap1=AtomicChange [name=submap1, d123, putEntries={=L0}]}]",
+                change.toString());
+    }
+
+    @Test
     public void testEncodeDecodeAtomicChange_preamble()
     {
         final String k1 = "one";

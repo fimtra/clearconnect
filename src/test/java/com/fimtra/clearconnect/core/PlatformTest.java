@@ -433,6 +433,35 @@ public class PlatformTest
     }
 
     @Test
+    public void testLotsOfServices() throws IOException
+    {
+        // this test specifically verifies fragmentation of a record - the serviceInstance record
+        // we have many services here and we want to ensure that the record is fragmented
+
+        createAgent();
+
+        int max = 100;
+        for(int i = 0; i < max; i++)
+        {
+            assertTrue(this.agent.createPlatformServiceInstance("service-" + i,
+                    this.primary, this.agentHost, servicePort++,
+                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+        }
+
+        createAgent008();
+
+        final TestServiceInstanceAvailableListener listener = new TestServiceInstanceAvailableListener();
+        final TestServiceInstanceAvailableListener listener2 = new TestServiceInstanceAvailableListener();
+        agent008.addServiceInstanceAvailableListener(listener);
+        agent008.addServiceInstanceAvailableListener(listener2);
+
+        listener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, "service-0[PRIMARY]");
+
+        // note: +1 for the platform registry "PlatformRegistry[PlatformTestJUnit-testLotsOfServices]"
+        assertEquals("Got: " + listener2.available, max + 1, listener2.available.size());
+    }
+
+    @Test
     public void testCannotMixRedundancyModeServices() throws IOException
     {
         final String SERVICE1 = logStart();
