@@ -290,11 +290,11 @@ public class StringProtocolCodec implements ICodec<char[]>
         // belt-n-braces buffer resizing - we assume worst case scenario for the buffer sizes
         if (decodingBuffers.keyArr.length < decodedMessage.length)
         {
-            decodingBuffers.keyArr = new char[decodedMessage.length];
+            decodingBuffers.keyArr = new char[getNewSize(decodingBuffers.keyArr.length, decodedMessage.length)];
         }
         if (decodingBuffers.valArr.length < decodedMessage.length)
         {
-            decodingBuffers.valArr = new char[decodedMessage.length];
+            decodingBuffers.valArr = new char[getNewSize(decodingBuffers.keyArr.length, decodedMessage.length)];
         }
 
         decodingBuffers.dataArr = decodingBuffers.keyArr;
@@ -467,6 +467,11 @@ public class StringProtocolCodec implements ICodec<char[]>
         return atomicChange;
     }
 
+    private static int getNewSize(int currentLength, int newLength)
+    {
+        return Math.max(currentLength * 2, newLength);
+    }
+
     private static int handleEscapeChar(char current, char[] data, int dataPtr)
     {
         switch(current)
@@ -632,74 +637,62 @@ public class StringProtocolCodec implements ICodec<char[]>
             key = entry.getKey();
             value = entry.getValue();
             txString.append(DELIMITER);
-            // todo can we ensure no null keys ever?
-            if (key == null)
-            {
-                txString.append(NULL_CHAR);
-            }
-            else
-            {
-                length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
-                if (keyChars.ref.length < length)
-                {
-                    keyChars.ref = new char[length];
-                    keyChars.ref[0] = NULL_CHAR;
-                    keyChars.ref[1] = NULL_CHAR;
-                }
-                cbuf = keyChars.ref;
-                key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
 
-                last = 0;
-                for (i = 0; i < length; i++)
-                {
-                    switch(cbuf[i])
-                    {
-                        case CR:
-                            escapedChars[1] = CHAR_r;
-                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
-                            last = i + 1;
-                            break;
-                        case LF:
-                            escapedChars[1] = CHAR_n;
-                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
-                            last = i + 1;
-                            break;
-                        case CHAR_ESCAPE:
-                        case CHAR_TOKEN_DELIM:
-                        case CHAR_KEY_VALUE_SEPARATOR:
-                            escapedChars[1] = cbuf[i];
-                            txString.append(cbuf, last, i - last, escapedChars, 0, 2);
-                            last = i + 1;
-                            break;
-                        default:
-                    }
-                }
-                txString.append(cbuf, last, length - last);
+            // note: key is never null, records do not allow null keys
+            length = key.length() + DOUBLE_KEY_PREAMBLE_LENGTH;
+            if (keyChars.ref.length < length)
+            {
+                keyChars.ref = new char[getNewSize(keyChars.ref.length, length)];
+                keyChars.ref[0] = NULL_CHAR;
+                keyChars.ref[1] = NULL_CHAR;
             }
+            cbuf = keyChars.ref;
+            key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
+
+            last = 0;
+            char charAt;
+            for (i = 0; i < length; i++)
+            {
+                charAt = cbuf[i];
+                switch(charAt)
+                {
+                    case CR:
+                        escapedChars[1] = CHAR_r;
+                        txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                        last = i + 1;
+                        break;
+                    case LF:
+                        escapedChars[1] = CHAR_n;
+                        txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                        last = i + 1;
+                        break;
+                    case CHAR_ESCAPE:
+                    case CHAR_TOKEN_DELIM:
+                    case CHAR_KEY_VALUE_SEPARATOR:
+                        escapedChars[1] = charAt;
+                        txString.append(cbuf, last, i - last, escapedChars, 0, 2);
+                        last = i + 1;
+                        break;
+                    default:
+                }
+            }
+            txString.append(cbuf, last, length - last);
 
             txString.append(CHAR_KEY_VALUE_SEPARATOR);
             if (value == null || changeType == DELIMITER_REMOVE_CODE)
             {
                 txString.append(NULL_CHAR);
             }
+            else if (value.getType() == IValue.TypeEnum.TEXT)
+            {
+                txString.append(IValue.TEXT_CODE);
+                escape(value.textValue(), txString, chars, escapedChars);
+            }
             else
             {
-                // todo optimise to just if(TEXT)-else
-                switch(value.getType())
-                {
-                    case DOUBLE:
-                    case LONG:
-                    case BLOB:
-                        // longs, doubles and blobs do not need escaping
-                        // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
-                        value.appendTo(txString);
-                        break;
-                    case TEXT:
-                    default:
-                        txString.append(IValue.TEXT_CODE);
-                        escape(value.textValue(), txString, chars, escapedChars);
-                        break;
-                }
+                // longs, doubles and blobs do not need escaping
+                // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
+                value.appendTo(txString);
             }
         }
     }
@@ -715,7 +708,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             final int length = valueToSend.length();
             if (charsRef.ref.length < length)
             {
-                charsRef.ref = new char[length];
+                charsRef.ref = new char[getNewSize(charsRef.ref.length, length)];
             }
 
             final char[] chars = charsRef.ref;
@@ -860,7 +853,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         if (decodingBuffers.keyArr.length < decodedMessage.length)
         {
-            decodingBuffers.keyArr = new char[decodedMessage.length];
+            decodingBuffers.keyArr = new char[getNewSize(decodingBuffers.keyArr.length, decodedMessage.length)];
         }
 
         for (; i < decodedMessage.length; i++)

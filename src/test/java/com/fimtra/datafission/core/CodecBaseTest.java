@@ -179,15 +179,27 @@ public abstract class CodecBaseTest
         assertNotNull(txStringForChange);
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void testGetTxMessageForAtomicChangeWithNullKeyAndData()
     {
+        // we can never have a null key - Record does not allow this
         Map<String, IValue> addedEntries = new HashMap<>();
         addedEntries.put(null, null);
         Map<String, IValue> removedEntries = new HashMap<>();
         removedEntries.put(null, null);
         final IRecordChange changeFromRxData = performTxRxAndGetChange(this.name, addedEntries, removedEntries);
         checkResults(this.name, ContextUtils.EMPTY_MAP, removedEntries, changeFromRxData);
+    }
+
+    @Test
+    public void testGetTxMessageForAtomicChangeWithNullData()
+    {
+        Map<String, IValue> addedEntries = new HashMap<>();
+        addedEntries.put("k1", null);
+        Map<String, IValue> removedEntries = new HashMap<>();
+        removedEntries.put("k2", null);
+        final IRecordChange changeFromRxData = performTxRxAndGetChange(this.name, addedEntries, removedEntries);
+        checkResults(this.name, addedEntries, removedEntries, changeFromRxData);
     }
 
     @Test
