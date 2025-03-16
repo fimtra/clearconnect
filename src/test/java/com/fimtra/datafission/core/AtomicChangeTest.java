@@ -272,13 +272,13 @@ public class AtomicChangeTest
         this.candidate.mergeEntryUpdatedChange(K1, V1, null);
         assertEquals(1, candidate.getSize());
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
-        assertEquals(2, candidate.getSize());
+        assertEquals(1, candidate.getSize());
         this.candidate.mergeEntryRemovedChange(K2, V1);
-        assertEquals(3, candidate.getSize());
+        assertEquals(2, candidate.getSize());
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, null);
-        assertEquals(4, candidate.getSize());
+        assertEquals(3, candidate.getSize());
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
-        assertEquals(5, candidate.getSize());
+        assertEquals(3, candidate.getSize());
     }
     
     @Test

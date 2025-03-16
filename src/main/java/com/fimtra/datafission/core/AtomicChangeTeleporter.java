@@ -99,7 +99,7 @@ final class AtomicChangeTeleporter
      */
     private enum EntryEnum
     {
-            PUT, OVERWRITTEN, REMOVED;
+        PUT, REMOVED;
 
         Map<String, IValue> getEntriesToRead(AtomicChange atomicChange)
         {
@@ -107,8 +107,6 @@ final class AtomicChangeTeleporter
             {
                 case PUT:
                     return atomicChange.getPutEntries();
-                case OVERWRITTEN:
-                    return atomicChange.getOverwrittenEntries();
                 case REMOVED:
                     return atomicChange.getRemovedEntries();
             }
@@ -121,8 +119,6 @@ final class AtomicChangeTeleporter
             {
                 case PUT:
                     return atomicChange.internalGetPutEntries();
-                case OVERWRITTEN:
-                    return atomicChange.internalGetOverwrittenEntries();
                 case REMOVED:
                     return atomicChange.internalGetRemovedEntries();
             }
@@ -136,8 +132,8 @@ final class AtomicChangeTeleporter
     private static void merge(AtomicChange source, AtomicChange receivedPart) throws IncorrectSequenceException
     {
         {
-            final long sourceSequence = source.sequence.get().longValue();
-            if (sourceSequence != -1 && sourceSequence != receivedPart.sequence.get().longValue())
+            final long sourceSequence = source.sequence.get();
+            if (sourceSequence != -1 && sourceSequence != receivedPart.sequence.get())
             {
                 throw new IncorrectSequenceException(source.getName(),
                     source.getName() + " expected fragment with sequence: " + sourceSequence + " but got: "
@@ -149,7 +145,6 @@ final class AtomicChangeTeleporter
         source.sequence = receivedPart.sequence;
 
         mergeEntries(EntryEnum.PUT, source, receivedPart, null);
-        mergeEntries(EntryEnum.OVERWRITTEN, source, receivedPart, null);
         mergeEntries(EntryEnum.REMOVED, source, receivedPart, null);
         final Set<String> subMapKeys = receivedPart.getSubMapKeys();
         if (!subMapKeys.isEmpty())
@@ -159,7 +154,6 @@ final class AtomicChangeTeleporter
             {
                 receivedSubMap = receivedPart.internalGetSubMapAtomicChange(key);
                 mergeEntries(EntryEnum.PUT, source, receivedSubMap, key);
-                mergeEntries(EntryEnum.OVERWRITTEN, source, receivedSubMap, key);
                 mergeEntries(EntryEnum.REMOVED, source, receivedSubMap, key);
             }
         }
@@ -303,8 +297,6 @@ final class AtomicChangeTeleporter
 
         partsIndex = writeEntries(EntryEnum.PUT, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
             null, totalChangeCount);
-        partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, change, parts, partsIndex, changeCounter,
-            this.maxChangesPerPart, null, totalChangeCount);
         partsIndex = writeEntries(EntryEnum.REMOVED, name, change, parts, partsIndex, changeCounter,
             this.maxChangesPerPart, null, totalChangeCount);
 
@@ -318,8 +310,6 @@ final class AtomicChangeTeleporter
                 subMapChange = change.internalGetSubMapAtomicChange(key);
                 partsIndex = writeEntries(EntryEnum.PUT, name, subMapChange, parts, partsIndex, changeCounter,
                     this.maxChangesPerPart, key, totalChangeCount);
-                partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, subMapChange, parts, partsIndex, changeCounter,
-                    this.maxChangesPerPart, key, totalChangeCount);
                 partsIndex = writeEntries(EntryEnum.REMOVED, name, subMapChange, parts, partsIndex, changeCounter,
                     this.maxChangesPerPart, key, totalChangeCount);
             }
@@ -332,9 +322,9 @@ final class AtomicChangeTeleporter
      *            a received part of an {@link AtomicChange}
      * @return <code>null</code> if the received part was not the final part otherwise the completed
      *         {@link AtomicChange} from all its received parts
-     * @throws IncorrectSequenceException 
+     * @throws IncorrectSequenceException if the received part has the wrong sequence number
      */
-    synchronized AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException 
+    synchronized AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException
     {
         this.nameRef.set(null);
         getNameAndPart(receivedPart.getName(), this.nameRef, this.part);

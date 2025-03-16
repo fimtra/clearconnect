@@ -140,7 +140,7 @@ public interface IRecordChange
     long getSequence();
     
     /**
-     * @return the sum of the number of put,overwritten,removed entries in this record change and
+     * @return the sum of the number of put,removed entries in this record change and
      *         sub-map changes.
      */
     int getSize();

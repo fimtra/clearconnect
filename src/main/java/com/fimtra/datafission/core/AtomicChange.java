@@ -276,7 +276,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     public int getSize()
     {
         int size = this.putEntries == null ? 0 : this.putEntries.size();
-        size += this.overwrittenEntries == null ? 0 : this.overwrittenEntries.size();
         size += this.removedEntries == null ? 0 : this.removedEntries.size();
 
         if (this.subMapAtomicChanges != null)
@@ -286,7 +285,6 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
             {
                 value = entry.getValue();
                 size += value.putEntries == null ? 0 : value.putEntries.size();
-                size += value.overwrittenEntries == null ? 0 : value.overwrittenEntries.size();
                 size += value.removedEntries == null ? 0 : value.removedEntries.size();
             }
         }
