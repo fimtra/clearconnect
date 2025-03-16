@@ -891,6 +891,13 @@ public final class ContextUtils
         return RPC_EXECUTOR.isExecutorThread(Thread.currentThread().getId());
     }
 
+    private static final ThreadLocal<Boolean> IS_FRAMEWORK_THREAD = ThreadLocal.withInitial(() -> {
+        final long id = Thread.currentThread()
+                .getId();
+        return CORE_EXECUTOR.isExecutorThread(id) || RPC_EXECUTOR.isExecutorThread(id)
+                || SYSTEM_RECORD_EXECUTOR.isExecutorThread(id);
+    });
+
     /**
      * @return <code>true</code> if the thread is an internal thread, this covers core, rpc and
      * system threads
@@ -900,9 +907,7 @@ public final class ContextUtils
      */
     public static boolean isFrameworkThread()
     {
-        final long id = Thread.currentThread().getId();
-        return CORE_EXECUTOR.isExecutorThread(id) || RPC_EXECUTOR.isExecutorThread(id)
-            || SYSTEM_RECORD_EXECUTOR.isExecutorThread(id);
+        return IS_FRAMEWORK_THREAD.get();
     }
 
     /**
