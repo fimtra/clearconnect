@@ -32,6 +32,8 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
 import com.fimtra.thimble.ISequentialRunnable;
+import com.fimtra.util.CharRef;
+import com.fimtra.util.LongRef;
 import com.fimtra.util.is;
 
 /**
@@ -41,7 +43,7 @@ import com.fimtra.util.is;
  */
 public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
-    private static final Long SEQ_INIT = (long) -1;
+    private static final long SEQ_INIT = -1L;
 
     private static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(newMap(0));
     private static final Map<String, IValue> NOOP_MAP = noopMap();
@@ -135,8 +137,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     };
 
     final String name;
-    AtomicReference<Character> scope = new AtomicReference<>(DELTA_SCOPE);
-    AtomicReference<Long> sequence = new AtomicReference<>(SEQ_INIT);
+    final CharRef scope;
+    final LongRef sequence;
 
     Map<String, IValue> putEntries;
     Map<String, IValue> overwrittenEntries;
@@ -155,7 +157,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
      */
     public AtomicChange(IRecord image)
     {
-        this(image.getName());
+        this(image.getName(), new CharRef(IMAGE_SCOPE_CHAR), new LongRef(image.getSequence()));
         synchronized (image.getWriteLock())
         {
             if (!image.isEmpty())
@@ -167,24 +169,36 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
                         image.getOrCreateSubMap(subMapKey));
             }
-            this.scope.set(IMAGE_SCOPE);
-            this.sequence.set(image.getSequence());
         }
     }
 
     public AtomicChange(String name, Map<String, IValue> putEntries, Map<String, IValue> overwrittenEntries,
-        Map<String, IValue> removedEntries)
+            Map<String, IValue> removedEntries)
+    {
+        this(name, putEntries, overwrittenEntries, removedEntries, new CharRef(DELTA_SCOPE_CHAR),
+                new LongRef(SEQ_INIT));
+    }
+
+    AtomicChange(String name)
+    {
+        this(name, null, null, null);
+    }
+
+    AtomicChange(String name, CharRef scope, LongRef sequence)
+    {
+        this(name, null, null, null, scope, sequence);
+    }
+
+    private AtomicChange(String name, Map<String, IValue> putEntries, Map<String, IValue> overwrittenEntries,
+            Map<String, IValue> removedEntries, CharRef scope, LongRef sequence)
     {
         super();
         this.name = name;
         this.putEntries = putEntries;
         this.overwrittenEntries = overwrittenEntries;
         this.removedEntries = removedEntries;
-    }
-
-    AtomicChange(String name)
-    {
-        this(name, null, null, null);
+        this.scope = scope;
+        this.sequence = sequence;
     }
 
     // ==== methods used to support use as the ISequentialRunnable
@@ -628,15 +642,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
                 this.subMapAtomicChanges = newMap();
                 this.subMapKeys = Collections.unmodifiableSet(this.subMapAtomicChanges.keySet());
             }
-            AtomicChange subMapAtomicChange = this.subMapAtomicChanges.get(subMapKey);
-            if (subMapAtomicChange == null)
-            {
-                subMapAtomicChange = new AtomicChange(subMapKey);
-                subMapAtomicChange.scope = this.scope;
-                subMapAtomicChange.sequence = this.sequence;
-                this.subMapAtomicChanges.put(subMapKey, subMapAtomicChange);
-            }
-            return subMapAtomicChange;
+            return this.subMapAtomicChanges.computeIfAbsent(subMapKey,
+                    k -> new AtomicChange(k, this.scope, this.sequence));
         }
     }
 
@@ -733,8 +740,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         final int prime = 31;
         int result = 1;
         result = prime * result + ((this.name == null) ? 0 : this.name.hashCode());
-        result = prime * result + ((this.scope.get() == null) ? 0 : this.scope.get().hashCode());
-        result = prime * result + ((this.sequence.get() == null) ? 0 : this.sequence.get().hashCode());
+        result = prime * result + ((this.scope == null) ? 0 : this.scope.hashCode());
+        result = prime * result + ((this.sequence == null) ? 0 : this.sequence.hashCode());
         return result;
     }
 

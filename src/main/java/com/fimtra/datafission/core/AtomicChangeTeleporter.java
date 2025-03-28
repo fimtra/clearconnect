@@ -141,8 +141,8 @@ final class AtomicChangeTeleporter
             }
         }
 
-        source.scope = receivedPart.scope;
-        source.sequence = receivedPart.sequence;
+        source.scope.set(receivedPart.scope.get());
+        source.sequence.set(receivedPart.sequence.get());
 
         mergeEntries(EntryEnum.PUT, source, receivedPart, null);
         mergeEntries(EntryEnum.REMOVED, source, receivedPart, null);
@@ -235,9 +235,8 @@ final class AtomicChangeTeleporter
                 loopCount = 0;
                 partsIndex++;
                 parts[partsIndex] = new AtomicChange(
-                        PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
-                parts[partsIndex].scope = source.scope;
-                parts[partsIndex].sequence = source.sequence;
+                        PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name,
+                        source.scope, source.sequence);
 
                 if (subMapKey != null)
                 {
@@ -291,9 +290,9 @@ final class AtomicChangeTeleporter
         final AtomicInteger changeCounter = new AtomicInteger();
 
         // populate the first element
-        parts[partsIndex] = new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
-        parts[partsIndex].scope = change.scope;
-        parts[partsIndex].sequence = change.sequence;
+        parts[partsIndex] = new AtomicChange(
+                PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name, change.scope,
+                change.sequence);
 
         partsIndex = writeEntries(EntryEnum.PUT, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
             null, totalChangeCount);
