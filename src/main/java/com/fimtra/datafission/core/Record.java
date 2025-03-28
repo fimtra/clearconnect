@@ -912,9 +912,12 @@ final class SubMap implements Map<String, IValue>
                     else
                     {
                         previous = this.subMap.remove(internKey);
-                        changes.removedKeys[removePtr] = internKey;
-                        changes.removedValues[removePtr] = previous;
-                        removePtr++;
+                        if (previous != null)
+                        {
+                            changes.removedKeys[removePtr] = internKey;
+                            changes.removedValues[removePtr] = previous;
+                            removePtr++;
+                        }
 
                     }
                 }
