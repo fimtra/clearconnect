@@ -55,6 +55,7 @@ public class ImageDeltaChangeProcessorTest
         this.candidate = new ImageDeltaChangeProcessor();
         this.name = "test-recordName";
         this.record = mock(IRecord.class);
+        when(this.record.getWriteLock()).thenReturn(new Object());
         this.changeToApply = mock(IRecordChange.class);
 
         // simulate we have an image
@@ -85,6 +86,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
         verify(this.record).clear();
+        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
     
@@ -113,6 +115,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.record).clear();
         verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
         verifyGetSequenceCalled();
+        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
     
@@ -156,6 +159,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
         verify(this.record).clear();
+        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 
@@ -197,6 +201,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
         verify(this.record).clear();
+        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 

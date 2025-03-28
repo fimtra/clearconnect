@@ -121,35 +121,41 @@ final class ImageDeltaChangeProcessor
             else
             {
                 // its an image and it forms the base-line definition for the record
-                record.clear();                
-                changeToApply.applyCompleteAtomicChangeToRecord(record);
-                
-                // apply any subsequent deltas (this only occurs over multicast topology)
-                final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
-                if (deltas != null)
+                synchronized (record.getWriteLock())
                 {
-                    long deltaSequence;
-                    long lastSequence = changeToApply.getSequence();
-                    for (IRecordChange deltaChange : deltas)
+                    record.clear();
+                    changeToApply.applyCompleteAtomicChangeToRecord(record);
+
+                    // apply any subsequent deltas (this only occurs over multicast topology)
+                    if (!cachedDeltas.isEmpty())
                     {
-                        deltaSequence = deltaChange.getSequence();
-                        // this allows us to skip deltas that are earlier than the received image
-                        if (deltaSequence > lastSequence)
+                        final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
+                        if (deltas != null)
                         {
-                            if (lastSequence + 1 != deltaSequence)
+                            long deltaSequence;
+                            long lastSequence = changeToApply.getSequence();
+                            for (IRecordChange deltaChange : deltas)
                             {
-                                Log.log(this, "Incorrect sequence for cached delta ", name, ", delta.seq=",
-                                    Long.toString(deltaSequence), " last.seq=", Long.toString(lastSequence));
-                                
-                                this.imageReceived.remove(name);
-                                return RESYNC;
+                                deltaSequence = deltaChange.getSequence();
+                                // this allows us to skip deltas that are earlier than the received image
+                                if (deltaSequence > lastSequence)
+                                {
+                                    if (lastSequence + 1 != deltaSequence)
+                                    {
+                                        Log.log(this, "Incorrect sequence for cached delta ", name,
+                                                ", delta.seq=", Long.toString(deltaSequence), " last.seq=",
+                                                Long.toString(lastSequence));
+
+                                        this.imageReceived.remove(name);
+                                        return RESYNC;
+                                    }
+                                    deltaChange.applyCompleteAtomicChangeToRecord(record);
+                                    lastSequence = deltaSequence;
+                                }
                             }
-                            deltaChange.applyCompleteAtomicChangeToRecord(record);
-                            lastSequence = deltaSequence;
                         }
                     }
                 }
-
                 if (!imageAlreadyReceived)
                 {
                     this.imageReceived.put(name, Boolean.TRUE);
