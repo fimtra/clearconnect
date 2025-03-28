@@ -200,7 +200,7 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     {
         try
         {
-            this.context.doPublishChange(this.name, this, this.sequence.get());
+            this.context.doPublishChange(this);
         }
         finally
         {

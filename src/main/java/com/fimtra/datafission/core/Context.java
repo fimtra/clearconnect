@@ -250,8 +250,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return this.images.keySet();
         }
 
-        IRecord updateInstance(String name, IRecordChange change)
+        IRecord updateInstance(IRecordChange change)
         {
+            final String name = change.getName();
             final Record record = this.images.get(name);
             if (record != null)
             {
@@ -393,7 +394,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.active = true;
     }
 
-    private Record createSystemRecord(String recordName)
+    private void createSystemRecord(String recordName)
     {
         this.sequences.put(recordName, new AtomicLong());
         final AtomicChange atomicChange = new AtomicChange(recordName);  
@@ -406,7 +407,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         // add to the context record
         this.records.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
 
-        return record;
     }
 
     @Override
@@ -511,14 +511,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         synchronized (this.recordCreateLock)
         {
-            /*
-             * This is only called when receiving a non-empty remote record for the first time. We
-             * need to insert a blank image because the sequence will not be 0 so an image would
-             * never be inserted when publishing the change. Note: this method is called in the
-             * record context so the image is inserted by the same thread context as it would be for
-             * the publish change logic.
-             */
-            this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, this.noopChangeManager));
             return createRecordInternal_callWithLock(name, ContextUtils.EMPTY_MAP);
         }
     }
@@ -529,6 +521,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         {
             throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
         }
+
+        this.imageCache.put(name, new Record(name, initialData, this.noopChangeManager));
 
         //
         // DO NOT ALTER THE ORDER OF THESE STATEMENTS
@@ -1295,15 +1289,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return Collections.unmodifiableMap(this.rpcInstances);
     }
 
-    void doPublishChange(final String recordName, final IRecordChange atomicChange, long sequence)
+    void doPublishChange(final IRecordChange atomicChange)
     {
-        if (sequence == 0)
-        {
-            this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this.noopChangeManager));
-        }
-
         // update the image with the atomic changes in the runnable
-        final IRecord notifyImage = this.imageCache.updateInstance(recordName, atomicChange);
+        final IRecord notifyImage = this.imageCache.updateInstance(atomicChange);
 
         // this can happen if there is a concurrent delete
         if (notifyImage == null)
@@ -1321,6 +1310,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         long start;
         IRecordListener listener = null;
+        final String recordName = atomicChange.getName();
 
         // NOTE: always get the subscribers to notify in the context of the handling the record
         // change! If we had a snapshot of the subscribers taken outside of the context, we would
@@ -1355,8 +1345,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     listenersNotExpectingImage.add(listener);
                 }
             }
-            listenersToNotify =
-                listenersNotExpectingImage.toArray(new IRecordListener[0]);
+            listenersToNotify = listenersNotExpectingImage.toArray(new IRecordListener[0]);
         }
 
         for (int i = 0; i < listenersToNotify.length; i++)
