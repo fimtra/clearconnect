@@ -37,6 +37,7 @@ import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.CollectionUtils;
+import com.fimtra.util.LongRef;
 import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
@@ -108,7 +109,7 @@ final class Record implements IRecord, Cloneable
     static final ObjectPool<String> keysPool =
         new ObjectPool<>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
-    final AtomicLong sequence;
+    final LongRef sequence;
     final String name;
     final IAtomicChangeManager context;
     Map<String, IValue> data;
@@ -121,7 +122,7 @@ final class Record implements IRecord, Cloneable
         this.data = CollectionUtils.newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
-        this.sequence = new AtomicLong(0);
+        this.sequence = new LongRef(0);
     }
 
     /**
@@ -135,7 +136,7 @@ final class Record implements IRecord, Cloneable
         this.data = CollectionUtils.newMap(data);
         this.subMaps = subMaps;
         this.context = context;
-        this.sequence = new AtomicLong(0);
+        this.sequence = new LongRef(0);
     }
 
     @Override
@@ -472,7 +473,7 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this)
         {
-            return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data, this.subMaps);
+            return toString(this.context.getName(), this.name, this.sequence.get(), this.data, this.subMaps);
         }
     }
 
@@ -619,7 +620,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public long getSequence()
     {
-        return this.sequence.longValue();
+        return this.sequence.get();
     }
 
     Set<Entry<String, IValue>> getSnapshotOfBackingEntrySet()
