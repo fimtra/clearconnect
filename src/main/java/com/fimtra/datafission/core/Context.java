@@ -15,6 +15,8 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.datafission.IRecordChange.DELTA_SCOPE_CHAR;
+
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -54,12 +56,14 @@ import com.fimtra.thimble.ICoalescingRunnable;
 import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.CharRef;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
+import com.fimtra.util.LongRef;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
@@ -396,17 +400,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     private void createSystemRecord(String recordName)
     {
-        this.sequences.put(recordName, new AtomicLong());
-        final AtomicChange atomicChange = new AtomicChange(recordName);  
-        this.pendingAtomicChanges.put(recordName, atomicChange);
-        atomicChange.setSequence(this.sequences.get(recordName).incrementAndGet());
-        this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this.noopChangeManager));
-        Record record = new Record(recordName, ContextUtils.EMPTY_MAP, this);
-        this.records.put(recordName, record);
+        createRecordAndInfrastructure(recordName, ContextUtils.EMPTY_MAP);
 
         // add to the context record
         this.records.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
-
     }
 
     @Override
@@ -522,28 +519,32 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
         }
 
-        this.imageCache.put(name, new Record(name, initialData, this.noopChangeManager));
-
-        //
-        // DO NOT ALTER THE ORDER OF THESE STATEMENTS
-        //
-
-        final Record record = new Record(name, ContextUtils.EMPTY_MAP, this);
-        this.records.put(name, record);
-        // start at -1 because the getPendingAtomicChangesForWrite will incrementAndGet thus
-        // starting at 0
-        this.sequences.put(name, new AtomicLong(-1));
-        synchronized (record.getWriteLock())
-        {
-            getPendingAtomicChangesForWrite(name).setScope(IRecordChange.IMAGE_SCOPE_CHAR);
-        }
-
-        // this will set off an atomic change for the construction
-        record.putAll(initialData);
+        final Record record = createRecordAndInfrastructure(name, initialData);
 
         if (log)
         {
             Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
+        }
+
+        return record;
+    }
+
+    private Record createRecordAndInfrastructure(String recordName, Map<String, IValue> initialImageData)
+    {
+        final int initialSequence = 0;
+
+        this.sequences.put(recordName, new AtomicLong(initialSequence));
+        this.pendingAtomicChanges.put(recordName,
+                new AtomicChange(recordName, new CharRef(IRecordChange.IMAGE_SCOPE_CHAR),
+                        new LongRef(initialSequence)));
+        this.imageCache.put(recordName, new Record(recordName, initialImageData, this.noopChangeManager));
+        final Record record = new Record(recordName, ContextUtils.EMPTY_MAP, this);
+        this.records.put(recordName, record);
+
+        if (!initialImageData.isEmpty())
+        {
+            // this will set off an atomic change for the construction
+            record.putAll(initialImageData);
         }
 
         return record;
@@ -983,8 +984,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final AtomicLong sequence = this.sequences.get(name);
             if (sequence != null)
             {
-                atomicChange = new AtomicChange(name);
-                atomicChange.setSequence(sequence.incrementAndGet());
+                atomicChange = new AtomicChange(name, new CharRef(DELTA_SCOPE_CHAR),
+                        new LongRef(sequence.incrementAndGet()));
                 this.pendingAtomicChanges.put(name, atomicChange);
             }
         }
