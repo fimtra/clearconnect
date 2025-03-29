@@ -558,7 +558,7 @@ public final class ContextUtils
      */
     public static boolean isSystemRecordName(String name)
     {
-        if (name != null && name.length() > 7 && name.charAt(0) == 'C' && name.charAt(6) == 't')
+        if (name.length() > 7 && name.charAt(0) == 'C')
         {
             return SYSTEM_RECORDS.contains(name);
         }
