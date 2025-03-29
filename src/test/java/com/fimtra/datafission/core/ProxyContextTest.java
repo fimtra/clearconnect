@@ -264,10 +264,22 @@ public class ProxyContextTest
             {
                 Log.log(this,
                     ">>> teardown: " + ProxyContextTest.this.candidate + "  " + ProxyContextTest.this.publisher);
-                ProxyContextTest.this.executor.shutdownNow();
-                ProxyContextTest.this.publisher.destroy();
-                ProxyContextTest.this.candidate.destroy();
-                ProxyContextTest.this.context.destroy();
+                if (ProxyContextTest.this.executor != null)
+                {
+                    ProxyContextTest.this.executor.shutdownNow();
+                }
+                if (ProxyContextTest.this.publisher != null)
+                {
+                    ProxyContextTest.this.publisher.destroy();
+                }
+                if (ProxyContextTest.this.candidate != null)
+                {
+                    ProxyContextTest.this.candidate.destroy();
+                }
+                if (ProxyContextTest.this.context != null)
+                {
+                    ProxyContextTest.this.context.destroy();
+                }
             }
         }).run();
         
@@ -2364,5 +2376,31 @@ public class ProxyContextTest
 
         candidate.removeObserver(observer2, recordName);
         assertNotNull(candidate.getRecord(recordName));
+    }
+
+    @Test
+    public void test_substituteRemoteNameWithLocalName()
+    {
+        String v = "R12345678901234567890";
+        assertEquals(v, ProxyContext.substituteRemoteNameWithLocalName(v));
+        v = "R12345";
+        assertEquals(v, ProxyContext.substituteRemoteNameWithLocalName(v));
+        assertEquals(ISystemRecordNames.CONTEXT_RPCS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS));
+        assertEquals(ISystemRecordNames.CONTEXT_CONNECTIONS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS));
+        assertEquals(ISystemRecordNames.CONTEXT_RECORDS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS));
+        assertEquals(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS));
+    }
+
+    @Test
+    public void test_substituteLocalNameWithRemoteName()
+    {
+        String v = "C12345678901234567890";
+        assertEquals(v, ProxyContext.substituteLocalNameWithRemoteName(v));
+        v = "C12345";
+        assertEquals(v, ProxyContext.substituteLocalNameWithRemoteName(v));
+        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_RPCS));
+        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_CONNECTIONS));
+        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_RECORDS));
+        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS));
     }
 }

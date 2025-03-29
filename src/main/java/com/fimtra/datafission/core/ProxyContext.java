@@ -258,8 +258,8 @@ public final class ProxyContext implements IObserverContext
     public static final TextValue RECORD_DISCONNECTED = TextValue.valueOf("DISCONNECTED");
 
     // constructs to handle mapping of local system record names to remote names
-    static final Map<String, String> remoteToLocalSystemRecordNameConversions;
-    static final Map<String, String> localToRemoteSystemRecordNameConversions;
+    private static final Map<String, String> remoteToLocalSystemRecordNameConversions;
+    private static final Map<String, String> localToRemoteSystemRecordNameConversions;
 
     static
     {
@@ -280,9 +280,10 @@ public final class ProxyContext implements IObserverContext
 
     static String substituteRemoteNameWithLocalName(final String name)
     {
-        if (name.startsWith(IRemoteSystemRecordNames.REMOTE, 0))
+        if (name.length() > 16 && name.charAt(0) == 'R')
         {
-            return remoteToLocalSystemRecordNameConversions.get(name);
+            // strip off the "Remote" prefix - if its not found then just return the name
+            return remoteToLocalSystemRecordNameConversions.getOrDefault(name, name);
         }
         else
         {
@@ -292,7 +293,7 @@ public final class ProxyContext implements IObserverContext
 
     static String substituteLocalNameWithRemoteName(final String name)
     {
-        if (name.startsWith(ISystemRecordNames.CONTEXT, 0))
+        if (ContextUtils.isSystemRecordName(name))
         {
             return localToRemoteSystemRecordNameConversions.get(name);
         }
