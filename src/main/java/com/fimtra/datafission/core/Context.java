@@ -240,7 +240,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         void put(String recordName, Record record)
         {
             this.images.put(recordName, record);
-            this.immutableImages.put(recordName, new ImmutableRecord(record));
         }
 
         IRecord remove(String name)
@@ -263,7 +262,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 change.applyCompleteAtomicChangeToRecord(record);
             }
             // the Record in the images map backs the ImmutableRecord in the immutableImages map
-            return this.immutableImages.get(name);
+            // we create an ImmutableRecord only on first update/publish of a record
+            // see Context.getLastPublishedImage_callInRecordContext
+            return this.immutableImages.computeIfAbsent(name, k -> new ImmutableRecord(record));
         }
 
         /**
@@ -404,6 +405,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         // add to the context record
         this.records.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
+
+        publishAtomicChange(recordName, true);
     }
 
     @Override

@@ -66,7 +66,7 @@ public abstract class TestUtils
      */
     public static void waitForEvent(EventChecker check) throws InterruptedException, EventFailedException
     {
-        waitForEvent(check, 30000);
+        waitForEvent(check, 5000);
     }
 
     /**

@@ -1003,7 +1003,7 @@ public class PlatformUtils
      */
     public static boolean isClearConnectRecord(String recordName)
     {
-        return (ContextUtils.isSystemRecordName(recordName))
-            || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName);
+        return recordName != null && ((ContextUtils.isSystemRecordName(recordName))
+            || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName));
     }
 }

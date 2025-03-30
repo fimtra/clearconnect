@@ -85,6 +85,7 @@ public class ContextTest
     @After
     public void tearDown() throws Exception
     {
+        this.candidate.destroy();
     }
 
     @Test
@@ -619,8 +620,7 @@ public class ContextTest
         createRecordWaitForUpdate(name);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
-        // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
-        subscriptionsObserver.latch = new CountDownLatch(2);
+        subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
@@ -693,8 +693,7 @@ public class ContextTest
         createRecordWaitForUpdate(name);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
-        // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
-        subscriptionsObserver.latch = new CountDownLatch(2);
+        subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
@@ -745,8 +744,7 @@ public class ContextTest
         Map<String, IValue> subscriptions = this.candidate.getRecord(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
-        // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
-        subscriptionsObserver.latch = new CountDownLatch(2);
+        subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
         verify("(ImmutableSnapshot)testContext|ContextSubscriptions|", subscriptionsObserver,
@@ -769,8 +767,7 @@ public class ContextTest
         this.candidate.addObserver(observer1, name);
 
         TestCachingAtomicChangeObserver subscriptionsObserver = new TestCachingAtomicChangeObserver();
-        // NOTE: when subscribing for the 'context subscriptions' we get 2 updates
-        subscriptionsObserver.latch = new CountDownLatch(2);
+        subscriptionsObserver.latch = new CountDownLatch(1);
         this.candidate.addObserver(subscriptionsObserver, ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         assertTrue(subscriptionsObserver.latch.await(1, TimeUnit.SECONDS));
 
@@ -1248,5 +1245,27 @@ public class ContextTest
         }
         this.candidate.removeObserver(observer, name);
         return record;
+    }
+
+    @Test
+    public void testAddSingleObserverBeforeCreating() throws InterruptedException
+    {
+        CountDownLatch latch = new CountDownLatch(1);
+        final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(latch);
+        this.candidate.addObserver(observer, name);
+
+        Map<String, IValue> expectedMap = new HashMap<>();
+        expectedMap.put(K1, V1);
+        expectedMap.put(K2, V2);
+        Map<String, IValue> instance = createRecordWaitForUpdate(name, expectedMap);
+        assertNotNull(instance);
+        assertTrue("Did not get notified on creation", latch.await(1, TimeUnit.SECONDS));
+
+        final int size = observer.changes.size();
+        assertEquals("Got: " + observer.changes, 1, size);
+        assertEquals(expectedMap, observer.images.get(0));
+        assertEquals(2, observer.changes.get(0).getPutEntries().size());
+        assertEquals(0, observer.changes.get(0).getOverwrittenEntries().size());
+        assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
     }
 }
