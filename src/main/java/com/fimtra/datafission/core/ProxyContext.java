@@ -308,15 +308,13 @@ public final class ProxyContext implements IObserverContext
         String... recordNames)
     {
         final List<String> records = new ArrayList<>(recordNames.length);
-        for (int i = 0; i < recordNames.length; i++)
+        for (String recordName : recordNames)
         {
-            if (!ContextUtils.isSystemRecordName(recordNames[i])
-                && !RECORD_CONNECTION_STATUS_NAME.equals(recordNames[i]))
+            if (!ContextUtils.isSystemRecordName(recordName)
+                    && !RECORD_CONNECTION_STATUS_NAME.equals(recordName)
+                    && subscriptionManager.getSubscribersFor(recordName).length == count)
             {
-                if (subscriptionManager.getSubscribersFor(recordNames[i]).length == count)
-                {
-                    records.add(substituteRemoteNameWithLocalName(recordNames[i]));
-                }
+                records.add(substituteRemoteNameWithLocalName(recordName));
             }
         }
         return records.toArray(new String[0]);
@@ -361,27 +359,24 @@ public final class ProxyContext implements IObserverContext
             }
             final IRecordListener[] subscribersFor =
                 ProxyContext.this.context.recordObservers.getSubscribersFor(this.changeName);
-            IRecordListener iAtomicChangeObserver = null;
             long start;
-            final int size = subscribersFor.length;
-            if (size == 0)
+            if (subscribersFor.length == 0)
             {
                 Log.log(ProxyContext.this, "*** Unexpected RPC result for ", this.changeName);
             }
-            for (int i = 0; i < size; i++)
+            for (IRecordListener iAtomicChangeObserver : subscribersFor)
             {
                 try
                 {
-                    iAtomicChangeObserver = subscribersFor[i];
                     start = System.nanoTime();
                     iAtomicChangeObserver.onChange(null, this.changeToApply);
                     ContextUtils.measureTask(this.changeName, "RPC result handling", iAtomicChangeObserver,
-                        (System.nanoTime() - start));
+                            (System.nanoTime() - start));
                 }
                 catch (Exception e)
                 {
                     Log.log(ProxyContext.this,
-                        "Could not notify " + iAtomicChangeObserver + " with " + this.changeToApply, e);
+                            "Could not notify " + iAtomicChangeObserver + " with " + this.changeToApply, e);
                 }
             }
         }
@@ -1203,11 +1198,8 @@ public final class ProxyContext implements IObserverContext
                 }
 
                 // remove the records that are no longer subscribed
-                String recordName;
-                for (int i = 0; i < recordsToUnsubscribe.length; i++)
+                for (String recordName : recordsToUnsubscribe)
                 {
-                    recordName = recordsToUnsubscribe[i];
-
                     // ignore system record names - these can be in here because if we subscribe for
                     // RemoteContextRpcs, say, we actually send ContextRpcs (we need the ContextRpcs
                     // of the remote context).
@@ -1221,9 +1213,8 @@ public final class ProxyContext implements IObserverContext
                 // mark the records as disconnected
                 synchronized (this.remoteConnectionStatusRecord.getWriteLock())
                 {
-                    for (int i = 0; i < recordsToUnsubscribe.length; i++)
+                    for (String recordName : recordsToUnsubscribe)
                     {
-                        recordName = recordsToUnsubscribe[i];
                         this.remoteConnectionStatusRecord.put(recordName, RECORD_DISCONNECTED);
                     }
                     this.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
@@ -1772,10 +1763,10 @@ public final class ProxyContext implements IObserverContext
         CountDownLatch latch = new CountDownLatch(recordNames.length);
         Queue<CountDownLatch> latches;
         Queue<CountDownLatch> pending;
-        for (int i = 0; i < recordNames.length; i++)
+        for (String recordName : recordNames)
         {
             pending = new ConcurrentLinkedQueue<>();
-            latches = this.actionResponseLatches.putIfAbsent(action + recordNames[i], pending);
+            latches = this.actionResponseLatches.putIfAbsent(action + recordName, pending);
             if (latches == null)
             {
                 latches = pending;
@@ -1936,15 +1927,11 @@ public final class ProxyContext implements IObserverContext
         String token;
         List<String> records;
 
+        for (String recordName : recordNamesToSubscribeFor)
         {
-            String recordName;
-            for (int i = 0; i < recordNamesToSubscribeFor.length; i++)
-            {
-                recordName = recordNamesToSubscribeFor[i];
-                token = this.tokenPerRecord.get(recordName);
-                records = recordsPerToken.computeIfAbsent(token, k -> new ArrayList<>());
-                records.add(recordName);
-            }
+            token = this.tokenPerRecord.get(recordName);
+            records = recordsPerToken.computeIfAbsent(token, k -> new ArrayList<>());
+            records.add(recordName);
         }
 
         for (Map.Entry<String, List<String>> entry : recordsPerToken.entrySet())
