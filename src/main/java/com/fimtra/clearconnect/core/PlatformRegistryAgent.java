@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -207,7 +208,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         Log.log(this, "Registry addresses: ", Arrays.toString(registryAddresses));
         this.startTime = System.currentTimeMillis();
-        this.agentName = addProcId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
+        this.agentName = addProcId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(this.startTime);
         this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
         this.createLock = new ReentrantLock();
         this.destroyCalled = new AtomicBoolean(false);
@@ -784,15 +785,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public boolean destroyPlatformServiceInstance(String serviceFamily, String serviceMember)
     {
+        final String platformServiceInstanceID =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+        final PlatformServiceInstance service;
         this.createLock.lock();
         try
         {
-            final String platformServiceInstanceID =
-                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-            final PlatformServiceInstance service =
-                    this.localPlatformServiceInstances.remove(platformServiceInstanceID);
+            service = this.localPlatformServiceInstances.remove(platformServiceInstanceID);
             if (service != null)
             {
+                // de-register holding the createLock
                 try
                 {
                     this.registryProxy.getRpc(PlatformRegistry.DEREGISTER)
@@ -804,28 +806,27 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                             "Could not deregister service " + platformServiceInstanceID
                                     + ", continuing to destroy", e);
                 }
-                try
-                {
-                    service.destroy();
-                }
-                catch (Exception e)
-                {
-                    Log.log(PlatformRegistryAgent.this,
-                            "Could not destroy service " + platformServiceInstanceID, e);
-                }
-                return true;
             }
-        }
-        catch (Exception e)
-        {
-            Log.log(PlatformRegistryAgent.this,
-                    "Could not destroy service " + serviceFamily + ":" + serviceMember, e);
+            else
+            {
+                return false;
+            }
         }
         finally
         {
             this.createLock.unlock();
         }
-        return false;
+
+        try
+        {
+            service.destroy();
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.log(PlatformRegistryAgent.this, "Could not destroy service " + platformServiceInstanceID, e);
+            return false;
+        }
     }
 
     @Override
@@ -959,14 +960,24 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     boolean doDestroyProxy(String serviceFamily, ConcurrentMap<String, PlatformServiceProxy> proxies)
     {
+        final PlatformServiceProxy proxy;
         this.createLock.lock();
         try
         {
-            final PlatformServiceProxy proxy = proxies.remove(serviceFamily);
+            proxy = proxies.remove(serviceFamily);
             if (proxy == null)
             {
                 return false;
             }
+        }
+        finally
+        {
+            this.createLock.unlock();
+        }
+
+        // destroy the proxy outside the lock to prevent deadlock
+        try
+        {
             proxy.destroy();
             return true;
         }
@@ -975,10 +986,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             Log.log(this, "Could not destroy proxy to " + serviceFamily, e);
             return false;
         }
-        finally
-        {
-            this.createLock.unlock();
-        }
+
     }
 
     @Override
@@ -989,72 +997,56 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             return;
         }
 
-        this.createLock.lock();
-        try
+        Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+
+        safeCall(registryConnectionMonitor::destroy);
+        safeCall(serviceAvailableListeners::destroy);
+        safeCall(serviceInstanceAvailableListeners::destroy);
+        safeCall(registryAvailableListeners::destroy);
+
+        if (this.dynamicAttributeUpdateTask != null)
         {
-            Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-
             try
             {
-                this.registryProxy.destroy();
+                this.dynamicAttributeUpdateTask.cancel(false);
             }
             catch (Exception e)
             {
-                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
-            }
-
-            // need to do this asynch to prevent deadlock with createLock
-            agentExecutor.execute(this.registryConnectionMonitor::destroy);
-
-            try
-            {
-                this.serviceAvailableListeners.destroy();
-                this.serviceInstanceAvailableListeners.destroy();
-                this.registryAvailableListeners.destroy();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformRegistryAgent.this, "Could not destroy listener notifiers", e);
-            }
-
-            if (this.dynamicAttributeUpdateTask != null)
-            {
-                try
-                {
-                    this.dynamicAttributeUpdateTask.cancel(false);
-                }
-                catch (Exception e)
-                {
-                    Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
-                }
-            }
-
-            for (PlatformServiceInstance service : new HashSet<>(this.localPlatformServiceInstances.values()))
-            {
-                destroyPlatformServiceInstance(service.serviceFamily, service.serviceMember);
-            }
-            for (PlatformServiceProxy proxy : new HashSet<>(this.serviceProxies.values()))
-            {
-                destroyPlatformServiceProxy(proxy.serviceFamily);
-            }
-            for (String serviceInstanceId : new HashSet<>(this.serviceInstanceProxies.keySet()))
-            {
-                destroyPlatformServiceInstanceProxy(serviceInstanceId);
-            }
-
-            // shutdown the executor at the end to allow notification caches to finish cleanly
-            try
-            {
-                this.agentExecutor.shutdown();
-            }
-            catch (Exception e)
-            {
-                Log.log(PlatformRegistryAgent.this, "Could not shutdown executor", e);
+                Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
             }
         }
-        finally
+
+        for (PlatformServiceInstance service : new HashSet<>(this.localPlatformServiceInstances.values()))
         {
-            this.createLock.unlock();
+            destroyPlatformServiceInstance(service.serviceFamily, service.serviceMember);
+        }
+        for (PlatformServiceProxy proxy : new HashSet<>(this.serviceProxies.values()))
+        {
+            destroyPlatformServiceProxy(proxy.serviceFamily);
+        }
+        for (String serviceInstanceId : new HashSet<>(this.serviceInstanceProxies.keySet()))
+        {
+            destroyPlatformServiceInstanceProxy(serviceInstanceId);
+        }
+
+        // when destroying platform service instances,
+        // we need the registryProxy to call the deregister RPC
+        // so destroy the proxy AFTER
+        safeCall(registryProxy::destroy);
+
+        // shutdown the executor at the end to allow notification caches to finish cleanly
+        safeCall(agentExecutor::shutdown);
+    }
+
+    private void safeCall(Runnable destroy)
+    {
+        try
+        {
+            destroy.run();
+        }
+        catch (Exception e)
+        {
+            Log.log(this, "Could not destroy " + ObjectUtils.safeToString(destroy), e);
         }
     }
 
