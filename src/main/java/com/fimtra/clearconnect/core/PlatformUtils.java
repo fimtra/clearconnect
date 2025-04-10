@@ -15,7 +15,12 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.tcpchannel.TcpChannelUtils.LOCALHOST_IP;
+
+import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -146,7 +151,7 @@ public class PlatformUtils
             "Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
                 newline).append(newline);
 
-        sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
+        sb.append("Localhost IP: ").append(LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
         sb.append("System thread limit: ").append(DataFissionProperties.Values.SYSTEM_THREAD_COUNT).append(newline);
         sb.append("Core thread limit: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
@@ -171,6 +176,22 @@ public class PlatformUtils
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";
+    private static final String LOCALHOST_NAME;
+
+    static
+    {
+        final String hostAddress;
+        try
+        {
+            hostAddress = InetAddress.getLocalHost()
+                    .getHostName();
+        }
+        catch (UnknownHostException e)
+        {
+            throw new RuntimeException("Could not get host address", e);
+        }
+        LOCALHOST_NAME = hostAddress;
+    }
 
     /**
      * Used to provide an efficient "one-shot" latch
@@ -737,20 +758,69 @@ public class PlatformUtils
     }
 
     /**
-     * @return a string in the form <tt>'name[0]@canonical_host_name'</tt>. <br>
-     *         If there are no name arguments, the 'name' is the calling class.
+     * @return a string in the form <tt>'name[0]@canonical_host_name'</tt>. <br> If there are no name
+     * arguments, the 'name' is the calling class. If name[0] already contains '@' and the host name, it is
+     * returned as is. <br>
      */
     public static String composeHostQualifiedName(String... name)
     {
         try
         {
-            return (name == null || name.length == 0 ? ThreadUtils.getIndirectCallingClassSimpleName() : name[0]) + "@"
-                + TcpChannelUtils.LOCALHOST_IP;
+            final String root =
+                    name == null || name.length == 0 ? ThreadUtils.getIndirectCallingClassSimpleName() :
+                            name[0];
+            if (root.indexOf('@') > -1 && (root.contains(LOCALHOST_IP) || root.contains(LOCALHOST_NAME)))
+            {
+                // don't add the host
+                return root;
+            }
+            return root + "@" + LOCALHOST_IP;
         }
         catch (Exception e)
         {
             Log.log(PlatformRegistryAgent.class, "Could not create default name", e);
             return "default:" + System.currentTimeMillis();
+        }
+    }
+
+    static String addProcessId(String processName)
+    {
+        return doAddProcessId(processName, ManagementFactory.getRuntimeMXBean()
+                .getName());
+    }
+
+    static String doAddProcessId(String processName, String jvmName)
+    {
+        final int jvmNameHostIndex = jvmName.indexOf('@');
+        final int processNameHostIndex = processName.indexOf('@');
+        if (jvmNameHostIndex > -1 && (jvmName.contains(LOCALHOST_IP) || jvmName.contains(LOCALHOST_NAME)))
+        {
+            final String pid = jvmName.substring(0, jvmNameHostIndex);
+            final String hostName = jvmName.substring(jvmNameHostIndex + 1);
+            if (processNameHostIndex > -1)
+            {
+                // processName has hostname, just add process id
+                return processName + "#" + pid;
+            }
+            else
+            {
+                return processName + "@" + hostName + "#" + pid;
+            }
+        }
+        else
+        {
+            // there is no host in the jvmName (its probably just a pid)
+            if (processNameHostIndex > -1 && (processName.contains(LOCALHOST_IP) || processName.contains(
+                    LOCALHOST_NAME)))
+            {
+                // processName has hostname, just add process id
+                return processName + "#" + jvmName;
+            }
+            else
+            {
+                // processName has no hostname, add it
+                return processName + "@" + LOCALHOST_IP + "#" + jvmName;
+            }
         }
     }
 

@@ -24,6 +24,9 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import com.fimtra.clearconnect.IPlatformServiceComponent;
 import com.fimtra.clearconnect.event.IRpcAvailableListener;
 import com.fimtra.datafission.IRpcInstance;
@@ -32,6 +35,7 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.ContextUtils;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.tcpchannel.TcpChannelUtils;
 import org.junit.Test;
 import org.mockito.stubbing.Answer;
 
@@ -149,4 +153,40 @@ public class PlatformUtilsTest
 			assertTrue(PlatformUtils.isClearConnectRecord(name));
 		}
 	}
+
+    @Test
+    public void testAddProcessId() throws UnknownHostException
+    {
+        final String hostName = InetAddress.getLocalHost()
+                .getHostName();
+        final String hostAddress = InetAddress.getLocalHost()
+                .getHostAddress();
+        final String name_hostName = "name@" + hostName;
+        final String name_hostAddress = "name@" + hostAddress;
+        final String expected_hostName = name_hostName + "#123";
+        final String expected_hostAddress = name_hostAddress + "#123";
+        final String jvmName_hostName = "123@" + hostName;
+        final String jvmName_hostAddress = "123@" + hostAddress;
+        final String jvmName_pidOnly = "123";
+
+        assertEquals(expected_hostName, PlatformUtils.doAddProcessId("name", jvmName_hostName));
+        assertEquals(expected_hostAddress, PlatformUtils.doAddProcessId("name", jvmName_hostAddress));
+
+        assertEquals(expected_hostAddress, PlatformUtils.doAddProcessId("name", jvmName_pidOnly));
+        assertEquals(expected_hostAddress, PlatformUtils.doAddProcessId(name_hostAddress, jvmName_pidOnly));
+        assertEquals(expected_hostName, PlatformUtils.doAddProcessId(name_hostName, jvmName_pidOnly));
+
+        assertEquals(expected_hostName, PlatformUtils.doAddProcessId(name_hostName, jvmName_hostName));
+        assertEquals(expected_hostAddress, PlatformUtils.doAddProcessId(name_hostAddress, jvmName_hostAddress));
+    }
+
+    @Test
+    public void test_composeHostQualifiedName() throws UnknownHostException
+    {
+        final String expected_withHostname = "user@" + InetAddress.getLocalHost().getHostName();
+        assertEquals(expected_withHostname, PlatformUtils.composeHostQualifiedName(expected_withHostname));
+        final String expected_withIp = "user@" + InetAddress.getLocalHost().getHostAddress();
+        assertEquals(expected_withIp, PlatformUtils.composeHostQualifiedName(expected_withIp));
+        assertEquals(expected_withIp, PlatformUtils.composeHostQualifiedName("user"));
+    }
 }

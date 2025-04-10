@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
@@ -109,23 +108,12 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
     }
 
-    private static String addProcId(String agentName)
-    {
-        final String processName = ManagementFactory.getRuntimeMXBean().getName();
-        if (!agentName.contains(processName))
-        {
-            return agentName + "_" + processName;
-        }
-        return agentName;
-    }
-
     private static final IRecordListener NOOP_OBSERVER = (image, atomicChange) -> {
 
     };
 
     final long startTime;
     final String agentName;
-    final String hostQualifiedAgentName;
     volatile String platformName;
     boolean registryConnected;
     final ProxyContext registryProxy;
@@ -208,8 +196,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         Log.log(this, "Registry addresses: ", Arrays.toString(registryAddresses));
         this.startTime = System.currentTimeMillis();
-        this.agentName = addProcId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(this.startTime);
-        this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
+        this.agentName = PlatformUtils.addProcessId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(this.startTime);
         this.createLock = new ReentrantLock();
         this.destroyCalled = new AtomicBoolean(false);
         this.localPlatformServiceInstances = new ConcurrentHashMap<>();
@@ -1111,7 +1098,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public String getAgentName()
     {
-        return this.hostQualifiedAgentName;
+        return this.agentName;
     }
 
     @Override
