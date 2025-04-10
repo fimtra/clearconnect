@@ -236,12 +236,10 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
 
         this.serviceAvailableListeners =
-                PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy,
-                        IRegistryRecordNames.SERVICES, this);
+                PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy, this);
 
         this.serviceInstanceAvailableListeners =
-                PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy,
-                        IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, this);
+                PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy, this);
 
         // "split-brain" protection
         // setup listening for services lost from the registry - we use this to detect if the

@@ -15,6 +15,7 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.*;
 import static com.fimtra.tcpchannel.TcpChannelUtils.LOCALHOST_IP;
 
 import java.lang.management.ManagementFactory;
@@ -73,7 +74,6 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelProperties;
-import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
 import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.LazyObject.IDestructor;
@@ -236,13 +236,13 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services are discovered.
      */
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
-        final IObserverContext context, final String servicesRecordName, final Object logContext)
+        final IObserverContext context, final Object logContext)
     {
         final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
             new NotifyingCache<IServiceAvailableListener, String>(
-                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), servicesRecordName))
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), SERVICES))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -294,8 +294,8 @@ public class PlatformUtils
             updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
-        context.addObserver(observer, servicesRecordName);
-        awaitUpdateLatch(logContext, servicesRecordName, updateWaitLatch);
+        context.addObserver(observer, SERVICES);
+        awaitUpdateLatch(logContext, SERVICES, updateWaitLatch);
         return serviceAvailableListeners;
     }
 
@@ -303,14 +303,14 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services INSTANCES are discovered.
      */
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
-        final IObserverContext context, final String serviceInstancesPerServiceRecordName, final Object logContext)
+        final IObserverContext context, final Object logContext)
     {
         final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
             new NotifyingCache<IServiceInstanceAvailableListener, String>(
                 (IDestructor) (ref) -> context.removeObserver(listenerReference.get(),
-                    serviceInstancesPerServiceRecordName))
+                        SERVICE_INSTANCES_PER_SERVICE_FAMILY))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -354,8 +354,8 @@ public class PlatformUtils
             updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
-        context.addObserver(observer, serviceInstancesPerServiceRecordName);
-        awaitUpdateLatch(logContext, serviceInstancesPerServiceRecordName, updateWaitLatch);
+        context.addObserver(observer, SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+        awaitUpdateLatch(logContext, SERVICE_INSTANCES_PER_SERVICE_FAMILY, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
 
