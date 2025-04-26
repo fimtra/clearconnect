@@ -596,11 +596,6 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             this.writeLock.lock();
             try
             {
-                // remove all data from the cache and trigger listeners
-                for (String key : new HashSet<>(this.cache.keySet()))
-                {
-                    notifyListenersDataRemoved(key);
-                }
                 this.listeners = Collections.emptyList();
                 this.cache.clear();
             }

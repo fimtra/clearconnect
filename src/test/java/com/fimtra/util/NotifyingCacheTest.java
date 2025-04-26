@@ -347,20 +347,8 @@ public class NotifyingCacheTest
 
         // destroy, check we get notified (count should be 0 as its removed)
         this.candidate.destroy();
-        TestUtils.waitForEvent(new EventChecker()
-        {
-            @Override
-            public Object got()
-            {
-                return listener.size();
-            }
-
-            @Override
-            public Object expect()
-            {
-                return Integer.valueOf(0);
-            }
-        });
+        assertEquals(0, this.candidate.cache.size());
+        assertEquals(0, this.candidate.listeners.size());
     }
 
     @Test
