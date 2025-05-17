@@ -263,11 +263,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             if (record != null)
             {
                 change.applyCompleteAtomicChangeToRecord(record);
+                // the Record in the images map backs the ImmutableRecord in the immutableImages map
+                // we create an ImmutableRecord only on first update/publish of a record
+                // see Context.getLastPublishedImage_callInRecordContext
+                return this.immutableImages.computeIfAbsent(name, k -> new ImmutableRecord(record));
             }
-            // the Record in the images map backs the ImmutableRecord in the immutableImages map
-            // we create an ImmutableRecord only on first update/publish of a record
-            // see Context.getLastPublishedImage_callInRecordContext
-            return this.immutableImages.computeIfAbsent(name, k -> new ImmutableRecord(record));
+            else
+            {
+                return null;
+            }
         }
 
         /**
