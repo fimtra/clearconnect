@@ -7,7 +7,7 @@ package com.fimtra.util;
  */
 public final class CharRef
 {
-    char value;
+    volatile char value;
 
     public CharRef(char value)
     {

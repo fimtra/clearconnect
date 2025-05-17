@@ -10,6 +10,28 @@ import static org.junit.Assert.*;
 public class LongRefTest
 {
     @Test
+    public void testIncrementAndGet()
+    {
+        final long expectedValue = 0;
+        final LongRef ref = new LongRef(expectedValue);
+
+        // Initial value check
+        assertEquals(expectedValue, ref.get());
+
+        // Increment and get
+        ref.incrementAndGet();
+        assertTrue(ref.get() == (expectedValue + 1));
+
+        ref.set(0);
+        // Multiple increments and checks
+        for (int i = 0; i < 10; i++)
+        {
+            ref.incrementAndGet();
+            assertEquals(i + 1, ref.get());
+        }
+    }
+
+    @Test
     public void testConstructorAndGet()
     {
         LongRef ref = new LongRef(123L);

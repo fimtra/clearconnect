@@ -7,7 +7,7 @@ package com.fimtra.util;
  */
 public final class LongRef
 {
-    long value;
+    volatile long value;
 
     public LongRef(long value)
     {
@@ -22,6 +22,13 @@ public final class LongRef
     public void set(long value)
     {
         this.value = value;
+    }
+
+    public long incrementAndGet()
+    {
+        final long v = value + 1L;
+        value = v;
+        return v;
     }
 
     @Override
