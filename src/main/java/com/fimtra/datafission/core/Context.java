@@ -39,6 +39,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext;
@@ -100,8 +101,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      */
     public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
 
-    static final BiConsumer<IRecord, IRecordChange> NOOP_SEQUENCE_UPDATER = (record, change) -> {
-    };
 
     static final AtomicInteger eventCount = new AtomicInteger();
 
@@ -305,6 +304,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Map<String, AtomicChange> pendingAtomicChanges;
     /** cheap read-write lock semantics */
     volatile Map<String, IRpcInstance> rpcInstances;
+    /**
+     * Tracks sequence per record name
+     * <p>
+     * Access with record lock (locking record)
+     */
+    final Map<String, LongRef> sequences;
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
@@ -380,6 +385,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             + "-" + UUID.randomUUID();
 
         final int initialSize = 1024;
+        this.sequences = new ConcurrentHashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
         this.records = new ConcurrentHashMap<>(initialSize);
         this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
@@ -536,6 +542,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         final int initialSequence = 0;
 
+        this.sequences.put(recordName, new LongRef(initialSequence));
         this.pendingAtomicChanges.put(recordName,
                 new AtomicChange(recordName, new CharRef(IRecordChange.IMAGE_SCOPE_CHAR),
                         new LongRef(initialSequence)));
@@ -569,6 +576,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // this.recordObservers.removeSubscribersFor(name);
 
                 this.pendingAtomicChanges.remove(name);
+                this.sequences.remove(name);
                 this.imageCache.remove(name);
 
                 if (log)
@@ -677,12 +685,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     CountDownLatch publishAtomicChange(final String name, final boolean forcePublish)
     {
-        return publishAtomicChange(name, forcePublish, NOOP_SEQUENCE_UPDATER);
-    }
-
-    CountDownLatch publishAtomicChange(final String name, final boolean forcePublish,
-            BiConsumer<IRecord, IRecordChange> sequenceUpdater)
-    {
         this.throttle.eventStart(name, forcePublish);
 
         try
@@ -714,8 +716,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     this.throttle.eventFinish();
                     return latch;
                 }
-
-                sequenceUpdater.accept(record, atomicChange);
 
                 // update the sequence (version) of the record when publishing
                 ((Record) record).setSequence(atomicChange.getSequence());
@@ -979,50 +979,64 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    private AtomicChange getAtomicChange(IRecord record)
+    private void doAtomicChange(String recordName, Consumer<AtomicChange> action)
     {
-        return this.pendingAtomicChanges.computeIfAbsent(record.getName(),
-                recordName -> new AtomicChange(recordName, new CharRef(DELTA_SCOPE_CHAR),
-                        new LongRef(record.getSequence() + 1)));
+        // doAtomicChange called always whilst holding the record lock
+        AtomicChange atomicChange = this.pendingAtomicChanges.get(recordName);
+        if (atomicChange == null)
+        {
+            final LongRef sequence = this.sequences.get(recordName);
+            if (sequence != null)
+            {
+                atomicChange = new AtomicChange(recordName, new CharRef(DELTA_SCOPE_CHAR),
+                        new LongRef(sequence.incrementAndGet()));
+                this.pendingAtomicChanges.put(recordName, atomicChange);
+            }
+        }
+        if (atomicChange != null)
+        {
+            action.accept(atomicChange);
+        }
     }
 
     @Override
     public void addBulkChangesToAtomicChange(IRecord record, ThreadLocalBulkChanges changes)
     {
-        getAtomicChange(record).mergeBulkChanges(changes);
+        doAtomicChange(record.getName(), a -> a.mergeBulkChanges(changes));
     }
 
     @Override
     public void addBulkSubMapChangesToAtomicChange(IRecord record, String subMapKey,
             ThreadLocalBulkChanges changes)
     {
-        getAtomicChange(record).mergeBulkSubMapChanges(subMapKey, changes);
+        doAtomicChange(record.getName(), a -> a.mergeBulkSubMapChanges(subMapKey, changes));
     }
 
     @Override
     public void addEntryUpdatedToAtomicChange(IRecord record, String key, IValue current, IValue previous)
     {
-        getAtomicChange(record).mergeEntryUpdatedChange(key, current, previous);
+        doAtomicChange(record.getName(), a -> a.mergeEntryUpdatedChange(key, current, previous));
     }
 
     @Override
     public void addEntryRemovedToAtomicChange(IRecord record, String key, IValue value)
     {
-        getAtomicChange(record).mergeEntryRemovedChange(key, value);
+        doAtomicChange(record.getName(), a -> a.mergeEntryRemovedChange(key, value));
     }
 
     @Override
     public void addSubMapEntryUpdatedToAtomicChange(IRecord record, String subMapKey, String key,
             IValue current, IValue previous)
     {
-        getAtomicChange(record).mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
+        doAtomicChange(record.getName(),
+                a -> a.mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous));
     }
 
     @Override
     public void addSubMapEntryRemovedToAtomicChange(IRecord record, String subMapKey, String key,
             IValue value)
     {
-        getAtomicChange(record).mergeSubMapEntryRemovedChange(subMapKey, key, value);
+        doAtomicChange(record.getName(), a -> a.mergeSubMapEntryRemovedChange(subMapKey, key, value));
     }
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
@@ -1210,6 +1224,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.rpcExecutor.execute(sequentialRunnable);
     }
 
+    /**
+     * Provides the means for a {@link ProxyContext} to tell its internal {@link Context} what
+     * sequence to use when processing a received record change
+     */
+    void copySequenceFromRemote(String recordName, long sequence)
+    {
+        this.sequences.get(recordName).set(sequence);
+        doAtomicChange(recordName, a -> a.setSequence(sequence));
+    }
 
     boolean permissionTokenValidForRecord(String permissionToken, String recordName)
     {

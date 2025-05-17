@@ -94,12 +94,12 @@ public interface IRecordChange
     IRecordChange getSubMapAtomicChange(String subMapKey);
 
     /**
-     * Apply the atomic change (excluding sub-map atomic changes) to the target map
+     * Apply the atomic change (excluding sequence and sub-map atomic changes) to the target map
      */
     void applyTo(Map<String, IValue> target);
 
     /**
-     * Apply the complete atomic change (including sub-map atomic changes) to the target record
+     * Apply the complete atomic change (including sequence and sub-map atomic changes) to the target record.
      */
     void applyCompleteAtomicChangeToRecord(IRecord record);
 

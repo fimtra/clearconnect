@@ -38,7 +38,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 
 import com.fimtra.channel.EndPointAddress;
 import com.fimtra.channel.IReceiver;
@@ -624,11 +623,6 @@ public final class ProxyContext implements IObserverContext
      */
     private final static class RxAtomicChangeHandler implements ISequentialRunnable
     {
-        // note: use the record.getSequence() as this will be the DELTA
-        // sequence if an image was received and then cached deltas applied
-        // on top of it
-        static final BiConsumer<IRecord, IRecordChange> SEQUENCE_UPDATER =
-                (record, change) -> change.setSequence(record.getSequence());
 
         final RxFrameHandler frameHandler;
         // variables written by rx-frame-processor and read by a context thread
@@ -720,7 +714,11 @@ public final class ProxyContext implements IObserverContext
                                 this.proxyContext.context.publishAtomicChange(RECORD_CONNECTION_STATUS_NAME);
                             }
 
-                            this.proxyContext.context.publishAtomicChange(name, false, SEQUENCE_UPDATER);
+                            // note: use the record.getSequence() as this will be the DELTA
+                            // sequence if an image was received and then cached deltas applied
+                            // on top of it
+                            this.proxyContext.context.copySequenceFromRemote(name, record.getSequence());
+                            this.proxyContext.context.publishAtomicChange(name, false);
                             break;
                         case ImageDeltaChangeProcessor.RESYNC:
                             this.proxyContext.resync(name);
