@@ -1,3 +1,93 @@
+<--- Release 3.16.13 --->
+Network msgs/sec:78837
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,205,210,213,216
+1,2,207,215,215,219
+1,3,214,219,231,235
+1,4,219,226,233,233
+1,5,212,225,239,245
+1,6,225,237,252,251
+1,7,232,249,256,267
+1,8,254,260,273,278
+1,9,250,272,302,288
+1,10,267,289,289,297
+1,11,283,297,311,315
+1,12,303,315,318,425
+1,13,356,369,377,389
+1,14,546,428,383,376
+1,15,343,365,382,387
+totalTx=493272
+totalRx=493268
+totalTimeSecs=23
+txMsgsPerSec=20730
+rxMsgsPerSec=20730
+networkMsgsPerSec=41461
+kbPublished=16363
+msgsPublished=100987
+avgMsgSizeBytes=165
+Windows 11 (10.0), amd64, Java 1.8.0_452, cpus=16
+
+
+<--- Release 3.16.12 --->
+Network msgs/sec:79100
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,207,220,216,213
+1,2,204,209,218,217
+1,3,205,218,229,230
+1,4,214,219,230,230
+1,5,216,224,235,239
+1,6,223,232,243,259
+1,7,233,242,263,262
+1,8,239,258,261,269
+1,9,259,268,278,288
+1,10,269,279,292,297
+1,11,294,292,301,308
+1,12,292,318,323,323
+1,13,313,318,324,339
+1,14,336,360,348,350
+1,15,317,338,358,356
+totalTx=493278
+totalRx=493274
+totalTimeSecs=22
+txMsgsPerSec=21523
+rxMsgsPerSec=21523
+networkMsgsPerSec=43047
+kbPublished=16464
+msgsPublished=101854
+avgMsgSizeBytes=165
+Windows 11 (10.0), amd64, Java 1.8.0_452, cpus=16
+
+
+<--- Release 3.16.7 --->
+Network msgs/sec:78680
+echoServiceCount, recordCount,avgRtdLatencyMicros (1 fields),avgRtdLatencyMicros (6 fields),avgRtdLatencyMicros (11 fields),avgRtdLatencyMicros (16 fields)
+1,1,213,221,229,236
+1,2,211,214,236,239
+1,3,215,223,257,261
+1,4,207,223,265,264
+1,5,217,232,264,275
+1,6,228,239,277,285
+1,7,234,250,296,309
+1,8,253,266,306,318
+1,9,263,274,323,338
+1,10,277,292,349,360
+1,11,287,299,391,391
+1,12,300,317,421,427
+1,13,313,349,455,461
+1,14,323,345,475,496
+1,15,331,346,507,492
+totalTx=493172
+totalRx=493173
+totalTimeSecs=24
+txMsgsPerSec=19749
+rxMsgsPerSec=19749
+networkMsgsPerSec=39498
+kbPublished=19128
+msgsPublished=144527
+avgMsgSizeBytes=135
+Windows 11 (10.0), amd64, Java 1.8.0_452, cpus=16
+
+
 <--- Release 3.0.0 --->
 - Allow transport technology to be specified during service creation (API change)
 - Use ephemeral ports for service creation when no port is specified
