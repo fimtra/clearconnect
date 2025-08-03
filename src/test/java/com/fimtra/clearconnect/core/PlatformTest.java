@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.channel.ChannelUtils;
@@ -59,10 +58,10 @@ import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
+import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
@@ -339,7 +338,7 @@ public class PlatformTest
     }
 
     @Test
-    public void test_does_not_reconnect_to_destoyed_proxy() throws IOException, InterruptedException
+    public void testDoesNotReconnectToDestoyedService() throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
         createAgent();
@@ -375,12 +374,22 @@ public class PlatformTest
         assertTrue(serviceStarted.await(5, TimeUnit.SECONDS));
         assertEquals("Got: " + listener.available, 2, listener.available.size());
 
+        assertEquals(1, registry.eventHandler.monitoredServiceInstances.size());
+        final ProxyContext proxy = registry.eventHandler.monitoredServiceInstances.values()
+                .iterator()
+                .next();
+        assertTrue(proxy.isActive());
+
         // simulate just the network layer disconnecting
-        Log.log(this, ">>>> Destroying: " + platformServiceInstance);
-        platformServiceInstance.destroy();
+        Log.log(this, ">>>> Destroying: " + platformServiceInstance.publisher);
+        platformServiceInstance.publisher.destroy();
 
         assertTrue(serviceStopped.await(5, TimeUnit.SECONDS));
         assertEquals("Got: " + listener.unavailable, 1, listener.unavailable.size());
+
+        // check the registry destroys the proxy to the service
+        assertEquals(0, registry.eventHandler.monitoredServiceInstances.size());
+        assertFalse(proxy.isActive());
     }
 
     @Test
@@ -630,7 +639,7 @@ public class PlatformTest
         platformServiceInstance.doSetFtState(Boolean.FALSE);
 
         verify(listener, timeout(1000).times(1)).onDisconnected(eq(SERVICE1), anyInt());
-        verify(listener, timeout(2000).times(2)).onConnected(eq(SERVICE1), anyInt());
+        verify(listener, timeout(4000).times(2)).onConnected(eq(SERVICE1), anyInt());
         assertTrue(latch.await(1, TimeUnit.SECONDS));
     }
 

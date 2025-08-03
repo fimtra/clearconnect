@@ -1668,7 +1668,6 @@ public final class ProxyContext implements IObserverContext
             if (this.reconnectPeriodMillis == Integer.MAX_VALUE)
             {
                 Log.log(this, "Reconnect DISABLED for ", getShortName(), " to ", getEndPoint());
-                destroy();
             }
             else
             {
