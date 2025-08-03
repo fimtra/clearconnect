@@ -376,8 +376,8 @@ public class PlatformTest
         assertEquals("Got: " + listener.available, 2, listener.available.size());
 
         // simulate just the network layer disconnecting
-        Log.log(this, ">>>> Destroying: " + platformServiceInstance.publisher);
-        platformServiceInstance.publisher.destroy();
+        Log.log(this, ">>>> Destroying: " + platformServiceInstance);
+        platformServiceInstance.destroy();
 
         assertTrue(serviceStopped.await(5, TimeUnit.SECONDS));
         assertEquals("Got: " + listener.unavailable, 1, listener.unavailable.size());
