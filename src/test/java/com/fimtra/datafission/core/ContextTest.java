@@ -323,7 +323,7 @@ public class ContextTest
         assertEquals(new HashMap<>(instance), observer2.changes.get(0).getPutEntries());
         assertEquals(0, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
-        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
+        check_listenersBeingNotifiedWithInitialImages_zero();
     }
     
     @Test
@@ -377,8 +377,26 @@ public class ContextTest
         assertEquals(putEntries, observer.changes.get(0).getPutEntries());
         assertEquals(1, observer.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer.changes.get(0).getRemovedEntries().size());
-        
-        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
+        check_listenersBeingNotifiedWithInitialImages_zero();
+    }
+
+    private void check_listenersBeingNotifiedWithInitialImages_zero() throws InterruptedException
+    {
+        // this volatile variable is updated AFTER the observers are notified, so spin for a bit
+        waitForEvent(new EventChecker()
+        {
+            @Override
+            public Object expect()
+            {
+                return 0;
+            }
+
+            @Override
+            public Object got()
+            {
+                return candidate.listenersBeingNotifiedWithInitialImages;
+            }
+        });
     }
 
     @Test
@@ -435,7 +453,7 @@ public class ContextTest
         assertEquals(expectedPuts, observer2.changes.get(0).getPutEntries());
         assertEquals(1, observer2.changes.get(0).getOverwrittenEntries().size());
         assertEquals(0, observer2.changes.get(0).getRemovedEntries().size());
-        assertEquals(0, this.candidate.listenersBeingNotifiedWithInitialImages);
+        check_listenersBeingNotifiedWithInitialImages_zero();
     }
 
     @Test
