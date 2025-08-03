@@ -35,9 +35,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.channel.ChannelUtils;
@@ -57,7 +59,9 @@ import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
+import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
@@ -332,6 +336,51 @@ public class PlatformTest
         }, "tearDown-" + this.name.getMethodName()).start();
 
         ChannelUtils.WATCHDOG.configure(5000);
+    }
+
+    @Test
+    public void test_does_not_reconnect_to_destoyed_proxy() throws IOException, InterruptedException
+    {
+        final String SERVICE1 = logStart();
+        createAgent();
+
+        final CountDownLatch serviceStopped = new CountDownLatch(1);
+        final CountDownLatch serviceStarted = new CountDownLatch(1);
+        registry.context.addObserver((image, atomicChange) -> {
+            System.err.println(image);
+            final Map<String, IValue> servicesForAgent = image.getOrCreateSubMap(agent.getAgentName());
+            if (servicesForAgent.isEmpty())
+            {
+                if (serviceStarted.getCount() == 0)
+                {
+                    // service has stopped
+                    serviceStopped.countDown();
+                }
+            }
+            else
+            {
+                serviceStarted.countDown();
+            }
+        }, PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT);
+
+        final TestServiceInstanceAvailableListener listener = new TestServiceInstanceAvailableListener();
+        agent.addServiceInstanceAvailableListener(listener);
+
+        assertTrue(
+                this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
+                        WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+        final PlatformServiceInstance platformServiceInstance =
+                (PlatformServiceInstance) agent.getPlatformServiceInstance(SERVICE1, this.primary);
+
+        assertTrue(serviceStarted.await(5, TimeUnit.SECONDS));
+        assertEquals("Got: " + listener.available, 2, listener.available.size());
+
+        // simulate just the network layer disconnecting
+        Log.log(this, ">>>> Destroying: " + platformServiceInstance.publisher);
+        platformServiceInstance.publisher.destroy();
+
+        assertTrue(serviceStopped.await(5, TimeUnit.SECONDS));
+        assertEquals("Got: " + listener.unavailable, 1, listener.unavailable.size());
     }
 
     @Test

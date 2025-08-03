@@ -782,8 +782,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 // de-register holding the createLock
                 try
                 {
-                    this.registryProxy.getRpc(PlatformRegistry.DEREGISTER)
-                            .execute(TextValue.valueOf(serviceFamily), TextValue.valueOf(serviceMember));
+                    final IRpcInstance rpc = this.registryProxy.getRpc(PlatformRegistry.DEREGISTER);
+                    if (rpc == null)
+                    {
+                        Log.log(PlatformRegistryAgent.this,
+                                "No deregister RPC found, assuming registry connection is dead");
+                    }
+                    else
+                    {
+                        rpc.execute(TextValue.valueOf(serviceFamily), TextValue.valueOf(serviceMember));
+                    }
                 }
                 catch (Exception e)
                 {

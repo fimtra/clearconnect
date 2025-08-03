@@ -1428,7 +1428,10 @@ final class EventHandler
                 PlatformUtils.getHostNameFromServiceInfoRecord(serviceRecordStructure),
                 PlatformUtils.getPortFromServiceInfoRecord(serviceRecordStructure), transportTechnology,
                 PlatformRegistry.SERVICE_NAME);
-        serviceProxy.setReconnectPeriodMillis(this.registry.reconnectPeriodMillis);
+        // we do not re-connect - if a service is lost, we remove it from the registry
+        // the responsibility is on the agent to re-register the service
+        // the agent listens to the SERVICE_INSTANCES_PER_SERVICE_FAMILY record to detect loss of service
+        serviceProxy.setReconnectPeriodMillis(Integer.MAX_VALUE);
 
         this.monitoredServiceInstances.put(registrationToken, serviceProxy);
 

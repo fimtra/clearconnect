@@ -990,7 +990,7 @@ public final class ProxyContext implements IObserverContext
      * 
      * @param reconnectPeriodMillis
      *            the period in milliseconds to wait before trying a reconnect to the context,
-     *            cannot be less than 50
+     *            cannot be less than 50. A value of Integer.MAX_VALUE disables reconnection ability.
      * @see Values#PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS
      */
     public void setReconnectPeriodMillis(int reconnectPeriodMillis)
@@ -1665,11 +1665,20 @@ public final class ProxyContext implements IObserverContext
                 }
             }
 
-            Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
-                Long.toString(this.reconnectPeriodMillis), "ms ");
+            if (this.reconnectPeriodMillis == Integer.MAX_VALUE)
+            {
+                Log.log(this, "Reconnect DISABLED for ", getShortName(), " to ", getEndPoint());
+                destroy();
+            }
+            else
+            {
+                Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
+                        Long.toString(this.reconnectPeriodMillis), "ms ");
 
-            this.reconnectTask =
-                RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis, TimeUnit.MILLISECONDS);
+                this.reconnectTask =
+                        RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis,
+                                TimeUnit.MILLISECONDS);
+            }
         }
     }
 
