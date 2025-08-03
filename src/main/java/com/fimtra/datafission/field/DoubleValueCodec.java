@@ -1,7 +1,5 @@
 package com.fimtra.datafission.field;
 
-import static com.fimtra.datafission.field.LongValueCodec.DigitOnes;
-import static com.fimtra.datafission.field.LongValueCodec.DigitTens;
 
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -189,8 +187,8 @@ class DoubleValueCodec
                 q = lValue / 100;
                 r = (int) (lValue - (q * 100));
                 lValue = q;
-                digits[--lsDigitPos] = DigitOnes[r];
-                digits[--lsDigitPos] = DigitTens[r];
+                digits[--lsDigitPos] = (char) (48 + (r % 10));
+                digits[--lsDigitPos] = (char) (48 + (r / 10));
                 decExponent+=2;
             }
 
@@ -201,7 +199,7 @@ class DoubleValueCodec
             {
                 q2 = (i2 * 52429) >>> 19;
                 r = i2 - (q2 * 10);
-                digits[--lsDigitPos] = LongValueCodec.digits[r];
+                digits[--lsDigitPos] = (char) (48 + r);
                 decExponent++;
                 i2 = q2;
             }
@@ -350,7 +348,7 @@ class DoubleValueCodec
                 }
                 else
                 {
-                    digits[ndigit++] = LongValueCodec.digits[q];
+                    digits[ndigit++] = (char) (48 + q);
                 }
                 //
                 // HACK! Java spec sez that we always have at least
@@ -374,7 +372,7 @@ class DoubleValueCodec
                     low = mZeroOrLess | (b < m);
                     high = mZeroOrLess | (b + m > tens);
 
-                    digits[ndigit++] = LongValueCodec.digits[q];
+                    digits[ndigit++] = (char) (48 + q);
                 }
                 lowDigitDifference = (b << 1) - tens;
             }
@@ -411,7 +409,7 @@ class DoubleValueCodec
                 }
                 else
                 {
-                    digits[ndigit++] = LongValueCodec.digits[q];
+                    digits[ndigit++] = (char) (48 + q);
                 }
                 //
                 // HACK! Java spec sez that we always have at least
@@ -431,7 +429,7 @@ class DoubleValueCodec
                     Mval = Mval.multBy10(); //Mval = Mval.mult( 10 );
                     low = (Bval.cmp(Mval) < 0);
                     high = tenSval.addAndCmp(Bval, Mval) <= 0;
-                    digits[ndigit++] = LongValueCodec.digits[q];
+                    digits[ndigit++] = (char) (48 + q);
                 }
                 if (high && low)
                 {
@@ -628,19 +626,19 @@ class DoubleValueCodec
                 // decExponent has 1, 2, or 3, digits
                 if (e <= 9)
                 {
-                    buffer[i++] = LongValueCodec.digits[e];
+                    buffer[i++] = (char) (48 + e);
                 }
                 else if (e <= 99)
                 {
-                    buffer[i++] = LongValueCodec.digits[e / 10];
-                    buffer[i++] = LongValueCodec.digits[e % 10];
+                    buffer[i++] = (char) (48 + (e / 10));
+                    buffer[i++] = (char) (48 + (e % 10));
                 }
                 else
                 {
-                    buffer[i++] = LongValueCodec.digits[e / 100];
+                    buffer[i++] = (char) (48 + (e / 100));
                     e %= 100;
-                    buffer[i++] = LongValueCodec.digits[e / 10];
-                    buffer[i++] = LongValueCodec.digits[e % 10];
+                    buffer[i++] = (char) (48 + (e / 10));
+                    buffer[i++] = (char) (48 + (e % 10));
                 }
             }
             stringAppender.setLength(i);
@@ -867,7 +865,7 @@ class DoubleValueCodec
                     // Avoids two comparisons and two branches
                     if (((c - 48) & 0xFFFF) <= 9)
                     {
-                        lValue = lValue * 10L + (long) LongValueCodec.digits_from_char[c];
+                        lValue = lValue * 10L + (c - 48);
                         nDigits++;
                     }
                     else if (c == '.')
@@ -992,7 +990,7 @@ class DoubleValueCodec
                     c = in[i++];
                     if (((c - 48) & 0xFFFF) <= 9)
                     {
-                        expVal = expVal * 10 + LongValueCodec.digits_from_char[c];
+                        expVal = expVal * 10 + (c - 48);
                     }
                     else
                     {

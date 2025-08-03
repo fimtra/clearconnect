@@ -1,15 +1,12 @@
 package com.fimtra.datafission.field;
 
-import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
-import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
-import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
-import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import org.junit.Test;
 
@@ -67,326 +64,124 @@ public class LongValueCodecTest
     public void test_to_from_charArray()
     {
         final int LOOPS = 1_000_000;
-        // size=20 for -ve 19 digits
-        final char[] chars = new char[20];
 
-        doToFromCharArrayTest(Long.MAX_VALUE, chars);
-        doToFromCharArrayTest(-Long.MAX_VALUE, chars);
+        doToFromCharArrayTest(Long.MAX_VALUE);
+        doToFromCharArrayTest(-Long.MAX_VALUE);
 
         for (long lVal = 0; lVal < LOOPS; lVal++)
         {
-            doToFromCharArrayTest(lVal, chars);
+            doToFromCharArrayTest(lVal);
         }
 
         for (long lVal = 0; lVal < LOOPS; lVal++)
         {
-            doToFromCharArrayTest(-lVal, chars);
+            doToFromCharArrayTest(-lVal);
         }
     }
 
-    private static void doToFromCharArrayTest(long lVal, char[] chars)
+    private static void doToFromCharArrayTest(long lVal)
     {
-        final int len = lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal);
-        LongValueCodec.writeToCharArray(lVal, chars, 0, len);
-        assertEquals(lVal, LongValueCodec.fromCharArray(chars, 0, len));
+        final char[] chars = new char[lVal < 0 ? 20 : 19];
+        int start = LongValueCodec.writeToCharArray(lVal, chars);
+
+        // NOTE: writeToCharArray is not 100% symmetrical with fromCharArray
+        if (lVal < 0)
+        {
+            chars[--start] = '-';
+        }
+
+        assertEquals(lVal, LongValueCodec.fromCharArray(chars, start, chars.length - start));
     }
 
     @Test
-    public void test_stringSize()
+    public void testArrayVsCompute()
     {
-        final int LOOPS = 19;
-        for (int i = 0; i < LOOPS; i++)
-        {
-            long v = 5 * (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
-        }
+        final int MAX = 10_000_000;
+        long t;
+        char c;
+        long q;
+        int r;
+        int num = 1234567;
+        char[] arr_buf = new char[2];
+        char[] com_buf = new char[2];
 
-        for (int i = 0; i < LOOPS; i++)
+        long com_time, arr_time;
+        long total_com_time = 0, total_arr_time = 0;
+        for (int j = 0; j < 10; j++)
         {
-            long v = (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
+            // old array routine from java.long.Long
+            t = System.nanoTime();
+            for (int i = 0; i < MAX; i++)
+            {
+                q = num / 100;
+                r = (int) (num - (q * 100));
+                arr_buf[1] = DigitOnes[r];
+                arr_buf[0] = DigitTens[r];
+            }
+            arr_time = System.nanoTime() - t;
+            //            System.err.println("arr_time=" + arr_time);
+            total_arr_time += arr_time;
+
+            t = System.nanoTime();
+            for (int i = 0; i < MAX; i++)
+            {
+                q = num / 100;
+                r = (int) (num - (q * 100));
+                com_buf[1] = (char) (48 + (r % 10));
+                com_buf[0] = (char) (48 + (r / 10));
+            }
+            com_time = System.nanoTime() - t;
+            //            System.err.println("com_time=" + com_time);
+            total_com_time += com_time;
+
+            assertArrayEquals(arr_buf, com_buf);
         }
+        System.err.println("total_arr_time=" + total_arr_time);
+        System.err.println("total_com_time=" + total_com_time);
+        assertTrue(total_com_time < total_arr_time);
     }
 
-    @Test
-    public synchronized void test_performance_loop_vs_array()
-    {
-        List<long[]> times;
-        int tries = 0;
-        do
-        {
-            tries++;
-            times = new ArrayList<>();
-            doPerfTest_loop_vs_array(5, times);
-            doPerfTest_loop_vs_array(5000L, times);
-            doPerfTest_loop_vs_array(50000000000000L, times);
-            doPerfTest_loop_vs_array(1328623089214211837L, times);
-            doPerfTest_loop_vs_array(Long.MAX_VALUE, times);
+    static final char[] DigitTens = {
+            //
+            '0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
+            //
+            '1', '1', '1', '1', '1', '1', '1', '1', '1', '1',
+            //
+            '2', '2', '2', '2', '2', '2', '2', '2', '2', '2',
+            //
+            '3', '3', '3', '3', '3', '3', '3', '3', '3', '3',
+            //
+            '4', '4', '4', '4', '4', '4', '4', '4', '4', '4',
+            //
+            '5', '5', '5', '5', '5', '5', '5', '5', '5', '5',
+            //
+            '6', '6', '6', '6', '6', '6', '6', '6', '6', '6',
+            //
+            '7', '7', '7', '7', '7', '7', '7', '7', '7', '7',
+            //
+            '8', '8', '8', '8', '8', '8', '8', '8', '8', '8',
+            //
+            '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', };
 
-            final Random random = new Random();
-            for (int i = 0; i < 5; i++)
-            {
-                long lVal = random.nextLong();
-                if (lVal < 0)
-                {
-                    lVal = -lVal;
-                }
-                doPerfTest_loop_vs_array(lVal, times);
-            }
-        }
-        while (!checkNormalVsOptimisedResults(times, "test_performance_loop_vs_array", tries));
-    }
-
-    private static void doPerfTest_loop_vs_array(long lVal, List<long[]> times)
-    {
-        //        System.err.println("============== " + lVal + "-stringSize loops:" + LOOPS + "=============");
-
-        // warmup
-        for (int i = 0; i < LOOPS; i++)
-        {
-            stringSize_loop(lVal);
-            LongValueCodec.stringSize(lVal);
-        }
-
-        for (int j = 0; j < REPEAT_RUNS; j++)
-        {
-            prepareForPerfTestStep();
-
-            long tLoop = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                stringSize_loop(lVal);
-            }
-            tLoop = System.nanoTime() - tLoop;
-
-            prepareForPerfTestStep();
-
-            long tArr = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                LongValueCodec.stringSize(lVal);
-            }
-            tArr = System.nanoTime() - tArr;
-
-            assertEquals(stringSize_loop(lVal), LongValueCodec.stringSize(lVal));
-
-            //        System.err.println("tLoop=" + tLoop + " tArr=" + tArr);
-
-            saveQuickestTimes(times, tLoop, tArr);
-        }
-
-    }
-
-    // taken from source code for Long.stringSize
-    private static int stringSize_loop(long x)
-    {
-        long p = 10;
-        for (int i = 1; i < 19; i++)
-        {
-            if (x < p)
-            {
-                return i;
-            }
-            p = 10 * p;
-        }
-        return 19;
-    }
-
-    // ====================
-    @Test
-    public void compare_stringSize_implementations()
-    {
-        long[] testValues = { 0L, 1L,
-
-                9L, 10L,
-
-                99L, 100L,
-
-                999L, 1000L,
-
-                9999L, 10_000L,
-
-                99_999L, 100_000L,
-
-                999_999L, 1_000_000L,
-
-                9_999_999L, 10_000_000L,
-
-                99_999_999L, 100_000_000L,
-
-                999_999_999L, 1_000_000_000L,
-
-                9_999_999_999L, 10_000_000_000L,
-
-                99_999_999_999L, 100_000_000_000L,
-
-                999_999_999_999L, 1_000_000_000_000L,
-
-                9_999_999_999_999L, 10_000_000_000_000L,
-
-                99_999_999_999_999L, 100_000_000_000_000L,
-
-                999_999_999_999_999L, 1_000_000_000_000_000L,
-
-                9_999_999_999_999_999L, 10_000_000_000_000_000L,
-
-                99_999_999_999_999_999L, 100_000_000_000_000_000L,
-
-                999_999_999_999_999_999L, 1_000_000_000_000_000_000L };
-
-        int iterations = 10_000_000;
-        int warmupIterations = iterations;
-
-        // Warmup
-        for (int i = 0; i < warmupIterations; i++)
-        {
-            for (long value : testValues)
-            {
-                stringSize(value);
-                stringSize_classic(value);
-                stringSize_copilot(value);
-            }
-        }
-
-        // Timing
-        long startOriginal = System.nanoTime();
-        for (int i = 0; i < iterations; i++)
-        {
-            for (long value : testValues)
-            {
-                stringSize(value);
-            }
-        }
-        long timeOriginal = System.nanoTime() - startOriginal;
-
-        long startClassic = System.nanoTime();
-        for (int i = 0; i < iterations; i++)
-        {
-            for (long value : testValues)
-            {
-                stringSize_classic(value);
-            }
-        }
-        long timeClassic = System.nanoTime() - startClassic;
-
-        long startCopilot = System.nanoTime();
-        for (int i = 0; i < iterations; i++)
-        {
-            for (long value : testValues)
-            {
-                stringSize_copilot(value);
-            }
-        }
-        long timeCopilot = System.nanoTime() - startCopilot;
-
-        // Verify results
-        for (long value : testValues)
-        {
-            int sizeOriginal = stringSize(value);
-            int sizeClassic = stringSize_classic(value);
-            int sizeCopilot = stringSize_copilot(value);
-
-            assertEquals("Classic implementation mismatch for value " + value, sizeOriginal, sizeClassic);
-            assertEquals("Copilot implementation mismatch for value " + value, sizeOriginal, sizeCopilot);
-        }
-
-        // Report average time per operation
-        long opsCount = (long) iterations * testValues.length;
-        System.out.printf(
-                "Average time per operation (ns):%n" + "Original: %.2f%nClassic: %.2f%nCopilot: %.2f%n",
-                (double) timeOriginal / opsCount, (double) timeClassic / opsCount,
-                (double) timeCopilot / opsCount);
-    }
-
-    static int stringSize_classic(long x)
-    {
-        long p = 10;
-        for (int i = 1; i < 19; i++)
-        {
-            if (x < p)
-            {
-                return i;
-            }
-            p = (p << 3) + (p << 1);
-        }
-        return 19;
-    }
-
-    static int stringSize_copilot(long x)
-    {
-        if (x < 100000)
-        {
-            if (x < 100)
-            {
-                return x < 10 ? 1 : 2;
-            }
-            if (x < 10000)
-            {
-                return x < 1000 ? 3 : 4;
-            }
-            return 5;
-        }
-
-        if (x < 10000000000L)
-        {
-            if (x < 10000000)
-            {
-                if (x < 1000000)
-                {
-                    return 6;
-                }
-                return 7;
-            }
-            if (x < 1000000000)
-            {
-                if (x < 100000000)
-                {
-                    return 8;
-                }
-                return 9;
-            }
-            return 10;
-        }
-
-        if (x < 1000000000000000L)
-        {
-            if (x < 1000000000000L)
-            {
-                if (x < 100000000000L)
-                {
-                    return 11;
-                }
-                return 12;
-            }
-            if (x < 100000000000000L)
-            {
-                if (x < 10000000000000L)
-                {
-                    return 13;
-                }
-                return 14;
-            }
-            return 15;
-        }
-
-        if (x < 100000000000000000L)
-        {
-            if (x < 10000000000000000L)
-            {
-                return 16;
-            }
-            return 17;
-        }
-        if (x < 1000000000000000000L)
-        {
-            return 18;
-        }
-        return 19;
-    }
-
-    static int stringSize(long x)
-    {
-        return LongValueCodec.stringSize(x);
-    }
-
+    static final char[] DigitOnes = {
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            //
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', };
 }

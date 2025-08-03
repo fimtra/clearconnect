@@ -114,14 +114,8 @@ public class LongValue extends AbstractValue
     @Override
     public final StringAppender toStringAppender()
     {
-        final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
-                LongValueCodec.stringSize(value))
-                // plus 1 for the LONG_CODE
-                + 1;
-        final StringAppender appender = new StringAppender(digitCount);
-        final char[] buf = appender.reserveAndGet(digitCount);
-        buf[0] = IValue.LONG_CODE;
-        LongValueCodec.writeToCharArray(value, buf, 1, digitCount);
+        final StringAppender appender = new StringAppender(19);
+        writeToAppender(appender);
         return appender;
     }
 
@@ -155,15 +149,31 @@ public class LongValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
-                LongValueCodec.stringSize(value))
-                // plus 1 for the LONG_CODE
-                + 1;
-        int start = stringAppender.getLength();
-        final char[] buf = stringAppender.reserveAndGet(digitCount);
-        final int len = start + digitCount;
-        buf[start++] = IValue.LONG_CODE;
-        LongValueCodec.writeToCharArray(value, buf, start, len);
+        writeToAppender(stringAppender);
         return stringAppender;
+    }
+
+    /** holds the re-usable char[] for writing a long */
+    private static final ThreadLocal<char[]> TEMP = ThreadLocal.withInitial(() -> new char[19]);
+
+    private void writeToAppender(StringAppender appender)
+    {
+        final char[] chars = TEMP.get();
+        final int index = LongValueCodec.writeToCharArray(value, chars);
+        final int len = 19 - index;
+        final char[] dest;
+        int start = appender.getLength();
+        if (value < 0)
+        {
+            dest = appender.reserveAndGet(len + 2);
+            dest[start++] = IValue.LONG_CODE;
+            dest[start++] = '-';
+        }
+        else
+        {
+            dest = appender.reserveAndGet(len + 1);
+            dest[start++] = IValue.LONG_CODE;
+        }
+        System.arraycopy(chars, index, dest, start, len);
     }
 }
