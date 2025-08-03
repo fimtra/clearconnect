@@ -199,11 +199,11 @@ public class PlatformServiceTest
     @Test
     public void testGetAllRecordNames()
     {
-        assertEquals(6, this.candidate.getAllRecordNames().size());
+        assertEquals(1, this.candidate.getAllRecordNames().size());
         assertTrue(this.candidate.createRecord(record1));
-        assertEquals(7, this.candidate.getAllRecordNames().size());
+        assertEquals(2, this.candidate.getAllRecordNames().size());
         assertTrue(this.candidate.createRecord(record2));
-        assertEquals(8, this.candidate.getAllRecordNames().size());
+        assertEquals(3, this.candidate.getAllRecordNames().size());
     }
 
     @Test

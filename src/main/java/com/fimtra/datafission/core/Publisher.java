@@ -184,6 +184,7 @@ public class Publisher
         final Map<String, CoalescingRecordListener> systemRecordPublishers;
         /** Holds the message sequences for the system records that are published */
         final Map<String, AtomicLong> systemRecordSequences;
+        final IRecordListener systemRecordListener;
 
         ProxyContextMultiplexer(IEndPointService service)
         {
@@ -196,6 +197,9 @@ public class Publisher
             this.systemRecordPublishers =
                 new HashMap<>(ContextUtils.SYSTEM_RECORDS.size());
             this.systemRecordSequences = new HashMap<>(ContextUtils.SYSTEM_RECORDS.size());
+            this.systemRecordListener =
+                    (imageCopy, atomicChange) -> systemRecordPublishers.get(imageCopy.getName())
+                            .onChange(imageCopy, atomicChange);
 
             for (String systemRecord : ContextUtils.SYSTEM_RECORDS)
             {
@@ -216,14 +220,7 @@ public class Publisher
         @Override
         public void onChange(IRecord imageCopy, final IRecordChange atomicChange)
         {
-            if (isSystemRecordUpdateCoalesced(imageCopy.getName()))
-            {
-                this.systemRecordPublishers.get(imageCopy.getName()).onChange(imageCopy, atomicChange);
-            }
-            else
-            {
-                handleRecordChange(atomicChange);
-            }
+            handleRecordChange(atomicChange);
         }
 
         void handleRecordChange(IRecordChange atomicChange)
@@ -243,10 +240,10 @@ public class Publisher
             if (parts != null)
             {
                 int loopBroadcastCount;
-                for (int i = 0; i < parts.length; i++)
+                for (AtomicChange part : parts)
                 {
-                    txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(parts[i]);
-                    
+                    txMessage = Publisher.this.mainCodec.getTxMessageForAtomicChange(part);
+
                     loopBroadcastCount = this.service.broadcast(name, txMessage, clients);
                     bytesPublished += loopBroadcastCount * txMessage.length;
                     broadcastCount += loopBroadcastCount;
@@ -284,6 +281,7 @@ public class Publisher
             {
                 synchronized (Publisher.this.lock)
                 {
+                    IRecordListener observer;
                     final List<String> increment = new LinkedList<>();
                     for (final String name : names)
                     {
@@ -295,10 +293,17 @@ public class Publisher
                                 {
                                     if (ProxyContextMultiplexer.this.subscribers.getSubscribersFor(name).length == 1)
                                     {
+                                        if (isSystemRecordUpdateCoalesced(name))
+                                        {
+                                            observer = ProxyContextMultiplexer.this.systemRecordListener;
+                                        }
+                                        else
+                                        {
+                                            observer = ProxyContextMultiplexer.this;
+                                        }
                                         // NOTE: adding the observer ends up calling
                                         // addDeltaToSubscriptionCount which publishes the image
-                                        if (!Publisher.this.context.addObserver(permissionToken,
-                                                        ProxyContextMultiplexer.this, name)
+                                        if (!Publisher.this.context.addObserver(permissionToken, observer, name)
                                                 .get()
                                                 .get(name))
                                         {
@@ -401,9 +406,32 @@ public class Publisher
                     }
                 }
                 Publisher.this.context.addDeltaToSubscriptionCount(-1, decrement);
-                Publisher.this.context.removeObserver(ProxyContextMultiplexer.this,
-                    remove.toArray(new String[0]));
 
+                // split remove between system and user-space
+                final List<String> systemRecords = new ArrayList<>(5);
+                final List<String> nonSystemRecords = new ArrayList<>(remove.size());
+                for (String recordName : remove)
+                {
+                    if (isSystemRecordUpdateCoalesced(recordName))
+                    {
+                        systemRecords.add(recordName);
+                    }
+                    else
+                    {
+                        nonSystemRecords.add(recordName);
+                    }
+                }
+                if (!systemRecords.isEmpty())
+                {
+                    Publisher.this.context.removeObserver(ProxyContextMultiplexer.this.systemRecordListener,
+                            systemRecords.toArray(new String[0]));
+                }
+                if (!nonSystemRecords.isEmpty())
+                {
+                    Publisher.this.context.removeObserver(ProxyContextMultiplexer.this,
+
+                            nonSystemRecords.toArray(new String[0]));
+                }
                 for (String name : remove)
                 {
                     ProxyContextMultiplexer.this.service.endBroadcast(name);
@@ -448,9 +476,9 @@ public class Publisher
             final AtomicChange[] parts = this.teleporter.split(change);
             if (parts != null)
             {
-                for (int i = 0; i < parts.length; i++)
+                for (AtomicChange part : parts)
                 {
-                    publisher.publish(publisher.codec.getTxMessageForAtomicChange(parts[i]), true, name);
+                    publisher.publish(publisher.codec.getTxMessageForAtomicChange(part), true, name);
                 }
             }
             else
@@ -515,7 +543,7 @@ public class Publisher
                     TextValue.valueOf(Publisher.this.getTransportTechnology().toString()));
             }
 
-            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+            publishContextConnectionsChange();
 
             scheduleStatsUpdateTask();
 
@@ -727,7 +755,7 @@ public class Publisher
             if (Publisher.this.connectionsRecord.removeSubMap(
                 getTransmissionStatisticsFieldName(ProxyContextPublisher.this.channel)) != null)
             {
-                Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+                publishContextConnectionsChange();
             }
 
             Log.log(this, "Destroyed ", this.identity, ", removed ", Integer.toString(copy.size()), " subscriptions (",
@@ -745,7 +773,7 @@ public class Publisher
             this.identity = identity;
             Publisher.this.connectionsRecord.getOrCreateSubMap(getTransmissionStatisticsFieldName(this.channel)).put(
                 IContextConnectionsRecordFields.PROXY_ID, TextValue.valueOf(this.identity));
-            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+            publishContextConnectionsChange();
         }
 
         @Override
@@ -810,11 +838,16 @@ public class Publisher
         }
     }
 
+    private CountDownLatch publishContextConnectionsChange()
+    {
+        return Publisher.this.context.publishSystemRecord(Publisher.this.connectionsRecord);
+    }
+
     final Map<ITransportChannel, ProxyContextPublisher> proxyContextPublishers;
     final Context context;
     final ICodec mainCodec;
     final IEndPointService server;
-    final IRecord connectionsRecord;
+    final SystemRecord connectionsRecord;
     final ProxyContextMultiplexer multiplexer;
     final TransportTechnologyEnum transportTechnology;
     long contextConnectionsRecordPublishPeriodMillis = DataFissionProperties.Values.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS;
@@ -1073,8 +1106,7 @@ public class Publisher
                             }
                         }
 
-                        this.publishAtomicChange =
-                            Publisher.this.context.publishAtomicChange(ISystemRecordNames.CONTEXT_CONNECTIONS);
+                        this.publishAtomicChange = publishContextConnectionsChange();
                     }
                 }
             }, this.contextConnectionsRecordPublishPeriodMillis, this.contextConnectionsRecordPublishPeriodMillis,

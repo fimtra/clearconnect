@@ -42,13 +42,27 @@ import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
 /**
+ * Represents a system record in a {@link Context}. These differ from user-space records in that they are not
+ * available for general use and hold internal state for the context itself.
+ *
+ * @see com.fimtra.datafission.IObserverContext.ISystemRecordNames
+ */
+class SystemRecord extends Record
+{
+    SystemRecord(String name, Map<String, IValue> data, IAtomicChangeManager context)
+    {
+        super(name, data, context);
+    }
+}
+
+/**
  * The standard implementation. This does not allow <code>null</code> keys. Records are equal by
  * value of their internal data map entries.
  * 
  * @see IRecord The IRecord interface for further behaviour documentation
  * @author Ramon Servadei
  */
-final class Record implements IRecord, Cloneable
+class Record implements IRecord, Cloneable
 {
     static String toString(String contextName, String recordName, long sequence, Map<String, IValue> data,
         Map<String, Map<String, IValue>> subMaps)

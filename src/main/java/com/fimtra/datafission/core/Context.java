@@ -38,7 +38,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import com.fimtra.datafission.DataFissionProperties;
@@ -151,9 +150,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /**
      * Bypass any checks and get a writable ContextConnections record - <b>only used for internals</b>
      */
-    static IRecord getContextConnectionsRecordInternal(IObserverContext context)
+    static SystemRecord getContextConnectionsRecordInternal(IObserverContext context)
     {
-        return ((Context) context).records.get(ISystemRecordNames.CONTEXT_CONNECTIONS);
+        return ((Context) context).systemRecords.get(ISystemRecordNames.CONTEXT_CONNECTIONS);
     }
 
     /**
@@ -210,6 +209,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     /** Holds all records in this context */
     final ConcurrentMap<String, IRecord> records;
+    final Map<String, SystemRecord> systemRecords;
 
     /**
      * Maintains a map of {@link Record} images and {@link ImmutableRecord} instances backed by the
@@ -338,7 +338,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Map<IRecordListener, Set<String>> listenersToNotifyWithInitialImages;
     volatile int listenersBeingNotifiedWithInitialImages;
 
-    final ContextThrottle throttle;
+    final IEventLifeCycle throttle;
+    final IEventLifeCycle noopThrottle;
 
     /** Construct the context with the given name */
     public Context(String name)
@@ -367,7 +368,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         super();
 
         this.name = name;
-        this.throttle = new ContextThrottle(DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD, eventCount);
+        this.throttle = new ContextThrottle(DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD,
+                eventCount);
+        this.noopThrottle = new IEventLifeCycle()
+        {
+        };
         this.noopChangeManager = new NoopAtomicChangeManager(this.name);
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
@@ -388,6 +393,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.sequences = new ConcurrentHashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
         this.records = new ConcurrentHashMap<>(initialSize);
+        this.systemRecords = new HashMap<>();
         this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
         this.tokenPerRecord = new ConcurrentHashMap<>(initialSize);
         this.rpcInstances = new HashMap<>();
@@ -407,12 +413,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     private void createSystemRecord(String recordName)
     {
-        createRecordAndInfrastructure(recordName, ContextUtils.EMPTY_MAP);
+        createRecordAndInfrastructure(recordName, ContextUtils.EMPTY_MAP, true);
 
         // add to the context record
-        this.records.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
+        this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
 
-        publishAtomicChange(recordName, true);
+        publishSystemRecord(this.systemRecords.get(recordName));
     }
 
     @Override
@@ -479,14 +485,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
         // publish the update to the ContextRecords before publishing to observers - one of the
         // observers may check the ContextRecords so the created record MUST be in there before
-        final IRecord contextRecords = this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
+        final SystemRecord contextRecords = this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
         if (!isSystemRecordReady(contextRecords))
         {
             throw new IllegalStateException(
                 "Cannot create new record [" + name + "] in shutdown context " + ObjectUtils.safeToString(this));
         }
 
-        final Record record;
+        final IRecord record;
         synchronized (this.recordCreateLock)
         {
             record = createRecordInternal_callWithLock(name, initialData);
@@ -497,14 +503,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // important to access subscriptions whilst holding the write lock of CONTEXT_RECORDS -
             // see addDeltaToSubscriptionCount - this ensures we create the record with the correct
             // subscriptions count
-            final IRecord contextSubscriptions = this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+            final IRecord contextSubscriptions = this.systemRecords.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
             final IValue subscriptionCount = contextSubscriptions.get(name);
             contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
-            publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
+            publishSystemRecord(this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS));
         }
 
         // always force a publish for the initial create - guaranteed to be sequence 0
-        publishAtomicChange(name, true);
+        publishAtomicChange(name, this.noopThrottle);
 
         return record;
     }
@@ -521,14 +527,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    private Record createRecordInternal_callWithLock(final String name, Map<String, IValue> initialData)
+    private IRecord createRecordInternal_callWithLock(final String name, Map<String, IValue> initialData)
     {
         if (this.records.get(name) != null)
         {
             throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
         }
 
-        final Record record = createRecordAndInfrastructure(name, initialData);
+        final IRecord record = createRecordAndInfrastructure(name, initialData, false);
 
         if (log)
         {
@@ -538,7 +544,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return record;
     }
 
-    private Record createRecordAndInfrastructure(String recordName, Map<String, IValue> initialImageData)
+    private IRecord createRecordAndInfrastructure(String recordName, Map<String, IValue> initialImageData,
+            boolean isSystemRecord)
     {
         final int initialSequence = 0;
 
@@ -546,9 +553,19 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.pendingAtomicChanges.put(recordName,
                 new AtomicChange(recordName, new CharRef(IRecordChange.IMAGE_SCOPE_CHAR),
                         new LongRef(initialSequence)));
-        this.imageCache.put(recordName, new Record(recordName, initialImageData, this.noopChangeManager));
-        final Record record = new Record(recordName, ContextUtils.EMPTY_MAP, this);
-        this.records.put(recordName, record);
+        this.imageCache.put(recordName,
+                isSystemRecord ? new SystemRecord(recordName, initialImageData, this.noopChangeManager) :
+                        new Record(recordName, initialImageData, this.noopChangeManager));
+        final Record record = isSystemRecord ? new SystemRecord(recordName, ContextUtils.EMPTY_MAP, this) :
+                new Record(recordName, ContextUtils.EMPTY_MAP, this);
+        if (isSystemRecord)
+        {
+            this.systemRecords.put(recordName, (SystemRecord) record);
+        }
+        else
+        {
+            this.records.put(recordName, record);
+        }
 
         if (!initialImageData.isEmpty())
         {
@@ -609,7 +626,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             return;
                         }
 
-                        final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
+                        final SystemRecord contextRecords =
+                                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
                         if (isSystemRecordReady(contextRecords))
                         {
                             synchronized (contextRecords.getWriteLock())
@@ -618,7 +636,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                 {
                                     contextRecords.remove(name);
                                 }
-                                publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
+                                publishSystemRecord(contextRecords);
                             }
                         }
                     }
@@ -637,12 +655,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public IRecord getRecord(String name)
     {
-        IRecord record = this.records.get(name);
         if (ContextUtils.isSystemRecordName(name))
         {
-            return record.getImmutableInstance();
+            return this.systemRecords.get(name).getImmutableInstance();
         }
-        return record;
+        return this.records.get(name);
     }
 
     @Override
@@ -674,18 +691,18 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch publishAtomicChange(IRecord record)
     {
-        return publishAtomicChange(record.getName());
+        return publishAtomicChange(record.getName(), this.throttle);
     }
 
     @Override
     public CountDownLatch publishAtomicChange(final String name)
     {
-        return publishAtomicChange(name, false);
+        return publishAtomicChange(name, this.throttle);
     }
 
-    CountDownLatch publishAtomicChange(final String name, final boolean forcePublish)
+    CountDownLatch publishAtomicChange(final String name, final IEventLifeCycle eventLifeCycle)
     {
-        this.throttle.eventStart(name, forcePublish);
+        eventLifeCycle.eventStart();
 
         try
         {
@@ -695,7 +712,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 Log.log(this, "Ignoring publish of non-existent record [", name, "]");
                 latch.countDown();
-                this.throttle.eventFinish();
+                eventLifeCycle.eventFinish();
                 return latch;
             }
 
@@ -710,10 +727,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // publishAtomicChange - pending change will have been used
 
                 // prevent empty changes BUT also allow the initial create if it had blank data
-                if (atomicChange == null || (!forcePublish && atomicChange.isEmpty()))
+                if (atomicChange == null || (eventLifeCycle != noopThrottle && atomicChange.isEmpty()))
                 {
                     latch.countDown();
-                    this.throttle.eventFinish();
+                    eventLifeCycle.eventFinish();
                     return latch;
                 }
 
@@ -726,15 +743,33 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // Perform after the synchronized block to ensure the atomic change write
             // is flushed to main memory before we try to execute it.
             // Running the atomicChange will call doPublishChange.
-            executeSequentialCoreTask(atomicChange);
+            coreExecutor.execute(atomicChange);
 
             return latch;
         }
         catch (RuntimeException e)
         {
-            this.throttle.eventFinish();
+            eventLifeCycle.eventFinish();
             throw e;
         }
+    }
+
+    CountDownLatch publishSystemRecord(SystemRecord record)
+    {
+        final CountDownLatch latch = new CountDownLatch(1);
+        synchronized (record.getWriteLock())
+        {
+            final AtomicChange atomicChange = this.pendingAtomicChanges.remove(record.getName());
+            if (atomicChange == null)
+            {
+                latch.countDown();
+                return latch;
+            }
+            record.setSequence(atomicChange.getSequence());
+            atomicChange.preparePublish(latch, this);
+            systemExecutor.execute(atomicChange);
+        }
+        return latch;
     }
 
     @Override
@@ -933,7 +968,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     void addDeltaToSubscriptionCount(final int delta, final Collection<String> recordNames)
     {
         final Map<String, LongValue> countsPerRecord = new HashMap<>(recordNames.size());
-        final IRecord contextSubscriptions = Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+        final SystemRecord contextSubscriptions =
+                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         if (isSystemRecordReady(contextSubscriptions))
         {
             synchronized (contextSubscriptions.getWriteLock())
@@ -959,10 +995,11 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     }
                     countsPerRecord.put(recordName, observerCount);
                 }
-                publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+                publishSystemRecord(contextSubscriptions);
             }
         }
-        final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
+        final SystemRecord contextRecords =
+                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
         if (isSystemRecordReady(contextRecords))
         {
             synchronized (contextRecords.getWriteLock())
@@ -974,7 +1011,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         contextRecords.put(recordName, countsPerRecord.get(recordName));
                     }
                 }
-                publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
+                publishSystemRecord(contextRecords);
             }
         }
     }
@@ -1041,13 +1078,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
     {
-        final IRecord contextStatus = this.records.get(ISystemRecordNames.CONTEXT_STATUS);
+        final SystemRecord contextStatus = this.systemRecords.get(ISystemRecordNames.CONTEXT_STATUS);
         if (isSystemRecordReady(contextStatus))
         {
             synchronized (contextStatus.getWriteLock())
             {
                 IStatusAttribute.Utils.setStatus(statusAttribute, contextStatus);
-                publishAtomicChange(ISystemRecordNames.CONTEXT_STATUS);
+                publishSystemRecord(contextStatus);
             }
         }
     }
@@ -1055,7 +1092,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void createRpc(IRpcInstance rpc)
     {
-        final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
+        final SystemRecord contextRpcs = this.systemRecords.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
             synchronized (contextRpcs.getWriteLock())
@@ -1068,7 +1105,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 copy.put(rpc.getName(), rpc);
                 this.rpcInstances = copy;
                 contextRpcs.put(rpc.getName(), TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
-                publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
+                publishSystemRecord(contextRpcs);
                 Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc), " in ", getName());
             }
         }
@@ -1077,7 +1114,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void removeRpc(String rpcName)
     {
-        final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
+        final SystemRecord contextRpcs = this.systemRecords.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
             synchronized (contextRpcs.getWriteLock())
@@ -1088,8 +1125,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 if (rpc != null)
                 {
                     Log.log(this, "Removing RPC ", ObjectUtils.safeToString(rpc), " from ", getName());
-                    this.records.get(ISystemRecordNames.CONTEXT_RPCS).remove(rpcName);
-                    publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
+                    contextRpcs.remove(rpcName);
+                    publishSystemRecord(contextRpcs);
                 }
             }
         }
@@ -1202,13 +1239,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
-        if (sequentialRunnable.context() == sequentialRunnable)
+        final Object context = sequentialRunnable.context();
+        if (context == sequentialRunnable)
         {
             throw new IllegalArgumentException(
                     "Sequential runnable [" + sequentialRunnable + "] is coalescing on itself!");
         }
 
-        final Object context = sequentialRunnable.context();
         if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
         {
             this.systemExecutor.execute(sequentialRunnable);
@@ -1253,7 +1290,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.permissionFilter = filter;
     }
 
-    boolean isSystemRecordReady(IRecord systemRecord)
+    boolean isSystemRecordReady(SystemRecord systemRecord)
     {
         return systemRecord != null && this.active;
     }
@@ -1372,4 +1409,20 @@ interface IAtomicChangeManager
     void addBulkChangesToAtomicChange(IRecord record, ThreadLocalBulkChanges changes);
 
     void addBulkSubMapChangesToAtomicChange(IRecord record, String subMapKey, ThreadLocalBulkChanges changes);
+}
+
+/**
+ * Provides methods to signal start and end of an event, typically used for throttle logic
+ *
+ * @author Ramon Servadei
+ */
+interface IEventLifeCycle
+{
+    default void eventStart()
+    {
+    }
+
+    default void eventFinish()
+    {
+    }
 }

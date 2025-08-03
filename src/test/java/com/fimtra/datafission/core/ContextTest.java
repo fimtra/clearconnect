@@ -840,11 +840,6 @@ public class ContextTest
         Set<String> expected = new HashSet<>();
         expected.add(name);
         expected.add(name2);
-        expected.add(ISystemRecordNames.CONTEXT_RECORDS);
-        expected.add(ISystemRecordNames.CONTEXT_STATUS);
-        expected.add(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
-        expected.add(ISystemRecordNames.CONTEXT_RPCS);
-        expected.add(ISystemRecordNames.CONTEXT_CONNECTIONS);
         assertEquals(expected, this.candidate.getRecordNames());
     }
 

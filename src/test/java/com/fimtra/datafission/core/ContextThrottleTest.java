@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -55,7 +54,7 @@ public class ContextThrottleTest
         long start = System.currentTimeMillis();
         for (int i = 0; i < LIMIT * 4; i++)
         {
-            this.candidate.eventStart("some record name", false);
+            this.candidate.eventStart();
         }
         time.set(System.currentTimeMillis() - start);
 
@@ -91,7 +90,7 @@ public class ContextThrottleTest
         latch.await();
         
         start = System.currentTimeMillis();
-        this.candidate.eventStart("some record name", false);
+        this.candidate.eventStart();
         time.set(System.currentTimeMillis() - start);
         assertTrue("Was: " + time.get(), time.get() < 100);
         assertEquals("Got: " + this.candidate.exemptThreads, 0, this.candidate.exemptThreads.size());
@@ -103,7 +102,7 @@ public class ContextThrottleTest
         Runnable task = () -> {
             for (int i = 0; i < LIMIT; i++)
             {
-                ContextThrottleTest.this.candidate.eventStart("some record name", false);
+                ContextThrottleTest.this.candidate.eventStart();
             }
         };
         Thread t = new Thread(task);
@@ -112,55 +111,4 @@ public class ContextThrottleTest
         t.join(1000);
         assertEquals(LIMIT, this.candidate.eventCount.get());
     }
-
-    @Test
-    public void testSystemRecordSkipsThrottle() throws InterruptedException
-    {
-        Runnable task = () -> {
-            for (int i = 0; i < LIMIT * 2; i++)
-            {
-                ContextThrottleTest.this.candidate.eventStart(ISystemRecordNames.CONTEXT_CONNECTIONS, false);
-            }
-        };
-        Thread t = new Thread(task);
-        t.start();
-
-        t.join(1000);
-        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
-    }
-
-    @Test
-    public void testForceFlagSkipsThrottle() throws InterruptedException
-    {
-        Runnable task = () -> {
-            for (int i = 0; i < LIMIT * 2; i++)
-            {
-                ContextThrottleTest.this.candidate.eventStart("some record name", true);
-            }
-        };
-        Thread t = new Thread(task);
-        t.start();
-
-        t.join(1000);
-        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
-    }
-
-    @Test
-    public void testFrameworkThreadSkipsThrottle() throws InterruptedException
-    {
-        final CountDownLatch latch = new CountDownLatch(1);
-        Runnable task = () -> {
-            for (int i = 0; i < LIMIT * 2; i++)
-            {
-                ContextThrottleTest.this.candidate.eventStart("some record name", false);
-            }
-            latch.countDown();
-        };
-        ContextUtils.CORE_EXECUTOR.execute(task);
-
-        latch.await(1000, TimeUnit.MILLISECONDS);
-
-        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
-    }
-
 }

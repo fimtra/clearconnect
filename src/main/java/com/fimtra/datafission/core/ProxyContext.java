@@ -718,7 +718,7 @@ public final class ProxyContext implements IObserverContext
                             // sequence if an image was received and then cached deltas applied
                             // on top of it
                             this.proxyContext.context.copySequenceFromRemote(name, record.getSequence());
-                            this.proxyContext.context.publishAtomicChange(name, false);
+                            this.proxyContext.context.publishAtomicChange(name);
                             break;
                         case ImageDeltaChangeProcessor.RESYNC:
                             this.proxyContext.resync(name);
