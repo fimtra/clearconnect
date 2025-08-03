@@ -1,5 +1,7 @@
 package com.fimtra.util;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Basic reference to a native long. This is useful for passing a long by reference to a method.
  *
@@ -7,28 +9,26 @@ package com.fimtra.util;
  */
 public final class LongRef
 {
-    volatile long value;
+    final AtomicLong value;
 
     public LongRef(long value)
     {
-        this.value = value;
+        this.value = new AtomicLong(value);
     }
 
     public long get()
     {
-        return value;
+        return value.get();
     }
 
     public void set(long value)
     {
-        this.value = value;
+        this.value.lazySet(value);
     }
 
     public long incrementAndGet()
     {
-        final long v = value + 1L;
-        value = v;
-        return v;
+        return this.value.incrementAndGet();
     }
 
     @Override
@@ -39,19 +39,18 @@ public final class LongRef
             return false;
         }
 
-        LongRef longRef = (LongRef) o;
-        return value == longRef.value;
+        return value.get() == ((LongRef) o).value.get();
     }
 
     @Override
     public int hashCode()
     {
-        return Long.hashCode(value);
+        return Long.hashCode(value.get());
     }
 
     @Override
     public String toString()
     {
-        return Long.toString(value);
+        return Long.toString(value.get());
     }
 }
