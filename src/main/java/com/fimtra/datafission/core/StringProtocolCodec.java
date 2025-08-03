@@ -15,8 +15,6 @@
  */
 package com.fimtra.datafission.core;
 
-import static com.fimtra.util.CollectionUtils.emptyIfNull;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -51,11 +49,11 @@ import com.fimtra.util.StringAppender;
 import com.fimtra.util.ThreadUtils;
 
 /**
- * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a
- * string text protocol. The format of the string in ABNF notation:
+ * A codec for messages that are sent between a {@link Publisher} and {@link ProxyContext} using a string text
+ * protocol. The format of the string in ABNF notation:
  *
  * <pre>
- *  preamble name seq [puts] [removes] [sub-map]
+ *  preamble name seq [puts] [removes] *[sub-map]
  *
  *  preamble       = 0*ALPHA
  *  name           = "|" 1*ALPHA ; the name of the notifying record instance
@@ -278,6 +276,7 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         boolean sequenceAndScopeSet = false;
         boolean expectingSubmapName = false;
+        char c;
         char previous = 0;
         int slashCount = 0;
 
@@ -288,56 +287,60 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         // todo this can resolve to rather large arrays being kept - need to optimise somehow
         // belt-n-braces buffer resizing - we assume worst case scenario for the buffer sizes
-        if (decodingBuffers.keyArr.length < decodedMessage.length)
+        final int msgLen = decodedMessage.length;
+        if (decodingBuffers.keyArr.length < msgLen)
         {
-            decodingBuffers.keyArr = new char[getNewSize(decodingBuffers.keyArr.length, decodedMessage.length)];
+            decodingBuffers.keyArr = new char[getNewSize(decodingBuffers.keyArr.length, msgLen)];
         }
-        if (decodingBuffers.valArr.length < decodedMessage.length)
+        if (decodingBuffers.valArr.length < msgLen)
         {
-            decodingBuffers.valArr = new char[getNewSize(decodingBuffers.keyArr.length, decodedMessage.length)];
+            decodingBuffers.valArr = new char[getNewSize(decodingBuffers.keyArr.length, msgLen)];
         }
 
         decodingBuffers.dataArr = decodingBuffers.keyArr;
 
         // Brief description:
-        // handle the header and data in dedicated for-loops, breaking when the relevant attributes are complete
-        // so we have a for-loop covering each of these sections: preamble, name, scope+sequence, data
-        // we scan through the char[] once, breaking out of the for-loop when we have all the data for each section
-        // we break out of the for-loop, this is a bit like a goto but not as bad
+        // handle the header and data in dedicated while-loops, breaking when the relevant attributes are complete
+        // so we have a while-loop covering each of these sections: preamble, name, scope+sequence, data
+        // we scan through the char[] once, breaking out of the while-loop when we have all the data for each section
+        // we break out of the while-loop, this is a bit like a goto but not as bad
 
         // preamble
-        while (i < decodedMessage.length)
+        while (true)
         {
-            if (isTokenDelim(decodedMessage[i], previous, slashCount))
+            c = decodedMessage[i];
+            if (c == CHAR_TOKEN_DELIM && (previous != CHAR_ESCAPE ||
+                    // the previous was '\' and there was an even number of contiguous slashes
+                    ((slashCount & 0x1) == 0)))
             {
                 i++;
-                sectionStart = i;
                 break;
             }
-            slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
-            previous = decodedMessage[i];
+            slashCount = (c == CHAR_ESCAPE) ? slashCount + 1 : 0;
+            previous = c;
             i++;
         }
 
         // name
-        while (i < decodedMessage.length)
+        while (true)
         {
-            if (decodedMessage[i] == CHAR_TOKEN_DELIM)
+            c = decodedMessage[i];
+            if (c == CHAR_TOKEN_DELIM)
             {
                 // record names will be resolved multiple times, so use a pool to reduce memory churn
-                atomicChange = new AtomicChange(resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr));
+                atomicChange =
+                        new AtomicChange(resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr));
                 i++;
                 sectionStart = i;
                 break;
             }
-            else if (decodedMessage[i] == CHAR_ESCAPE)
+            else if (c == CHAR_ESCAPE)
             {
-                i++;
-                dataPtr = handleEscapeChar(decodedMessage[i], decodingBuffers.dataArr, dataPtr);
+                dataPtr = handleEscapeChar(decodedMessage[++i], decodingBuffers.dataArr, dataPtr);
             }
-            else if (decodedMessage[i] != 0)
+            else if (c != 0)
             {
-                decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
+                decodingBuffers.dataArr[dataPtr++] = c;
             }
             i++;
         }
@@ -346,9 +349,12 @@ public class StringProtocolCodec implements ICodec<char[]>
         synchronized (atomicChange)
         {
             // scope and sequence
-            while(i < decodedMessage.length)
+            while (i != msgLen)
             {
-                if (isTokenDelim(decodedMessage[i], previous, slashCount))
+                c = decodedMessage[i];
+                if (c == CHAR_TOKEN_DELIM && (previous != CHAR_ESCAPE ||
+                        // the previous was '\' and there was an even number of contiguous slashes
+                        ((slashCount & 0x1) == 0)))
                 {
                     atomicChange.setScope(decodedMessage[sectionStart++]);
                     atomicChange.setSequence(
@@ -359,18 +365,20 @@ public class StringProtocolCodec implements ICodec<char[]>
                     sequenceAndScopeSet = true;
                     break;
                 }
-                slashCount = (decodedMessage[i] == CHAR_ESCAPE) ? slashCount + 1 : 0;
-                previous = decodedMessage[i];
+                slashCount = (c == CHAR_ESCAPE) ? slashCount + 1 : 0;
+                previous = c;
                 i++;
             }
 
             decodingBuffers.dataArr = decodingBuffers.keyArr;
             dataPtr = 0;
 
+            target = atomicChange;
             // data
-            while (i < decodedMessage.length)
+            while (i != msgLen)
             {
-                if (decodedMessage[i] == CHAR_TOKEN_DELIM)
+                c = decodedMessage[i];
+                if (c == CHAR_TOKEN_DELIM)
                 {
                     // its the end of a token section "|"
                     if (i - sectionStart == 1)
@@ -378,13 +386,9 @@ public class StringProtocolCodec implements ICodec<char[]>
                         switch(decodedMessage[i - 1])
                         {
                             case PUT_CODE:
-                                target = subMapName == null ? atomicChange :
-                                        atomicChange.internalGetSubMapAtomicChange(subMapName);
                                 targetMap = target.internalGetPutEntries();
                                 break;
                             case REMOVE_CODE:
-                                target = subMapName == null ? atomicChange :
-                                        atomicChange.internalGetSubMapAtomicChange(subMapName);
                                 targetMap = target.internalGetRemovedEntries();
                                 break;
                             case SUBMAP_CODE:
@@ -399,7 +403,10 @@ public class StringProtocolCodec implements ICodec<char[]>
                     {
                         if (expectingSubmapName)
                         {
+                            alignRemovedEntries(target);
+
                             subMapName = resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr);
+                            target = atomicChange.internalGetSubMapAtomicChange(subMapName);
                             expectingSubmapName = false;
                         }
                         else
@@ -414,24 +421,23 @@ public class StringProtocolCodec implements ICodec<char[]>
                     sectionStart = i + 1;
                     dataPtr = 0;
                 }
-                else if (decodedMessage[i] == CHAR_KEY_VALUE_SEPARATOR)
+                else if (c == CHAR_KEY_VALUE_SEPARATOR)
                 {
                     decodingBuffers.dataArr = decodingBuffers.valArr;
                     keyPtr = dataPtr;
                     dataPtr = 0;
                 }
-                else if (decodedMessage[i] == CHAR_ESCAPE)
+                else if (c == CHAR_ESCAPE)
                 {
-                    i++;
-                    dataPtr = handleEscapeChar(decodedMessage[i], decodingBuffers.dataArr, dataPtr);
+                    dataPtr = handleEscapeChar(decodedMessage[++i], decodingBuffers.dataArr, dataPtr);
                 }
-                else if (decodedMessage[i] != 0)
+                else if (c != 0)
                 {
                     // when decoding a byte[] into a char[], the byte[] and char[] lengths are the
                     // same BUT characters taking up 2 bytes for encoding only take up 1 char so we
                     // end up with trailing 0 in the char[], e.g. '£' = [-62][-93] for bytes but is
                     // 1 char in a char[]
-                    decodingBuffers.dataArr[dataPtr++] = decodedMessage[i];
+                    decodingBuffers.dataArr[dataPtr++] = c;
                 }
                 i++;
             }
@@ -456,15 +462,19 @@ public class StringProtocolCodec implements ICodec<char[]>
                         resolveValue(decodingBuffers.dataArr, dataPtr));
             }
 
-            // remove any keys that are in put and removed - leave in removed
-            if (target.putEntries != null && target.removedEntries != null
-                    && !target.removedEntries.isEmpty())
-            {
-                target.putEntries.keySet()
-                        .removeAll(target.removedEntries.keySet());
-            }
+            alignRemovedEntries(target);
         }
         return atomicChange;
+    }
+
+    private static void alignRemovedEntries(AtomicChange target)
+    {
+        // remove any keys that are in put and removed - leave in removed
+        if (target.putEntries != null && target.removedEntries != null && !target.removedEntries.isEmpty())
+        {
+            target.putEntries.keySet()
+                    .removeAll(target.removedEntries.keySet());
+        }
     }
 
     private static int getNewSize(int currentLength, int newLength)
@@ -498,13 +508,6 @@ public class StringProtocolCodec implements ICodec<char[]>
         return dataPtr;
     }
 
-    private static boolean isTokenDelim(char current, char previous, int slashCount)
-    {
-        return current == StringProtocolCodec.CHAR_TOKEN_DELIM && (previous != CHAR_ESCAPE ||
-                // the previous was '\' and there was an even number of contiguous slashes
-                ((slashCount & 0x1) == 0));
-    }
-
     static class EncodingBuffers
     {
         CharArrayReference charArrayRef;
@@ -516,9 +519,9 @@ public class StringProtocolCodec implements ICodec<char[]>
 
         CharsetEncoder getEncoder(Charset cs)
         {
-            return this.encoders.computeIfAbsent(cs,
-                    c -> c.newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(
-                            CodingErrorAction.REPLACE));
+            return this.encoders.computeIfAbsent(cs, c -> c.newEncoder()
+                    .onMalformedInput(CodingErrorAction.REPLACE)
+                    .onUnmappableCharacter(CodingErrorAction.REPLACE));
         }
     }
 
@@ -542,21 +545,6 @@ public class StringProtocolCodec implements ICodec<char[]>
     static byte[] encodeAtomicChange(char[] preamble, IRecordChange atomicChange, Charset charSet,
         Function<ByteBuffer, byte[]> encodedHandler)
     {
-        final Map<String, IValue> putEntries;
-        final Map<String, IValue> removedEntries;
-        final Set<String> subMapKeys;
-        if (atomicChange instanceof AtomicChange)
-        {
-            putEntries = emptyIfNull(((AtomicChange) atomicChange).putEntries);
-            removedEntries = emptyIfNull(((AtomicChange) atomicChange).removedEntries);
-        }
-        else
-        {
-            putEntries = atomicChange.getPutEntries();
-            removedEntries = atomicChange.getRemovedEntries();
-        }
-        subMapKeys = atomicChange.getSubMapKeys();
-
         final EncodingBuffers encodingBuffers = ENCODING_BUFFERS.get();
         encodingBuffers.sb.setLength(0);
         final CharArrayReference charArrayRef = encodingBuffers.charArrayRef;
@@ -567,21 +555,16 @@ public class StringProtocolCodec implements ICodec<char[]>
         sb.append(preamble);
         escape(atomicChange.getName(), sb, charArrayRef, escapedChars);
         // add the sequence
-        sb.append(DELIMITER).append(atomicChange.getScope()).append(atomicChange.getSequence());
-        if (!putEntries.isEmpty())
-        {
-            addEntriesToTxString(DELIMITER_PUT_CODE, putEntries, sb, charArrayRef, escapedChars,
-                    keyCharArrayRef);
-        }
-        if (!removedEntries.isEmpty())
-        {
-            addEntriesToTxString(DELIMITER_REMOVE_CODE, removedEntries, sb, charArrayRef, escapedChars,
-                    keyCharArrayRef);
-        }
-        IRecordChange subMapAtomicChange;
+        sb.append(DELIMITER)
+                .append(atomicChange.getScope())
+                .append(atomicChange.getSequence());
+        processPutRemoves(atomicChange, sb, charArrayRef, escapedChars, keyCharArrayRef);
+
+        // sub-maps (if any)
+        final Set<String> subMapKeys = atomicChange.getSubMapKeys();
         if (!subMapKeys.isEmpty())
         {
-            Map<String, IValue> entries;
+            IRecordChange subMapAtomicChange;
             for (String subMapKey : subMapKeys)
             {
                 subMapAtomicChange = atomicChange.getSubMapAtomicChange(subMapKey);
@@ -589,34 +572,62 @@ public class StringProtocolCodec implements ICodec<char[]>
                 {
                     sb.append(DELIMITER_SUBMAP_CODE);
                     escape(subMapKey, sb, charArrayRef, escapedChars);
-                    entries = subMapAtomicChange instanceof AtomicChange ?
-                            emptyIfNull(((AtomicChange) subMapAtomicChange).putEntries) :
-                            subMapAtomicChange.getPutEntries();
-                    if (!entries.isEmpty())
-                    {
-                        addEntriesToTxString(DELIMITER_PUT_CODE, entries, sb, charArrayRef, escapedChars,
-                                keyCharArrayRef);
-                    }
-                    entries = subMapAtomicChange instanceof AtomicChange ?
-                            emptyIfNull(((AtomicChange) subMapAtomicChange).removedEntries) :
-                            subMapAtomicChange.getRemovedEntries();
-                    if (!entries.isEmpty())
-                    {
-                        addEntriesToTxString(DELIMITER_REMOVE_CODE, entries, sb, charArrayRef, escapedChars,
-                                keyCharArrayRef);
-                    }
+                    processPutRemoves(subMapAtomicChange, sb, charArrayRef, escapedChars, keyCharArrayRef);
                 }
             }
         }
 
         try
         {
-            return encodedHandler.apply(encodingBuffers.getEncoder(charSet).encode(sb.getCharBuffer()));
+            return encodedHandler.apply(encodingBuffers.getEncoder(charSet)
+                    .encode(sb.getCharBuffer()));
         }
         catch (CharacterCodingException e)
         {
             throw new RuntimeException("Could not encode " + atomicChange, e);
         }
+    }
+
+    private static void processPutRemoves(IRecordChange change, StringAppender sb,
+            CharArrayReference charArrayRef, char[] escapedChars, CharArrayReference keyCharArrayRef)
+    {
+        Map<String, IValue> entries;
+
+        if (change instanceof AtomicChange)
+        {
+            entries = ((AtomicChange) change).putEntries;
+            if (notEmpty(entries))
+            {
+                addEntriesToTxString(DELIMITER_PUT_CODE, entries, sb, charArrayRef, escapedChars,
+                        keyCharArrayRef);
+            }
+            entries = ((AtomicChange) change).removedEntries;
+            if (notEmpty(entries))
+            {
+                addEntriesToTxString(DELIMITER_REMOVE_CODE, ((AtomicChange) change).removedEntries, sb,
+                        charArrayRef, escapedChars, keyCharArrayRef);
+            }
+        }
+        else
+        {
+            entries = change.getPutEntries();
+            if (notEmpty(entries))
+            {
+                addEntriesToTxString(DELIMITER_PUT_CODE, entries, sb, charArrayRef, escapedChars,
+                        keyCharArrayRef);
+            }
+            entries = change.getRemovedEntries();
+            if (notEmpty(entries))
+            {
+                addEntriesToTxString(DELIMITER_REMOVE_CODE, entries, sb, charArrayRef, escapedChars,
+                        keyCharArrayRef);
+            }
+        }
+    }
+
+    private static boolean notEmpty(Map<String, IValue> entries)
+    {
+        return entries != null && !entries.isEmpty();
     }
 
     private static void addEntriesToTxString(final char[] changeType, final Map<String, IValue> entries,
