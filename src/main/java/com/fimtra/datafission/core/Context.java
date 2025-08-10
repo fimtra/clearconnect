@@ -790,17 +790,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final Map<String, Boolean> resultMap = new HashMap<>(recordNames.length);
         final FutureTask<Map<String, Boolean>> futureResult = new FutureTask<>(() -> {
             final List<String> permissionedRecords = new LinkedList<>();
-            for (int i = 0; i < recordNames.length; i++)
+            for (String recordName : recordNames)
             {
-                if (recordNames[i] != null && permissionTokenValidForRecord(permissionToken, recordNames[i]))
+                if (recordName != null && permissionTokenValidForRecord(permissionToken, recordName))
                 {
-                    permissionedRecords.add(recordNames[i]);
-                    Context.this.tokenPerRecord.put(recordNames[i], permissionToken);
-                    resultMap.put(recordNames[i], Boolean.TRUE);
+                    permissionedRecords.add(recordName);
+                    Context.this.tokenPerRecord.put(recordName, permissionToken);
+                    resultMap.put(recordName, Boolean.TRUE);
                 }
                 else
                 {
-                    resultMap.put(recordNames[i], Boolean.FALSE);
+                    resultMap.put(recordName, Boolean.FALSE);
                 }
             }
 
@@ -940,10 +940,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
 
             final List<String> toRemove = new LinkedList<>();
-            String name;
-            for (int i = 0; i < names.length; i++)
+            for (String name : names)
             {
-                name = names[i];
                 if (this.recordObservers.removeSubscriberFor(name, observer))
                 {
                     if (log)
@@ -1332,7 +1330,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         long start;
-        IRecordListener listener = null;
         final String recordName = atomicChange.getName();
 
         // NOTE: always get the subscribers to notify in the context of the handling the record
@@ -1348,10 +1345,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // work out who to notify, i.e. listeners NOT expecting an image
             Set<String> initialImagePending;
             final List<IRecordListener> listenersNotExpectingImage = new LinkedList<>();
-            for (int i = 0; i < listenersToNotify.length; i++)
+            for (IRecordListener listener : listenersToNotify)
             {
-                listener = listenersToNotify[i];
-
                 // NOTE: cannot optimise by locking
                 // listenersToNotifyWithInitialImages outside the loop - this can
                 // lead to a deadlock as the lock order with initialImagePending
@@ -1371,11 +1366,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             listenersToNotify = listenersNotExpectingImage.toArray(new IRecordListener[0]);
         }
 
-        for (int i = 0; i < listenersToNotify.length; i++)
+        for (IRecordListener listener : listenersToNotify)
         {
             try
             {
-                listener = listenersToNotify[i];
                 start = System.nanoTime();
                 listener.onChange(notifyImage, atomicChange);
                 ContextUtils.measureTask(recordName, "local record update", listener, (System.nanoTime() - start));
