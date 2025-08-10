@@ -26,9 +26,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
@@ -38,7 +36,6 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.LongRef;
-import com.fimtra.util.ObjectPool;
 import com.fimtra.util.is;
 
 /**
@@ -116,12 +113,6 @@ class Record implements IRecord, Cloneable
     }
 
     private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = CollectionUtils.newMap(2);
-    /**
-     * A pool for the keys. Keys across records stand a VERY good chance of being repeated many
-     * times so this is a valuable memory optimisation.
-     */
-    static final ObjectPool<String> keysPool =
-        new ObjectPool<>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
     final LongRef sequence;
     final String name;
@@ -132,7 +123,7 @@ class Record implements IRecord, Cloneable
     Record(String name, Map<String, IValue> data, IAtomicChangeManager context)
     {
         super();
-        this.name = keysPool.intern(name);
+        this.name = name;
         this.data = CollectionUtils.newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
@@ -146,7 +137,7 @@ class Record implements IRecord, Cloneable
         Map<String, Map<String, IValue>> subMaps)
     {
         super();
-        this.name = keysPool.intern(name);
+        this.name = name;
         this.data = CollectionUtils.newMap(data);
         this.subMaps = subMaps;
         this.context = context;
@@ -302,24 +293,23 @@ class Record implements IRecord, Cloneable
         }
         synchronized (this)
         {
-            final String internKey = keysPool.intern(key);
             final IValue previous;
             if (value != null)
             {
-                previous = this.data.put(internKey, value);
+                previous = this.data.put(key, value);
                 // if there is no change, we perform no update
                 if (!value.equals(previous))
                 {
-                    this.context.addEntryUpdatedToAtomicChange(this.name, internKey, value, previous);
+                    this.context.addEntryUpdatedToAtomicChange(this.name, key, value, previous);
                 }
             }
             else
             {
                 // a null is treated as if it removes the key
-                previous = this.data.remove(internKey);
+                previous = this.data.remove(key);
                 if (previous != null)
                 {
-                    this.context.addEntryRemovedToAtomicChange(this.name, internKey, previous);
+                    this.context.addEntryRemovedToAtomicChange(this.name, key, previous);
                 }
             }
             return previous;
@@ -365,23 +355,23 @@ class Record implements IRecord, Cloneable
         synchronized (this)
         {
             IValue value;
-            String internKey;
+            String key;
 
             if (this.context instanceof NoopAtomicChangeManager)
             {
                 for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
                 {
                     value = entry.getValue();
-                    internKey = keysPool.intern(entry.getKey());
+                    key = entry.getKey();
 
                     if (value != null)
                     {
-                        this.data.put(internKey, value);
+                        this.data.put(key, value);
                     }
                     else
                     {
                         // a null is treated as if it removes the key
-                        this.data.remove(internKey);
+                        this.data.remove(key);
                     }
                 }
             }
@@ -394,15 +384,15 @@ class Record implements IRecord, Cloneable
                 for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
                 {
                     value = entry.getValue();
-                    internKey = keysPool.intern(entry.getKey());
+                    key = entry.getKey();
 
                     if (value != null)
                     {
-                        previous = this.data.put(internKey, value);
+                        previous = this.data.put(key, value);
                         // if there is no change, we perform no update
                         if (!value.equals(previous))
                         {
-                            changes.putKeys[putPtr] = internKey;
+                            changes.putKeys[putPtr] = key;
                             changes.putValues[putPtr][0] = value;
                             changes.putValues[putPtr][1] = previous;
                             putPtr++;
@@ -411,10 +401,10 @@ class Record implements IRecord, Cloneable
                     else
                     {
                         // a null is treated as if it removes the key
-                        previous = this.data.remove(internKey);
+                        previous = this.data.remove(key);
                         if (previous != null)
                         {
-                            changes.removedKeys[removePtr] = internKey;
+                            changes.removedKeys[removePtr] = key;
                             changes.removedValues[removePtr] = previous;
                             removePtr++;
                         }
@@ -515,9 +505,8 @@ class Record implements IRecord, Cloneable
                 {
                     this.subMaps = CollectionUtils.newMap(4);
                 }
-                final String internKey = keysPool.intern(key);
-                submap = new SubMap(this, internKey);
-                this.subMaps.put(internKey, submap);
+                submap = new SubMap(this, key);
+                this.subMaps.put(key, submap);
             }
             return submap;
         }
@@ -839,20 +828,19 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            final String internKey = Record.keysPool.intern(key);
             final IValue previous;
             if (value != null)
             {
-                previous = this.subMap.put(internKey, value);
+                previous = this.subMap.put(key, value);
                 if (!value.equals(previous))
                 {
-                    this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
+                    this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, key, value, previous);
                 }
             }
             else
             {
-                previous = this.subMap.remove(internKey);
-                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
+                previous = this.subMap.remove(key);
+                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key, previous);
             }
             return previous;
         }
@@ -882,23 +870,23 @@ final class SubMap implements Map<String, IValue>
         synchronized (this.record)
         {
             IValue value;
-            String internKey;
+            String key;
 
             if (this.record.context instanceof NoopAtomicChangeManager)
             {
                 for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
                 {
                     value = entry.getValue();
-                    internKey = Record.keysPool.intern(entry.getKey());
+                    key = entry.getKey();
 
                     if (value != null)
                     {
-                        this.subMap.put(internKey, value);
+                        this.subMap.put(key, value);
                     }
                     else
                     {
                         // a null is treated as if it removes the key
-                        this.subMap.remove(internKey);
+                        this.subMap.remove(key);
                     }
                 }
             }
@@ -911,14 +899,14 @@ final class SubMap implements Map<String, IValue>
                 for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
                 {
                     value = entry.getValue();
-                    internKey = Record.keysPool.intern(entry.getKey());
+                    key = entry.getKey();
 
                     if (value != null)
                     {
-                        previous = this.subMap.put(internKey, value);
+                        previous = this.subMap.put(key, value);
                         if (!value.equals(previous))
                         {
-                            changes.putKeys[putPtr] = internKey;
+                            changes.putKeys[putPtr] = key;
                             changes.putValues[putPtr][0] = value;
                             changes.putValues[putPtr][1] = previous;
                             putPtr++;
@@ -926,10 +914,10 @@ final class SubMap implements Map<String, IValue>
                     }
                     else
                     {
-                        previous = this.subMap.remove(internKey);
+                        previous = this.subMap.remove(key);
                         if (previous != null)
                         {
-                            changes.removedKeys[removePtr] = internKey;
+                            changes.removedKeys[removePtr] = key;
                             changes.removedValues[removePtr] = previous;
                             removePtr++;
                         }

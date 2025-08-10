@@ -789,7 +789,8 @@ public class StringProtocolCodec implements ICodec<char[]>
     }
 
     static final CharSubArrayKeyedPool<String> decodedKeysPool =
-        new CharSubArrayKeyedPool<String>("codec-decoded-keys", 0, Record.keysPool)
+            new CharSubArrayKeyedPool<String>("codec-decoded-keys-chars", 0,
+                    new KeyedObjectPool<>("codec-decoded-keys-strings"))
             {
                 @Override
                 public String newInstance(String string)

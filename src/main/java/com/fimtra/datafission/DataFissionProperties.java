@@ -124,13 +124,6 @@ public abstract class DataFissionProperties
         String RECONNECT_THREAD_COUNT = BASE + "reconnectThreadCount";
 
         /**
-         * The system property name to define the maximum size of the keys pool used for record keys.<br>
-         * E.g.
-         * <code>-DdataFission.keysPoolMaxSize=200</code>
-         */
-        String KEYS_POOL_MAX = BASE + "keysPoolMaxSize";
-
-        /**
          * The system property name to define the size of the {@link LongValue} pool. E.g.
          * <code>-DdataFission.longValuePoolSize=2048</code>
          */
@@ -369,15 +362,6 @@ public abstract class DataFissionProperties
          * @see Names#RECONNECT_THREAD_COUNT
          */
         int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "1"));
-
-        /**
-         * The maximum size for the keys pool for records.
-         * <p>
-         * Default is 0 (unlimited).
-         *
-         * @see Names#KEYS_POOL_MAX
-         */
-        int KEYS_POOL_MAX = SystemUtils.getPropertyAsInt(Names.KEYS_POOL_MAX, 0);
 
         /**
          * The size for the {@link LongValue} pool.
