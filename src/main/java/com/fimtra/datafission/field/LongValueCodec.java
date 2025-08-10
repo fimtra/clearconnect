@@ -154,7 +154,7 @@ abstract class LongValueCodec
     }
 
     /**
-     * Uses a binary search algorithm to compute the number of digits
+     * Uses a binary search algorithm to compute the number of chars for a string, plus 1 for the leading 'L'
      */
     static int stringSize(long x)
     {
@@ -164,26 +164,22 @@ abstract class LongValueCodec
             {
                 if (x < 100L) //2
                 {
-                    //1
-                    return x < 10L ? 1 : 2;
+                    return x < 10L ? 2 : 3;
                 }
                 else
                 {
-                    //3
-                    return x < 1000L ? 3 : 4;
+                    return x < 1000L ? 4 : 5;
                 }
             }
             else
             {
                 if (x < 1000000L) //6
                 {
-                    //5
-                    return x < 100000L ? 5 : 6;
+                    return x < 100000L ? 6 : 7;
                 }
                 else
                 {
-                    //7
-                    return x < 10000000L ? 7 : 8;
+                    return x < 10000000L ? 8 : 9;
                 }
             }
         }
@@ -193,39 +189,34 @@ abstract class LongValueCodec
             {
                 if (x < 10000000000L) //10
                 {
-                    //9
-                    return x < 1000000000L ? 9 : 10;
+                    return x < 1000000000L ? 10 : 11;
                 }
                 else
                 {
-                    //11
-                    return x < 100000000000L ? 11 : 12;
+                    return x < 100000000000L ? 12 : 13;
                 }
             }
             else
             {
                 if (x < 100000000000000L) //14
                 {
-                    //13
-                    return x < 10000000000000L ? 13 : 14;
+                    return x < 10000000000000L ? 14 : 15;
                 }
                 else
                 {
                     if (x < 10000000000000000L) //16
                     {
-                        //15
-                        return x < 1000000000000000L ? 15 : 16;
+                        return x < 1000000000000000L ? 16 : 17;
                     }
                     else
                     {
                         if (x < 100000000000000000L) //17
                         {
-                            return 17;
+                            return 18;
                         }
                         else
                         {
-                            //18
-                            return x < 1000000000000000000L ? 18 : 19;
+                            return x < 1000000000000000000L ? 19 : 20;
                         }
                     }
                 }

@@ -86,7 +86,8 @@ public class LongValueCodecTest
 
     private static void doToFromCharArrayTest(long lVal, char[] chars)
     {
-        final int len = lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal);
+        final int len =
+                (lVal < 0 ? LongValueCodec.stringSize(-lVal) + 1 : LongValueCodec.stringSize(lVal)) - 1;
         LongValueCodec.writeToCharArray(lVal, chars, 0, len);
         assertEquals(lVal, LongValueCodec.fromCharArray(chars, 0, len));
     }
@@ -98,13 +99,13 @@ public class LongValueCodecTest
         for (int i = 0; i < LOOPS; i++)
         {
             long v = 5 * (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v) - 1);
         }
 
         for (int i = 0; i < LOOPS; i++)
         {
             long v = (long) Math.pow(10, i);
-            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v));
+            assertEquals("v=" + v, i + 1, LongValueCodec.stringSize(v) - 1);
         }
     }
 
@@ -185,11 +186,11 @@ public class LongValueCodecTest
         {
             if (x < p)
             {
-                return i;
+                return i + 1;
             }
             p = 10 * p;
         }
-        return 19;
+        return 20;
     }
 
     // ====================
@@ -282,7 +283,7 @@ public class LongValueCodecTest
         // Verify results
         for (long value : testValues)
         {
-            int sizeOriginal = stringSize(value);
+            int sizeOriginal = stringSize(value) - 1;
             int sizeClassic = stringSize_classic(value);
             int sizeCopilot = stringSize_copilot(value);
 

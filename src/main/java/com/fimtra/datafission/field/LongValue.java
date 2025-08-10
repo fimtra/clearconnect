@@ -114,10 +114,9 @@ public class LongValue extends AbstractValue
     @Override
     public final StringAppender toStringAppender()
     {
+        // includes the plus 1 for the LONG_CODE
         final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
-                LongValueCodec.stringSize(value))
-                // plus 1 for the LONG_CODE
-                + 1;
+                LongValueCodec.stringSize(value));
         final StringAppender appender = new StringAppender(digitCount);
         final char[] buf = appender.reserveAndGet(digitCount);
         buf[0] = IValue.LONG_CODE;
@@ -155,10 +154,9 @@ public class LongValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
+        // includes the plus 1 for the LONG_CODE
         final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
-                LongValueCodec.stringSize(value))
-                // plus 1 for the LONG_CODE
-                + 1;
+                LongValueCodec.stringSize(value));
         int start = stringAppender.getLength();
         final char[] buf = stringAppender.reserveAndGet(digitCount);
         final int len = start + digitCount;
