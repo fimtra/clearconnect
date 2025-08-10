@@ -166,7 +166,9 @@ public final class TextValue extends AbstractValue
     @Override
     public StringAppender toStringAppender()
     {
-        return appendTo(new StringAppender(this.value.length()));
+        return appendTo(new StringAppender(this.value.length()
+                // for the TEXT_CODE
+                + 1));
     }
 
     @Override
@@ -192,6 +194,6 @@ public final class TextValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(IValue.TEXT_CODE).append(this.value);
+        return stringAppender.append(IValue.TEXT_CODE, this.value);
     }
 }
