@@ -310,7 +310,7 @@ class Record implements IRecord, Cloneable
                 // if there is no change, we perform no update
                 if (previous == null || !previous.equals(value))
                 {
-                    this.context.addEntryUpdatedToAtomicChange(this, internKey, value, previous);
+                    this.context.addEntryUpdatedToAtomicChange(this.name, internKey, value, previous);
                 }
             }
             else
@@ -319,7 +319,7 @@ class Record implements IRecord, Cloneable
                 previous = this.data.remove(internKey);
                 if (previous != null)
                 {
-                    this.context.addEntryRemovedToAtomicChange(this, internKey, previous);
+                    this.context.addEntryRemovedToAtomicChange(this.name, internKey, previous);
                 }
             }
             return previous;
@@ -422,7 +422,7 @@ class Record implements IRecord, Cloneable
                 }
                 changes.putSize = putPtr;
                 changes.removedSize = removePtr;
-                this.context.addBulkChangesToAtomicChange(this, changes);
+                this.context.addBulkChangesToAtomicChange(this.name, changes);
             }
         }
     }
@@ -647,17 +647,17 @@ class Record implements IRecord, Cloneable
 
     void addEntryRemovedToAtomicChange(String key, final IValue value)
     {
-        this.context.addEntryRemovedToAtomicChange(this, key, value);
+        this.context.addEntryRemovedToAtomicChange(this.name, key, value);
     }
 
     void addSubMapEntryUpdatedToAtomicChange(String subMapKey, String key, final IValue current, IValue previous)
     {
-        this.context.addSubMapEntryUpdatedToAtomicChange(this, subMapKey, key, current, previous);
+        this.context.addSubMapEntryUpdatedToAtomicChange(this.name, subMapKey, key, current, previous);
     }
 
     void addSubMapEntryRemovedToAtomicChange(String subMapKey, String key, final IValue value)
     {
-        this.context.addSubMapEntryRemovedToAtomicChange(this, subMapKey, key, value);
+        this.context.addSubMapEntryRemovedToAtomicChange(this.name, subMapKey, key, value);
     }
 
     void setSequence(long sequence)
@@ -938,7 +938,7 @@ final class SubMap implements Map<String, IValue>
                 }
                 changes.putSize = putPtr;
                 changes.removedSize = removePtr;
-                this.record.context.addBulkSubMapChangesToAtomicChange(this.record, this.subMapKey, changes);
+                this.record.context.addBulkSubMapChangesToAtomicChange(this.record.name, this.subMapKey, changes);
             }
         }
     }

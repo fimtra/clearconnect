@@ -176,33 +176,33 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         @Override
-        public void addEntryUpdatedToAtomicChange(IRecord record, String key, IValue current, IValue previous)
+        public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
         {
         }
 
         @Override
-        public void addEntryRemovedToAtomicChange(IRecord record, String key, IValue value)
+        public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
         {
         }
 
         @Override
-        public void addSubMapEntryUpdatedToAtomicChange(IRecord record, String subMapKey, String key, IValue current,
+        public void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key, IValue current,
             IValue previous)
         {
         }
 
         @Override
-        public void addSubMapEntryRemovedToAtomicChange(IRecord record, String subMapKey, String key, IValue value)
+        public void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key, IValue value)
         {
         }
 
         @Override
-        public void addBulkChangesToAtomicChange(IRecord record, ThreadLocalBulkChanges changes)
+        public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
         {
         }
 
         @Override
-        public void addBulkSubMapChangesToAtomicChange(IRecord record, String subMapKey, ThreadLocalBulkChanges changes)
+        public void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey, ThreadLocalBulkChanges changes)
         {
         }
     }
@@ -1037,43 +1037,43 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     }
 
     @Override
-    public void addBulkChangesToAtomicChange(IRecord record, ThreadLocalBulkChanges changes)
+    public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
     {
-        doAtomicChange(record.getName(), a -> a.mergeBulkChanges(changes));
+        doAtomicChange(recordName, a -> a.mergeBulkChanges(changes));
     }
 
     @Override
-    public void addBulkSubMapChangesToAtomicChange(IRecord record, String subMapKey,
+    public void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey,
             ThreadLocalBulkChanges changes)
     {
-        doAtomicChange(record.getName(), a -> a.mergeBulkSubMapChanges(subMapKey, changes));
+        doAtomicChange(recordName, a -> a.mergeBulkSubMapChanges(subMapKey, changes));
     }
 
     @Override
-    public void addEntryUpdatedToAtomicChange(IRecord record, String key, IValue current, IValue previous)
+    public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
     {
-        doAtomicChange(record.getName(), a -> a.mergeEntryUpdatedChange(key, current, previous));
+        doAtomicChange(recordName, a -> a.mergeEntryUpdatedChange(key, current, previous));
     }
 
     @Override
-    public void addEntryRemovedToAtomicChange(IRecord record, String key, IValue value)
+    public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
     {
-        doAtomicChange(record.getName(), a -> a.mergeEntryRemovedChange(key, value));
+        doAtomicChange(recordName, a -> a.mergeEntryRemovedChange(key, value));
     }
 
     @Override
-    public void addSubMapEntryUpdatedToAtomicChange(IRecord record, String subMapKey, String key,
+    public void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key,
             IValue current, IValue previous)
     {
-        doAtomicChange(record.getName(),
+        doAtomicChange(recordName,
                 a -> a.mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous));
     }
 
     @Override
-    public void addSubMapEntryRemovedToAtomicChange(IRecord record, String subMapKey, String key,
+    public void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key,
             IValue value)
     {
-        doAtomicChange(record.getName(), a -> a.mergeSubMapEntryRemovedChange(subMapKey, key, value));
+        doAtomicChange(recordName, a -> a.mergeSubMapEntryRemovedChange(subMapKey, key, value));
     }
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
@@ -1397,18 +1397,18 @@ interface IAtomicChangeManager
 {
     String getName();
 
-    void addEntryUpdatedToAtomicChange(IRecord record, String key, IValue current, IValue previous);
+    void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous);
 
-    void addEntryRemovedToAtomicChange(IRecord record, String key, IValue value);
+    void addEntryRemovedToAtomicChange(String recordName, String key, IValue value);
 
-    void addSubMapEntryUpdatedToAtomicChange(IRecord record, String subMapKey, String key, IValue current,
+    void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key, IValue current,
         IValue previous);
 
-    void addSubMapEntryRemovedToAtomicChange(IRecord record, String subMapKey, String key, IValue value);
+    void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key, IValue value);
 
-    void addBulkChangesToAtomicChange(IRecord record, ThreadLocalBulkChanges changes);
+    void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes);
 
-    void addBulkSubMapChangesToAtomicChange(IRecord record, String subMapKey, ThreadLocalBulkChanges changes);
+    void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey, ThreadLocalBulkChanges changes);
 }
 
 /**
