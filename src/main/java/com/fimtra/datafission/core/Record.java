@@ -308,7 +308,7 @@ class Record implements IRecord, Cloneable
             {
                 previous = this.data.put(internKey, value);
                 // if there is no change, we perform no update
-                if (previous == null || !previous.equals(value))
+                if (!value.equals(previous))
                 {
                     this.context.addEntryUpdatedToAtomicChange(this.name, internKey, value, previous);
                 }
@@ -400,7 +400,7 @@ class Record implements IRecord, Cloneable
                     {
                         previous = this.data.put(internKey, value);
                         // if there is no change, we perform no update
-                        if (previous == null || !previous.equals(value))
+                        if (!value.equals(previous))
                         {
                             changes.putKeys[putPtr] = internKey;
                             changes.putValues[putPtr][0] = value;
@@ -844,7 +844,7 @@ final class SubMap implements Map<String, IValue>
             if (value != null)
             {
                 previous = this.subMap.put(internKey, value);
-                if (previous == null || !previous.equals(value))
+                if (!value.equals(previous))
                 {
                     this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value, previous);
                 }
@@ -916,7 +916,7 @@ final class SubMap implements Map<String, IValue>
                     if (value != null)
                     {
                         previous = this.subMap.put(internKey, value);
-                        if (previous == null || !previous.equals(value))
+                        if (!value.equals(previous))
                         {
                             changes.putKeys[putPtr] = internKey;
                             changes.putValues[putPtr][0] = value;
