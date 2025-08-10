@@ -61,14 +61,15 @@ public final class StringAppender
      */
     public char[] reserveAndGet(int sizeToReserve)
     {
-        if (this.len + sizeToReserve > this.chars.length)
+        final int newLen = this.len + sizeToReserve;
+        if (newLen > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (sizeToReserve < 9 ? 16 : (sizeToReserve * 2))];
+            final char[] _c = new char[this.chars.length + (sizeToReserve < 9 ? 16 : (sizeToReserve << 1))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
             this.charBuffer = null;
         }
-        len += sizeToReserve;
+        len = newLen;
         return this.chars;
     }
 
@@ -95,32 +96,66 @@ public final class StringAppender
         return this;
     }
 
+    public StringAppender append(char c1, char c2)
+    {
+        if (this.len + 2 > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + 16];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+            this.charBuffer = null;
+        }
+        this.chars[this.len++] = c1;
+        this.chars[this.len++] = c2;
+        return this;
+    }
+
+    public StringAppender append(char c, String s)
+    {
+        final int s_len = s.length();
+        final int combined = s_len + 1;
+        final int newLen = this.len + combined;
+        if (newLen > this.chars.length)
+        {
+            final char[] _c = new char[this.chars.length + (combined < 9 ? 16 : (combined << 1))];
+            System.arraycopy(this.chars, 0, _c, 0, this.len);
+            this.chars = _c;
+            this.charBuffer = null;
+        }
+        this.chars[this.len++] = c;
+        s.getChars(0, s_len, this.chars, this.len);
+        this.len = newLen;
+        return this;
+    }
+
     public StringAppender append(char[] v)
     {
         final int length = v.length;
-        if (this.len + length > this.chars.length)
+        final int newLen = this.len + length;
+        if (newLen > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
+            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length << 1))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
             this.charBuffer = null;
         }
         System.arraycopy(v, 0, this.chars, this.len, length);
-        this.len += length;
+        this.len = newLen;
         return this;
     }
 
     public StringAppender append(char[] v, int offset, int len)
     {
-        if (this.len + len > this.chars.length)
+        final int newLen = this.len + len;
+        if (newLen > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (len < 9 ? 16 : (len * 2))];
+            final char[] _c = new char[this.chars.length + (len < 9 ? 16 : (len << 1))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
             this.charBuffer = null;
         }
         System.arraycopy(v, offset, this.chars, this.len, len);
-        this.len += len;
+        this.len = newLen;
         return this;
     }
 
@@ -132,7 +167,7 @@ public final class StringAppender
         final int combined = len1 + len2;
         if (this.len + combined > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (combined < 9 ? 16 : (combined * 2))];
+            final char[] _c = new char[this.chars.length + (combined < 9 ? 16 : (combined << 1))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
             this.charBuffer = null;
@@ -151,15 +186,16 @@ public final class StringAppender
             return append("null");
         }
         final int length = v.length();
-        if (this.len + length > this.chars.length)
+        final int newLen = this.len + length;
+        if (newLen > this.chars.length)
         {
-            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length * 2))];
+            final char[] _c = new char[this.chars.length + (length < 9 ? 16 : (length << 1))];
             System.arraycopy(this.chars, 0, _c, 0, this.len);
             this.chars = _c;
             this.charBuffer = null;
         }
         v.getChars(0, length, this.chars, this.len);
-        this.len += length;
+        this.len = newLen;
         return this;
     }
 

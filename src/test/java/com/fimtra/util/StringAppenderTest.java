@@ -44,8 +44,10 @@ public class StringAppenderTest
                 .append("_string".toCharArray(), 1, 2)
                 .append((String) null)
                 .append("  a very long long long long long long long long long long long long string".toCharArray(), 1, 74)
+                .append('x', " and a string")
+                .append(' ', '!');
         ;
-        assertEquals("c10.1stringstringstnull a very long long long long long long long long long long long long string", candidate.toString());
+        assertEquals("c10.1stringstringstnull a very long long long long long long long long long long long long stringx and a string !", candidate.toString());
     }
 
     @Test
