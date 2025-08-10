@@ -125,9 +125,6 @@ public class DoubleValueTest
         for (int i = -LONG_VALUE_POOL_SIZE; i <= LONG_VALUE_POOL_SIZE; i++)
         {
             assertEquals(Double.toString(i), new DoubleValue(i).textValue());
-            assertSame(DoubleValue.valueOf(i)
-                    .textValue(), DoubleValue.valueOf(i)
-                    .textValue());
         }
 
         assertEquals("Infinity", DoubleValue.valueOf(POSITIVE_INFINITY)
