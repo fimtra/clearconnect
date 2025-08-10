@@ -270,20 +270,27 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
     @Override
     public boolean isEmpty()
     {
-        final boolean noMapEntries = noOverwrittenEntries() && noPutEntries() && noRemovedEntries();
-        if (noMapEntries && this.subMapAtomicChanges != null)
+        if (!(putEntries == null || putEntries.isEmpty()))
         {
-            for (Map.Entry<String, AtomicChange> entry : this.subMapAtomicChanges.entrySet())
+            return false;
+        }
+        if (!(removedEntries == null || removedEntries.isEmpty()))
+        {
+            return false;
+        }
+        // check submaps
+        if (this.subMapAtomicChanges != null)
+        {
+            for (Map.Entry<String, AtomicChange> entry : subMapAtomicChanges.entrySet())
             {
-                if (!entry.getValue().isEmpty())
+                if (!entry.getValue()
+                        .isEmpty())
                 {
                     return false;
                 }
             }
-            // no entries in maps and submaps
-            return true;
         }
-        return noMapEntries;
+        return true;
     }
 
     @Override
