@@ -43,6 +43,7 @@ import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
 import com.fimtra.util.CharSubArrayKeyedPool;
+import com.fimtra.util.KeyedObjectPool;
 import com.fimtra.util.Log;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.StringAppender;
@@ -264,14 +265,12 @@ public class StringProtocolCodec implements ICodec<char[]>
         return instance;
     });
 
-    static final AtomicChange NULL_CHANGE = new AtomicChange("NULL_CHANGE");
     static final Map<String, IValue> NULL_MAP = new HashMap<>();
 
     static IRecordChange decodeAtomicChange(char[] decodedMessage, DecodingBuffers decodingBuffers)
     {
-        AtomicChange atomicChange = NULL_CHANGE;
-        AtomicChange target = NULL_CHANGE;
-        String subMapName = null;
+        AtomicChange atomicChange;
+        AtomicChange target;
         Map<String, IValue> targetMap = NULL_MAP;
 
         boolean sequenceAndScopeSet = false;
@@ -405,8 +404,8 @@ public class StringProtocolCodec implements ICodec<char[]>
                         {
                             alignRemovedEntries(target);
 
-                            subMapName = resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr);
-                            target = atomicChange.internalGetSubMapAtomicChange(subMapName);
+                            target = atomicChange.internalGetSubMapAtomicChange(
+                                    resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr));
                             expectingSubmapName = false;
                         }
                         else
@@ -453,8 +452,7 @@ public class StringProtocolCodec implements ICodec<char[]>
             // could be a fragmented change, ending with a submap name, e.g. |record1|i0|p|key=value|:|submap
             else if (expectingSubmapName)
             {
-                subMapName = resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr);
-                target.getSubMapAtomicChange(subMapName);
+                target.getSubMapAtomicChange(resolvePooledStringNoPreamble(decodingBuffers.dataArr, dataPtr));
             }
             else
             {
@@ -640,6 +638,7 @@ public class StringProtocolCodec implements ICodec<char[]>
         int last;
         int length;
         char[] cbuf;
+        char charAt;
         escapedChars[0] = CHAR_ESCAPE;
         txString.append(changeType);
 
@@ -661,7 +660,6 @@ public class StringProtocolCodec implements ICodec<char[]>
             key.getChars(0, key.length(), cbuf, DOUBLE_KEY_PREAMBLE_LENGTH);
 
             last = 0;
-            char charAt;
             for (i = 0; i < length; i++)
             {
                 charAt = cbuf[i];
@@ -689,18 +687,18 @@ public class StringProtocolCodec implements ICodec<char[]>
             }
             txString.append(cbuf, last, length - last);
 
-            txString.append(CHAR_KEY_VALUE_SEPARATOR);
             if (value == null || changeType == DELIMITER_REMOVE_CODE)
             {
-                txString.append(NULL_CHAR);
+                txString.append(CHAR_KEY_VALUE_SEPARATOR, NULL_CHAR);
             }
             else if (value.getType() == IValue.TypeEnum.TEXT)
             {
-                txString.append(IValue.TEXT_CODE);
+                txString.append(CHAR_KEY_VALUE_SEPARATOR, IValue.TEXT_CODE);
                 escape(value.textValue(), txString, chars, escapedChars);
             }
             else
             {
+                txString.append(CHAR_KEY_VALUE_SEPARATOR);
                 // longs, doubles and blobs do not need escaping
                 // note: blob string is "B<hex string for bytes>", e.g. B7366abc4
                 value.appendTo(txString);
@@ -792,13 +790,13 @@ public class StringProtocolCodec implements ICodec<char[]>
 
     static final CharSubArrayKeyedPool<String> decodedKeysPool =
         new CharSubArrayKeyedPool<String>("codec-decoded-keys", 0, Record.keysPool)
-        {
-            @Override
-            public String newInstance(String string)
             {
-                return string;
-            }
-        };
+                @Override
+                public String newInstance(String string)
+                {
+                    return string;
+                }
+            };
 
     /**
      * Creates a string from the chars (already unescaped) from position 0 to end
