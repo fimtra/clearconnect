@@ -301,7 +301,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      * <p>
      * Access with record lock (locking record)
      */
-    final Map<String, AtomicChange> pendingAtomicChanges;
+    final Map<String, IAtomicChangeMergingOps> pendingAtomicChanges;
     /** cheap read-write lock semantics */
     volatile Map<String, IRpcInstance> rpcInstances;
     /**
@@ -716,7 +716,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 return latch;
             }
 
-            final AtomicChange atomicChange;
+            final IAtomicChangeMergingOps atomicChange;
             synchronized (record.getWriteLock())
             {
                 atomicChange = this.pendingAtomicChanges.remove(name);
@@ -759,7 +759,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         final CountDownLatch latch = new CountDownLatch(1);
         synchronized (record.getWriteLock())
         {
-            final AtomicChange atomicChange = this.pendingAtomicChanges.remove(record.getName());
+            final IAtomicChangeMergingOps atomicChange = this.pendingAtomicChanges.remove(record.getName());
             if (atomicChange == null)
             {
                 latch.countDown();
@@ -1014,10 +1014,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    private void doAtomicChange(String recordName, Consumer<AtomicChange> action)
+    private void doAtomicChange(String recordName, Consumer<IAtomicChangeMergingOps> action)
     {
         // doAtomicChange called always whilst holding the record lock
-        AtomicChange atomicChange = this.pendingAtomicChanges.get(recordName);
+        IAtomicChangeMergingOps atomicChange = this.pendingAtomicChanges.get(recordName);
         if (atomicChange == null)
         {
             final LongRef sequence = this.sequences.get(recordName);
@@ -1403,6 +1403,28 @@ interface IAtomicChangeManager
     void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes);
 
     void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey, ThreadLocalBulkChanges changes);
+}
+
+/**
+ * Operations for merging changes into an atomic ahgne
+ *
+ * @author Ramon Servadei
+ */
+interface IAtomicChangeMergingOps extends IRecordChange, ISequentialRunnable
+{
+    void mergeBulkChanges(ThreadLocalBulkChanges changes);
+
+    void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes);
+
+    void mergeEntryUpdatedChange(String key, IValue current, IValue previous);
+
+    void mergeEntryRemovedChange(String key, IValue value);
+
+    void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous);
+
+    void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value);
+
+    void preparePublish(CountDownLatch latch, Context context);
 }
 
 /**

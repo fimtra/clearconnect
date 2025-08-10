@@ -26,12 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
-import com.fimtra.thimble.ISequentialRunnable;
 import com.fimtra.util.CharRef;
 import com.fimtra.util.LongRef;
 import com.fimtra.util.is;
@@ -41,14 +39,14 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei
  */
-public final class AtomicChange implements IRecordChange, ISequentialRunnable
+public final class AtomicChange implements IAtomicChangeMergingOps
 {
     private static final long SEQ_INIT = -1L;
 
     private static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(newMap(0));
     private static final Map<String, IValue> NOOP_MAP = noopMap();
 
-    private static final IRecordChange NULL_CHANGE = new IRecordChange()
+    private static final IAtomicChangeMergingOps NULL_CHANGE = new IAtomicChangeMergingOps()
     {
         @Override
         public boolean isEmpty()
@@ -134,6 +132,52 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         {
             return 0;
         }
+        @Override
+        public void run()
+        {
+        }
+
+        @Override
+        public Object context()
+        {
+            return "null";
+        }
+
+        @Override
+        public void mergeBulkChanges(ThreadLocalBulkChanges changes)
+        {
+        }
+
+        @Override
+        public void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
+        {
+        }
+
+        @Override
+        public void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
+        {
+        }
+
+        @Override
+        public void mergeEntryRemovedChange(String key, IValue value)
+        {
+        }
+
+        @Override
+        public void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current,
+                IValue previous)
+        {
+        }
+
+        @Override
+        public void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
+        {
+        }
+
+        @Override
+        public void preparePublish(CountDownLatch latch, Context context)
+        {
+        }
     };
 
     final String name;
@@ -203,7 +247,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
 
     // ==== methods used to support use as the ISequentialRunnable
 
-    void preparePublish(CountDownLatch latch, Context context)
+    @Override
+    public void preparePublish(CountDownLatch latch, Context context)
     {
         this.latch = latch;
         this.context = context;
@@ -518,7 +563,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         return this.sequence.get();
     }
 
-    void mergeBulkChanges(ThreadLocalBulkChanges changes)
+    @Override
+    public void mergeBulkChanges(ThreadLocalBulkChanges changes)
     {
         synchronized (this)
         {
@@ -559,12 +605,14 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
     }
 
-    void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
+    @Override
+    public void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeBulkChanges(changes);
     }
 
-    void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
+    @Override
+    public void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
     {
         internalGetPutEntries().put(key, current);
         if (previous != null)
@@ -580,7 +628,8 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         }
     }
 
-    void mergeEntryRemovedChange(String key, IValue value)
+    @Override
+    public void mergeEntryRemovedChange(String key, IValue value)
     {
         if (putEntries != null)
         {
@@ -594,12 +643,14 @@ public final class AtomicChange implements IRecordChange, ISequentialRunnable
         internalGetRemovedEntries().put(key, value);
     }
 
-    void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
+    @Override
+    public void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeEntryUpdatedChange(key, current, previous);
     }
 
-    void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
+    @Override
+    public void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeEntryRemovedChange(key, value);
     }
