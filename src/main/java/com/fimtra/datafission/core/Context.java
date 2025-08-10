@@ -16,6 +16,7 @@
 package com.fimtra.datafission.core;
 
 import static com.fimtra.datafission.IRecordChange.DELTA_SCOPE_CHAR;
+import static com.fimtra.datafission.IRecordChange.IMAGE_SCOPE_CHAR;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -38,7 +39,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.IObserverContext;
@@ -101,7 +101,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
 
 
-    static final AtomicInteger eventCount = new AtomicInteger();
+    private static final AtomicInteger eventCount = new AtomicInteger();
+    private static final CountDownLatch deadLatch = new CountDownLatch(0);
 
     static
     {
@@ -244,10 +245,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             this.images.put(recordName, record);
         }
 
-        IRecord remove(String name)
+        void remove(String name)
         {
             this.immutableImages.remove(name);
-            return this.images.remove(name);
+            this.images.remove(name);
         }
 
         Set<String> keySet()
@@ -702,50 +703,30 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     CountDownLatch publishAtomicChange(final String name, final IEventLifeCycle eventLifeCycle)
     {
-        eventLifeCycle.eventStart();
+        final IRecord record = this.records.get(name);
+        if (record == null)
+        {
+            Log.log(this, "Ignoring publish of non-existent record [", name, "]");
+            return deadLatch;
+        }
 
+        // engage throttle logic only if we have a record,
+        // we need to lock here to ensure no out-of-order publishing of the same record by different threads
+        eventLifeCycle.eventStart();
         try
         {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final IRecord record = this.records.get(name);
-            if (record == null)
+            final IAtomicChangeMergingOps atomicChange = getAtomicChangeToPublish(record);
+            final CountDownLatch publishLatch = atomicChange.getPublishLatch();
+            if (publishLatch == null)
             {
-                Log.log(this, "Ignoring publish of non-existent record [", name, "]");
-                latch.countDown();
                 eventLifeCycle.eventFinish();
-                return latch;
+                return deadLatch;
             }
-
-            final IAtomicChangeMergingOps atomicChange;
-            synchronized (record.getWriteLock())
+            else
             {
-                atomicChange = this.pendingAtomicChanges.remove(name);
-                // Note: theory for how atomicChange can be null here:
-                // 1. T1 created record
-                // 2. T2 calls publish atomicChange with name - publishes
-                // 3. T1 has created record and finishes createRecord which calls
-                // publishAtomicChange - pending change will have been used
-
-                // prevent empty changes BUT also allow the initial create if it had blank data
-                if (atomicChange == null || (eventLifeCycle != noopThrottle && atomicChange.isEmpty()))
-                {
-                    latch.countDown();
-                    eventLifeCycle.eventFinish();
-                    return latch;
-                }
-
-                // update the sequence (version) of the record when publishing
-                ((Record) record).setSequence(atomicChange.getSequence());
-
-                atomicChange.preparePublish(latch, this);
+                coreExecutor.execute(atomicChange);
+                return publishLatch;
             }
-
-            // Perform after the synchronized block to ensure the atomic change write
-            // is flushed to main memory before we try to execute it.
-            // Running the atomicChange will call doPublishChange.
-            coreExecutor.execute(atomicChange);
-
-            return latch;
         }
         catch (RuntimeException e)
         {
@@ -756,20 +737,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     CountDownLatch publishSystemRecord(SystemRecord record)
     {
-        final CountDownLatch latch = new CountDownLatch(1);
-        synchronized (record.getWriteLock())
+        final IAtomicChangeMergingOps atomicChange = getAtomicChangeToPublish(record);
+        final CountDownLatch publishLatch = atomicChange.getPublishLatch();
+        if (publishLatch == null)
         {
-            final IAtomicChangeMergingOps atomicChange = this.pendingAtomicChanges.remove(record.getName());
-            if (atomicChange == null)
-            {
-                latch.countDown();
-                return latch;
-            }
-            record.setSequence(atomicChange.getSequence());
-            atomicChange.preparePublish(latch, this);
-            systemExecutor.execute(atomicChange);
+            return deadLatch;
         }
-        return latch;
+        else
+        {
+            systemExecutor.execute(atomicChange);
+            return publishLatch;
+        }
     }
 
     @Override
@@ -1014,64 +992,55 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
     }
 
-    private void doAtomicChange(String recordName, Consumer<IAtomicChangeMergingOps> action)
-    {
-        // doAtomicChange called always whilst holding the record lock
-        IAtomicChangeMergingOps atomicChange = this.pendingAtomicChanges.get(recordName);
-        if (atomicChange == null)
-        {
-            final LongRef sequence = this.sequences.get(recordName);
-            if (sequence != null)
-            {
-                atomicChange = new AtomicChange(recordName, new CharRef(DELTA_SCOPE_CHAR),
-                        new LongRef(sequence.incrementAndGet()));
-                this.pendingAtomicChanges.put(recordName, atomicChange);
-            }
-        }
-        if (atomicChange != null)
-        {
-            action.accept(atomicChange);
-        }
-    }
-
     @Override
     public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
     {
-        doAtomicChange(recordName, a -> a.mergeBulkChanges(changes));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeBulkChanges(changes);
     }
 
     @Override
     public void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey,
             ThreadLocalBulkChanges changes)
     {
-        doAtomicChange(recordName, a -> a.mergeBulkSubMapChanges(subMapKey, changes));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeBulkSubMapChanges(subMapKey, changes);
     }
 
     @Override
     public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
     {
-        doAtomicChange(recordName, a -> a.mergeEntryUpdatedChange(key, current, previous));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeEntryUpdatedChange(key, current, previous);
     }
 
     @Override
     public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
     {
-        doAtomicChange(recordName, a -> a.mergeEntryRemovedChange(key, value));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeEntryRemovedChange(key, value);
     }
 
     @Override
     public void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key,
             IValue current, IValue previous)
     {
-        doAtomicChange(recordName,
-                a -> a.mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
     }
 
     @Override
     public void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key,
             IValue value)
     {
-        doAtomicChange(recordName, a -> a.mergeSubMapEntryRemovedChange(subMapKey, key, value));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .mergeSubMapEntryRemovedChange(subMapKey, key, value);
     }
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
@@ -1266,7 +1235,9 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     void copySequenceFromRemote(String recordName, long sequence)
     {
         this.sequences.get(recordName).set(sequence);
-        doAtomicChange(recordName, a -> a.setSequence(sequence));
+        // called always whilst holding the record lock
+        this.pendingAtomicChanges.get(recordName)
+                .setSequence(sequence);
     }
 
     boolean permissionTokenValidForRecord(String permissionToken, String recordName)
@@ -1380,6 +1351,27 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             }
         }
     }
+
+    private IAtomicChangeMergingOps getAtomicChangeToPublish(IRecord record)
+    {
+        synchronized (record.getWriteLock())
+        {
+            final String name = record.getName();
+            final IAtomicChangeMergingOps atomicChangeToPublish = this.pendingAtomicChanges.get(name);
+            if (!atomicChangeToPublish.isEmpty() || atomicChangeToPublish.getScope() == IMAGE_SCOPE_CHAR)
+            {
+                // setup the next atomic change
+                pendingAtomicChanges.put(name, new AtomicChange(name, new CharRef(DELTA_SCOPE_CHAR),
+                        new LongRef(this.sequences.get(name)
+                                .incrementAndGet())));
+
+                // update the sequence (version) of the record when publishing
+                ((Record) record).setSequence(atomicChangeToPublish.getSequence());
+                atomicChangeToPublish.preparePublish(this);
+            }
+            return atomicChangeToPublish;
+        }
+    }
 }
 
 /**
@@ -1424,7 +1416,12 @@ interface IAtomicChangeMergingOps extends IRecordChange, ISequentialRunnable
 
     void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value);
 
-    void preparePublish(CountDownLatch latch, Context context);
+    void preparePublish(Context context);
+
+    /**
+     * @return the publish latch, null if this change is not ready to publish
+     */
+    CountDownLatch getPublishLatch();
 }
 
 /**

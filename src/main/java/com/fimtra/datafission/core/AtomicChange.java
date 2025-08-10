@@ -132,6 +132,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         {
             return 0;
         }
+
         @Override
         public void run()
         {
@@ -175,8 +176,14 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         }
 
         @Override
-        public void preparePublish(CountDownLatch latch, Context context)
+        public void preparePublish(Context context)
         {
+        }
+
+        @Override
+        public CountDownLatch getPublishLatch()
+        {
+            return null;
         }
     };
 
@@ -248,10 +255,16 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     // ==== methods used to support use as the ISequentialRunnable
 
     @Override
-    public void preparePublish(CountDownLatch latch, Context context)
+    public void preparePublish(Context context)
     {
-        this.latch = latch;
+        this.latch = new CountDownLatch(1);
         this.context = context;
+    }
+
+    @Override
+    public CountDownLatch getPublishLatch()
+    {
+        return latch;
     }
 
     @Override

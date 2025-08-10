@@ -487,7 +487,7 @@ public class ContextTest
         this.candidate.addObserver(observer, name);
         this.candidate.addObserver(observer2, name);
         this.candidate.addObserver(observer2, name);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNotNull(this.candidate.pendingAtomicChanges.get(name));
         assertEquals(2, this.candidate.recordObservers.getSubscribersFor(name).length);
 
         assertTrue(latch.await(1, TimeUnit.SECONDS));
@@ -947,9 +947,9 @@ public class ContextTest
         assertNull(this.candidate.pendingAtomicChanges.get(name));
 
         assertNotNull(createRecordWaitForUpdate(name));
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNotNull(this.candidate.pendingAtomicChanges.get(name));
         this.candidate.publishAtomicChange(name).await();
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNotNull(this.candidate.pendingAtomicChanges.get(name));
     }
 
     @Test
@@ -1019,7 +1019,7 @@ public class ContextTest
 
         this.candidate.removeObserver(observer2, name);
         assertEquals(0, this.candidate.recordObservers.getSubscribersFor(name).length);
-        assertNull(this.candidate.pendingAtomicChanges.get(name));
+        assertNotNull(this.candidate.pendingAtomicChanges.get(name));
     }
 
     @Test
