@@ -8,19 +8,14 @@ package com.fimtra.datafission.field;
  */
 abstract class LongValueCodec
 {
-    /**
-     * @param i
-     * @param buf
-     * @return the index where the data starts, it ends at the end of the char[]
-     */
-    static int writeToCharArray(long i, char[] buf)
+    static void writeToCharArray(long i, char[] buf, int start, int lsDigitPos)
     {
         if (i < 0)
         {
+            buf[start] = '-';
             i = -i;
         }
 
-        int lsDigitPos = buf.length;
         long q;
         int r;
 
@@ -54,8 +49,6 @@ abstract class LongValueCodec
             i2 = q2;
         }
         while (i2 != 0);
-
-        return lsDigitPos;
     }
 
     private static final long NEG_MAX_MULTMIN = -Long.MAX_VALUE / 10;
@@ -157,6 +150,86 @@ abstract class LongValueCodec
         else
         {
             throw new NumberFormatException(new String(chars, start, len));
+        }
+    }
+
+    /**
+     * Uses a binary search algorithm to compute the number of digits
+     */
+    static int stringSize(long x)
+    {
+        if (x < 100000000L) //8
+        {
+            if (x < 10000L) //4
+            {
+                if (x < 100L) //2
+                {
+                    //1
+                    return x < 10L ? 1 : 2;
+                }
+                else
+                {
+                    //3
+                    return x < 1000L ? 3 : 4;
+                }
+            }
+            else
+            {
+                if (x < 1000000L) //6
+                {
+                    //5
+                    return x < 100000L ? 5 : 6;
+                }
+                else
+                {
+                    //7
+                    return x < 10000000L ? 7 : 8;
+                }
+            }
+        }
+        else
+        {
+            if (x < 1000000000000L) //12
+            {
+                if (x < 10000000000L) //10
+                {
+                    //9
+                    return x < 1000000000L ? 9 : 10;
+                }
+                else
+                {
+                    //11
+                    return x < 100000000000L ? 11 : 12;
+                }
+            }
+            else
+            {
+                if (x < 100000000000000L) //14
+                {
+                    //13
+                    return x < 10000000000000L ? 13 : 14;
+                }
+                else
+                {
+                    if (x < 10000000000000000L) //16
+                    {
+                        //15
+                        return x < 1000000000000000L ? 15 : 16;
+                    }
+                    else
+                    {
+                        if (x < 100000000000000000L) //17
+                        {
+                            return 17;
+                        }
+                        else
+                        {
+                            //18
+                            return x < 1000000000000000000L ? 18 : 19;
+                        }
+                    }
+                }
+            }
         }
     }
 
