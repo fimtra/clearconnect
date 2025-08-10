@@ -260,15 +260,21 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 final PlatformServiceInstance serviceInstance =
                                         PlatformRegistryAgent.this.localPlatformServiceInstances.get(
                                                 serviceInstanceId);
-                                if (serviceInstance != null && serviceInstance.isActive())
+                                if (serviceInstance != null)
                                 {
-                                    Log.log(PlatformRegistryAgent.this, "Re-registering ", serviceInstanceId);
-                                    registerServiceWithRetry(serviceInstance, null);
-                                }
-                                else
-                                {
-                                    Log.log(PlatformRegistryAgent.this,
-                                            "NOT re-registering DEAD service instance ", serviceInstanceId);
+                                    // the service is native to this agent, check active
+                                    if (serviceInstance.isActive())
+                                    {
+                                        Log.log(PlatformRegistryAgent.this, "Re-registering ",
+                                                serviceInstanceId);
+                                        registerServiceWithRetry(serviceInstance, null);
+                                    }
+                                    else
+                                    {
+                                        Log.log(PlatformRegistryAgent.this,
+                                                "NOT re-registering DEAD service instance ",
+                                                serviceInstanceId);
+                                    }
                                 }
                             });
                         }
