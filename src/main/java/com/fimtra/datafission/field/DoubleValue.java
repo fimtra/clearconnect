@@ -15,6 +15,9 @@
  */
 package com.fimtra.datafission.field;
 
+import static com.fimtra.datafission.field.CachedDoubleValue.NEG_INTEGRAL_POOL;
+import static com.fimtra.datafission.field.CachedDoubleValue.POS_INTEGRAL_POOL;
+
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
 
@@ -32,6 +35,19 @@ public class DoubleValue extends AbstractValue
      */
     public static DoubleValue valueOf(double value)
     {
+        if (((long) value) == value
+                && value < POS_INTEGRAL_POOL.length
+                && -value < NEG_INTEGRAL_POOL.length)
+        {
+            if (value >= 0)
+            {
+                return POS_INTEGRAL_POOL[(int) value];
+            }
+            else
+            {
+                return NEG_INTEGRAL_POOL[(int) -value];
+            }
+        }
         return new DoubleValue(value);
     }
 
