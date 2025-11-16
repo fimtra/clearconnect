@@ -61,14 +61,14 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
             {
                 this.txCipher = new SymmetricCipher(TRANSFORMATION, this.txKey);
                 this.rxCipher = new SymmetricCipher(fromPublisher.dataTransformation,
-                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
+                    SerializationUtils.fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
             }
             else
             {
                 // pre 3.15.5 support
                 this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
                 this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
-                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
+                    SerializationUtils.fromByteArray(this.handshakeCipher.decrypt(fromPublisher.extra)));
             }
         }
         catch (Exception e)
@@ -86,14 +86,14 @@ public final class EncryptedSessionSyncAndDataProtocol extends EncryptedSessionS
             {
                 this.txCipher = new SymmetricCipher(TRANSFORMATION, this.txKey);
                 this.rxCipher = new SymmetricCipher(fromProxy.dataTransformation,
-                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
+                    SerializationUtils.fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
             }
             else
             {
                 // pre 3.15.5 support
                 this.txCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION, this.txKey);
                 this.rxCipher = new SymmetricCipher(SYMMETRIC_TRANSFORMATION,
-                    SerializationUtils.<SecretKey>fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
+                    SerializationUtils.fromByteArray(this.handshakeCipher.decrypt(fromProxy.extra)));
             }
 
             response.extra = this.handshakeCipher.encrypt(SerializationUtils.toByteArray(this.txKey));

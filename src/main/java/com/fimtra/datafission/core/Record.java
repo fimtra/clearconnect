@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei
- *
+ * Copyright (c) 2013 Ramon Servadei 
+ *  
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *
+ *    
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,41 +18,51 @@ package com.fimtra.datafission.core;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.util.ArrayList;
+import java.util.AbstractCollection;
+import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.DataFissionProperties.Values;
-import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IRecord;
-import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
+import com.fimtra.datafission.core.Context.NoopAtomicChangeManager;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.util.CollectionUtils;
-import com.fimtra.util.ObjectPool;
+import com.fimtra.util.LongRef;
 import com.fimtra.util.is;
 
 /**
- * The standard implementation. This does not allow <code>null</code> keys. Records are equal by value of
- * their internal data map entries.
+ * Represents a system record in a {@link Context}. These differ from user-space records in that they are not
+ * available for general use and hold internal state for the context itself.
  *
- * @author Ramon Servadei
- * @see IRecord The IRecord interface for further behaviour documentation
+ * @see com.fimtra.datafission.IObserverContext.ISystemRecordNames
  */
-final class Record implements IRecord, Cloneable
+class SystemRecord extends Record
 {
+    SystemRecord(String name, Map<String, IValue> data, IAtomicChangeManager context)
+    {
+        super(name, data, context);
+    }
+}
 
+/**
+ * The standard implementation. This does not allow <code>null</code> keys. Records are equal by
+ * value of their internal data map entries.
+ * 
+ * @see IRecord The IRecord interface for further behaviour documentation
+ * @author Ramon Servadei
+ */
+class Record implements IRecord, Cloneable
+{
     static String toString(String contextName, String recordName, long sequence, Map<String, IValue> data,
-            Map<String, Map<String, IValue>> subMaps)
+        Map<String, Map<String, IValue>> subMaps)
     {
         String subMapString;
         if (subMaps.size() > Values.MAX_MAP_FIELDS_TO_PRINT)
@@ -74,7 +84,9 @@ final class Record implements IRecord, Cloneable
                 {
                     sb.append(", ");
                 }
-                sb.append(entry.getKey()).append("=").append(entry.getValue());
+                sb.append(entry.getKey())
+                        .append("=")
+                        .append(entry.getValue());
             }
             sb.append("}");
             subMapString = sb.toString();
@@ -82,10 +94,9 @@ final class Record implements IRecord, Cloneable
 
         final String dataString = ContextUtils.mapToString(data);
         final StringBuilder sb = new StringBuilder(
-                dataString.length() + subMapString.length() + contextName.length() + recordName.length()
-                        + 30);
+            dataString.length() + subMapString.length() + contextName.length() + recordName.length() + 30);
         sb.append(contextName).append("|").append(recordName).append("|").append(sequence).append("|").append(
-                dataString).append("|subMaps").append(subMapString);
+            dataString).append("|subMaps").append(subMapString);
         return sb.toString();
     }
 
@@ -102,40 +113,35 @@ final class Record implements IRecord, Cloneable
     }
 
     private static final Map<String, Map<String, IValue>> EMPTY_SUBMAP = CollectionUtils.newMap(2);
-    /**
-     * A pool for the keys. Keys across records stand a VERY good chance of being repeated many times so this
-     * is a valuable memory optimisation.
-     */
-    static final ObjectPool<String> keysPool =
-            new ObjectPool<>("record-keys", DataFissionProperties.Values.KEYS_POOL_MAX);
 
-    final AtomicLong sequence = new AtomicLong(-1);
+    final LongRef sequence;
     final String name;
-    final IObserverContext context;
+    final IAtomicChangeManager context;
     Map<String, IValue> data;
     Map<String, Map<String, IValue>> subMaps;
-    AtomicChange atomicChange;
 
-    Record(String name, Map<String, IValue> data, IObserverContext context)
+    Record(String name, Map<String, IValue> data, IAtomicChangeManager context)
     {
         super();
-        this.name = keysPool.intern(name);
+        this.name = name;
         this.data = CollectionUtils.newMap(data);
         this.subMaps = EMPTY_SUBMAP;
         this.context = context;
+        this.sequence = new LongRef(0);
     }
 
     /**
      * Clone constructor for providing pre-sized subMaps to prevent re-hashing
      */
-    Record(String name, Map<String, IValue> data, IObserverContext context,
-            Map<String, Map<String, IValue>> subMaps)
+    Record(String name, Map<String, IValue> data, IAtomicChangeManager context,
+        Map<String, Map<String, IValue>> subMaps)
     {
         super();
-        this.name = keysPool.intern(name);
+        this.name = name;
         this.data = CollectionUtils.newMap(data);
         this.subMaps = subMaps;
         this.context = context;
+        this.sequence = new LongRef(0);
     }
 
     @Override
@@ -149,14 +155,15 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this)
         {
-            for (Entry<String, IValue> stringIValueEntry : new HashMap<>(this.data).entrySet())
+            for (Entry<String, IValue> entry : new HashMap<>(this.data).entrySet())
             {
-                remove(stringIValueEntry.getKey());
+                remove(entry.getKey());
             }
 
-            for (Entry<String, Map<String, IValue>> stringMapEntry : this.subMaps.entrySet())
+            for (Entry<String, Map<String, IValue>> entry : this.subMaps.entrySet())
             {
-                stringMapEntry.getValue().clear();
+                entry.getValue()
+                        .clear();
             }
             this.data = CollectionUtils.newMap(4);
             this.subMaps = EMPTY_SUBMAP;
@@ -184,22 +191,22 @@ final class Record implements IRecord, Cloneable
     @Override
     public Set<Entry<String, IValue>> entrySet()
     {
-        final int size = this.data.size();
-        final Set<Entry<String, IValue>> entrySet = new HashSet<Entry<String, IValue>>(size)
+        return new AbstractSet<Entry<String, IValue>>()
         {
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<Entry<String, IValue>> iterator()
             {
-                return new EntrySetIterator(super.iterator(), Record.this);
+                return new EntrySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (this)
-        {
-            entrySet.addAll(this.data.entrySet());
-        }
-
-        return entrySet;
     }
 
     @Override
@@ -227,7 +234,7 @@ final class Record implements IRecord, Cloneable
             synchronized (other)
             {
                 return is.eq(this.name, other.name) && is.eq(this.context.getName(), other.context.getName())
-                        && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
+                    && is.eq(this.data, other.data) && is.eq(this.subMaps, other.subMaps);
             }
         }
     }
@@ -259,21 +266,22 @@ final class Record implements IRecord, Cloneable
     @Override
     public Set<String> keySet()
     {
-        final Set<String> keySet = new HashSet<String>(this.data.size())
+        return new AbstractSet<String>()
         {
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<String> iterator()
             {
-                return new KeySetIterator(super.iterator(), Record.this);
+                return new KeySetIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (this)
-        {
-            keySet.addAll(this.data.keySet());
-        }
-
-        return keySet;
     }
 
     @Override
@@ -285,24 +293,23 @@ final class Record implements IRecord, Cloneable
         }
         synchronized (this)
         {
-            final String internKey = keysPool.intern(key);
             final IValue previous;
             if (value != null)
             {
-                previous = this.data.put(internKey, value);
+                previous = this.data.put(key, value);
                 // if there is no change, we perform no update
-                if (previous == null || !previous.equals(value))
+                if (!value.equals(previous))
                 {
-                    getPendingAtomicChange().mergeEntryUpdatedChange(internKey, value, previous);
+                    this.context.addEntryUpdatedToAtomicChange(this.name, key, value, previous);
                 }
             }
             else
             {
                 // a null is treated as if it removes the key
-                previous = this.data.remove(internKey);
+                previous = this.data.remove(key);
                 if (previous != null)
                 {
-                    getPendingAtomicChange().mergeEntryRemovedChange(internKey, previous);
+                    this.context.addEntryRemovedToAtomicChange(this.name, key, previous);
                 }
             }
             return previous;
@@ -311,7 +318,7 @@ final class Record implements IRecord, Cloneable
 
     /**
      * Convenience put method for a long value
-     *
+     * 
      * @see #put(String, IValue)
      */
     @Override
@@ -322,7 +329,7 @@ final class Record implements IRecord, Cloneable
 
     /**
      * Convenience put method for a double value
-     *
+     * 
      * @see #put(String, IValue)
      */
     @Override
@@ -333,7 +340,7 @@ final class Record implements IRecord, Cloneable
 
     /**
      * Convenience put method for a String value
-     *
+     * 
      * @see #put(String, IValue)
      */
     @Override
@@ -347,53 +354,66 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this)
         {
-            String key;
             IValue value;
-            String internKey;
+            String key;
 
-            final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(t.size());
-            IValue previous;
-            int putPtr = 0;
-            int removePtr = 0;
-            for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
+            if (this.context instanceof NoopAtomicChangeManager)
             {
-                key = entry.getKey();
-                value = entry.getValue();
-                internKey = keysPool.intern(key);
-
-                if (value != null)
+                for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
                 {
-                    previous = this.data.put(internKey, value);
-                    // if there is no change, we perform no update
-                    if (this.context != null)
+                    value = entry.getValue();
+                    key = entry.getKey();
+
+                    if (value != null)
                     {
-                        if (previous == null || !previous.equals(value))
+                        this.data.put(key, value);
+                    }
+                    else
+                    {
+                        // a null is treated as if it removes the key
+                        this.data.remove(key);
+                    }
+                }
+            }
+            else
+            {
+                final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(t.size());
+                IValue previous;
+                int putPtr = 0;
+                int removePtr = 0;
+                for (Entry<? extends String, ? extends IValue> entry : t.entrySet())
+                {
+                    value = entry.getValue();
+                    key = entry.getKey();
+
+                    if (value != null)
+                    {
+                        previous = this.data.put(key, value);
+                        // if there is no change, we perform no update
+                        if (!value.equals(previous))
                         {
-                            changes.putKeys[putPtr] = internKey;
+                            changes.putKeys[putPtr] = key;
                             changes.putValues[putPtr][0] = value;
                             changes.putValues[putPtr][1] = previous;
                             putPtr++;
                         }
                     }
-                }
-                else
-                {
-                    // a null is treated as if it removes the key
-                    previous = this.data.remove(internKey);
-                    if (this.context != null)
+                    else
                     {
+                        // a null is treated as if it removes the key
+                        previous = this.data.remove(key);
                         if (previous != null)
                         {
-                            changes.removedKeys[removePtr] = internKey;
+                            changes.removedKeys[removePtr] = key;
                             changes.removedValues[removePtr] = previous;
                             removePtr++;
                         }
                     }
                 }
+                changes.putSize = putPtr;
+                changes.removedSize = removePtr;
+                this.context.addBulkChangesToAtomicChange(this.name, changes);
             }
-            changes.putSize = putPtr;
-            changes.removedSize = removePtr;
-            getPendingAtomicChange().mergeBulkChanges(changes);
         }
     }
 
@@ -404,11 +424,18 @@ final class Record implements IRecord, Cloneable
         {
             if (key instanceof String)
             {
-                final IValue value;
-                if ((value = this.data.remove(key)) != null)
+                if (this.context instanceof NoopAtomicChangeManager)
                 {
-                    addEntryRemovedToAtomicChange((String) key, value);
-                    return value;
+                    this.data.remove(key);
+                }
+                else
+                {
+                    if (this.data.containsKey(key))
+                    {
+                        final IValue value = this.data.remove(key);
+                        addEntryRemovedToAtomicChange((String) key, value);
+                        return value;
+                    }
                 }
             }
         }
@@ -427,26 +454,22 @@ final class Record implements IRecord, Cloneable
     @Override
     public Collection<IValue> values()
     {
-        final int size = this.data.size();
-        final List<String> keys = new ArrayList<>(size);
-        final List<IValue> values = new ArrayList<IValue>(size)
+        return new AbstractCollection<IValue>()
         {
+            final Set<Map.Entry<String, IValue>> backingEntrySet = Record.this.getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<IValue> iterator()
             {
-                return new ValuesIterator(super.iterator(), keys, Record.this);
+                return new ValuesIterator(Record.this, this.backingEntrySet.iterator(), Record.this);
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (this)
-        {
-            this.data.forEach((key, value) -> {
-                keys.add(key);
-                values.add(value);
-            });
-        }
-
-        return values;
     }
 
     @Override
@@ -454,8 +477,7 @@ final class Record implements IRecord, Cloneable
     {
         synchronized (this)
         {
-            return toString(this.context.getName(), this.name, this.sequence.longValue(), this.data,
-                    this.subMaps);
+            return toString(this.context.getName(), this.name, this.sequence.get(), this.data, this.subMaps);
         }
     }
 
@@ -468,11 +490,7 @@ final class Record implements IRecord, Cloneable
     @Override
     public String getContextName()
     {
-        if (this.context != null)
-        {
-            return this.context.getName();
-        }
-        return "";
+        return this.context.getName();
     }
 
     @Override
@@ -487,9 +505,8 @@ final class Record implements IRecord, Cloneable
                 {
                     this.subMaps = CollectionUtils.newMap(4);
                 }
-                final String internKey = keysPool.intern(key);
-                submap = new SubMap(this, internKey);
-                this.subMaps.put(internKey, submap);
+                submap = new SubMap(this, key);
+                this.subMaps.put(key, submap);
             }
             return submap;
         }
@@ -544,13 +561,9 @@ final class Record implements IRecord, Cloneable
             putAll((Map<String, IValue>) demergeMaps[0]);
             Map<String, Map<String, IValue>> subMaps = (Map<String, Map<String, IValue>>) demergeMaps[1];
 
-            String key;
-            Map<String, IValue> value;
             for (Entry<String, Map<String, IValue>> entry : subMaps.entrySet())
             {
-                key = entry.getKey();
-                value = entry.getValue();
-                getOrCreateSubMap(key).putAll(value);
+                getOrCreateSubMap(entry.getKey()).putAll(entry.getValue());
             }
         }
     }
@@ -580,20 +593,16 @@ final class Record implements IRecord, Cloneable
         synchronized (this)
         {
             final Record cloneRecord;
-            if (this.subMaps.size() == 0)
+            if (this.subMaps.isEmpty())
             {
                 cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context);
             }
             else
             {
-                final Map<String, Map<String, IValue>> cloneSubMaps =
-                        CollectionUtils.newMap(this.subMaps.size());
-                cloneRecord =
-                        new Record(this.name, CollectionUtils.newMap(this.data), this.context, cloneSubMaps);
-                Map.Entry<String, Map<String, IValue>> entry;
-                for (Entry<String, Map<String, IValue>> stringMapEntry : this.subMaps.entrySet())
+                final Map<String, Map<String, IValue>> cloneSubMaps = CollectionUtils.newMap(this.subMaps.size());
+                cloneRecord = new Record(this.name, CollectionUtils.newMap(this.data), this.context, cloneSubMaps);
+                for (Entry<String, Map<String, IValue>> entry : this.subMaps.entrySet())
                 {
-                    entry = stringMapEntry;
                     cloneSubMaps.put(entry.getKey(), ((SubMap) entry.getValue()).clone(cloneRecord));
                 }
             }
@@ -614,174 +623,42 @@ final class Record implements IRecord, Cloneable
     @Override
     public long getSequence()
     {
-        return this.sequence.longValue();
+        return this.sequence.get();
+    }
+
+    Set<Entry<String, IValue>> getSnapshotOfBackingEntrySet()
+    {
+        synchronized (this)
+        {
+            return CollectionUtils.newHashSet(this.data.entrySet());
+        }
     }
 
     void addEntryRemovedToAtomicChange(String key, final IValue value)
     {
-        getPendingAtomicChange().mergeEntryRemovedChange(key, value);
+        this.context.addEntryRemovedToAtomicChange(this.name, key, value);
     }
 
-    void addSubMapEntryUpdatedToAtomicChange(String subMapKey, String key, final IValue current,
-            IValue previous)
+    void addSubMapEntryUpdatedToAtomicChange(String subMapKey, String key, final IValue current, IValue previous)
     {
-        getPendingAtomicChange().mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
+        this.context.addSubMapEntryUpdatedToAtomicChange(this.name, subMapKey, key, current, previous);
     }
 
     void addSubMapEntryRemovedToAtomicChange(String subMapKey, String key, final IValue value)
     {
-        getPendingAtomicChange().mergeSubMapEntryRemovedChange(subMapKey, key, value);
+        this.context.addSubMapEntryRemovedToAtomicChange(this.name, subMapKey, key, value);
     }
 
     void setSequence(long sequence)
     {
         this.sequence.set(sequence);
     }
-
-    /**
-     * Update the record with the complete state of the record change AND set the record sequence to that of
-     * the change.
-     */
-    void applyChangeAndSetSequence(IRecordChange change)
-    {
-        synchronized (this)
-        {
-            change.applyCompleteAtomicChangeToRecord(this);
-            setSequence(change.getSequence());
-            this.atomicChange = null;
-        }
-    }
-
-    /**
-     * Get the pending {@link AtomicChange}, creating if necessary. The change always has a sequence that is 1
-     * ahead of the current record sequence.
-     */
-    AtomicChange getPendingAtomicChange()
-    {
-        if (this.atomicChange == null)
-        {
-            synchronized (this)
-            {
-                if (this.atomicChange == null)
-                {
-                    this.atomicChange = new AtomicChange(this.name);
-                    this.atomicChange.setSequence(getSequence() + 1);
-                }
-            }
-        }
-        return this.atomicChange;
-    }
-
-    private static abstract class AbstractIterator<T> implements Iterator<T>
-    {
-        private final Iterator<T> iterator;
-        private final Map<String, IValue> target;
-
-        private AbstractIterator(Iterator<T> iterator, Map<String, IValue> target)
-        {
-            this.iterator = iterator;
-            this.target = target;
-        }
-
-        @Override
-        public final boolean hasNext()
-        {
-            return this.iterator.hasNext();
-        }
-
-        @Override
-        public final T next()
-        {
-            final T next = this.iterator.next();
-            doNext(next);
-            return next;
-        }
-
-        @Override
-        public final void remove()
-        {
-            this.target.remove(getKey());
-            this.iterator.remove();
-        }
-
-        abstract void doNext(T next);
-
-        abstract String getKey();
-    }
-
-    static final class KeySetIterator extends AbstractIterator<String>
-    {
-        private String current;
-
-        KeySetIterator(Iterator<String> iterator, Map<String, IValue> target)
-        {
-            super(iterator, target);
-        }
-
-        @Override
-        void doNext(String next)
-        {
-            this.current = next;
-        }
-
-        @Override
-        String getKey()
-        {
-            return this.current;
-        }
-    }
-
-    static final class ValuesIterator extends AbstractIterator<IValue>
-    {
-        private final List<String> keys;
-        private int i = -1;
-
-        ValuesIterator(Iterator<IValue> iterator, List<String> keys, Map<String, IValue> target)
-        {
-            super(iterator, target);
-            this.keys = keys;
-        }
-
-        @Override
-        void doNext(IValue next)
-        {
-            this.i++;
-        }
-
-        @Override
-        String getKey()
-        {
-            return this.keys.get(this.i);
-        }
-    }
-
-    static final class EntrySetIterator extends AbstractIterator<Entry<String, IValue>>
-    {
-        private Entry<String, IValue> current;
-
-        EntrySetIterator(Iterator<Entry<String, IValue>> iterator, Map<String, IValue> target)
-        {
-            super(iterator, target);
-        }
-
-        @Override
-        void doNext(Entry<String, IValue> next)
-        {
-            this.current = next;
-        }
-
-        @Override
-        String getKey()
-        {
-            return this.current.getKey();
-        }
-    }
 }
 
 /**
- * A sub-map view onto the record's internal map. The sub-map key-values are held in the record's map with
- * each key prefixed with a string.
- *
+ * A sub-map view onto the record's internal map. The sub-map key-values are held in the record's
+ * map with each key prefixed with a string.
+ * 
  * @author Ramon Servadei
  */
 final class SubMap implements Map<String, IValue>
@@ -792,11 +669,11 @@ final class SubMap implements Map<String, IValue>
 
     /**
      * Format of each key in a submap is:
-     *
+     * 
      * <pre>
      * {subMapKey}.keyOfEntryInSubMap
      * </pre>
-     * <p>
+     * 
      * this returns the <code>subMapKey</code> argument wrapped as <tt>{subMapKey}.</tt>
      */
     static String encodeSubMapKey(String subMapKey)
@@ -806,17 +683,18 @@ final class SubMap implements Map<String, IValue>
 
     /**
      * Format of each key in a submap is:
-     *
+     * 
      * <pre>
      * {subMapKey}.keyOfEntryInSubMap
      * </pre>
-     * <p>
+     * 
      * This method returns an array holding the <code>subMapKey</code> and
      * <code>keyOfEntryInSubMap</code> parts.
-     *
-     * @param recordKey one of the keys in a record
+     * 
+     * @param recordKey
+     *            one of the keys in a record
      * @return <code>new String[]{subMapKey, keyOfEntryInSubMap}</code> OR <code>null</code> if the
-     * record key is not for a sub-map
+     *         record key is not for a sub-map
      */
     static String[] decodeSubMapKeys(String recordKey)
     {
@@ -828,7 +706,7 @@ final class SubMap implements Map<String, IValue>
                 return null;
             }
             return new String[] { recordKey.substring(1, indexOf),
-                    recordKey.substring(indexOf + SUB_MAP_KEY_SUFFIX.length()) };
+                recordKey.substring(indexOf + SUB_MAP_KEY_SUFFIX.length()) };
         }
         return null;
     }
@@ -866,6 +744,38 @@ final class SubMap implements Map<String, IValue>
         {
             return ContextUtils.mapToString(this.subMap);
         }
+    }
+
+    static Iterator<Map.Entry<String, IValue>> subMapIterator(final Iterator<Map.Entry<String, IValue>> subMapIterator)
+    {
+        return new Iterator<Map.Entry<String, IValue>>()
+        {
+            Map.Entry<String, IValue> current;
+
+            @Override
+            public boolean hasNext()
+            {
+                boolean hasNext = subMapIterator.hasNext();
+                if (!hasNext)
+                {
+                    this.current = null;
+                }
+                return hasNext;
+            }
+
+            @Override
+            public Map.Entry<String, IValue> next()
+            {
+                this.current = subMapIterator.next();
+                return this.current;
+            }
+
+            @Override
+            public void remove()
+            {
+                subMapIterator.remove();
+            }
+        };
     }
 
     @Override
@@ -918,21 +828,19 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            final String internKey = Record.keysPool.intern(key);
             final IValue previous;
             if (value != null)
             {
-                previous = this.subMap.put(internKey, value);
-                if (previous == null || !previous.equals(value))
+                previous = this.subMap.put(key, value);
+                if (!value.equals(previous))
                 {
-                    this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, internKey, value,
-                            previous);
+                    this.record.addSubMapEntryUpdatedToAtomicChange(this.subMapKey, key, value, previous);
                 }
             }
             else
             {
-                previous = this.subMap.remove(internKey);
-                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, internKey, previous);
+                previous = this.subMap.remove(key);
+                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key, previous);
             }
             return previous;
         }
@@ -943,9 +851,16 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            final IValue previous = this.subMap.remove(key);
-            this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
-            return previous;
+            if (this.record.context instanceof NoopAtomicChangeManager)
+            {
+                return this.subMap.remove(key);
+            }
+            else
+            {
+                final IValue previous = this.subMap.remove(key);
+                this.record.addSubMapEntryRemovedToAtomicChange(this.subMapKey, key.toString(), previous);
+                return previous;
+            }
         }
     }
 
@@ -954,42 +869,65 @@ final class SubMap implements Map<String, IValue>
     {
         synchronized (this.record)
         {
-            String key;
             IValue value;
-            String internKey;
+            String key;
 
-            final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(m.size());
-            IValue previous;
-            int putPtr = 0;
-            int removePtr = 0;
-            for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
+            if (this.record.context instanceof NoopAtomicChangeManager)
             {
-                key = entry.getKey();
-                value = entry.getValue();
-                internKey = Record.keysPool.intern(key);
-
-                if (value != null)
+                for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
                 {
-                    previous = this.subMap.put(internKey, value);
-                    if (previous == null || !previous.equals(value))
+                    value = entry.getValue();
+                    key = entry.getKey();
+
+                    if (value != null)
                     {
-                        changes.putKeys[putPtr] = internKey;
-                        changes.putValues[putPtr][0] = value;
-                        changes.putValues[putPtr][1] = previous;
-                        putPtr++;
+                        this.subMap.put(key, value);
+                    }
+                    else
+                    {
+                        // a null is treated as if it removes the key
+                        this.subMap.remove(key);
                     }
                 }
-                else
-                {
-                    previous = this.subMap.remove(internKey);
-                    changes.removedKeys[removePtr] = internKey;
-                    changes.removedValues[removePtr] = previous;
-                    removePtr++;
-                }
             }
-            changes.putSize = putPtr;
-            changes.removedSize = removePtr;
-            this.record.getPendingAtomicChange().mergeBulkSubMapChanges(this.subMapKey, changes);
+            else
+            {
+                final ThreadLocalBulkChanges changes = ThreadLocalBulkChanges.get().initialise(m.size());
+                IValue previous;
+                int putPtr = 0;
+                int removePtr = 0;
+                for (Entry<? extends String, ? extends IValue> entry : m.entrySet())
+                {
+                    value = entry.getValue();
+                    key = entry.getKey();
+
+                    if (value != null)
+                    {
+                        previous = this.subMap.put(key, value);
+                        if (!value.equals(previous))
+                        {
+                            changes.putKeys[putPtr] = key;
+                            changes.putValues[putPtr][0] = value;
+                            changes.putValues[putPtr][1] = previous;
+                            putPtr++;
+                        }
+                    }
+                    else
+                    {
+                        previous = this.subMap.remove(key);
+                        if (previous != null)
+                        {
+                            changes.removedKeys[removePtr] = key;
+                            changes.removedValues[removePtr] = previous;
+                            removePtr++;
+                        }
+
+                    }
+                }
+                changes.putSize = putPtr;
+                changes.removedSize = removePtr;
+                this.record.context.addBulkSubMapChangesToAtomicChange(this.record.name, this.subMapKey, changes);
+            }
         }
     }
 
@@ -999,7 +937,7 @@ final class SubMap implements Map<String, IValue>
         synchronized (this.record)
         {
             Set<Map.Entry<String, IValue>> entrySet = entrySet();
-            for (Iterator<Map.Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext(); )
+            for (Iterator<Map.Entry<String, IValue>> iterator = entrySet.iterator(); iterator.hasNext();)
             {
                 iterator.next();
                 iterator.remove();
@@ -1010,66 +948,88 @@ final class SubMap implements Map<String, IValue>
     @Override
     public Set<String> keySet()
     {
-        final Set<String> keySet = new HashSet<String>(this.subMap.size())
+        return new AbstractSet<String>()
         {
+            final Set<Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<String> iterator()
             {
-                return new Record.KeySetIterator(super.iterator(), SubMap.this);
+                return new KeySetIterator(SubMap.this.record, subMapIterator(this.backingEntrySet.iterator()),
+                    SubMap.this)
+                {
+                    @Override
+                    void remove_callWithWriteLock(String key, IValue value)
+                    {
+                        this.record.addSubMapEntryRemovedToAtomicChange(SubMap.this.subMapKey, key, value);
+                    }
+                };
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (SubMap.this.record)
-        {
-            keySet.addAll(this.subMap.keySet());
-        }
-
-        return keySet;
     }
 
     @Override
     public Collection<IValue> values()
     {
-        final int size = this.subMap.size();
-        final List<String> keys = new ArrayList<>(size);
-        final List<IValue> values = new ArrayList<IValue>(size)
+        return new AbstractCollection<IValue>()
         {
+            final Set<java.util.Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<IValue> iterator()
             {
-                return new Record.ValuesIterator(super.iterator(), keys, SubMap.this);
+                return new ValuesIterator(SubMap.this.record, subMapIterator(this.backingEntrySet.iterator()),
+                    SubMap.this)
+                {
+                    @Override
+                    void remove_callWithWriteLock(String key, IValue value)
+                    {
+                        this.record.addSubMapEntryRemovedToAtomicChange(SubMap.this.subMapKey, key, value);
+                    }
+                };
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (SubMap.this.record)
-        {
-            this.subMap.forEach((key, value) -> {
-                keys.add(key);
-                values.add(value);
-            });
-        }
-
-        return values;
     }
 
     @Override
     public Set<Map.Entry<String, IValue>> entrySet()
     {
-        final Set<Entry<String, IValue>> entrySet = new HashSet<Entry<String, IValue>>(this.subMap.size())
+        return new AbstractSet<Map.Entry<String, IValue>>()
         {
+            final Set<Map.Entry<String, IValue>> backingEntrySet = getSnapshotOfBackingEntrySet();
+
             @Override
             public Iterator<Entry<String, IValue>> iterator()
             {
-                return new Record.EntrySetIterator(super.iterator(), SubMap.this);
+                return new EntrySetIterator(SubMap.this.record, subMapIterator(this.backingEntrySet.iterator()),
+                    SubMap.this)
+                {
+                    @Override
+                    void remove_callWithWriteLock(String key, IValue value)
+                    {
+                        this.record.addSubMapEntryRemovedToAtomicChange(SubMap.this.subMapKey, key, value);
+                    }
+                };
+            }
+
+            @Override
+            public int size()
+            {
+                return this.backingEntrySet.size();
             }
         };
-
-        synchronized (SubMap.this.record)
-        {
-            entrySet.addAll(this.subMap.entrySet());
-        }
-
-        return entrySet;
     }
 
     @Override
@@ -1088,8 +1048,8 @@ final class SubMap implements Map<String, IValue>
         {
             synchronized (other.record)
             {
-                return is.eq(this.subMapKey, other.subMapKey) && is.eq(this.record.getName(),
-                        other.record.getName()) && is.eq(this.subMap, other.subMap);
+                return is.eq(this.subMapKey, other.subMapKey) && is.eq(this.record.getName(), other.record.getName())
+                    && is.eq(this.subMap, other.subMap);
             }
         }
     }
@@ -1098,5 +1058,165 @@ final class SubMap implements Map<String, IValue>
     public int hashCode()
     {
         return this.subMapKey.hashCode();
+    }
+
+    Set<Map.Entry<String, IValue>> getSnapshotOfBackingEntrySet()
+    {
+        synchronized (this.record)
+        {
+            return CollectionUtils.newHashSet(this.subMap.entrySet());
+        }
+    }
+}
+
+/**
+ * A base class for an iterator that can be returned from the {@link Collection} objects returned
+ * from the methods {@link Record#keySet()}, {@link Record#values()} and {@link Record#entrySet()}.
+ * This iterator will call the {@link Record#addEntryRemovedToAtomicChange(String, IValue)} method
+ * when items from the underlying {@link Map} of the record are removed by this iterator.
+ * 
+ * @author Ramon Servadei
+ * @param <IteratorType>
+ *            the type the {@link Iterator} returns
+ */
+abstract class AbstractNotifyingIterator<IteratorType> implements Iterator<IteratorType>
+{
+    /** The record this entry set iterator operates on */
+    final Record record;
+    final Map<String, IValue> target;
+
+    /**
+     * The iterator returned from the {@link #record} - this is a SNAPSHOT of the entries at the
+     * point when the iterator was created
+     */
+    private final Iterator<Entry<String, IValue>> snapshotEntryIterator;
+
+    /** Tracks the current iteration item */
+    private Entry<String, IValue> current;
+
+    AbstractNotifyingIterator(Record record, Iterator<Entry<String, IValue>> entryIterator, Map<String, IValue> target)
+    {
+        this.record = record;
+        this.snapshotEntryIterator = entryIterator;
+        this.target = target;
+    }
+
+    @Override
+    public boolean hasNext()
+    {
+        boolean hasNext = this.snapshotEntryIterator.hasNext();
+        if (!hasNext)
+        {
+            this.current = null;
+        }
+        return hasNext;
+    }
+
+    @Override
+    public IteratorType next()
+    {
+        this.current = this.snapshotEntryIterator.next();
+        return getValueForNext(this.current);
+    }
+
+    @Override
+    public void remove()
+    {
+        synchronized (this.record)
+        {
+            this.snapshotEntryIterator.remove();
+            this.target.remove(this.current.getKey());
+            remove_callWithWriteLock(this.current.getKey(), this.current.getValue());
+        }
+    }
+
+    abstract void remove_callWithWriteLock(String key, IValue value);
+
+    /**
+     * Called from the {@link #next()} method to return the correct value from the current record
+     * entry.
+     * 
+     * @param currentEntry
+     *            the current record entry the iterator is pointing to after the delegate iterator's
+     *            call to {@link #next()}
+     * @return the correct value from the current record entry
+     */
+    abstract IteratorType getValueForNext(Entry<String, IValue> currentEntry);
+}
+
+/**
+ * Iterates over the {@link Record#keySet()} collection.
+ * 
+ * @author Ramon Servadei
+ */
+class KeySetIterator extends AbstractNotifyingIterator<String>
+{
+    KeySetIterator(Record record, Iterator<Entry<String, IValue>> entryIterator, Map<String, IValue> target)
+    {
+        super(record, entryIterator, target);
+    }
+
+    @Override
+    String getValueForNext(Entry<String, IValue> currentEntry)
+    {
+        return currentEntry.getKey();
+    }
+
+    @Override
+    void remove_callWithWriteLock(String key, IValue value)
+    {
+        this.record.addEntryRemovedToAtomicChange(key, value);
+    }
+}
+
+/**
+ * Iterates over the {@link Record#entrySet()} collection.
+ * 
+ * @author Ramon Servadei
+ */
+class EntrySetIterator extends AbstractNotifyingIterator<Entry<String, IValue>>
+{
+
+    EntrySetIterator(Record record, Iterator<Entry<String, IValue>> entryIterator, Map<String, IValue> target)
+    {
+        super(record, entryIterator, target);
+    }
+
+    @Override
+    Entry<String, IValue> getValueForNext(Entry<String, IValue> currentEntry)
+    {
+        return currentEntry;
+    }
+
+    @Override
+    void remove_callWithWriteLock(String key, IValue value)
+    {
+        this.record.addEntryRemovedToAtomicChange(key, value);
+    }
+}
+
+/**
+ * Iterates over the {@link Record#values()} collection.
+ * 
+ * @author Ramon Servadei
+ */
+class ValuesIterator extends AbstractNotifyingIterator<IValue>
+{
+
+    ValuesIterator(Record record, Iterator<Entry<String, IValue>> entryIterator, Map<String, IValue> target)
+    {
+        super(record, entryIterator, target);
+    }
+
+    @Override
+    IValue getValueForNext(Entry<String, IValue> currentEntry)
+    {
+        return currentEntry.getValue();
+    }
+
+    @Override
+    void remove_callWithWriteLock(String key, IValue value)
+    {
+        this.record.addEntryRemovedToAtomicChange(key, value);
     }
 }

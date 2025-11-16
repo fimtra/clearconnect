@@ -27,12 +27,10 @@ import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import com.fimtra.datafission.field.LongValue;
-import com.fimtra.executors.ContextExecutorFactory;
-import com.fimtra.executors.IContextExecutor;
-import com.fimtra.executors.gatling.GatlingExecutor;
+import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.IContextExecutor;
 import com.fimtra.util.TestUtils;
 import com.fimtra.util.TestUtils.EventChecker;
-import com.fimtra.util.ThreadUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,9 +60,7 @@ public class CoalescingRecordListenerTest
     @Before
     public void setUp() throws Exception
     {
-        // we need a min of 2 threads for coalescing testing, otherwise we get lock-step processing and no coalescing happens
-        // note: the CC internals will used the pooled executor so we only need our test one to have 1 thread
-        this.executor = new GatlingExecutor("CoalescingRecordListenerTest", 1);
+        this.executor = ContextExecutorFactory.create("CoalescingRecordListenerTest", 1);
         this.candidate = new Context("testContext");
     }
 
@@ -97,8 +93,7 @@ public class CoalescingRecordListenerTest
         assertTrue(observer.latch.await(1, TimeUnit.SECONDS));
         assertEquals(instance, observer.getLatestImage());
 
-        final int MAX = 10000;
-        for (int i = 0; i < MAX; i++)
+        for (int i = 0; i < 100; i++)
         {
             instance.put(K1, i);
             submap.put(K2, LongValue.valueOf(i));
@@ -116,15 +111,12 @@ public class CoalescingRecordListenerTest
             @Override
             public Object expect()
             {
-                return (long) (MAX - 1);
+                return 99L;
             }
         });
 
         // verify coalescing worked - we should not get 99 updates!
-        final int size = observer.changes.size();
-        final int limit = (int) (MAX * 0.95);
-        System.err.println("testSimpleCoalescing checking " + size + " < " + limit);
-        assertTrue("Got: " + size, size < limit);
+        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 70);
         assertEquals(instance, observer.getLatestImage());
     }
 
@@ -202,13 +194,10 @@ public class CoalescingRecordListenerTest
             @Override
             public Object expect()
             {
-                return 0l;
+                return 0L;
             }
         });
 
-        final int size = observer.changes.size();
-        final int limit = recordCount / 10;
-        System.err.println("testHeavyLoadCoalescing_100000_updates checking " + size + " < " + limit);
-        assertTrue("Got: " + observer.changes.size(), size < limit);
+        assertTrue("Got: " + observer.changes.size(), observer.changes.size() < 500);
     }
 }

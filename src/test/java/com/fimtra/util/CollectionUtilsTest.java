@@ -16,13 +16,13 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.Deque;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Before;
@@ -43,37 +43,37 @@ public class CollectionUtilsTest
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetIterator()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
+        Map<Long, Long> m = new HashMap<>();
         CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().remove();
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetAdd()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
+        Map<Long, Long> m = new HashMap<>();
         CollectionUtils.unmodifiableEntrySet(m.entrySet()).add(null);
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testUnmodifiableEntrySetIteratorSetValue()
     {
-        Map<Long, Long> m = new HashMap<Long, Long>();
-        m.put(1l, 1l);
-        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().next().setValue(2l);
+        Map<Long, Long> m = new HashMap<>();
+        m.put(1L, 1L);
+        CollectionUtils.unmodifiableEntrySet(m.entrySet()).iterator().next().setValue(2L);
     }
     
     @Test
     public void testNewSetFromString()
     {
-        HashSet<String> expected = new HashSet<String>();
+        HashSet<String> expected = new HashSet<>();
         assertEquals(expected, CollectionUtils.newSetFromString(null, ","));
         
-        expected = new HashSet<String>();
+        expected = new HashSet<>();
         expected.add("");
         assertEquals(expected, CollectionUtils.newSetFromString("", ","));
         assertEquals(expected, CollectionUtils.newSetFromString(" ", ","));
         
-        expected = new HashSet<String>();
+        expected = new HashSet<>();
         expected.add("1");
         expected.add("2");
         expected.add("3");
@@ -81,23 +81,28 @@ public class CollectionUtilsTest
     }
 
     @Test
-    public void testNoopDeque()
+    public void test_emptyIfNull()
     {
-        final Deque<Object> candidate = CollectionUtils.noopDeque();
-
-        assertFalse(candidate.add(""));
-        candidate.addFirst("");
-        candidate.addLast("");
-        assertFalse(candidate.offer(""));
-        assertFalse(candidate.offerFirst(""));
-        assertFalse(candidate.offerLast(""));
-        candidate.push("");
-
-        List<String> l = new ArrayList<>();
-        l.add("");
-        assertFalse(candidate.addAll(l));
-
-        assertEquals(0, candidate.size());
+        final Map m = new HashMap();
+        assertSame(m, CollectionUtils.emptyIfNull(m));
+        assertSame(Collections.EMPTY_MAP, CollectionUtils.emptyIfNull(null));
     }
 
+    @Test
+    public void noopMap()
+    {
+        final Map<String, String> m = CollectionUtils.noopMap();
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
+
+        assertNull(m.put("one", "two"));
+        assertNull(m.put("one", "two"));
+        // will still be empty
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
+
+        assertNull(m.remove("one"));
+        assertTrue(m.isEmpty());
+        assertEquals(0, m.size());
+    }
 }

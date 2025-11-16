@@ -15,16 +15,19 @@
  */
 package com.fimtra.channel;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import com.fimtra.tcpchannel.TcpChannel;
 import com.fimtra.tcpchannel.TcpServer;
 import com.fimtra.tcpchannel.TestTcpServer.EchoReceiver;
 import com.fimtra.tcpchannel.TestTcpServer.NoopReceiver;
+import com.fimtra.util.Pair;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -84,6 +87,9 @@ public class TestChannelWatchdog
 
         Thread.sleep(PERIOD + 2);
 
+        final List<Pair<Integer, String>> channelStats = candidate.getChannelStats();
+        assertEquals("Got: " + channelStats, 4, channelStats.size());
+
         client.destroy("unit test shutdown");
         // assertTrue(clientClosedLatch.await(5, TimeUnit.SECONDS));
 
@@ -91,6 +97,10 @@ public class TestChannelWatchdog
         Thread.sleep(PERIOD * 10);
         assertFalse(candidate.channels.contains(client));
         assertTrue("Got: " + candidate.channels, candidate.channels.contains(client2));
+
+        assertEquals(2, candidate.getChannelStats()
+                .size());
+
         client.destroy("unit test");
         client2.destroy("unit test");
         server.destroy();

@@ -51,10 +51,11 @@ public abstract class FileUtils
         private final String[] allowedFileExtensions;
 
         /**
-         * Filters files that have an allowed file extension. Lowercase and uppercase extensions are
-         * ignored, so .ext, .EXT, .eXt are all matched.
+         * Filters files that have an allowed file extension. Lowercase and uppercase extensions are ignored,
+         * so .ext, .EXT, .eXt are all matched.
          *
-         * @param allowedFileExtensions the extenstions to allow, specified <b>without a "."</b> so "ext" NOT ".ext"
+         * @param allowedFileExtensions the extenstions to allow, specified <b>without a "."</b> so "ext" NOT
+         *                              ".ext"
          */
         public ExtensionFileFilter(String... allowedFileExtensions)
         {
@@ -100,8 +101,8 @@ public abstract class FileUtils
     }
 
     /**
-     * @return a {@link List} of {@link File}s in a directory with {@link File}s that are filtered
-     * using the fileFilter.
+     * @return a {@link List} of {@link File}s in a directory with {@link File}s that are filtered using the
+     * fileFilter.
      * @throws IllegalArgumentException if the directory parameter is not a filesystem directory.
      */
     public static File[] readFiles(File directory, FileFilter fileFilter)
@@ -114,8 +115,8 @@ public abstract class FileUtils
     }
 
     /**
-     * Copies, recursively, the contents of the srcDir to the targetDir. This creates the targetDir
-     * if it does not exist.
+     * Copies, recursively, the contents of the srcDir to the targetDir. This creates the targetDir if it does
+     * not exist.
      * <p>
      * This is non-atomic.
      */
@@ -144,8 +145,8 @@ public abstract class FileUtils
     }
 
     /**
-     * Deletes all files in the directory, recursively deleting sub-directories of this directory.
-     * Depth first scanning.
+     * Deletes all files in the directory, recursively deleting sub-directories of this directory. Depth first
+     * scanning.
      * <p>
      * This is non-atomic.
      */
@@ -171,8 +172,7 @@ public abstract class FileUtils
     }
 
     /**
-     * Deletes the file, recursively scanning sub-directories if its a directory. Depth first
-     * scanning.
+     * Deletes the file, recursively scanning sub-directories if its a directory. Depth first scanning.
      * <p>
      * This is non-atomic.
      */
@@ -236,8 +236,8 @@ public abstract class FileUtils
     }
 
     /**
-     * Archives all files that are in the log directory that are olderThanMinutes. Each archived file is gzipped, suffixed with
-     * .gz and put into the archive directory.
+     * Archives all files that are in the log directory that are olderThanMinutes. Each archived file is
+     * gzipped, suffixed with .gz and put into the archive directory.
      */
     public static void archiveLogs(long olderThanMinutes)
     {
@@ -305,10 +305,9 @@ public abstract class FileUtils
 
     private static void fastCopyFile(final File sourceFile, final File targetFile) throws IOException
     {
-        try (FileInputStream fileInputStream = new FileInputStream(sourceFile);
-             FileChannel sourceChannel = fileInputStream.getChannel();
-             FileOutputStream fileOutputStream = new FileOutputStream(targetFile);
-             FileChannel destinationChannel = fileOutputStream.getChannel())
+        try (FileInputStream fileInputStream = new FileInputStream(
+                sourceFile); FileChannel sourceChannel = fileInputStream.getChannel(); FileOutputStream fileOutputStream = new FileOutputStream(
+                targetFile); FileChannel destinationChannel = fileOutputStream.getChannel())
         {
             sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);
         }
@@ -407,8 +406,7 @@ public abstract class FileUtils
     }
 
     /**
-     * Delete files in the directory that have the prefix and are older than the specified number of
-     * minutes.
+     * Delete files in the directory that have the prefix and are older than the specified number of minutes.
      *
      * @param directory                 the directory to scan
      * @param olderThanMinutes          the age in minutes for files to delete

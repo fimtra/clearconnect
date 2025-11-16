@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,11 +15,18 @@
  */
 package com.fimtra.datafission.core;
 
+import static com.fimtra.datafission.core.StringProtocolCodec.CHAR_ESCAPE;
+import static com.fimtra.datafission.core.StringProtocolCodec.DECODING_BUFFERS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +45,7 @@ import org.junit.Test;
 
 /**
  * Tests for the {@link StringProtocolCodec}
- * 
+ *
  * @author Ramon Servadei
  */
 public class StringProtocolCodecTest extends CodecBaseTest
@@ -59,15 +66,25 @@ public class StringProtocolCodecTest extends CodecBaseTest
         String value = "some value \\|| with | delimiters \\/ |\\ |/";
         StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
-        assertEquals(value, unescape);
+        assertEquals(value, unescape(sb.toString()));
     }
 
     private static char[] prepareEscapeCharArr()
     {
         final char[] cs = new char[2];
-        cs[0] = StringProtocolCodec.CHAR_ESCAPE;
+        cs[0] = CHAR_ESCAPE;
         return cs;
+    }
+
+    @Test
+    public void testUnmappedChars() throws CharacterCodingException
+    {
+        final String stringWithUnmapped =
+                "bad number:" + new DecimalFormat("0.0#######").format(Double.NaN) + " something";
+        final Charset defaultCharset = Charset.defaultCharset();
+        StringProtocolCodec.ENCODING_BUFFERS.get().getEncoder(
+                defaultCharset == StandardCharsets.UTF_8 ? StandardCharsets.ISO_8859_1 :
+                        StandardCharsets.UTF_8).encode(CharBuffer.wrap(stringWithUnmapped));
     }
 
     @Test
@@ -76,8 +93,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         String value = "||||||||";
         StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
-        assertEquals(value, unescape);
+        assertEquals(value, unescape(sb.toString()));
     }
 
     @Test
@@ -86,8 +102,7 @@ public class StringProtocolCodecTest extends CodecBaseTest
         String value = "special char ending \\";
         StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
-        String unescape = StringProtocolCodec.stringFromCharBuffer(sb.toString().toCharArray(), 0, sb.toString().length());
-        assertEquals(value, unescape);
+        assertEquals(value, unescape(sb.toString()));
     }
 
     @Test
@@ -99,9 +114,17 @@ public class StringProtocolCodecTest extends CodecBaseTest
         String escaped = sb.toString();
         assertFalse(escaped.contains("\r"));
         assertFalse(escaped.contains("\n"));
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray(), 0, sb.toString().length());
-        assertEquals(value, unescape);
+        assertEquals(value, unescape(escaped));
     }
+
+    private static String unescape(String escaped)
+    {
+        final char[] decodedMessage = escaped.toCharArray();
+        final char[] dataArr = new char[decodedMessage.length];
+        return StringProtocolCodec.createString(dataArr,
+                StringProtocolCodec.unescape(decodedMessage, 0, decodedMessage.length, dataArr));
+    }
+
 
     @Test
     public void testStringWithEscapedCRLF()
@@ -109,44 +132,13 @@ public class StringProtocolCodecTest extends CodecBaseTest
         String value = "some value \\|| with \\r\\n | delimiters \\/ |\\ |/";
         StringAppender sb = new StringAppender();
         StringProtocolCodec.escape(value, sb, this.chars, prepareEscapeCharArr());
-        String escaped = sb.toString();
-        String unescape = StringProtocolCodec.stringFromCharBuffer(escaped.toString().toCharArray(), 0, sb.toString().length());
-        assertEquals(value, unescape);
-    }
-
-    @Test
-    public void testEncodeDecodeValue()
-    {
-        char[] chars = StringProtocolCodec.encodeValue(null).toString().toCharArray();
-        char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
-        assertNull("got: " + decodeValue, decodeValue);
-    }
-
-    @Test
-    public void testEncodeDecodeValueWithTextValueUsingSpecialChar()
-    {
-        TextValue value = TextValue.valueOf(StringProtocolCodec.NULL_VALUE);
-        char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
-        char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
-        assertEquals(value, decodeValue);
-    }
-
-    @Test
-    public void testEncodeDecodeValueWithTextValue()
-    {
-        TextValue value = TextValue.valueOf("");
-        char[] chars = StringProtocolCodec.encodeValue(value).toString().toCharArray();
-        char[] tempArr = new char[chars.length];
-        IValue decodeValue = StringProtocolCodec.decodeValue(chars, 0, chars.length, tempArr);
-        assertEquals(value, decodeValue);
+        assertEquals(value, unescape(sb.toString()));
     }
 
     @Test
     public void testGetCommandMessageForRecordNames()
     {
-        String[] args = new String[] { "one", "two", "three", "|\\|\\||special" };
+        String[] args = new String[] { "one", "two", "three", "|\\|\\||special", "$%£" };
         List<String> result =
             StringProtocolCodec.getNamesFromCommandMessage(StringProtocolCodec.getEncodedNamesForCommandMessage(
                 StringProtocolCodec.SUBSCRIBE_COMMAND, args).toCharArray());
@@ -154,7 +146,150 @@ public class StringProtocolCodecTest extends CodecBaseTest
     }
 
     @Test
+    public void testGetCommandMessageForRecordNames_LARGE()
+    {
+        String[] args = new String[] { "one", "two",
+                "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" };
+        List<String> result = StringProtocolCodec.getNamesFromCommandMessage(
+                StringProtocolCodec.getEncodedNamesForCommandMessage(StringProtocolCodec.SUBSCRIBE_COMMAND,
+                                args)
+                        .toCharArray());
+        assertEquals(Arrays.toString(args), Arrays.toString(result.toArray(new String[result.size()])));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_emptyImage()
+    {
+        AtomicChange change = new AtomicChange("empty");
+        change.setScope(IRecordChange.IMAGE_SCOPE_CHAR);
+        change.setSequence(0);
+
+        final IRecordChange result = getRecordChange(change);
+
+        assertEquals(IRecordChange.IMAGE_SCOPE_CHAR, result.getScope());
+        assertEquals(0, result.getSequence());
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleTextValue()
+    {
+        doSingleValueTest("k1", TextValue.valueOf("val1"));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleTextValue_specialChars()
+    {
+        doSingleValueTest("k1=", TextValue.valueOf("val1"));
+        doSingleValueTest("k1\\=", TextValue.valueOf("val1"));
+        doSingleValueTest("k1\\", TextValue.valueOf("val1"));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleBlobValue()
+    {
+        doSingleValueTest("k1", BlobValue.valueOf("val1".getBytes()));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_singleBlobValue_LARGE()
+    {
+        doSingleValueTest("k1", BlobValue.valueOf(
+                ("012345678901234567890123456789012345678901234567890123456789"
+                        + "01234567890123456789012345678901234567890123456789"
+                        + "01234567890123456789012345678901234567890123456789"
+                        + "0123456789012345678901234567890123456789").getBytes()));
+    }
+
+    private void doSingleValueTest(String k1, IValue v1)
+    {
+        AtomicChange change = new AtomicChange("chg");
+        change.mergeEntryUpdatedChange(k1, v1, null);
+
+        final IRecordChange result = getRecordChange(change);
+
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        System.err.println(rec2);
+        assertEquals(1, rec2.size());
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+    }
+
+    private IRecordChange getRecordChange(AtomicChange change)
+    {
+        byte[] txMessageForChange =
+                this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
+        return this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+    }
+
+    @Test
     public void testEncodeDecodeAtomicChange()
+    {
+        final String k1 = "one$£";
+        final String k2 = "two$£";
+        final String k3 = "three$£";
+        final String k4 = "four$£";
+        final LongValue v1 = LongValue.valueOf(1);
+        final DoubleValue v2 = DoubleValue.valueOf(2);
+        final BlobValue v3 = BlobValue.valueOf("$£some value \\|| with \\r\\n | delimiters \\/ |\\ |/".getBytes());
+        final TextValue v4 = TextValue.valueOf("$£23456789-10-0123456789-20-$£23456789-30-0123456789-40-0123456789");
+
+        AtomicChange change = new AtomicChange("change-$£");
+        change.mergeEntryUpdatedChange(k1, v1, null);
+        change.mergeEntryUpdatedChange(k2, v2, null);
+        change.mergeEntryRemovedChange(k3, v3);
+        change.mergeEntryRemovedChange(k4, v4);
+
+        final IRecordChange result = getRecordChange(change);
+
+        Map<String, IValue> map1 = new HashMap<>();
+        map1.put(k1, v3);
+        map1.put(k3, v3);
+        map1.put(k4, v4);
+
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        rec1.putAll(map1);
+
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+        rec2.putAll(map1);
+
+        change.applyTo(rec1);
+        result.applyTo(rec2);
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+        assertFalse(rec1.containsKey(k3));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_withSubmapSpecialCharInName()
+    {
+        final String k1 = "k1";
+        final LongValue v1 = LongValue.valueOf(1);
+
+        AtomicChange change = new AtomicChange("change1");
+        change.mergeEntryUpdatedChange(k1, v1, null);
+        final String subMapKey = "subMap1=1";
+        change.mergeSubMapEntryUpdatedChange(subMapKey, k1, v1, null);
+
+        final IRecordChange result = getRecordChange(change);
+
+        Context c = new Context("test");
+        IRecord rec1 = c.getOrCreateRecord("rec1");
+        IRecord rec2 = c.getOrCreateRecord("rec2");
+
+        change.applyCompleteAtomicChangeToRecord(rec1);
+        result.applyCompleteAtomicChangeToRecord(rec2);
+        System.err.println(rec2);
+        assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
+        assertEquals(v1, rec1.getOrCreateSubMap(subMapKey).get(k1));
+        assertEquals(v1, rec2.getOrCreateSubMap(subMapKey).get(k1));
+    }
+
+    @Test
+    public void testEncodeDecodeAtomicChange_withSubmap()
     {
         final String k1 = "one$£";
         final String k2 = "two$£";
@@ -176,10 +311,9 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeSubMapEntryRemovedChange(subMapKey, k3, v3);
         change.mergeSubMapEntryRemovedChange(subMapKey, k4, v4);
 
-        byte[] txMessageForChange = this.candidate.finalEncode(this.candidate.getTxMessageForAtomicChange(change));
-        IRecordChange result = this.candidate.getAtomicChangeFromRxMessage(ByteBuffer.wrap(txMessageForChange));
+        final IRecordChange result = getRecordChange(change);
 
-        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        Map<String, IValue> map1 = new HashMap<>();
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
@@ -193,10 +327,23 @@ public class StringProtocolCodecTest extends CodecBaseTest
         rec2.putAll(map1);
         rec2.getOrCreateSubMap(subMapKey).putAll(map1);
 
-        change.applyTo(rec1);
-        result.applyTo(rec2);
+        change.applyCompleteAtomicChangeToRecord(rec1);
+        result.applyCompleteAtomicChangeToRecord(rec2);
         assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
         assertFalse(rec1.containsKey(k3));
+        assertEquals(v2, rec1.getOrCreateSubMap(subMapKey).get(k2));
+        assertEquals(v2, rec2.getOrCreateSubMap(subMapKey).get(k2));
+    }
+
+    @Test
+    public void testFragmentedAtomicChange()
+    {
+        final String encoded = "|record|d123|:|submap1|p|k1=L0|:|submap2";
+        final IRecordChange change =
+                StringProtocolCodec.decodeAtomicChange(encoded.toCharArray(), DECODING_BUFFERS.get());
+        assertEquals(
+                "AtomicChange [name=record, d123 subMapAtomicChanges={submap1=AtomicChange [name=submap1, d123, putEntries={=L0}]}]",
+                change.toString());
     }
 
     @Test
@@ -217,17 +364,18 @@ public class StringProtocolCodecTest extends CodecBaseTest
         change.mergeEntryUpdatedChange(k2, v2, null);
         change.mergeEntryRemovedChange(k3, v3);
         change.mergeEntryRemovedChange(k4, v4);
-        change.mergeSubMapEntryUpdatedChange("subMap1", k1, v1, null);
-        change.mergeSubMapEntryUpdatedChange("subMap1", k2, v2, null);
-        change.mergeSubMapEntryRemovedChange("subMap1", k3, v3);
-        change.mergeSubMapEntryRemovedChange("subMap1", k4, v4);
+        final String subMapKey = "subMap1";
+        change.mergeSubMapEntryUpdatedChange(subMapKey, k1, v1, null);
+        change.mergeSubMapEntryUpdatedChange(subMapKey, k2, v2, null);
+        change.mergeSubMapEntryRemovedChange(subMapKey, k3, v3);
+        change.mergeSubMapEntryRemovedChange(subMapKey, k4, v4);
 
         final StringProtocolCodec codec = new StringProtocolCodec();
         IRecordChange result =
             StringProtocolCodec.decodeAtomicChange(new String(StringProtocolCodec.encodeAtomicChange(
-                StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray());
+                StringProtocolCodec.RPC_COMMAND_CHARS, change, codec.getCharset(), codec.getEncodedBytesHandler())).toCharArray(), DECODING_BUFFERS.get());
 
-        Map<String, IValue> map1 = new HashMap<String, IValue>();
+        Map<String, IValue> map1 = new HashMap<>();
         map1.put(k1, v3);
         map1.put(k3, v3);
         map1.put(k4, v4);
@@ -235,16 +383,18 @@ public class StringProtocolCodecTest extends CodecBaseTest
         Context c = new Context("test");
         IRecord rec1 = c.getOrCreateRecord("rec1");
         rec1.putAll(map1);
-        rec1.getOrCreateSubMap("subMap1").putAll(map1);
+        rec1.getOrCreateSubMap(subMapKey).putAll(map1);
 
         IRecord rec2 = c.getOrCreateRecord("rec2");
         rec2.putAll(map1);
-        rec2.getOrCreateSubMap("subMap1").putAll(map1);
+        rec2.getOrCreateSubMap(subMapKey).putAll(map1);
 
-        change.applyTo(rec1);
-        result.applyTo(rec2);
+        change.applyCompleteAtomicChangeToRecord(rec1);
+        result.applyCompleteAtomicChangeToRecord(rec2);
         assertEquals(rec1.asFlattenedMap(), rec2.asFlattenedMap());
         assertFalse(rec1.containsKey(k3));
+        assertEquals(v2, rec1.getOrCreateSubMap(subMapKey).get(k2));
+        assertEquals(v2, rec2.getOrCreateSubMap(subMapKey).get(k2));
     }
 
     @Test
@@ -351,7 +501,6 @@ public class StringProtocolCodecTest extends CodecBaseTest
         )
         {
             sb.append(valueToSend);
-            return;
         }
     }
 }

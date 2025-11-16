@@ -15,31 +15,19 @@
  */
 package com.fimtra.datafission.field;
 
-import com.fimtra.datafission.DataFissionProperties;
+import static com.fimtra.datafission.field.CachedLongValue.NEG_POOL;
+import static com.fimtra.datafission.field.CachedLongValue.POS_POOL;
+
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
-import com.fimtra.util.is;
 
 /**
  * The IValue for a long.
  * 
  * @author Ramon Servadei
  */
-public final class LongValue extends AbstractValue
+public class LongValue extends AbstractValue
 {
-    static final int POOL_SIZE = DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;
-    static final LongValue[] pool = new LongValue[POOL_SIZE];
-    static final int poolTop = POOL_SIZE / 2;
-    static final int poolBottom = -((POOL_SIZE / 2) - 1);
-    static
-    {
-        int j = 0;
-        for (int i = poolBottom; i <= poolTop; i++)
-        {
-            pool[j++] = new LongValue(i);
-        }
-    }
-
     /**
      * Get a canonical {@link LongValue} for the value from a pool. If the pool does not contain an
      * instance for this value this returns a new instance.
@@ -51,9 +39,17 @@ public final class LongValue extends AbstractValue
      */
     public static LongValue valueOf(long value)
     {
-        if (value >= poolBottom && value <= poolTop)
+        // get permanent cached -2048 to 2048
+        if (value >= 0)
         {
-            return pool[(int) value - poolBottom];
+            if (value < POS_POOL.length)
+            {
+                return POS_POOL[(int) value];
+            }
+        }
+        else if (-value < NEG_POOL.length)
+        {
+            return NEG_POOL[(int) -value];
         }
         return new LongValue(value);
     }
@@ -82,26 +78,26 @@ public final class LongValue extends AbstractValue
         this(0);
     }
 
-    private LongValue(long value)
+    LongValue(long value)
     {
         super();
         this.value = value;
     }
 
     @Override
-    public TypeEnum getType()
+    public final TypeEnum getType()
     {
         return TypeEnum.LONG;
     }
 
     @Override
-    public long longValue()
+    public final long longValue()
     {
         return this.value;
     }
 
     @Override
-    public double doubleValue()
+    public final double doubleValue()
     {
         return this.value;
     }
@@ -109,143 +105,63 @@ public final class LongValue extends AbstractValue
     @Override
     public String textValue()
     {
-        return Long.toString(this.value);
-    }
-    
-    @Override
-    public final StringAppender toStringAppender()
-    {
-        return appendTo(new StringAppender());
-    }
-    
-    @Override
-    public int hashCode()
-    {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (int) (this.value ^ (this.value >>> 32));
-        return result;
+        // just return Long.toString value
+        // ...hard to beat this as it uses String internal constructor to share the char[]
+        // ...any other way has a 2x char[] construction cost...
+       return Long.toString(value);
     }
 
     @Override
-    public boolean equals(Object obj)
+    public final StringAppender toStringAppender()
     {
-        if (is.same(this, obj))
+        // includes the plus 1 for the LONG_CODE
+        final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
+                LongValueCodec.stringSize(value));
+        final StringAppender appender = new StringAppender(digitCount);
+        final char[] buf = appender.reserveAndGet(digitCount);
+        buf[0] = IValue.LONG_CODE;
+        LongValueCodec.writeToCharArray(value, buf, 1, digitCount);
+        return appender;
+    }
+
+    @Override
+    public final int hashCode()
+    {
+        return (int) (this.value ^ (this.value >>> 32));
+    }
+
+    @Override
+    public final boolean equals(Object obj)
+    {
+        if (this == obj)
         {
             return true;
         }
-        if (is.differentClass(this, obj))
+
+        if (!(obj instanceof LongValue))
         {
             return false;
         }
-        LongValue other = (LongValue) obj;
-        return is.eq(this.value, other.value);
+
+        return value == ((LongValue) obj).value;
     }
 
     public static IValue valueOf(char[] chars, int start, int len)
     {
-        return LongValue.valueOf(parseLong(chars, start, len));
-    }
-
-    private static long parseLong(char[] chars, int start, int length) throws NumberFormatException
-    {
-        if (chars == null)
-        {
-            throw new NumberFormatException("null");
-        }
-
-        long result = 0;
-        boolean negative = false;
-        int i = start, len = start + length;
-        long limit = -Long.MAX_VALUE;
-        long multmin;
-        int digit;
-
-        if (len > 0)
-        {
-            char firstChar = chars[i];
-            if (firstChar < '0')
-            {
-                // Possible leading "+" or "-"
-                if (firstChar == '-')
-                {
-                    negative = true;
-                    limit = Long.MIN_VALUE;
-                }
-                else
-                {
-                    if (firstChar != '+')
-                    {
-                        throw new NumberFormatException(new String(chars, start, len));
-                    }
-                }
-                if (len == 1)
-                { // Cannot have lone "+" or "-"
-                    throw new NumberFormatException(new String(chars, start, len));
-                }
-                i++;
-            }
-            multmin = (long) (limit * 0.1d);
-            while (i < len)
-            {
-                // Accumulating negatively avoids surprises near MAX_VALUE
-                switch(chars[i++])
-                {
-                    case '0':
-                        digit = 0;
-                        break;
-                    case '1':
-                        digit = 1;
-                        break;
-                    case '2':
-                        digit = 2;
-                        break;
-                    case '3':
-                        digit = 3;
-                        break;
-                    case '4':
-                        digit = 4;
-                        break;
-                    case '5':
-                        digit = 5;
-                        break;
-                    case '6':
-                        digit = 6;
-                        break;
-                    case '7':
-                        digit = 7;
-                        break;
-                    case '8':
-                        digit = 8;
-                        break;
-                    case '9':
-                        digit = 9;
-                        break;
-                    default :
-                        throw new NumberFormatException(new String(chars, start, len));
-                }
-                if (result < multmin)
-                {
-                    throw new NumberFormatException(new String(chars, start, len));
-                }
-                result *= 10;
-                if (result < limit + digit)
-                {
-                    throw new NumberFormatException(new String(chars, start, len));
-                }
-                result -= digit;
-            }
-        }
-        else
-        {
-            throw new NumberFormatException(new String(chars, start, len));
-        }
-        return negative ? result : -result;
+        return LongValue.valueOf(LongValueCodec.fromCharArray(chars, start, len));
     }
 
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(getType().toString()).append(this.value);
+        // includes the plus 1 for the LONG_CODE
+        final int digitCount = (value < 0 ? LongValueCodec.stringSize(-value) + 1 :
+                LongValueCodec.stringSize(value));
+        int start = stringAppender.getLength();
+        final char[] buf = stringAppender.reserveAndGet(digitCount);
+        final int len = start + digitCount;
+        buf[start++] = IValue.LONG_CODE;
+        LongValueCodec.writeToCharArray(value, buf, start, len);
+        return stringAppender;
     }
 }

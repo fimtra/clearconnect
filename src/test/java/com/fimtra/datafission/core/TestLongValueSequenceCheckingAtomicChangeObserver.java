@@ -36,7 +36,7 @@ import junit.framework.TestCase;
 class TestLongValueSequenceCheckingAtomicChangeObserver implements IRecordListener
 {
     CountDownLatch latch;
-    List<String> errors = new ArrayList<String>(1);
+    List<String> errors = new ArrayList<>(1);
     IRecordChange lastAtomicChange;
 
     TestLongValueSequenceCheckingAtomicChangeObserver()

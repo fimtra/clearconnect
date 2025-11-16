@@ -47,4 +47,25 @@ public class ExceptionUtilsTest {
 			System.out.println(stack);
 		}
 	}
+
+	@Test
+	public void test_handleInterruptedException()
+	{
+		try
+		{
+			Thread.currentThread()
+					.interrupt();
+			assertTrue(Thread.interrupted());
+			assertFalse(Thread.interrupted());
+
+			Thread.currentThread()
+					.interrupt();
+			throw new InterruptedException();
+		}
+		catch (InterruptedException e)
+		{
+			ExceptionUtils.handleInterruptedException(ExceptionUtilsTest.class, e, "interrupted");
+		}
+		assertFalse(Thread.interrupted());
+	}
 }

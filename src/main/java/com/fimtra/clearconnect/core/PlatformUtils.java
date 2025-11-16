@@ -15,7 +15,13 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.core.PlatformRegistry.IRegistryRecordNames.*;
+import static com.fimtra.tcpchannel.TcpChannelUtils.LOCALHOST_IP;
+
+import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,8 +74,8 @@ import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelProperties;
-import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.ClassUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.LazyObject.IDestructor;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -103,7 +109,7 @@ public class PlatformUtils
                     final String[] tokens = version.split(newline);
                     for (String token : tokens)
                     {
-                        if (token.toLowerCase().startsWith("version"))
+                        if (token.toLowerCase().startsWith("version", 0))
                         {
                             version = token;
                             break;
@@ -145,9 +151,13 @@ public class PlatformUtils
             "Developers: ramon.servadei@fimtra.com, paul.mackinlay@fimtra.com, james.lupton@fimtra.com").append(
                 newline).append(newline);
 
-        sb.append("Localhost IP: ").append(TcpChannelUtils.LOCALHOST_IP).append(newline);
+        sb.append("Localhost IP: ").append(LOCALHOST_IP).append(newline);
         sb.append("CPU logical count: ").append(Runtime.getRuntime().availableProcessors()).append(newline);
-        sb.append("TCP reader thread count: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT);
+        sb.append("System thread limit: ").append(DataFissionProperties.Values.SYSTEM_THREAD_COUNT).append(newline);
+        sb.append("Core thread limit: ").append(DataFissionProperties.Values.CORE_THREAD_COUNT).append(newline);
+        sb.append("RPC thread limit: ").append(DataFissionProperties.Values.RPC_THREAD_COUNT).append(newline);
+        sb.append("TCP reader thread limit: ").append(TcpChannelProperties.Values.READER_THREAD_COUNT).append(newline);
+        sb.append("TCP writer thread limit: ").append(TcpChannelProperties.Values.WRITER_THREAD_COUNT);
         Log.banner(PlatformUtils.class, sb.toString());
 
         String versionNumber = "?.?.?";
@@ -166,6 +176,22 @@ public class PlatformUtils
     static final String SERVICE_INSTANCE_PREFIX = "[";
     static final String SERVICE_INSTANCE_SUFFIX = "]";
     static final String SERVICE_CLIENT_DELIMITER = "->";
+    private static final String LOCALHOST_NAME;
+
+    static
+    {
+        final String hostAddress;
+        try
+        {
+            hostAddress = InetAddress.getLocalHost()
+                    .getHostName();
+        }
+        catch (UnknownHostException e)
+        {
+            throw new RuntimeException("Could not get host address", e);
+        }
+        LOCALHOST_NAME = hostAddress;
+    }
 
     /**
      * Used to provide an efficient "one-shot" latch
@@ -210,13 +236,13 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services are discovered.
      */
     static NotifyingCache<IServiceAvailableListener, String> createServiceAvailableNotifyingCache(
-        final IObserverContext context, final String servicesRecordName, final Object logContext)
+        final IObserverContext context, final Object logContext)
     {
         final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners =
             new NotifyingCache<IServiceAvailableListener, String>(
-                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), servicesRecordName))
+                (IDestructor) (ref) -> context.removeObserver(listenerReference.get(), SERVICES))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceAvailableListener listener, String key, String data)
@@ -244,7 +270,7 @@ public class PlatformUtils
                     toLog.add(serviceFamily);
                 }
             }
-            if (toLog.size() > 0)
+            if (!toLog.isEmpty())
             {
                 Log.log(logContext, "Services available: ", toLog.toString());
             }
@@ -261,15 +287,15 @@ public class PlatformUtils
                     toLog.add(serviceFamily);
                 }
             }
-            if (toLog.size() > 0)
+            if (!toLog.isEmpty())
             {
                 Log.log(logContext, "Services lost: ", toLog.toString());
             }
             updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
-        context.addObserver(observer, servicesRecordName);
-        awaitUpdateLatch(logContext, servicesRecordName, updateWaitLatch);
+        context.addObserver(observer, SERVICES);
+        awaitUpdateLatch(logContext, SERVICES, updateWaitLatch);
         return serviceAvailableListeners;
     }
 
@@ -277,14 +303,14 @@ public class PlatformUtils
      * Construct a {@link NotifyingCache} that handles when services INSTANCES are discovered.
      */
     static NotifyingCache<IServiceInstanceAvailableListener, String> createServiceInstanceAvailableNotifyingCache(
-        final IObserverContext context, final String serviceInstancesPerServiceRecordName, final Object logContext)
+        final IObserverContext context, final Object logContext)
     {
         final AtomicReference<IRecordListener> listenerReference = new AtomicReference<>();
         final OneShotLatch updateWaitLatch = new OneShotLatch();
         final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners =
             new NotifyingCache<IServiceInstanceAvailableListener, String>(
                 (IDestructor) (ref) -> context.removeObserver(listenerReference.get(),
-                    serviceInstancesPerServiceRecordName))
+                        SERVICE_INSTANCES_PER_SERVICE_FAMILY))
             {
                 @Override
                 protected void notifyListenerDataAdded(IServiceInstanceAvailableListener listener, String key,
@@ -307,16 +333,18 @@ public class PlatformUtils
              */
             IRecordChange changesForService;
             String serviceInstanceId;
+            Set<String> newServices;
+            Set<String> removedServices;
             for (String serviceFamily : atomicChange.getSubMapKeys())
             {
                 changesForService = atomicChange.getSubMapAtomicChange(serviceFamily);
-                Set<String> newServices = changesForService.getPutEntries().keySet();
+                newServices = changesForService.getPutEntries().keySet();
                 for (String serviceMember : newServices)
                 {
                     serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
                     serviceInstanceAvailableListeners.notifyListenersDataAdded(serviceInstanceId, serviceInstanceId);
                 }
-                Set<String> removedServices = changesForService.getRemovedEntries().keySet();
+                removedServices = changesForService.getRemovedEntries().keySet();
                 for (String serviceMember : removedServices)
                 {
                     serviceInstanceId = PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
@@ -326,8 +354,8 @@ public class PlatformUtils
             updateWaitLatch.countDown();
         };
         listenerReference.set(observer);
-        context.addObserver(observer, serviceInstancesPerServiceRecordName);
-        awaitUpdateLatch(logContext, serviceInstancesPerServiceRecordName, updateWaitLatch);
+        context.addObserver(observer, SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+        awaitUpdateLatch(logContext, SERVICE_INSTANCES_PER_SERVICE_FAMILY, updateWaitLatch);
         return serviceInstanceAvailableListeners;
     }
 
@@ -357,12 +385,12 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Set<String> newRecords = atomicChange.getPutEntries().keySet();
+            final Set<String> newRecords = atomicChange.getPutEntries().keySet();
             for (String recordName : newRecords)
             {
                 recordAvailableNotifyingCache.notifyListenersDataAdded(recordName, recordName);
             }
-            Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
+            final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
             for (String recordName : removedRecords)
             {
                 recordAvailableNotifyingCache.notifyListenersDataRemoved(recordName);
@@ -402,10 +430,11 @@ public class PlatformUtils
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
             Log.log(logContext, "RPC change: " + atomicChange.toString());
-            Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
+            IRpcInstance rpc;
+            final Set<Entry<String, IValue>> newRpcs = atomicChange.getPutEntries().entrySet();
             for (Entry<String, IValue> newRpc : newRpcs)
             {
-                final IRpcInstance rpc = context.getRpc(newRpc.getKey());
+                rpc = context.getRpc(newRpc.getKey());
                 if (rpc != null)
                 {
                     if (rpcAvailableNotifyingCache.notifyListenersDataAdded(rpc.getName(), rpc))
@@ -420,7 +449,7 @@ public class PlatformUtils
                         ObjectUtils.safeToString(logContext));
                 }
             }
-            Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
+            final Set<Entry<String, IValue>> removedRpcs = atomicChange.getRemovedEntries().entrySet();
             for (Entry<String, IValue> removedRpc : removedRpcs)
             {
                 if (rpcAvailableNotifyingCache.notifyListenersDataRemoved(removedRpc.getKey()))
@@ -465,33 +494,30 @@ public class PlatformUtils
                 }
             };
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
-            for (Entry<String, IValue> subsription : subscriptions)
+            final Set<Entry<String, IValue>> subscriptions = atomicChange.getPutEntries().entrySet();
+            IValue previous;
+            int previousSubscriberCount;
+            for (Entry<String, IValue> subscription : subscriptions)
             {
-                IValue previous = atomicChange.getOverwrittenEntries().get(subsription.getKey());
-                int previousSubscriberCount = 0;
+                previousSubscriberCount = 0;
+                previous = atomicChange.getOverwrittenEntries().get(subscription.getKey());
                 if (previous != null)
                 {
                     previousSubscriberCount = (int) previous.longValue();
                 }
-                int currentSubscriberCount = (int) subsription.getValue().longValue();
-                SubscriptionInfo info =
-                    new SubscriptionInfo(subsription.getKey(), currentSubscriberCount, previousSubscriberCount);
-                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
+                subscriptionNotifyingCache.notifyListenersDataAdded(subscription.getKey(),
+                        new SubscriptionInfo(subscription.getKey(), (int) subscription.getValue().longValue(),
+                                previousSubscriberCount));
             }
 
-            Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
+            final Set<Entry<String, IValue>> removedSubscriptions = atomicChange.getRemovedEntries().entrySet();
             for (Entry<String, IValue> removed : removedSubscriptions)
             {
-                int currentSubscriberCount = 0;
-                int previousSubscriberCount = (int) removed.getValue().longValue();
-                SubscriptionInfo info =
-                    new SubscriptionInfo(removed.getKey(), currentSubscriberCount, previousSubscriberCount);
-                subscriptionNotifyingCache.notifyListenersDataAdded(info.getRecordName(), info);
-                if (currentSubscriberCount == 0)
-                {
-                    subscriptionNotifyingCache.notifyListenersDataRemoved(info.getRecordName());
-                }
+                // notify no more subscribers
+                subscriptionNotifyingCache.notifyListenersDataAdded(removed.getKey(),
+                        new SubscriptionInfo(removed.getKey(), 0, (int) removed.getValue().longValue()));
+                // notify that the data is removed from the cache
+                subscriptionNotifyingCache.notifyListenersDataRemoved(removed.getKey());
             }
             updateWaitLatch.countDown();
         };
@@ -732,20 +758,69 @@ public class PlatformUtils
     }
 
     /**
-     * @return a string in the form <tt>'name[0]@canonical_host_name'</tt>. <br>
-     *         If there are no name arguments, the 'name' is the calling class.
+     * @return a string in the form <tt>'name[0]@canonical_host_name'</tt>. <br> If there are no name
+     * arguments, the 'name' is the calling class. If name[0] already contains '@' and the host name, it is
+     * returned as is. <br>
      */
     public static String composeHostQualifiedName(String... name)
     {
         try
         {
-            return (name == null || name.length == 0 ? ThreadUtils.getIndirectCallingClassSimpleName() : name[0]) + "@"
-                + TcpChannelUtils.LOCALHOST_IP;
+            final String root =
+                    name == null || name.length == 0 ? ThreadUtils.getIndirectCallingClassSimpleName() :
+                            name[0];
+            if (root.indexOf('@') > -1 && (root.contains(LOCALHOST_IP) || root.contains(LOCALHOST_NAME)))
+            {
+                // don't add the host
+                return root;
+            }
+            return root + "@" + LOCALHOST_IP;
         }
         catch (Exception e)
         {
             Log.log(PlatformRegistryAgent.class, "Could not create default name", e);
             return "default:" + System.currentTimeMillis();
+        }
+    }
+
+    static String addProcessId(String processName)
+    {
+        return doAddProcessId(processName, ManagementFactory.getRuntimeMXBean()
+                .getName());
+    }
+
+    static String doAddProcessId(String processName, String jvmName)
+    {
+        final int jvmNameHostIndex = jvmName.indexOf('@');
+        final int processNameHostIndex = processName.indexOf('@');
+        if (jvmNameHostIndex > -1 && (jvmName.contains(LOCALHOST_IP) || jvmName.contains(LOCALHOST_NAME)))
+        {
+            final String pid = jvmName.substring(0, jvmNameHostIndex);
+            final String hostName = jvmName.substring(jvmNameHostIndex + 1);
+            if (processNameHostIndex > -1)
+            {
+                // processName has hostname, just add process id
+                return processName + "#" + pid;
+            }
+            else
+            {
+                return processName + "@" + hostName + "#" + pid;
+            }
+        }
+        else
+        {
+            // there is no host in the jvmName (its probably just a pid)
+            if (processNameHostIndex > -1 && (processName.contains(LOCALHOST_IP) || processName.contains(
+                    LOCALHOST_NAME)))
+            {
+                // processName has hostname, just add process id
+                return processName + "#" + jvmName;
+            }
+            else
+            {
+                // processName has no hostname, add it
+                return processName + "@" + LOCALHOST_IP + "#" + jvmName;
+            }
         }
     }
 
@@ -813,6 +888,9 @@ public class PlatformUtils
         return new String[] { platformServiceInstanceID.substring(0, index), platformServiceInstanceID.substring(
             index + SERVICE_INSTANCE_PREFIX.length(), length - SERVICE_INSTANCE_SUFFIX.length()) };
     }
+
+    public static final int DECOMPOSED_SERVICE_NAME_INDEX = 0;
+    public static final int DECOMPOSED_SERVICE_INSTANCE_NAME_INDEX = 0;
 
     /**
      * Convenience method to execute the RPC hosted by the service component - this waits for the
@@ -915,7 +993,8 @@ public class PlatformUtils
             }
             catch (InterruptedException e)
             {
-                // we don't care!
+                ExceptionUtils.handleInterruptedException(PlatformUtils.class, e,
+                        "Interrupted waiting for RPC: " + rpcName);
             }
         }
         finally
@@ -957,7 +1036,8 @@ public class PlatformUtils
         }
         catch (InterruptedException e)
         {
-            // ignore
+            ExceptionUtils.handleInterruptedException(logContext, e,
+                    "Interrupted waiting for update latch: " + recordName);
         }
     }
 
@@ -993,7 +1073,7 @@ public class PlatformUtils
      */
     public static boolean isClearConnectRecord(String recordName)
     {
-        return (ContextUtils.isSystemRecordName(recordName))
-            || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName);
+        return recordName != null && ((ContextUtils.isSystemRecordName(recordName))
+            || PlatformServiceInstance.SERVICE_STATS_RECORD_NAME.equals(recordName));
     }
 }

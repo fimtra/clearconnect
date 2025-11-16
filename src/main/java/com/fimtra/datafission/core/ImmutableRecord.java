@@ -199,7 +199,7 @@ public class ImmutableRecord implements IRecord
     @Override
     public Map<String, IValue> getOrCreateSubMap(String subMapKey)
     {
-        if (this.backingRecord.subMaps.keySet().contains(subMapKey))
+        if (this.backingRecord.subMaps.containsKey(subMapKey))
         {
             return new ImmutableSubmap((SubMap) this.backingRecord.subMaps.get(subMapKey));
         }
@@ -219,11 +219,10 @@ public class ImmutableRecord implements IRecord
         return "(Immutable)" + this.backingRecord.toString();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T extends IValue> T get(String key)
     {
-        return (T) this.backingRecord.get(key);
+        return this.backingRecord.get(key);
     }
 
     @Override

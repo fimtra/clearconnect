@@ -87,4 +87,22 @@ public interface ITransportChannel
      * @return the transmission queue size
      */
     int getTxQueueSize();
+
+    /**
+     * @return the number of messages published
+     */
+    default long getMessagesPublished()
+    {
+        // to allow backwards API compatibility
+        return 0L;
+    }
+
+    /**
+     * @return the number of bytes published
+     */
+    default long getBytesPublished()
+    {
+        // to allow backwards API compatibility
+        return 0L;
+    }
 }

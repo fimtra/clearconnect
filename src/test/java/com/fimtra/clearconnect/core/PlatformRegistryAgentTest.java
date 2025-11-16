@@ -15,7 +15,6 @@
  */
 package com.fimtra.clearconnect.core;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -24,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.fimtra.channel.ChannelUtils;
 import com.fimtra.channel.EndPointAddress;
-import com.fimtra.channel.TransportTechnologyEnum;
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
@@ -72,6 +70,7 @@ public class PlatformRegistryAgentTest
         final IPlatformServiceInstance platformServiceInstance1 =
             this.candidate.getPlatformServiceInstance(serviceFamily, serviceMember);
 
+
         Thread.sleep(1000);
 
         // restart the registry
@@ -95,6 +94,7 @@ public class PlatformRegistryAgentTest
         }));
 
         assertTrue("Not re-connected", connected.await(10, TimeUnit.SECONDS));
+
         assertTrue(platformServiceInstance1.isActive());
     }
 

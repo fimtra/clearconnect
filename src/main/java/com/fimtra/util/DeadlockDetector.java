@@ -30,8 +30,6 @@ import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.fimtra.executors.ContextExecutorFactory;
-
 /**
  * Uses a {@link ThreadMXBean} to detect deadlocks.
  * <p>
@@ -42,14 +40,16 @@ import com.fimtra.executors.ContextExecutorFactory;
  *
  * @author Ramon Servadei
  */
-public final class DeadlockDetector {
+public final class DeadlockDetector
+{
     /**
      * An observer that receives events when threads are deadlocked. Registered via {@link
      * DeadlockDetector#newDeadlockDetectorTask(long, DeadlockObserver, boolean)}
      *
      * @author Ramon Servadei
      */
-    public static interface DeadlockObserver {
+    public interface DeadlockObserver
+    {
         void onDeadlockFound(ThreadInfoWrapper[] deadlocks);
     }
 
@@ -91,7 +91,8 @@ public final class DeadlockDetector {
             staticFile = null;
         }
 
-        final Runnable task = new Runnable() {
+        final Runnable task = new Runnable()
+        {
             final DeadlockDetector deadlockDetector = new DeadlockDetector();
 
             @Override
@@ -103,9 +104,9 @@ public final class DeadlockDetector {
                     if (threads != null)
                     {
                         final StringBuilder sb = new StringBuilder(1024);
-                        for (int i = 0; i < threads.length; i++)
+                        for (ThreadInfoWrapper thread : threads)
                         {
-                            sb.append(threads[i].toString());
+                            sb.append(thread.toString());
                         }
                         if (appender != null)
                         {
@@ -116,19 +117,14 @@ public final class DeadlockDetector {
                         }
                         else
                         {
-                            PrintWriter staticThreadDump = new PrintWriter(staticFile);
-                            try
+                            try (PrintWriter staticThreadDump = new PrintWriter(staticFile))
                             {
                                 final StringBuilder header = new StringBuilder();
-                                header.append("========  ").append(new Date().toString()).append(
-                                        "  ======").append(SystemUtils.lineSeparator());
+                                header.append("========  ").append(new Date()).append("  ======").append(
+                                        SystemUtils.lineSeparator());
                                 staticThreadDump.print(header);
                                 staticThreadDump.print(sb);
                                 staticThreadDump.flush();
-                            }
-                            finally
-                            {
-                                staticThreadDump.close();
                             }
                         }
                     }
@@ -138,9 +134,9 @@ public final class DeadlockDetector {
                     {
                         final StringBuilder sb = new StringBuilder(1024);
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
-                        for (int i = 0; i < deadlocks.length; i++)
+                        for (ThreadInfoWrapper deadlock : deadlocks)
                         {
-                            sb.append(deadlocks[i].toString());
+                            sb.append(deadlock.toString());
                         }
                         Log.log(ThreadUtils.class, sb.toString());
                         deadlockObserver.onDeadlockFound(deadlocks);
@@ -152,8 +148,8 @@ public final class DeadlockDetector {
                 }
             }
         };
-        return ThreadUtils.scheduleWithFixedDelay(task,
-                checkPeriodMillis, checkPeriodMillis, TimeUnit.MILLISECONDS);
+        return ThreadUtils.UTILS_EXECUTOR.scheduleWithFixedDelay(task, checkPeriodMillis, checkPeriodMillis,
+                TimeUnit.MILLISECONDS);
     }
 
     final ThreadMXBean threadMxBean;
@@ -164,7 +160,8 @@ public final class DeadlockDetector {
      *
      * @author Ramon Servadei
      */
-    public static final class ThreadInfoWrapper {
+    public static final class ThreadInfoWrapper
+    {
         private final ThreadInfo delegate;
 
         ThreadInfoWrapper(ThreadInfo delegate)
@@ -388,6 +385,6 @@ public final class DeadlockDetector {
                 wrappers.add(new ThreadInfoWrapper(threadInfo));
             }
         }
-        return wrappers.toArray(new ThreadInfoWrapper[wrappers.size()]);
+        return wrappers.toArray(new ThreadInfoWrapper[0]);
     }
 }

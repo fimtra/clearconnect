@@ -80,14 +80,14 @@ public class TestTcpChannel
 
         long size = 0;
         final int max = 100000;
-        List<String> data = new ArrayList<String>(max);
+        List<String> data = new ArrayList<>(max);
         for (int i = 0; i < max; i++)
         {
             data.add("index: " + i);
         }
 
         final CountDownLatch latch = new CountDownLatch(1);
-        final List<String> rxData = new ArrayList<String>(max);
+        final List<String> rxData = new ArrayList<>(max);
         IReceiver receiver = new IReceiver()
         {
 

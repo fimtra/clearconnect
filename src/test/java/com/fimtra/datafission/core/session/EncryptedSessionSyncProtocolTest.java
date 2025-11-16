@@ -175,7 +175,7 @@ public class EncryptedSessionSyncProtocolTest
     {
         // simulate failed sync
         ISessionManager manager = mock(ISessionManager.class);
-        when(manager.createSession((String[]) any())).thenReturn(null);
+        when(manager.createSession(any())).thenReturn(null);
 
         SessionContexts.registerSessionManager(this.name.getMethodName(), manager);
 

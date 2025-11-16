@@ -15,13 +15,18 @@
  */
 package com.fimtra.datafission.ui;
 
-import java.awt.*;
+import java.awt.Component;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.swing.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.swing.JComponent;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.TableColumnModelEvent;
@@ -123,10 +128,10 @@ public class RowOrientedRecordTable extends JTable implements ICellUpdateHandler
                 public void columnAdded(TableColumnModelEvent e)
                 {
                     final TableColumn column = getTableHeader().getColumnModel().getColumn(e.getToIndex());
-                    final Integer preferredWidth = widths.get(column.getHeaderValue());
+                    final Integer preferredWidth = widths.get(column.getHeaderValue().toString());
                     if (preferredWidth != null)
                     {
-                        column.setPreferredWidth(preferredWidth.intValue());
+                        column.setPreferredWidth(preferredWidth);
                     }
                 }
             });

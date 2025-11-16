@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,10 +53,12 @@ import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.BlobValue;
-import com.fimtra.executors.ContextExecutorFactory;
-import com.fimtra.executors.IContextExecutor;
-import com.fimtra.executors.ITaskStatistics;
+import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.thimble.IContextExecutor;
+import com.fimtra.thimble.TaskStatistics;
+import com.fimtra.thimble.ThimbleExecutor;
 import com.fimtra.util.CharBufferUtils;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.FileUtils.ExtensionFileFilter;
@@ -75,18 +78,20 @@ import com.fimtra.util.is;
  *
  * @author Ramon Servadei, Paul Mackinlay
  */
-public final class ContextUtils {
+public final class ContextUtils
+{
 
     /**
-     * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register an inner
-     * listener to any new records in the context.
+     * This listener is attached to the {@link ISystemRecordNames#CONTEXT_RECORDS} and will register
+     * an inner listener to any new records in the context.
      * <p>
-     * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code no longer
-     * requires the manager.
+     * To prevent a memory leak, the {@link #destroy()} <b>MUST</b> be called when application code
+     * no longer requires the manager.
      *
      * @author Ramon Servadei
      */
-    public static final class AllRecordsRegistrationManager implements IRecordListener {
+    public static final class AllRecordsRegistrationManager implements IRecordListener
+    {
         final IRecordListener allRecordsListener;
         final IObserverContext context;
         final Set<String> subscribed = new HashSet<>();
@@ -102,9 +107,9 @@ public final class ContextUtils {
         {
             this.context.removeObserver(this, ISystemRecordNames.CONTEXT_RECORDS);
             List<String> temp = new LinkedList<>(this.subscribed);
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
-                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
             this.subscribed.clear();
         }
@@ -120,9 +125,9 @@ public final class ContextUtils {
                     temp.add(recordName);
                 }
             }
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
-                this.context.addObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.addObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
 
             temp = new LinkedList<>();
@@ -133,9 +138,9 @@ public final class ContextUtils {
                     temp.add(recordName);
                 }
             }
-            if (temp.size() > 0)
+            if (!temp.isEmpty())
             {
-                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[temp.size()]));
+                this.context.removeObserver(this.allRecordsListener, temp.toArray(new String[0]));
             }
         }
     }
@@ -150,7 +155,7 @@ public final class ContextUtils {
     public static final ExtensionFileFilter RECORD_FILE_FILTER =
             new FileUtils.ExtensionFileFilter(RECORD_FILE_EXTENSION_NAME);
 
-    static final double INVERSE_1000000 = 1d / 1000000;
+    private static final double INVERSE_1000000 = 1d / 1000000;
 
     public static final Set<String> SYSTEM_RECORDS;
 
@@ -166,26 +171,33 @@ public final class ContextUtils {
     }
 
     /**
-     * This is the default shared {@link IContextExecutor} used for <b>system record</b> event handling.
+     * This is the default shared {@link ThimbleExecutor} used for <b>system record</b> event
+     * handling.
      *
      * @see #SYSTEM_RECORDS
      */
     final static IContextExecutor SYSTEM_RECORD_EXECUTOR =
-            ContextExecutorFactory.create(FISSION_SYSTEM, SYSTEM_RECORDS.size());
+            ContextExecutorFactory.create(FISSION_SYSTEM, DataFissionProperties.Values.SYSTEM_THREAD_COUNT);
 
     /**
-     * This is the default shared {@link IContextExecutor} that can be used by all contexts.
+     * This is the default shared {@link ThimbleExecutor} that can be used by all contexts.
      */
     final static IContextExecutor CORE_EXECUTOR =
             ContextExecutorFactory.create(FISSION_CORE, DataFissionProperties.Values.CORE_THREAD_COUNT);
 
     /**
-     * This is dedicated to handle RPC results. If RPC results are handled by the {@link #CORE_EXECUTOR}, a
-     * timeout could occur if the result is placed onto the same queue of the thread that is waiting for the
-     * result!
+     * This is dedicated to handle RPC results. If RPC results are handled by the
+     * {@link #CORE_EXECUTOR}, a timeout could occur if the result is placed onto the same queue of
+     * the thread that is waiting for the result!
      */
     final static IContextExecutor RPC_EXECUTOR =
             ContextExecutorFactory.create(FISSION_RPC, DataFissionProperties.Values.RPC_THREAD_COUNT);
+
+    /**
+     * This is the default shared SINGLE-THREAD 'utility scheduler' that is used by all contexts.
+     */
+    final static ScheduledExecutorService UTILITY_SCHEDULER =
+            ThreadUtils.newPermanentScheduledExecutorService("fission-utility", 1);
 
     final static RollingFileAppender qStatsLog = DataFissionProperties.Values.ENABLE_Q_STATS_LOGGING ?
             RollingFileAppender.createStandardRollingFileAppender("Qstats", UtilProperties.Values.LOG_DIR) :
@@ -202,11 +214,12 @@ public final class ContextUtils {
         return gcDutyCycle;
     }
 
-    static final AtomicReference<long[]> coreStats = new AtomicReference<>(new long[] { 0, 0, 0 });
+    static Map<Object, TaskStatistics> coreStats = CORE_EXECUTOR.getSequentialTaskStatistics();
 
     static
     {
-        ThreadUtils.scheduleWithFixedDelay(new Runnable() {
+        UTILITY_SCHEDULER.scheduleWithFixedDelay(new Runnable()
+        {
             // todo this needs to be sent to the registry in a new system-level record
             final FastDateFormat fdf = new FastDateFormat();
             long gcTimeLastPeriod;
@@ -230,7 +243,7 @@ public final class ContextUtils {
             @Override
             public void run()
             {
-                final Set<IContextExecutor> executors = ContextExecutorFactory.getExecutors();
+                final Set<ThimbleExecutor> executors = ThimbleExecutor.getExecutors();
                 final StringBuilder sb = new StringBuilder(1024);
                 final String yyyyMMddHHmmssSSS = this.fdf.yyyyMMddHHmmssSSS(System.currentTimeMillis());
 
@@ -239,38 +252,38 @@ public final class ContextUtils {
                 {
                     sb.append(yyyyMMddHHmmssSSS);
                 }
-                // context executor Qs
-                long qOverflow = 0, qSubmitted = 0, qExecuted = 0;
-                ITaskStatistics stats;
+                // thimble executor Qs
+                long qOverflow = 0, qSubmitted = 0;
+                TaskStatistics stats;
                 long overflow;
-                for (IContextExecutor executor : executors)
+                for (ThimbleExecutor thimbleExecutor : executors)
                 {
-                    final Map<Object, ITaskStatistics> coalescingTaskStatistics =
-                            executor.getCoalescingTaskStatistics();
+                    final Map<Object, TaskStatistics> coalescingTaskStatistics =
+                            thimbleExecutor.getCoalescingTaskStatistics();
                     stats = coalescingTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
-                    // we do not calculate overflow for coalescing and ignore coalesced counts
+                    // we do not calculate overflow for coalescing and we ignore coalesced counts
                     // otherwise we get skewed stats (ie. looks like a slow consumer)
                     qSubmitted += stats.getIntervalExecuted();
-                    qExecuted += stats.getIntervalExecuted();
 
-                    final Map<Object, ITaskStatistics> sequentialTaskStatistics =
-                            executor.getSequentialTaskStatistics();
+                    final Map<Object, TaskStatistics> sequentialTaskStatistics =
+                            thimbleExecutor.getSequentialTaskStatistics();
                     stats = sequentialTaskStatistics.get(IContextExecutor.QUEUE_LEVEL_STATS);
                     overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
                     qOverflow += (overflow < 0 ? 0 : overflow);
                     qSubmitted += stats.getIntervalSubmitted();
-                    qExecuted += stats.getIntervalExecuted();
+                    if (thimbleExecutor == CORE_EXECUTOR)
+                    {
+                        coreStats = sequentialTaskStatistics;
+                    }
 
                     if (qStatsLog != null)
                     {
-                        sb.append(", ").append(executor.getName()).append(" coalescing Q, ").append(
+                        sb.append(", ").append(thimbleExecutor.getName()).append(" coalescing Q, ").append(
                                 getStats(coalescingTaskStatistics));
-                        sb.append(", ").append(executor.getName()).append(" sequential Q, ").append(
+                        sb.append(", ").append(thimbleExecutor.getName()).append(" sequential Q, ").append(
                                 getStats(sequentialTaskStatistics));
                     }
                 }
-
-                coreStats.set(new long[] { qOverflow, qSubmitted, qExecuted });
 
                 if (qStatsLog != null)
                 {
@@ -312,10 +325,8 @@ public final class ContextUtils {
                 time = this.gcTimeLastPeriod;
                 this.gcTimeLastPeriod = gcMillisInPeriod;
                 gcMillisInPeriod -= time;
-                final double inverseLoggingPeriodSecs =
-                        1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                 // this is now the "% GC duty cycle per minute"
-                gcDutyCycle = (long) (gcMillisInPeriod * inverseLoggingPeriodSecs * 0.1d);
+                gcDutyCycle = gcMillisInPeriod / Values.STATS_LOGGING_PERIOD_SECS / 10;
 
                 sb.append(", ").append(getGcDutyCycle());
 
@@ -354,9 +365,9 @@ public final class ContextUtils {
                 }
             }
 
-            final String getStats(Map<Object, ITaskStatistics> taskStatisticsMap)
+            String getStats(Map<Object, TaskStatistics> taskStatisticsMap)
             {
-                final ITaskStatistics stats = taskStatisticsMap.get(IContextExecutor.QUEUE_LEVEL_STATS);
+                final TaskStatistics stats = taskStatisticsMap.get(IContextExecutor.QUEUE_LEVEL_STATS);
                 final StringBuilder sb = new StringBuilder(50);
 
                 long overflow = stats.getIntervalSubmitted() - stats.getIntervalExecuted();
@@ -379,21 +390,26 @@ public final class ContextUtils {
     static final char PROTOCOL_PREFIX = '_';
 
     /**
-     * @return a long[] for the sequential and coalescing tasks statistics, format {queue-overflow,
+     * @return a long[] for the sequential tasks statistics, format {queue-overflow,
      * queue-total-submitted, queue-total-executed}
      */
     public static long[] getCoreStats()
     {
-        return coreStats.get();
+        // todo should this be the summary across all thimble executors?
+        final TaskStatistics stats = coreStats.get(IContextExecutor.QUEUE_LEVEL_STATS);
+        final long totalSubmitted = stats.getTotalSubmitted();
+        final long totalExecuted = stats.getTotalExecuted();
+        return new long[] { (totalSubmitted - totalExecuted), totalSubmitted, totalExecuted };
     }
 
     /**
-     * Serialise the state of a context to the directory. Each record in the context is serialized into a
-     * distinct file in the directory called {record-name}.record. This does not serialize system records.
+     * Serialise the state of a context to the directory. Each record in the context is serialized
+     * into a distinct file in the directory called {record-name}.record. This does not serialize
+     * system records.
      * <p>
-     * This will create a backup of the current directory at the same level called {directory-name}-backup,
-     * then write the context records to a temp directory at the same level called {directory-name}-temp, then
-     * rename the temp directory to the directory argument.
+     * This will create a backup of the current directory at the same level called
+     * {directory-name}-backup, then write the context records to a temp directory at the same level
+     * called {directory-name}-temp, then rename the temp directory to the directory argument.
      * <p>
      * <b>This is a non-atomic operation.</b>
      *
@@ -424,8 +440,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Resolve a context's internal records by loading them from data files in directory. This does not
-     * resolve system records.
+     * Resolve a context's internal records by loading them from data files in directory. This does
+     * not resolve system records.
      * <p>
      * <b>NOTE:</b> records that currently exist in the context will have their state merged with
      * the data held in the record file that is loaded.
@@ -450,8 +466,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Convenience method to serialise a record to the directory. The record contents are serialised to a flat
-     * file {record-name}.record in the directory.
+     * Convenience method to serialise a record to the directory. The record contents are serialised
+     * to a flat file {record-name}.record in the directory.
      *
      * @param record    the record to serialise
      * @param directory the directory for the data file
@@ -475,8 +491,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Convenience method to resolve a record's internal data from a data file in directory. The record
-     * contents are serialised in a flat file {record-name}.record in the directory.
+     * Convenience method to resolve a record's internal data from a data file in directory. The
+     * record contents are serialised in a flat file {record-name}.record in the directory.
      *
      * @param record    the record to resolve
      * @param directory the directory for the data file
@@ -515,8 +531,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Convenience method to get the record name from a record file. This expects the file name to be in the
-     * format: {record name}.record
+     * Convenience method to get the record name from a record file. This expects the file name to
+     * be in the format: {record name}.record
      *
      * @param recordFile the record file
      * @return the record name of the file, <code>null</code> if not a record file
@@ -542,7 +558,7 @@ public final class ContextUtils {
      */
     public static boolean isSystemRecordName(String name)
     {
-        if (name != null && name.length() > 7 && name.charAt(0) == 'C' && name.charAt(6) == 't')
+        if (name.length() > 7 && name.charAt(0) == 'C')
         {
             return SYSTEM_RECORDS.contains(name);
         }
@@ -550,18 +566,17 @@ public final class ContextUtils {
     }
 
     /**
-     * A utility to register a listener that will be registered against all (non-system) records in a context.
-     * This creates an adapter listener that is registered to the context's {@link
-     * ISystemRecordNames#CONTEXT_RECORDS} record; when new records are added the allRecordsListener is added
-     * as an observer to the new record. <b>When finished with this, the {@link
-     * AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a memory leak.
-     * </b>
+     * A utility to register a listener that will be registered against all (non-system) records in
+     * a context. This creates an adapter listener that is registered to the context's
+     * {@link ISystemRecordNames#CONTEXT_RECORDS} record; when new records are added the
+     * allRecordsListener is added as an observer to the new record. <b>When finished with this, the
+     * {@link AllRecordsRegistrationManager#destroy} method MUST be called otherwise there may be a
+     * memory leak. </b>
      *
      * @param context            the context with the records that will be observed
-     * @param allRecordsListener the observer that will be attached to every (non-system) record in the
-     *                           context //
-     * @return the object that will automatically manage registering the allRecordsListener to any new records
-     * in the context.
+     * @param allRecordsListener the observer that will be attached to every (non-system) record in the context //
+     * @return the object that will automatically manage registering the allRecordsListener to any
+     * new records in the context.
      */
     public static AllRecordsRegistrationManager addAllRecordsListener(final IObserverContext context,
             final IRecordListener allRecordsListener)
@@ -599,8 +614,8 @@ public final class ContextUtils {
                     break;
                 case ContextUtils.LINE_SEPARATOR:
                     // we have a line - escaped(key)=escaped(value)
-                    key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
-                    value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+                    key = decodeKey(cbuf.array(), index, new char[index]);
+                    value = decodeValue(cbuf.array(), index + 1, cbuf.position(),
                             new char[cbuf.position() - (index + 1)]);
                     map.put(key, value);
                     cbuf.position(0);
@@ -621,11 +636,23 @@ public final class ContextUtils {
         // need to do the final one
         if (index > 0 && indexFound)
         {
-            key = StringProtocolCodec.decodeKey(cbuf.array(), 0, index, false, new char[index]);
-            value = StringProtocolCodec.decodeValue(cbuf.array(), index + 1, cbuf.position(),
+            key = decodeKey(cbuf.array(), index, new char[index]);
+            value = decodeValue(cbuf.array(), index + 1, cbuf.position(),
                     new char[cbuf.position() - (index + 1)]);
             map.put(key, value);
         }
+    }
+
+    private static String decodeKey(char[] escaped, int end, char[] output)
+    {
+        return StringProtocolCodec.resolvePooledStringNoPreamble(output,
+                StringProtocolCodec.unescape(escaped, 0, end, output));
+    }
+
+    private static IValue decodeValue(char[] escaped, int start, int end, char[] output)
+    {
+        return StringProtocolCodec.resolveValue(output,
+                StringProtocolCodec.unescape(escaped, start, end, output));
     }
 
     public static void serializeRecordMapToStream(Writer writer, Map<String, IValue> map) throws IOException
@@ -683,8 +710,8 @@ public final class ContextUtils {
     /**
      * Opposite of {@link #mergeMaps(Map, Map)}
      *
-     * @return first index is a Map&lt;String, IValue>, second index is a Map&lt;String, Map&lt;String,
-     * IValue>> ...
+     * @return first index is a Map&lt;String, IValue>, second index is a Map&lt;String,
+     * Map&lt;String, IValue>> ...
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static Map<?, ?>[] demergeMaps(final Map<String, IValue> mergedMap)
@@ -755,8 +782,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Get the string representation of the map, expressing {@link BlobValue} instances as their byte sizes
-     * rather than the literal translation of the blob's internal byte[]
+     * Get the string representation of the map, expressing {@link BlobValue} instances as their
+     * byte sizes rather than the literal translation of the blob's internal byte[]
      */
     public static String mapToString(Map<String, IValue> map)
     {
@@ -864,6 +891,13 @@ public final class ContextUtils {
         return RPC_EXECUTOR.isExecutorThread(Thread.currentThread().getId());
     }
 
+    private static final ThreadLocal<Boolean> IS_FRAMEWORK_THREAD = ThreadLocal.withInitial(() -> {
+        final long id = Thread.currentThread()
+                .getId();
+        return CORE_EXECUTOR.isExecutorThread(id) || RPC_EXECUTOR.isExecutorThread(id)
+                || SYSTEM_RECORD_EXECUTOR.isExecutorThread(id);
+    });
+
     /**
      * @return <code>true</code> if the thread is an internal thread, this covers core, rpc and
      * system threads
@@ -873,14 +907,7 @@ public final class ContextUtils {
      */
     public static boolean isFrameworkThread()
     {
-        final long id = Thread.currentThread().getId();
-        final boolean isCoreThread = CORE_EXECUTOR.isExecutorThread(id);
-        if (CORE_EXECUTOR == RPC_EXECUTOR)
-        {
-            return isCoreThread;
-        }
-        return isCoreThread || RPC_EXECUTOR.isExecutorThread(id) || SYSTEM_RECORD_EXECUTOR.isExecutorThread(
-                id);
+        return IS_FRAMEWORK_THREAD.get();
     }
 
     /**
@@ -914,18 +941,24 @@ public final class ContextUtils {
             return rpc;
         }
 
+        return getRpcWithSubscribeCheck(proxy, discoveryTimeoutMillis, rpcName);
+    }
+
+    static IRpcInstance getRpcWithSubscribeCheck(ProxyContext proxy, long discoveryTimeoutMillis,
+            String rpcName) throws TimeOutException
+    {
         // NOTE: even though the ProxyContext subscribes for the ContextRpcs record on construction,
         // race conditions may mean that the record has not been fully received yet, hence if the
         // record does not have the rpc name we add our own listener (then remove it).
         final AtomicReference<IRpcInstance> rpcRef = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
         final IRecordListener observer = (imageCopy, atomicChange) -> {
-            final IRpcInstance rpc1 = proxy.getRpc(rpcName);
-            if (rpc1 != null)
+            final IRpcInstance _rpc = proxy.getRpc(rpcName);
+            if (_rpc != null)
             {
                 try
                 {
-                    rpcRef.set(rpc1);
+                    rpcRef.set(_rpc);
                 }
                 finally
                 {
@@ -947,7 +980,8 @@ public final class ContextUtils {
             }
             catch (InterruptedException e)
             {
-                // we don't care!
+                ExceptionUtils.handleInterruptedException(ContextUtils.class, e,
+                        "Interrupted getting RPC: " + rpcName);
             }
         }
         finally
@@ -977,8 +1011,8 @@ public final class ContextUtils {
     }
 
     /**
-     * Utility to do a clean destroy by removing all records (listeners are notified) then destroying the
-     * context.
+     * Utility to do a clean destroy by removing all records (listeners are notified) then
+     * destroying the context.
      *
      * @param context the context to remove records from and then destroy
      * @see #removeRecords(Context)

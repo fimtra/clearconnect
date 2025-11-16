@@ -116,7 +116,7 @@ public class PlatformKernel {
 		this.configService.destroy();
 	}
 
-	private class KernelConfigService extends ConfigService {
+	private static class KernelConfigService extends ConfigService {
 		KernelConfigService(String host, int port) {
 			super(host, port);
 		}

@@ -25,11 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
- * A simple logger that writes to a file and to <code>System.err</code>. Uses a
- * {@link RollingFileAppender} to log to a file in the logs directory called
- * message_yyyyMMddHHmmss.log.
+ * A simple logger that writes to a file and to <code>System.err</code>. Uses a {@link RollingFileAppender} to
+ * log to a file in the logs directory called message_yyyyMMddHHmmss.log.
  *
  * @author Ramon Servadei
  * @author Paul Mackinlay
@@ -58,18 +58,8 @@ public abstract class Log
     static final RollingFileAppender FILE_APPENDER;
     private static boolean exceptionEncountered;
 
-    static final long timeRefMillis;
-    static final long timeRefNanos;
-
     static
     {
-        synchronized (Log.class)
-        {
-            // need these to execute atomically
-            timeRefNanos = System.nanoTime();
-            timeRefMillis = System.currentTimeMillis();
-        }
-
         final int periodMillis = UtilProperties.Values.LOG_FLUSH_PERIOD_MILLIS;
         FILE_APPENDER_EXECUTOR.scheduleWithFixedDelay(Log::flushMessages, periodMillis, periodMillis,
                 TimeUnit.MILLISECONDS);
@@ -86,22 +76,29 @@ public abstract class Log
 
         final String threadName;
         final Object source;
-        final CharSequence[] messages;
-        final long timeNanos;
+        final Supplier<String[]> messages;
+        final long timeMillis;
         String formattedMessage;
 
-        LogMessage(Thread t, Object source, CharSequence... messages)
+        LogMessage(Thread t, Object source, Supplier<String[]> messages)
         {
             this.threadName = t.getName();
             this.source = source;
             this.messages = messages;
-            this.timeNanos = System.nanoTime();
+            this.timeMillis = System.currentTimeMillis();
+        }
+
+        LogMessage(Thread t, Object source, String... messages)
+        {
+            this.threadName = t.getName();
+            this.source = source;
+            this.messages = () -> messages;
+            this.timeMillis = System.currentTimeMillis();
         }
 
         String getTime()
         {
-            return fastDateFormat.yyyyMMddHHmmssSSS(
-                    timeRefMillis + (long) ((this.timeNanos - timeRefNanos) * 0.000001d));
+            return fastDateFormat.yyyyMMddHHmmssSSS(this.timeMillis);
         }
 
         void print(PrintStream consoleStream)
@@ -121,12 +118,14 @@ public abstract class Log
                 return this.formattedMessage;
             }
 
+            final String[] msgs = this.messages.get();
+
             int len = LOG_PREFIX_EST_SIZE;
-            for (int i = 0; i < this.messages.length; i++)
+            for (int i = 0; i < msgs.length; i++)
             {
-                if (this.messages[i] != null)
+                if (msgs[i] != null)
                 {
-                    len += this.messages[i].length();
+                    len += msgs[i].length();
                 }
             }
             final StringBuilder sb = new StringBuilder(len);
@@ -147,11 +146,11 @@ public abstract class Log
                 cachedSimpleNames.put(c, classSimpleName);
             }
             sb.append(getTime()).append(DELIM).append(this.threadName).append(DELIM).append(
-                    classSimpleName).append(":").append(System.identityHashCode(this.source)).append(
+                    classSimpleName).append(":").append((System.identityHashCode(this.source))).append(
                     MESSAGE_DELIM);
-            for (int i = 0; i < this.messages.length; i++)
+            for (int i = 0; i < msgs.length; i++)
             {
-                sb.append(this.messages[i]);
+                sb.append(msgs[i]);
             }
             sb.append(LINE_SEPARATOR);
 
@@ -230,6 +229,11 @@ public abstract class Log
         });
     }
 
+    public static void log(Object source, Supplier<String[]> messages)
+    {
+        log(new LogMessage(Thread.currentThread(), source, messages));
+    }
+
     public static void log(Object source, String... messages)
     {
         log(new LogMessage(Thread.currentThread(), source, messages));
@@ -237,12 +241,13 @@ public abstract class Log
 
     public static void log(Object source, String message, Throwable t)
     {
-        final StringWriter stringWriter = new StringWriter(1024);
+        final StringAppenderWriter stringWriter = new StringAppenderWriter(1024);
         try (final PrintWriter pw = new PrintWriter(stringWriter))
         {
             pw.println();
             t.printStackTrace(pw);
-            final LogMessage logMessage = new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
+            final LogMessage logMessage =
+                    new LogMessage(Thread.currentThread(), source, message, stringWriter.toString());
             log(logMessage);
         }
     }

@@ -58,30 +58,11 @@ final class ImageDeltaChangeProcessor
         this.cachedDeltas.clear();
         this.imageReceived.clear();
     }
-
-    /**
-     * Used for updating a local record from a remote atomic change received from the remote record instance.
-     * This is like {@link IRecordChange#applyCompleteAtomicChangeToRecord(IRecord)} but also updates the record's CHANGE
-     * sequence to match {@link IRecordChange#getSequence()}. This ensures that when the local record is published, the
-     * sequence of the record updates to match the received remote change.
-     */
-    void applyRemoteChangeToLocalRecord(IRecordChange changeToApply, IRecord record)
-    {
-        synchronized (record.getWriteLock())
-        {
-            changeToApply.applyCompleteAtomicChangeToRecord(record);
-
-            if (record instanceof Record)
-            {
-                ((Record) record).getPendingAtomicChange().setSequence(changeToApply.getSequence());
-            }
-        }
-    }
-
+    
     int processRxChange(final IRecordChange changeToApply, final String name, IRecord record)
     {
         final boolean imageAlreadyReceived = this.imageReceived.containsKey(name);
-
+        
         // if the sequence is wrong...
         if (record.getSequence() + 1 != changeToApply.getSequence())
         {
@@ -140,35 +121,41 @@ final class ImageDeltaChangeProcessor
             else
             {
                 // its an image and it forms the base-line definition for the record
-                record.clear();
-                applyRemoteChangeToLocalRecord(changeToApply, record);
-
-                // apply any subsequent deltas (this only occurs over multicast topology)
-                final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
-                if (deltas != null)
+                synchronized (record.getWriteLock())
                 {
-                    long deltaSequence = -1;
-                    long lastSequence = changeToApply.getSequence();
-                    for (IRecordChange deltaChange : deltas)
+                    record.clear();
+                    changeToApply.applyCompleteAtomicChangeToRecord(record);
+
+                    // apply any subsequent deltas (this only occurs over multicast topology)
+                    if (!cachedDeltas.isEmpty())
                     {
-                        deltaSequence = deltaChange.getSequence();
-                        // this allows us to skip deltas that are earlier than the received image
-                        if (deltaSequence > lastSequence)
+                        final LowGcLinkedList<IRecordChange> deltas = this.cachedDeltas.remove(name);
+                        if (deltas != null)
                         {
-                            if (lastSequence + 1 != deltaSequence)
+                            long deltaSequence;
+                            long lastSequence = changeToApply.getSequence();
+                            for (IRecordChange deltaChange : deltas)
                             {
-                                Log.log(this, "Incorrect sequence for cached delta ", name, ", delta.seq=",
-                                    Long.toString(deltaSequence), " last.seq=", Long.toString(lastSequence));
-                                
-                                this.imageReceived.remove(name);
-                                return RESYNC;
+                                deltaSequence = deltaChange.getSequence();
+                                // this allows us to skip deltas that are earlier than the received image
+                                if (deltaSequence > lastSequence)
+                                {
+                                    if (lastSequence + 1 != deltaSequence)
+                                    {
+                                        Log.log(this, "Incorrect sequence for cached delta ", name,
+                                                ", delta.seq=", Long.toString(deltaSequence), " last.seq=",
+                                                Long.toString(lastSequence));
+
+                                        this.imageReceived.remove(name);
+                                        return RESYNC;
+                                    }
+                                    deltaChange.applyCompleteAtomicChangeToRecord(record);
+                                    lastSequence = deltaSequence;
+                                }
                             }
-                            applyRemoteChangeToLocalRecord(deltaChange, record);
-                            lastSequence = deltaSequence;
                         }
                     }
                 }
-
                 if (!imageAlreadyReceived)
                 {
                     this.imageReceived.put(name, Boolean.TRUE);
@@ -178,7 +165,7 @@ final class ImageDeltaChangeProcessor
         }
         else
         {
-            applyRemoteChangeToLocalRecord(changeToApply, record);
+            changeToApply.applyCompleteAtomicChangeToRecord(record);
             if (!imageAlreadyReceived)
             {
                 this.imageReceived.put(name, Boolean.TRUE);

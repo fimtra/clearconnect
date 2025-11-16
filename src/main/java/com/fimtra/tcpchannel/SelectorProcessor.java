@@ -40,7 +40,8 @@ import com.fimtra.util.ThreadUtils;
  * <p>
  * This provides scaling for multiple sockets.
  * 
- * @see TcpChannelUtils#READER
+ * @see TcpChannelUtils#READERS
+ * @see TcpChannelUtils#WRITERS
  * @see TcpChannelUtils#ACCEPT_PROCESSOR
  * @author Ramon Servadei
  */
@@ -242,5 +243,10 @@ final class SelectorProcessor implements Runnable
     {
         keyFor.interestOps(this.selectorProcessorOperation);
         this.selector.wakeup();
+    }
+
+    SelectionKey getKeyFor(SelectableChannel channel)
+    {
+        return channel.keyFor(this.selector);
     }
 }

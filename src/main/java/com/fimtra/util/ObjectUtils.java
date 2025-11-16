@@ -28,8 +28,8 @@ public abstract class ObjectUtils
     }
 
     /**
-     * Call the {@link Object#toString()} method on the object, if an exception occurs, a classname
-     * based description is returned.
+     * Call the {@link Object#toString()} method on the object, if an exception occurs, a classname based
+     * description is returned.
      */
     public static String safeToString(Object o)
     {

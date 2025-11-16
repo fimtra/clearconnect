@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,9 +97,9 @@ final class AtomicChangeTeleporter
      * 
      * @author Ramon Servadei
      */
-    private static enum EntryEnum
+    private enum EntryEnum
     {
-            PUT, OVERWRITTEN, REMOVED;
+        PUT, REMOVED;
 
         Map<String, IValue> getEntriesToRead(AtomicChange atomicChange)
         {
@@ -108,8 +107,6 @@ final class AtomicChangeTeleporter
             {
                 case PUT:
                     return atomicChange.getPutEntries();
-                case OVERWRITTEN:
-                    return atomicChange.getOverwrittenEntries();
                 case REMOVED:
                     return atomicChange.getRemovedEntries();
             }
@@ -122,8 +119,6 @@ final class AtomicChangeTeleporter
             {
                 case PUT:
                     return atomicChange.internalGetPutEntries();
-                case OVERWRITTEN:
-                    return atomicChange.internalGetOverwrittenEntries();
                 case REMOVED:
                     return atomicChange.internalGetRemovedEntries();
             }
@@ -137,30 +132,28 @@ final class AtomicChangeTeleporter
     private static void merge(AtomicChange source, AtomicChange receivedPart) throws IncorrectSequenceException
     {
         {
-            final long sourceSequence = source.sequence.get().longValue();
-            if (sourceSequence != -1 && sourceSequence != receivedPart.sequence.get().longValue())
+            final long sourceSequence = source.sequence.get();
+            if (sourceSequence != -1 && sourceSequence != receivedPart.sequence.get())
             {
                 throw new IncorrectSequenceException(source.getName(),
                     source.getName() + " expected fragment with sequence: " + sourceSequence + " but got: "
-                        + receivedPart.sequence.get().longValue());
+                        + receivedPart.sequence.get());
             }
         }
 
-        source.scope = receivedPart.scope;
-        source.sequence = receivedPart.sequence;
+        source.scope.set(receivedPart.scope.get());
+        source.sequence.set(receivedPart.sequence.get());
 
         mergeEntries(EntryEnum.PUT, source, receivedPart, null);
-        mergeEntries(EntryEnum.OVERWRITTEN, source, receivedPart, null);
         mergeEntries(EntryEnum.REMOVED, source, receivedPart, null);
         final Set<String> subMapKeys = receivedPart.getSubMapKeys();
-        if (subMapKeys.size() > 0)
+        if (!subMapKeys.isEmpty())
         {
             AtomicChange receivedSubMap;
             for (String key : subMapKeys)
             {
                 receivedSubMap = receivedPart.internalGetSubMapAtomicChange(key);
                 mergeEntries(EntryEnum.PUT, source, receivedSubMap, key);
-                mergeEntries(EntryEnum.OVERWRITTEN, source, receivedSubMap, key);
                 mergeEntries(EntryEnum.REMOVED, source, receivedSubMap, key);
             }
         }
@@ -171,18 +164,17 @@ final class AtomicChangeTeleporter
      */
     private static void mergeEntries(EntryEnum type, AtomicChange source, AtomicChange receivedPart, String subMapKey)
     {
+        final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
         if (subMapKey == null)
         {
-            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
-            if (entriesToCopy.size() > 0)
+            if (!entriesToCopy.isEmpty())
             {
                 type.getEntriesToWrite(source).putAll(entriesToCopy);
             }
         }
         else
         {
-            final Map<String, IValue> entriesToCopy = type.getEntriesToRead(receivedPart);
-            if (entriesToCopy.size() > 0)
+            if (!entriesToCopy.isEmpty())
             {
                 type.getEntriesToWrite(source.internalGetSubMapAtomicChange(subMapKey)).putAll(entriesToCopy);
             }
@@ -222,7 +214,7 @@ final class AtomicChangeTeleporter
         // NOTE: doing the mod here is less expensive than doing it each time within the loop!
         int loopCount = counter.get() % maxChangesPerPart;
 
-        Map<String, IValue> targetEntries = null;
+        Map<String, IValue> targetEntries;
         if (subMapKey != null)
         {
             targetEntries = type.getEntriesToWrite(parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
@@ -232,11 +224,8 @@ final class AtomicChangeTeleporter
             targetEntries = type.getEntriesToWrite(parts[partsIndex]);
         }
 
-        Map.Entry<String, IValue> entry = null;
-        for (Iterator<Map.Entry<String, IValue>> it =
-            type.getEntriesToRead(source).entrySet().iterator(); it.hasNext();)
+        for (Map.Entry<String, IValue> entry : type.getEntriesToRead(source).entrySet())
         {
-            entry = it.next();
             targetEntries.put(entry.getKey(), entry.getValue());
             loopCount++;
 
@@ -245,14 +234,14 @@ final class AtomicChangeTeleporter
             {
                 loopCount = 0;
                 partsIndex++;
-                parts[partsIndex] =
-                        new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
-                parts[partsIndex].scope = source.scope;
-                parts[partsIndex].sequence = source.sequence;
+                parts[partsIndex] = new AtomicChange(
+                        PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name,
+                        source.scope, source.sequence);
 
                 if (subMapKey != null)
                 {
-                    targetEntries = type.getEntriesToWrite(parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
+                    targetEntries = type.getEntriesToWrite(
+                            parts[partsIndex].internalGetSubMapAtomicChange(subMapKey));
                 }
                 else
                 {
@@ -306,28 +295,24 @@ final class AtomicChangeTeleporter
         final AtomicInteger changeCounter = new AtomicInteger();
 
         // populate the first element
-        parts[partsIndex] = new AtomicChange(PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name);
-        parts[partsIndex].scope = change.scope;
-        parts[partsIndex].sequence = change.sequence;
+        parts[partsIndex] = new AtomicChange(
+                PART_INDEX_PREFIX + (parts.length - partsIndex) + PART_INDEX_DELIM + name, change.scope,
+                change.sequence);
 
         partsIndex = writeEntries(EntryEnum.PUT, name, change, parts, partsIndex, changeCounter, this.maxChangesPerPart,
             null, totalChangeCount);
-        partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, change, parts, partsIndex, changeCounter,
-            this.maxChangesPerPart, null, totalChangeCount);
         partsIndex = writeEntries(EntryEnum.REMOVED, name, change, parts, partsIndex, changeCounter,
             this.maxChangesPerPart, null, totalChangeCount);
 
         // now do the submaps
         final Set<String> subMapKeys = change.getSubMapKeys();
-        if (subMapKeys.size() > 0)
+        if (!subMapKeys.isEmpty())
         {
             AtomicChange subMapChange;
             for (String key : subMapKeys)
             {
                 subMapChange = change.internalGetSubMapAtomicChange(key);
                 partsIndex = writeEntries(EntryEnum.PUT, name, subMapChange, parts, partsIndex, changeCounter,
-                    this.maxChangesPerPart, key, totalChangeCount);
-                partsIndex = writeEntries(EntryEnum.OVERWRITTEN, name, subMapChange, parts, partsIndex, changeCounter,
                     this.maxChangesPerPart, key, totalChangeCount);
                 partsIndex = writeEntries(EntryEnum.REMOVED, name, subMapChange, parts, partsIndex, changeCounter,
                     this.maxChangesPerPart, key, totalChangeCount);
@@ -341,9 +326,9 @@ final class AtomicChangeTeleporter
      *            a received part of an {@link AtomicChange}
      * @return <code>null</code> if the received part was not the final part otherwise the completed
      *         {@link AtomicChange} from all its received parts
-     * @throws IncorrectSequenceException 
+     * @throws IncorrectSequenceException if the received part has the wrong sequence number
      */
-    synchronized AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException 
+    synchronized AtomicChange combine(AtomicChange receivedPart) throws IncorrectSequenceException
     {
         this.nameRef.set(null);
         getNameAndPart(receivedPart.getName(), this.nameRef, this.part);

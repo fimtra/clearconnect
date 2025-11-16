@@ -29,8 +29,8 @@ public abstract class ArrayUtils
     }
 
     /**
-     * Checks if the passed in array contains the object <b>instance</b>. This performs the identity
-     * check <code>==</code> to determine the result.
+     * Checks if the passed in array contains the object <b>instance</b>. This performs the identity check
+     * <code>==</code> to determine the result.
      *
      * @return <code>true</code> if the array contains the instance
      */

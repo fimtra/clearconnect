@@ -52,4 +52,16 @@ public abstract class ExceptionUtils
         }
         return stackBuilder;
     }
+
+    /**
+     * Reset the interrupted state of the current thread and log the interrupted exception with message
+     */
+    public static void handleInterruptedException(Object source, InterruptedException e, String message)
+    {
+        if (Thread.interrupted())
+        {
+            Log.log(source, message, e);
+        }
+    }
+
 }

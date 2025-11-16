@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Ramon Servadei
+ * Copyright 2021 Ramon Servadei
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import org.junit.Test;
 /**
  * @author Ramon Servadei
  */
-public class SystemUtilsTest {
-
+public class SystemUtilsTest
+{
     @Test
     public void testGetProperty()
     {

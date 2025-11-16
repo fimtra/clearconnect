@@ -29,12 +29,14 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Ramon Servadei
  */
-public class KeyedObjectPool<K, T> {
+public class KeyedObjectPool<K, T>
+{
     final static List<WeakReference<KeyedObjectPool<?, ?>>> pools = new LowGcLinkedList<>();
 
     static
     {
-        ThreadUtils.scheduleAtFixedRate(() -> {
+        ThreadUtils.UTILS_EXECUTOR.scheduleAtFixedRate(() -> {
+
             synchronized (pools)
             {
                 for (Iterator<WeakReference<KeyedObjectPool<?, ?>>> iterator =

@@ -17,7 +17,7 @@ package com.fimtra.clearconnect.config.impl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -99,13 +99,13 @@ public class ConfigTest {
 		when(configRecord.getName()).thenReturn(this.serviceName);
 		IConfigChangeListener listener = mock(IConfigChangeListener.class);
 		this.config.addConfigChangeListener(listener);
-		Map<String, IValue> removedEntries = new HashMap<String, IValue>();
+		Map<String, IValue> removedEntries = new HashMap<>();
 		final TextValue v9 = TextValue.valueOf("config 1 removed");
 		String removeKey = "rkey1";
 		removedEntries.put(removeKey, v9);
 		when(memberRecord.containsKey(removeKey)).thenReturn(Boolean.TRUE);
 
-		Map<String, IValue> putEntries = new HashMap<String, IValue>();
+		Map<String, IValue> putEntries = new HashMap<>();
 		String key1 = "key1";
 		String key2 = "key2";
 		String value1 = "config 1";
@@ -130,10 +130,10 @@ public class ConfigTest {
 		this.config.addConfigChangeListener(listener2);
 
 		// trigger an update
-		Map<String, IValue> removedEntries = new HashMap<String, IValue>();
+		Map<String, IValue> removedEntries = new HashMap<>();
 		final TextValue v9 = TextValue.valueOf("v9");
 		removedEntries.put("key1", v9);
-		Map<String, IValue> putEntries = new HashMap<String, IValue>();
+		Map<String, IValue> putEntries = new HashMap<>();
 		final TextValue v1 = TextValue.valueOf("v1");
 		putEntries.put("k1", v1);
 		final TextValue v2 = TextValue.valueOf("v2");
@@ -145,9 +145,9 @@ public class ConfigTest {
 		this.config.removeConfigChangeListener(listener);
 
 		// trigger another update (its a duplicate but nevermind!)
-		removedEntries = new HashMap<String, IValue>();
+		removedEntries = new HashMap<>();
 		removedEntries.put("key2", v9);
-		putEntries = new HashMap<String, IValue>();
+		putEntries = new HashMap<>();
 		putEntries.put("k1", v1);
 		final TextValue v22 = TextValue.valueOf("v2.2");
 		putEntries.put("k2", v22);
@@ -156,12 +156,12 @@ public class ConfigTest {
 
 		verify(listener, times(1)).onPropertyChange(eq("k1"), eq(v1));
 		verify(listener, times(1)).onPropertyChange(eq("k2"), eq(v2));
-		verify(listener, times(1)).onPropertyChange(eq("key1"), (IValue) eq(null));
+		verify(listener, times(1)).onPropertyChange(eq("key1"), eq(null));
 		verify(listener2, times(1)).onPropertyChange(eq("k1"), eq(v1));
 		verify(listener2, times(1)).onPropertyChange(eq("k2"), eq(v2));
 		verify(listener2, times(1)).onPropertyChange(eq("k2"), eq(v22));
-		verify(listener2, times(1)).onPropertyChange(eq("key1"), (IValue) eq(null));
-		verify(listener2, times(1)).onPropertyChange(eq("key2"), (IValue) eq(null));
+		verify(listener2, times(1)).onPropertyChange(eq("key1"), eq(null));
+		verify(listener2, times(1)).onPropertyChange(eq("key2"), eq(null));
 
 		assertEquals(this.config.properties, putEntries);
 	}

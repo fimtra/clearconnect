@@ -62,7 +62,7 @@ public class LazyObjectTest
         assertNull(this.candidate.constructor);
         assertNull(this.candidate.destructor);
     }
-    
+
     @Test
     public void testNoUse()
     {

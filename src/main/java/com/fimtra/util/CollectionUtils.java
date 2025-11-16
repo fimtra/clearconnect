@@ -16,7 +16,6 @@
 package com.fimtra.util;
 
 import java.util.AbstractSet;
-import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -38,8 +37,8 @@ import com.fimtra.util.UtilProperties.Values;
 public abstract class CollectionUtils
 {
     /**
-     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable (
-     * {@link Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
+     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable ( {@link
+     * Entry#setValue(Object)} will throw {@link UnsupportedOperationException})
      *
      * @author Ramon Servadei
      */
@@ -130,17 +129,7 @@ public abstract class CollectionUtils
     }
 
     /**
-     * @return a synchronized Deque implementation
-     * @see Values#USE_LOW_GC_LINKEDLIST
-     */
-    public static <T> Deque<T> newSynchronizedDeque()
-    {
-        return new SynchronizedDeque<T>(newDeque());
-    }
-
-    /**
-     * @return an unmodifiable Set view of the comma separated items (each item is trimmed before
-     * adding)
+     * @return an unmodifiable Set view of the comma separated items (each item is trimmed before adding)
      * @deprecated Use {@link #newSetFromString(String, String)} instead
      */
     public static Set<String> newSetFromString(String commaSeparatedList)
@@ -150,8 +139,7 @@ public abstract class CollectionUtils
 
     /**
      * @param tokenSeparator the token that separates the items
-     * @return an unmodifiable Set view of the token separated items (each item is trimmed before
-     * adding)
+     * @return an unmodifiable Set view of the token separated items (each item is trimmed before adding)
      */
     public static Set<String> newSetFromString(String tokenSeparatedList, String tokenSeparator)
     {
@@ -169,8 +157,7 @@ public abstract class CollectionUtils
     }
 
     /**
-     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in
-     * entrySet
+     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in entrySet
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <K, V> Set<java.util.Map.Entry<K, V>> unmodifiableEntrySet(
@@ -223,41 +210,103 @@ public abstract class CollectionUtils
     }
 
     /**
-     * @return a noop {@link Deque} instance
+     * @return the map or an unmodifiable empty-map if null.
      */
-    public static <T> Deque<T> noopDeque()
+    public static <K, V> Map<K, V> emptyIfNull(Map<K, V> map)
     {
-        return new ArrayDeque<T>(0)
+        if (map == null)
+        {
+            return Collections.emptyMap();
+        }
+        return map;
+    }
+
+    /**
+     * A {@link Map} implementation that does not throw exceptions for mutation operations. Returns true for
+     * {@link Map#isEmpty()}
+     *
+     * @return A "noop" map implementation
+     */
+    public static <K, V> Map<K, V> noopMap()
+    {
+        return new Map<K, V>()
         {
             @Override
-            public void addFirst(T e)
+            public int size()
+            {
+                return 0;
+            }
+
+            @Override
+            public boolean isEmpty()
+            {
+                return true;
+            }
+
+            @Override
+            public boolean containsKey(Object key)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean containsValue(Object value)
+            {
+                return false;
+            }
+
+            @Override
+            public V get(Object key)
+            {
+                return null;
+            }
+
+            @Override
+            public V put(K key, V value)
+            {
+                return null;
+            }
+
+            @Override
+            public V remove(Object key)
+            {
+                return null;
+            }
+
+            @Override
+            public void putAll(Map<? extends K, ? extends V> m)
             {
                 // noop
             }
 
             @Override
-            public void addLast(T e)
+            public void clear()
             {
                 // noop
             }
 
             @Override
-            public boolean add(T e)
+            public Set<K> keySet()
             {
-                return false;
+                return Collections.emptySet();
             }
 
             @Override
-            public boolean offerFirst(T e)
+            public Collection<V> values()
             {
-                return false;
+                return Collections.emptyList();
             }
 
             @Override
-            public boolean offerLast(T e)
+            public Set<Entry<K, V>> entrySet()
             {
-                return false;
+                return Collections.emptySet();
             }
         };
+    }
+
+    public static <T> Set<T> newSet()
+    {
+        return new HashSet<>();
     }
 }

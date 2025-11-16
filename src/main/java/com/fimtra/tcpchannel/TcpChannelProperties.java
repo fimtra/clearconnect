@@ -26,13 +26,15 @@ import com.fimtra.util.SystemUtils;
  *
  * @author Ramon Servadei
  */
-public abstract class TcpChannelProperties {
+public abstract class TcpChannelProperties
+{
     /**
      * The names of the properties
      *
      * @author Ramon Servadei
      */
-    public interface Names {
+    public interface Names
+    {
         String BASE = "tcpChannel.";
         /**
          * The system property name to define the receive buffer size in bytes.<br> E.g.
@@ -66,6 +68,20 @@ public abstract class TcpChannelProperties {
          * E.g. <code>-DtcpChannel.serverBlacklistAcl=10.0.0.*;10.1.2.3 </code>
          */
         String PROPERTY_NAME_SERVER_BLACKLIST_ACL = BASE + "serverBlacklistAcl";
+        /**
+         * The system property name to define the count of connections per host that triggers suspicious
+         * connections checking (after grace period).
+         * <br> E.g. <code>-DtcpChannel.serverSuspiciousConnectionLimit=100</code>
+         */
+        String SERVER_SUSPICIOUS_CONNECTION_LIMIT = BASE + "serverSuspiciousConnectionLimit";
+        /**
+         * The system property name to define the grace period after server socket start after which
+         * suspicious connection logic is enabled (typically to accomodate server bounces and mass
+         * re-connects).
+         * <br> E.g. <code>-DtcpChannel.serverSuspiciousConnectionGracePeriodMillis=60000</code>
+         */
+        String SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS =
+                BASE + "serverSuspiciousConnectionGracePeriodMillis";
         /**
          * The system property name to define if connections to the {@link TcpServer} instances in the runtime
          * are logged. The logging will track the number of connections attempted from each host and whether
@@ -143,6 +159,22 @@ public abstract class TcpChannelProperties {
         String WRITER_THREAD_COUNT = BASE + "writerThreadCount";
 
         /**
+         * The system property name to define the number of channels/sockets associated with a reader {@link
+         * SelectorProcessor} before creating a new selector to spread the load.
+         * <p>
+         * E.g. <code>-DtcpChannel.readerChannelsPerSelector=4</code>
+         */
+        String READER_CHANNELS_PER_SELECTOR = BASE + "readerChannelsPerSelector";
+
+        /**
+         * The system property name to define the number of channels/sockets associated with a writer {@link
+         * SelectorProcessor} before creating a new selector to spread the load.
+         * <p>
+         * E.g. <code>-DtcpChannel.writerChannelsPerSelector=4</code>
+         */
+        String WRITER_CHANNELS_PER_SELECTOR = BASE + "writerChannelsPerSelector";
+
+        /**
          * The system property name to define the maximum size of the pool to hold re-usable tx fragment
          * objects.
          * <p>
@@ -186,7 +218,8 @@ public abstract class TcpChannelProperties {
      *
      * @author Ramon Servadei
      */
-    public interface Values {
+    public interface Values
+    {
         /**
          * The frame encoding, default is TERMINATOR_BASED.
          *
@@ -216,14 +249,26 @@ public abstract class TcpChannelProperties {
          * @see Names#SERVER_SOCKET_REUSE_ADDR
          */
         boolean SERVER_SOCKET_REUSE_ADDR = SystemUtils.getProperty(Names.SERVER_SOCKET_REUSE_ADDR, true);
-
+        /**
+         * The default for the server suspicious connection limit (after grace period), default is 100.
+         *
+         * @see Names#SERVER_SUSPICIOUS_CONNECTION_LIMIT
+         */
+        int SERVER_SUSPICIOUS_CONNECTION_LIMIT =
+                SystemUtils.getPropertyAsInt(Names.SERVER_SUSPICIOUS_CONNECTION_LIMIT, 100);
+        /**
+         * The default for the server suspicious connection grace period, default is 60,000 (1 min).
+         *
+         * @see Names#SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS
+         */
+        int SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS =
+                SystemUtils.getPropertyAsInt(Names.SERVER_SUSPICIOUS_CONNECTION_GRACE_PERIOD_MILLIS, 60000);
         /**
          * The default for server connection logging, default is <code>true</code>.
          *
          * @see Names#SERVER_CONNECTION_LOGGING
          */
         boolean SERVER_CONNECTION_LOGGING = SystemUtils.getProperty(Names.SERVER_CONNECTION_LOGGING, true);
-
         /**
          * The threshold value for logging when RX frame handling is slow, in nanos. This is important to
          * identify potential performance problems for TCP RX handling.
@@ -300,9 +345,29 @@ public abstract class TcpChannelProperties {
         /**
          * The number of threads to use for TCP socket writing.
          * <p>
-         * Default is:  {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
          */
         int WRITER_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.WRITER_THREAD_COUNT,
+                DataFissionProperties.Values.CORE_THREAD_COUNT);
+
+        /**
+         * The number of channels/sockets associated with a reader {@link SelectorProcessor} before creating a
+         * new selector to spread the load. Reader selector count never exceeds {@link #READER_THREAD_COUNT}.
+         * If all selectors are maxed out, we round-robin between them using the lowest each time.
+         * <p>
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
+         */
+        int READER_CHANNELS_PER_SELECTOR = SystemUtils.getPropertyAsInt(Names.READER_CHANNELS_PER_SELECTOR,
+                DataFissionProperties.Values.CORE_THREAD_COUNT);
+
+        /**
+         * The number of channels/sockets associated with a writer {@link SelectorProcessor} before creating a
+         * new selector to spread the load. Writer selector count never exceeds {@link #WRITER_THREAD_COUNT}.
+         * If all selectors are maxed out, we round-robin between them using the lowest each time.
+         * <p>
+         * Default is: {@link DataFissionProperties.Values#CORE_THREAD_COUNT}
+         */
+        int WRITER_CHANNELS_PER_SELECTOR = SystemUtils.getPropertyAsInt(Names.WRITER_CHANNELS_PER_SELECTOR,
                 DataFissionProperties.Values.CORE_THREAD_COUNT);
 
         /**
@@ -318,7 +383,6 @@ public abstract class TcpChannelProperties {
          * Default is: 1000
          */
         int RX_FRAGMENT_POOL_MAX_SIZE = SystemUtils.getPropertyAsInt(Names.RX_FRAGMENT_POOL_MAX_SIZE, 1000);
-
         /**
          * The maximum size of the pool to hold re-usable rx frame resolver objects.
          * <p>

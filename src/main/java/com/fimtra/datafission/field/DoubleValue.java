@@ -17,14 +17,13 @@ package com.fimtra.datafission.field;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.StringAppender;
-import com.fimtra.util.is;
 
 /**
  * The IValue for a double.
  * 
  * @author Ramon Servadei
  */
-public final class DoubleValue extends AbstractValue
+public class DoubleValue extends AbstractValue
 {
     private final double value;
 
@@ -66,23 +65,23 @@ public final class DoubleValue extends AbstractValue
 
     DoubleValue(char[] chars, int start, int len)
     {
-        this.value = Double.parseDouble(new String(chars, start, len));
+        this.value = DoubleValueCodeAdapter.fromCharArray(chars, start, len);
     }
 
     @Override
-    public TypeEnum getType()
+    public final TypeEnum getType()
     {
         return TypeEnum.DOUBLE;
     }
 
     @Override
-    public long longValue()
+    public final long longValue()
     {
         return (long) this.value;
     }
 
     @Override
-    public double doubleValue()
+    public final double doubleValue()
     {
         return this.value;
     }
@@ -90,44 +89,39 @@ public final class DoubleValue extends AbstractValue
     @Override
     public String textValue()
     {
-        return Double.toString(this.value);
+        return DoubleValueCodeAdapter.textValue(value);
     }
     
     @Override
     public final StringAppender toStringAppender()
     {
-        return appendTo(new StringAppender());
-    }
-    
-    @Override
-    public int hashCode()
-    {
-        final int prime = 31;
-        int result = 1;
-        long temp;
-        temp = Double.doubleToLongBits(this.value);
-        result = prime * result + (int) (temp ^ (temp >>> 32));
-        return result;
+        return appendTo(new StringAppender(28));
     }
 
     @Override
-    public boolean equals(Object obj)
+    public final int hashCode()
     {
-        if (is.same(this, obj))
+        final long bits = Double.doubleToLongBits(this.value);
+        return (int) (bits ^ (bits >>> 32));
+    }
+
+    @Override
+    public final boolean equals(Object obj)
+    {
+        if (this == obj)
         {
             return true;
         }
-        if (is.differentClass(this, obj))
+        if (!(obj instanceof DoubleValue))
         {
             return false;
         }
-        DoubleValue other = (DoubleValue) obj;
-        return is.eq(this.value, other.value);
+        return Double.doubleToLongBits(this.value) == Double.doubleToLongBits(((DoubleValue) obj).value);
     }
 
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(getType().toString()).append(this.value);
+        return DoubleValueCodeAdapter.appendTo(stringAppender, this.value);
     }
 }

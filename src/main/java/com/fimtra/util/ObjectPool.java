@@ -33,8 +33,8 @@ public final class ObjectPool<T> extends KeyedObjectPool<T, T>
     }
 
     /**
-     * Construct with a maximum size. When the maximum size is reached, the oldest entry in the pool
-     * is released to make room.
+     * Construct with a maximum size. When the maximum size is reached, the oldest entry in the pool is
+     * released to make room.
      */
     public ObjectPool(String name, int maxSize)
     {
@@ -42,12 +42,11 @@ public final class ObjectPool<T> extends KeyedObjectPool<T, T>
     }
 
     /**
-     * Intern the object into the pool. If the pool is limited in size and the pool does not contain
-     * the argument, the oldest pool entry is evicted and the argument added as the newest member of
-     * the pool.
+     * Intern the object into the pool. If the pool is limited in size and the pool does not contain the
+     * argument, the oldest pool entry is evicted and the argument added as the newest member of the pool.
      *
-     * @return the pooled version of the object (the same object if the object is the first instance
-     * of itself in the pool).
+     * @return the pooled version of the object (the same object if the object is the first instance of itself
+     * in the pool).
      */
     public T intern(T t)
     {

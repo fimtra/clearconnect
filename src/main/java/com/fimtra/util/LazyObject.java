@@ -98,16 +98,26 @@ public final class LazyObject<T>
     public boolean equals(Object obj)
     {
         if (this == obj)
+        {
             return true;
+        }
         if (obj == null)
+        {
             return false;
+        }
         if (getClass() != obj.getClass())
+        {
             return false;
+        }
         LazyObject<?> other = (LazyObject<?>) obj;
         if (this.ref == null)
+        {
             return other.ref == null;
+        }
         else
+        {
             return this.ref.equals(other.ref);
+        }
     }
 
     @Override

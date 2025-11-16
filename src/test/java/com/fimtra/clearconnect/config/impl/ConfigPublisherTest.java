@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
+import java.util.Collections;
 
 import com.fimtra.clearconnect.IPlatformServiceInstance;
 import org.junit.Before;
@@ -52,7 +52,7 @@ public class ConfigPublisherTest {
 	@Test
 	public void shouldTryToPublishRecord() {
 		String recordName = "test";
-		when(this.configPersist.getChangedRecordNames()).thenReturn(Arrays.asList(recordName));
+		when(this.configPersist.getChangedRecordNames()).thenReturn(Collections.singletonList(recordName));
 		this.configPublisher.run();
 		verify(this.platformServiceInstance, times(1)).getOrCreateRecord(recordName);
 	}

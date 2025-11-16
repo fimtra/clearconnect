@@ -20,29 +20,41 @@ package com.fimtra.util;
  *
  * @author Ramon Servadei
  */
-public final class CharSubArray
+final class CharSubArray
 {
     final char[] ref;
     final int start;
     final int end;
-    int hashcode;
+    final int hashcode;
 
-    public CharSubArray(char[] carray, int offset, int len)
+    CharSubArray(char[] carray, int offset, int len)
     {
         this.ref = carray;
         this.start = offset;
         this.end = offset + len;
 
-        // compute hashcode upfront
-        int h = this.hashcode;
-        if (this.end > this.start)
+        // compute hashcode upfront based on revese order of chars
+        int h = 0;
+        if (len > 6)
         {
-            for (int i = this.start; i < this.end; i++)
+            int i = end;
+            // use LAST 6 chars
+            h = this.ref[--i];
+            h = 31 * h + this.ref[--i];
+            h = 31 * h + this.ref[--i];
+            h = 31 * h + this.ref[--i];
+            h = 31 * h + this.ref[--i];
+            h = 31 * h + this.ref[--i];
+        }
+        else
+        {
+            for (int i = end - 1; i >= offset; i--)
             {
                 h = 31 * h + this.ref[i];
             }
-            this.hashcode = h;
         }
+
+        this.hashcode = h;
     }
 
     @Override
@@ -54,30 +66,25 @@ public final class CharSubArray
     @Override
     public boolean equals(Object obj)
     {
-        if (this == obj)
-        {
-            return true;
-        }
-        if (obj == null)
-        {
-            return false;
-        }
-        if (getClass() != obj.getClass())
-        {
-            return false;
-        }
-
+        // this is only called in the context of a Map key lookup
+        // and CharSubArray is only used in a CharSubArrayKeyedPool
+        // a map key lookup will check for hashcode first, then object reference then call equals
+        // so we skip null, hashcode and object reference checks
+        // and we assume the object is a CharSubArray
+        // (also obj will never be null as CharSubArrayKeyedPool only uses CharSubArray instances)
         final CharSubArray other = (CharSubArray) obj;
 
-        if ((this.end - this.start) != (other.end - other.start))
+        if ((this.end - this.start) != other.end)
         {
             return false;
         }
 
         int j = 0;
+        // note: obj is ALWAYS a key in a map constructed with a clean array so obj.start is always 0
+        // see CharSubArrayKeyedPool.get
         for (int i = this.start; i < this.end; i++)
         {
-            if (this.ref[i] != other.ref[other.start + j++])
+            if (this.ref[i] != other.ref[j++])
             {
                 return false;
             }

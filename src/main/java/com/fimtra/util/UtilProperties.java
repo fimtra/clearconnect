@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit;
  * @author Paul Mackinlay
  * @author Ramon Servadei
  */
-public abstract class UtilProperties {
+public abstract class UtilProperties
+{
     private UtilProperties()
     {
     }
@@ -34,7 +35,8 @@ public abstract class UtilProperties {
      * @author Ramon Servadei
      * @author Paul Mackinlay
      */
-    public interface Names {
+    public interface Names
+    {
         String BASE = "util.";
 
         /**
@@ -59,11 +61,10 @@ public abstract class UtilProperties {
          * <code>-Dutil.logFileRoleSizeKb=4096</code>
          */
         String LOG_FILE_ROLL_SIZE_KB = BASE + "logFileRoleSizeKb";
-
         /**
          * The system property name to define if log messages are written to std.err (in addition to the log
          * file). <br>
-         * <b>This is done using a dedicated executor so should not block application performance.</b><br>
+         * <b>SETTING THIS TO TRUE HAS A SEVERE PERFORMANCE IMPACT.</b><br>
          * E.g. <code>-Dutil.logToStdErr=true</code>
          */
         String LOG_TO_STDERR = BASE + "logToStdErr";
@@ -124,6 +125,12 @@ public abstract class UtilProperties {
          * <code>-Dutil.notifyingCacheFairLockPolicy=true</code>
          */
         String NOTIFYING_CACHE_FAIR_LOCK_POLICY = BASE + "notifyingCacheFairLockPolicy";
+
+        /**
+         * The system property name to define using dedicated update threads.
+         * <code>-Dutil.notifyingCacheUseUpdateThreads=false</code>
+         */
+        String NOTIFYING_CACHE_USE_UPDATE_THREADS = BASE + "notifyingCacheUseUpdateThreads";
     }
 
     /**
@@ -132,7 +139,8 @@ public abstract class UtilProperties {
      * @author Ramon Servadei
      * @author Paul Mackinlay
      */
-    public interface Values {
+    public interface Values
+    {
         /**
          * Determines if log messages are written to std.err. Default is <code>false</code>
          *
@@ -167,7 +175,6 @@ public abstract class UtilProperties {
          * @see Names#LOG_FILE_ROLL_SIZE_KB
          */
         int LOG_FILE_ROLL_SIZE_KB = SystemUtils.getPropertyAsInt(Names.LOG_FILE_ROLL_SIZE_KB, 4096);
-
         /**
          * Determines the size of the internal spare nodes pool of the {@link LowGcLinkedList}. Default is
          * <code>50</code>
@@ -232,6 +239,13 @@ public abstract class UtilProperties {
          */
         boolean NOTIFYING_CACHE_FAIR_LOCK_POLICY =
                 SystemUtils.getProperty(Names.NOTIFYING_CACHE_FAIR_LOCK_POLICY, true);
+
+        /**
+         * Defines if the {@link NotifyingCache} default behaviour uses update threads.<br> Default is
+         * <code>false</code>.
+         */
+        boolean NOTIFYING_CACHE_USE_UPDATE_THREADS =
+                SystemUtils.getProperty(Names.NOTIFYING_CACHE_USE_UPDATE_THREADS, false);
     }
 
 }

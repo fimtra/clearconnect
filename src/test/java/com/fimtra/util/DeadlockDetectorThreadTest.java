@@ -19,9 +19,8 @@ import java.util.concurrent.Future;
 
 import com.fimtra.util.DeadlockDetector.DeadlockObserver;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
-import org.junit.After;
 import org.junit.Test;
-import org.mockito.ArgumentMatchers;
+import org.mockito.Matchers;
 import org.mockito.Mockito;
 
 /**
@@ -32,17 +31,6 @@ import org.mockito.Mockito;
  */
 public class DeadlockDetectorThreadTest
 {
-    Future<?> future;
-
-    @After
-    public void tearDown() throws Exception
-    {
-        if(future != null)
-        {
-            future.cancel(false);
-        }
-    }
-
     @Test
     public void testStartAndStopNewDeadlockDetectorThread() throws InterruptedException
     {
@@ -52,9 +40,9 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        future = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
+        final Future<?> flag = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
-        future.cancel(false);
+        flag.cancel(false);
         Thread.sleep(200);
 
         DeadlockDetectorTest.createDeadlock();
@@ -71,8 +59,8 @@ public class DeadlockDetectorThreadTest
         }
         
         DeadlockObserver observer = Mockito.mock(DeadlockObserver.class);
-        future = DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
+        DeadlockDetector.newDeadlockDetectorTask(50, observer, false);
         Thread.sleep(100);
-        Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(ArgumentMatchers.any(ThreadInfoWrapper[].class));
+        Mockito.verify(observer, Mockito.atLeastOnce()).onDeadlockFound(Matchers.any(ThreadInfoWrapper[].class));
     }
 }

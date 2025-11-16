@@ -38,16 +38,16 @@ public interface IValue extends Comparable<IValue>
      * 
      * @author Ramon Servadei
      */
-    public static enum TypeEnum
+    enum TypeEnum
     {
         LONG(LONG_CODE), DOUBLE(DOUBLE_CODE), TEXT(TEXT_CODE), BLOB(BLOB_CODE);
 
         private final String shortString;
-        private char charCode;
+        private final char charCode;
 
-        private TypeEnum(char charCode)
+        TypeEnum(char charCode)
         {
-            this.shortString = new String(new char[] { charCode });
+            this.shortString = String.valueOf(charCode);
             this.charCode = charCode;
         }
 

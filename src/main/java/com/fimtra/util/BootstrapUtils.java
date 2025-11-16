@@ -19,6 +19,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileSystems;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -103,7 +104,8 @@ public abstract class BootstrapUtils
     public static String getHomeDirInitFilename(String initFile)
     {
         return (System.getProperty(initKeyInitFileName) == null ?
-                System.getProperty(sysKeyHomeDir) + System.getProperty(sysKeyFileSeparator) + dot + initFile
+                System.getProperty(sysKeyHomeDir) + FileSystems.getDefault()
+                        .getSeparator() + dot + initFile
                         + fileExtProperties : System.getProperty(initKeyInitFileName));
     }
 

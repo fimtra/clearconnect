@@ -147,8 +147,8 @@ public class isTest
     @Test
     public void testEqLongLong()
     {
-        final long arg1 = 1l;
-        final long arg2 = 2l;
+        final long arg1 = 1L;
+        final long arg2 = 2L;
         assertTrue(is.eq(arg1, arg1));
         assertFalse(is.eq(arg2, arg1));
     }
@@ -248,9 +248,9 @@ public class isTest
     @Test
     public void testEqLongArrayLongArray()
     {
-        final long[] arg1 = new long[] { 1l, 2l };
-        final long[] arg2 = new long[] { 1l, 2l };
-        final long[] arg3 = new long[] { 2l };
+        final long[] arg1 = new long[] { 1L, 2L };
+        final long[] arg2 = new long[] { 1L, 2L };
+        final long[] arg3 = new long[] { 2L };
         assertTrue(is.eq(arg1, arg2));
         assertFalse(is.eq(arg2, arg3));
     }

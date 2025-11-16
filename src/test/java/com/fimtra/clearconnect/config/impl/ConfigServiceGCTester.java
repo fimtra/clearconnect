@@ -58,7 +58,7 @@ public class ConfigServiceGCTester {
 		final String family;
 		final String member;
 
-		private ServiceInstance(String family, String member) {
+		ServiceInstance(String family, String member) {
 			this.family = family;
 			this.member = member;
 		}
@@ -98,8 +98,8 @@ public class ConfigServiceGCTester {
 			this.agent.waitForPlatformService(IConfigServiceProxy.CONFIG_SERVICE);
 			IPlatformServiceProxy platformServiceProxy = this.agent.getPlatformServiceProxy(IConfigServiceProxy.CONFIG_SERVICE);
 			this.configServiceProxy = new ConfigServiceProxy(platformServiceProxy);
-			System.out.println(new StringBuffer("Is random: ").append(this.isRandom)
-					.append("\nTake heap dump and then press any key to continue.").toString());
+			System.out.println(
+                    "Is random: " + this.isRandom + "\nTake heap dump and then press any key to continue.");
 			System.in.read();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -107,9 +107,9 @@ public class ConfigServiceGCTester {
 	}
 
 	void stop() {
-		System.out.println(new StringBuffer("Total cycles: ").append(this.cycles).append("\n").append("Millis to complete: ")
-				.append(System.currentTimeMillis() - startTimestamp).append("\n")
-				.append("Take heap dump and then press any key to continue.").toString());
+		System.out.println(
+                "Total cycles: " + this.cycles + "\n" + "Millis to complete: " + (System.currentTimeMillis()
+                        - startTimestamp) + "\n" + "Take heap dump and then press any key to continue.");
 		try {
 			System.in.read();
 		} catch (IOException e) {
@@ -228,7 +228,7 @@ public class ConfigServiceGCTester {
 	 */
 	public static void main(String[] args) {
 		maxCycles = (args != null && args.length > 0) ? Integer.parseInt(args[0]) : 100000;
-		boolean isRandom = (args != null && args.length > 1) ? true : false;
+		boolean isRandom = args != null && args.length > 1;
 		final ConfigServiceGCTester tester = new ConfigServiceGCTester(isRandom);
 		tester.start();
 	}

@@ -16,6 +16,7 @@
 package com.fimtra.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -141,7 +142,7 @@ public class DeadlockDetectorTest
 
         createDeadlock();
         deadlockedThreads = candidate.findDeadlocks();
-        assertTrue(deadlockedThreads != null);
+        assertNotNull(deadlockedThreads);
         assertEquals(2, deadlockedThreads.length);
         assertTrue(deadlockedThreads[0].getStackTrace().length > 8);
         System.out.println(Arrays.deepToString(deadlockedThreads));

@@ -34,7 +34,7 @@ public class ObjectPoolTest
     @Before
     public void setUp() throws Exception
     {
-        this.candidate = new ObjectPool<String>("unit-test", 2);
+        this.candidate = new ObjectPool<>("unit-test", 2);
     }
 
     @Test

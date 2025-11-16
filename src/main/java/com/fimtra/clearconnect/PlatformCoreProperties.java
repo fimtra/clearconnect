@@ -24,13 +24,15 @@ import com.fimtra.util.SystemUtils;
  * @author Ramon Servadei
  * @author Paul Mackinlay
  */
-public abstract class PlatformCoreProperties {
+public abstract class PlatformCoreProperties
+{
     /**
      * The names of the properties
      *
      * @author Ramon Servadei
      */
-    public interface Names {
+    public interface Names
+    {
         /**
          * The base token for the name-space for platform specific property names.
          */
@@ -92,6 +94,13 @@ public abstract class PlatformCoreProperties {
          * publishing its "Service Stats" record.<br> E.g. <code>-Dplatform.serviceStatsRecordPublishPeriodSecs=10</code><br>
          */
         String SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS = BASE + "serviceStatsRecordPublishPeriodSecs";
+
+        /**
+         * The system property name to define the if a "simple" platform registry is used.
+         * A simple platform registry only monitors services for connection live-ness, no stats, record or RPC monitoring.
+         * <br> E.g. <code>-Dplatform.simplePlatformRegistry=true</code><br>
+         */
+        String SIMPLE_PLATFORM_REGISTRY = BASE + "simplePlatformRegistry";
     }
 
     /**
@@ -99,7 +108,8 @@ public abstract class PlatformCoreProperties {
      *
      * @author Ramon Servadei
      */
-    public interface Values {
+    public interface Values
+    {
         /**
          * The default TCP server port assignment for the {@link PlatformRegistry}.
          * <p>
@@ -130,7 +140,8 @@ public abstract class PlatformCoreProperties {
          * @see Names#PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS
          */
         long PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS =
-                SystemUtils.getPropertyAsLong(Names.PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS, 30_000);
+                SystemUtils.getPropertyAsLong(Names.PLATFORM_AGENT_REMOTE_RECORD_IMAGE_TIMEOUT_MILLIS,
+                        30_000);
 
         /**
          * The period in milliseconds that an agent will wait for services to become available.
@@ -193,6 +204,14 @@ public abstract class PlatformCoreProperties {
          */
         long SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS =
                 SystemUtils.getPropertyAsLong(Names.SERVICE_STATS_RECORD_PUBLISH_PERIOD_SECS, 10);
+
+        /**
+         * Defines if a simple platform registry is used.
+         *
+         * @see Names#SIMPLE_PLATFORM_REGISTRY
+         */
+        boolean SIMPLE_PLATFORM_REGISTRY = SystemUtils.getProperty(Names.SIMPLE_PLATFORM_REGISTRY,
+                true);
     }
 
     private PlatformCoreProperties()

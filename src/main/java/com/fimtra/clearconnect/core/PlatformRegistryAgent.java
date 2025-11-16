@@ -15,15 +15,11 @@
  */
 package com.fimtra.clearconnect.core;
 
-import static com.fimtra.datafission.core.IStatusAttribute.Connection.CONNECTED;
-import static com.fimtra.datafission.core.IStatusAttribute.Connection.DISCONNECTED;
-
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -32,11 +28,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -61,18 +57,19 @@ import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.DataFissionProperties;
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.datafission.IRpcInstance.ExecutionException;
 import com.fimtra.datafission.IRpcInstance.TimeOutException;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ContextUtils;
-import com.fimtra.datafission.core.IStatusAttribute;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.executors.IContextExecutor;
 import com.fimtra.tcpchannel.TcpChannelUtils;
+import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.util.ExceptionUtils;
 import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
@@ -95,7 +92,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         // bootstrap the banner
         final String version = PlatformUtils.VERSION;
     }
-
     static boolean platformRegistryRpcsAvailable(final Set<String> rpcNames)
     {
         return rpcNames.contains(PlatformRegistry.REGISTER) && rpcNames.contains(PlatformRegistry.DEREGISTER)
@@ -112,20 +108,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         }
     }
 
-    private static String addProcId(String agentName)
-    {
-        final String processName = ManagementFactory.getRuntimeMXBean().getName();
-        if (!agentName.contains(processName))
-        {
-            return agentName + "_" + processName;
-        }
-        return agentName;
-    }
+    private static final IRecordListener NOOP_OBSERVER = (image, atomicChange) -> {
+
+    };
 
     final long startTime;
     final String agentName;
-    final String hostQualifiedAgentName;
     volatile String platformName;
+    boolean registryConnected;
     final ProxyContext registryProxy;
     final Lock createLock;
     /**
@@ -136,16 +126,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
      * The services registered through this agent. Key=function of {serviceFamily,serviceMember}
      */
     final ConcurrentMap<String, PlatformServiceInstance> localPlatformServiceInstances;
-    final ConcurrentMap<String, PlatformServiceProxy> serviceProxies;
-    final ConcurrentMap<String, PlatformServiceProxy> serviceInstanceProxies;
+    private final ConcurrentMap<String, PlatformServiceProxy> serviceProxies;
+    private final ConcurrentMap<String, PlatformServiceProxy> serviceInstanceProxies;
     final NotifyingCache<IServiceInstanceAvailableListener, String> serviceInstanceAvailableListeners;
     final NotifyingCache<IServiceAvailableListener, String> serviceAvailableListeners;
     final NotifyingCache<IRegistryAvailableListener, String> registryAvailableListeners;
-    final AtomicReference<IStatusAttribute.Connection> registryConnectionState;
-    final ScheduledExecutorService agentExecutor;
-
     ScheduledFuture<?> dynamicAttributeUpdateTask;
-    PlatformServiceConnectionMonitor registryConnectionMonitor;
+    boolean onPlatformServiceConnectedInvoked;
+    Future<?> registrationFinishTaskPending;
+
+    final ScheduledExecutorService agentExecutor;
+    final PlatformServiceConnectionMonitor registryConnectionMonitor;
 
     /**
      * Construct the agent connecting to the registry service on the specified host and use the
@@ -205,14 +196,12 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     {
         Log.log(this, "Registry addresses: ", Arrays.toString(registryAddresses));
         this.startTime = System.currentTimeMillis();
-        this.agentName = addProcId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(System.currentTimeMillis());
-        this.hostQualifiedAgentName = PlatformUtils.composeHostQualifiedName(this.agentName);
+        this.agentName = PlatformUtils.addProcessId(agentName) + "_" + new FastDateFormat().yyyyMMddHHmmssSSS(this.startTime);
         this.createLock = new ReentrantLock();
         this.destroyCalled = new AtomicBoolean(false);
         this.localPlatformServiceInstances = new ConcurrentHashMap<>();
         this.serviceProxies = new ConcurrentHashMap<>();
         this.serviceInstanceProxies = new ConcurrentHashMap<>();
-        this.registryConnectionState = new AtomicReference<>(DISCONNECTED);
 
         // make the actual connection to the registry
         this.registryProxy = new ProxyContext(
@@ -242,13 +231,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     }
                 };
 
+        // bulk register (and keep the NOOP oberver registered)
+        this.registryProxy.addObserver(NOOP_OBSERVER, IRegistryRecordNames.SERVICES, IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY,
+                IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+
         this.serviceAvailableListeners =
-                PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy,
-                        IRegistryRecordNames.SERVICES, this);
+                PlatformUtils.createServiceAvailableNotifyingCache(this.registryProxy, this);
 
         this.serviceInstanceAvailableListeners =
-                PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy,
-                        IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY, this);
+                PlatformUtils.createServiceInstanceAvailableNotifyingCache(this.registryProxy, this);
 
         // "split-brain" protection
         // setup listening for services lost from the registry - we use this to detect if the
@@ -261,7 +252,32 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     {
                         // only handle service unavailable signals when the registry is connected -
                         // otherwise let the registry re-connection tasks handle this
-                        reRegisterServiceIfConnectedToRegistry(serviceInstanceId);
+                        if (PlatformRegistryAgent.this.registryConnected
+                                // but ignore if we are destroying
+                                && !PlatformRegistryAgent.this.destroyCalled.get())
+                        {
+                            PlatformRegistryAgent.this.agentExecutor.execute(() -> {
+                                final PlatformServiceInstance serviceInstance =
+                                        PlatformRegistryAgent.this.localPlatformServiceInstances.get(
+                                                serviceInstanceId);
+                                if (serviceInstance != null)
+                                {
+                                    // the service is native to this agent, check active
+                                    if (serviceInstance.isActive())
+                                    {
+                                        Log.log(PlatformRegistryAgent.this, "Re-registering ",
+                                                serviceInstanceId);
+                                        registerServiceWithRetry(serviceInstance, null);
+                                    }
+                                    else
+                                    {
+                                        Log.log(PlatformRegistryAgent.this,
+                                                "NOT re-registering DEAD service instance ",
+                                                serviceInstanceId);
+                                    }
+                                }
+                            });
+                        }
                     }
 
                     @Override
@@ -274,9 +290,32 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.registryProxy.addObserver((imageCopy, atomicChange) -> {
             if (platformRegistryRpcsAvailable(imageCopy.keySet()))
             {
-                onRegistryConnected();
+                onRegistryConnected(false);
             }
         }, IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+
+        // listen for connection status changes in the registry service
+        this.registryConnectionMonitor =
+                new PlatformServiceConnectionMonitor(this.registryProxy, PlatformRegistry.SERVICE_NAME)
+                {
+                    @Override
+                    protected void onPlatformServiceReconnecting()
+                    {
+                        onPlatformServiceDisconnected();
+                    }
+
+                    @Override
+                    protected void onPlatformServiceDisconnected()
+                    {
+                        onRegistryDisconnected();
+                    }
+
+                    @Override
+                    protected void onPlatformServiceConnected()
+                    {
+                        onRegistryConnected(true);
+                    }
+                };
 
         // wait for the registry name to be received...
         synchronized (this.createLock)
@@ -290,8 +329,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 }
                 catch (InterruptedException e)
                 {
-                    throw new RuntimeException(
-                            "Interrupted whilst waiting for registry name from " + registryAddresses[0], e);
+                    ExceptionUtils.handleInterruptedException(this, e,
+                            "Interrupted whilst waiting for registry name from " + registryAddresses[0]);
                 }
             }
         }
@@ -307,29 +346,44 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
 
-    void onRegistryConnected()
+    void onRegistryConnected(boolean calledFromPlatformServiceConnectionMonitor)
     {
         this.createLock.lock();
         try
         {
-            if (this.registryConnectionState.get() != CONNECTED)
+            if (this.registrationFinishTaskPending == null || this.registrationFinishTaskPending.isDone())
             {
+                if (calledFromPlatformServiceConnectionMonitor)
+                {
+                    this.onPlatformServiceConnectedInvoked = true;
+                }
+                else
+                {
+                    if (!this.onPlatformServiceConnectedInvoked)
+                    {
+                        Log.log(PlatformRegistryAgent.this, "Waiting for registry service connection...");
+                        return;
+                    }
+                }
+
                 // NOTE: the RPC record may be updated whilst we check it
                 // remember; record access via "getRecord" is not thread safe
                 final IRecord remoteRpcs =
                         this.registryProxy.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-                final Set<String> rpcNames =
-                        remoteRpcs == null ? Collections.emptySet() : new HashSet<>(remoteRpcs.keySet());
+                if (remoteRpcs == null)
+                {
+                    Log.log(PlatformRegistryAgent.this, "No registry RPCs available");
+                    return;
+                }
+                final HashSet<String> rpcNames = new HashSet<>(remoteRpcs.keySet());
                 if (!platformRegistryRpcsAvailable(rpcNames))
                 {
-                    Log.log(this, "Waiting for registry RPCs, currently have: ",
+                    Log.log(PlatformRegistryAgent.this, "Waiting for registry RPCs, currently have: ",
                             ObjectUtils.safeToString(rpcNames));
+                    return;
                 }
-                else
-                {
-                    this.registryConnectionState.getAndSet(CONNECTED);
-                    this.agentExecutor.submit(this::finishRegistryConnection);
-                }
+
+                this.registrationFinishTaskPending = this.agentExecutor.submit(this::finishRegistryConnection);
             }
         }
         finally
@@ -345,13 +399,18 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         {
             try
             {
+                Log.log(PlatformRegistryAgent.this, "Completing registry connection activities...");
+
                 final String rpcGetPlatformNameResult =
-                        this.registryProxy.getRpc(PlatformRegistry.GET_PLATFORM_NAME).execute().textValue();
+                        this.registryProxy.getRpc(PlatformRegistry.GET_PLATFORM_NAME)
+                                .execute()
+                                .textValue();
 
                 // configure the channel watchdog heartbeat
-                String heartbeatConfig = this.registryProxy.getRpc(
-                        PlatformRegistry.GET_HEARTBEAT_CONFIG).execute().textValue();
-                int indexOf = heartbeatConfig.indexOf(":");
+                final String heartbeatConfig = this.registryProxy.getRpc(PlatformRegistry.GET_HEARTBEAT_CONFIG)
+                        .execute()
+                        .textValue();
+                final int indexOf = heartbeatConfig.indexOf(":");
                 if (indexOf > -1)
                 {
                     try
@@ -362,7 +421,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     }
                     catch (Exception e)
                     {
-                        Log.log(this, "Could not configure heartbeat for channel watchdog", e);
+                        Log.log(PlatformRegistryAgent.this,
+                                "Could not configure heartbeat for channel watchdog", e);
                     }
                 }
 
@@ -371,38 +431,54 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     this.platformName = rpcGetPlatformNameResult;
                     this.createLock.notifyAll();
                 }
+
                 this.registryAvailableListeners.notifyListenersDataAdded(this.platformName,
                         this.platformName);
             }
             catch (Exception e)
             {
-                Log.log(this, "Could not get platform name!");
+                Log.log(PlatformRegistryAgent.this, "Could not get platform name!");
             }
 
-            Log.banner(this, "*** REGISTRY CONNECTED *** " + ObjectUtils.safeToString(getRegistryEndPoint()));
+            // reset to prepare for a disconnect-reconnect sequence
+            this.onPlatformServiceConnectedInvoked = false;
+
+            Log.banner(PlatformRegistryAgent.this,
+                    "*** REGISTRY CONNECTED *** " + ObjectUtils.safeToString(getRegistryEndPoint()));
 
             setupRuntimeAttributePublishing();
 
-            startRegistryConnectionMonitor();
+            this.registryConnected = true;
+
         }
         finally
         {
+            this.registrationFinishTaskPending = null;
             this.createLock.unlock();
         }
 
-        // This must happen OUTSIDE the create lock else the lock is held whilst waiting for results
-        // of RPC registration which can block the registry trying to call the ftServiceInstanceStatus RPC
-        // on the service (presumably the thread handling the registry connect was also the context for
-        // handling RPC discovery from the registry)
+        // perform any re-registration tasks as a subsequent step on the same executor, this ensures that
+        // we notify IRegistryAvailableListeners with the registry connected event BEFORE we then go into
+        // any I/O operations for handling re-registration of services - handles a registry bounce scenario
+        this.agentExecutor.execute(() -> {
+            // This must happen OUTSIDE the create lock else the lock is held whilst waiting for results
+            // of RPC registration which can block the registry trying to call the ftServiceInstanceStatus RPC
+            // on the service (presumably the thread handling the registry connect was also the context for
+            // handling RPC discovery from the registry)
 
-        // (re)publish any service instances managed by this agent
-        for (final Iterator<Map.Entry<String, PlatformServiceInstance>> it =
-             this.localPlatformServiceInstances.entrySet().iterator(); it.hasNext(); )
-        {
-            PlatformServiceInstance platformServiceInstance = it.next().getValue();
-            Log.log(this, "Preparing to register ", ObjectUtils.safeToString(platformServiceInstance));
-            registerServiceWithRetry(platformServiceInstance, it::remove);
-        }
+            // (re)publish any service instances managed by this agent
+            PlatformServiceInstance platformServiceInstance;
+            for (final Iterator<Map.Entry<String, PlatformServiceInstance>> it =
+                 this.localPlatformServiceInstances.entrySet()
+                         .iterator(); it.hasNext(); )
+            {
+                platformServiceInstance = it.next()
+                        .getValue();
+                Log.log(PlatformRegistryAgent.this, "Preparing to register ",
+                        ObjectUtils.safeToString(platformServiceInstance));
+                registerServiceWithRetry(platformServiceInstance, it::remove);
+            }
+        });
     }
 
     void onRegistryDisconnected()
@@ -410,21 +486,22 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         this.createLock.lock();
         try
         {
-            if (this.registryConnectionState.getAndSet(DISCONNECTED) != DISCONNECTED)
+            if (this.platformName != null)
             {
-                Log.banner(this, "*** REGISTRY DISCONNECTED ***");
+                this.registryConnected = false;
+                Log.banner(PlatformRegistryAgent.this, "*** REGISTRY DISCONNECTED ***");
                 for (String serviceFamily : this.serviceAvailableListeners.keySet())
                 {
                     if (this.serviceAvailableListeners.notifyListenersDataRemoved(serviceFamily))
                     {
-                        Log.log(this, "Dropped service: '", serviceFamily, "'");
+                        Log.log(PlatformRegistryAgent.this, "Dropped service: '", serviceFamily, "'");
                     }
                 }
                 for (String serviceInstance : this.serviceInstanceAvailableListeners.keySet())
                 {
                     if (this.serviceInstanceAvailableListeners.notifyListenersDataRemoved(serviceInstance))
                     {
-                        Log.log(this, "Dropped serviceInstance: '", serviceInstance, "'");
+                        Log.log(PlatformRegistryAgent.this, "Dropped serviceInstance: '", serviceInstance, "'");
                     }
                 }
                 this.registryAvailableListeners.notifyListenersDataRemoved(this.platformName);
@@ -479,8 +556,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (InterruptedException e)
             {
-                throw new RuntimeException(
-                        "Interrupted whilst waiting for " + serviceFamily + " to be available", e);
+                if (Thread.interrupted())
+                {
+                    throw new RuntimeException(
+                            "Interrupted whilst waiting for " + serviceFamily + " to be available", e);
+                }
             }
         }
         finally
@@ -552,7 +632,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public boolean createPlatformServiceInstance(String serviceFamily, String serviceMember, String host,
             int port, WireProtocolEnum wireProtocol, RedundancyModeEnum redundancyMode,
-            IContextExecutor coreExecutor, IContextExecutor rpcExecutor,
+            ThimbleExecutor coreExecutor, ThimbleExecutor rpcExecutor,
             ScheduledExecutorService utilityExecutor, TransportTechnologyEnum transportTechnology)
     {
         this.createLock.lock();
@@ -578,7 +658,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (Exception e)
             {
-                Log.log(this,
+                Log.log(PlatformRegistryAgent.this,
                         "Could not create service " + platformServiceInstanceID + " at " + host + ":" + port,
                         e);
                 if (platformServiceInstance != null)
@@ -610,7 +690,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
             final CountDownLatch latch = new CountDownLatch(1);
             final IServiceInstanceAvailableListener listener =
-                    EventListenerUtils.synchronizedListener(new IServiceInstanceAvailableListener() {
+                    EventListenerUtils.synchronizedListener(new IServiceInstanceAvailableListener()
+                    {
                         @Override
                         public void onServiceInstanceAvailable(String serviceInstanceId)
                         {
@@ -632,13 +713,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
             try
             {
-                Log.log(this, "Registering ", ObjectUtils.safeToString(serviceInstance));
+                Log.log(PlatformRegistryAgent.this, "Registering ",
+                        ObjectUtils.safeToString(serviceInstance));
                 try
                 {
                     registerRpc.execute(TextValue.valueOf(serviceInstance.getPlatformServiceFamily()),
-                            TextValue.valueOf(serviceInstance.getWireProtocol().toString()), TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
-                            LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()), TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
-                            TextValue.valueOf(serviceInstance.getRedundancyMode().toString()), TextValue.valueOf(this.agentName),
+                            TextValue.valueOf(serviceInstance.getWireProtocol().toString()),
+                            TextValue.valueOf(serviceInstance.getEndPointAddress().getNode()),
+                            LongValue.valueOf(serviceInstance.getEndPointAddress().getPort()),
+                            TextValue.valueOf(serviceInstance.getPlatformServiceMemberName()),
+                            TextValue.valueOf(serviceInstance.getRedundancyMode().toString()),
+                            TextValue.valueOf(this.agentName),
                             TextValue.valueOf(serviceInstance.publisher.getTransportTechnology().toString()));
                 }
                 catch (ExecutionException e)
@@ -652,7 +737,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                                 serviceInstance.getRedundancyMode().toString()))
                         // NOTE: we're not checking the transport tech or wire protocol
                         {
-                            Log.log(this, "Registry has already registered ",
+                            Log.log(PlatformRegistryAgent.this, "Registry has already registered ",
                                     ObjectUtils.safeToString(serviceInstance));
                         }
                     }
@@ -667,68 +752,85 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 // needed
                 try
                 {
-                    if (!latch.await(Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+                    if (!latch.await(Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS,
+                            TimeUnit.MILLISECONDS))
                     {
                         throw new TimeOutException(
-                                "Did not get confirmation of registration of " + serviceInstance + " after waiting "
+                                "Did not get confirmation of registration of " + serviceInstance
+                                        + " after waiting "
                                         + Values.PLATFORM_AGENT_SERVICE_REGISTRATION_TIMEOUT_MILLIS + "ms");
                     }
                 }
                 catch (InterruptedException e)
                 {
-                    throw new ExecutionException(
-                            "Interrupted whilst waiting for registration confirmation of " + serviceInstance);
+                    if (Thread.interrupted())
+                    {
+                        throw new ExecutionException(
+                                "Interrupted whilst waiting for registration confirmation of " + serviceInstance);
+                    }
                 }
             }
             finally
             {
                 removeServiceInstanceAvailableListener(listener);
             }
+
         }
     }
 
     @Override
     public boolean destroyPlatformServiceInstance(String serviceFamily, String serviceMember)
     {
+        final String platformServiceInstanceID =
+                PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
+        final PlatformServiceInstance service;
         this.createLock.lock();
         try
         {
-            final String platformServiceInstanceID =
-                    PlatformUtils.composePlatformServiceInstanceID(serviceFamily, serviceMember);
-            final PlatformServiceInstance service =
-                    this.localPlatformServiceInstances.remove(platformServiceInstanceID);
+            service = this.localPlatformServiceInstances.remove(platformServiceInstanceID);
             if (service != null)
             {
+                // de-register holding the createLock
                 try
                 {
-                    this.registryProxy.getRpc(PlatformRegistry.DEREGISTER).execute(
-                            TextValue.valueOf(serviceFamily), TextValue.valueOf(serviceMember));
+                    final IRpcInstance rpc = this.registryProxy.getRpc(PlatformRegistry.DEREGISTER);
+                    if (rpc == null)
+                    {
+                        Log.log(PlatformRegistryAgent.this,
+                                "No deregister RPC found, assuming registry connection is dead");
+                    }
+                    else
+                    {
+                        rpc.execute(TextValue.valueOf(serviceFamily), TextValue.valueOf(serviceMember));
+                    }
                 }
                 catch (Exception e)
                 {
-                    Log.log(this, "Could not deregister service " + platformServiceInstanceID
-                            + ", continuing to destroy", e);
+                    Log.log(PlatformRegistryAgent.this,
+                            "Could not deregister service " + platformServiceInstanceID
+                                    + ", continuing to destroy", e);
                 }
-                try
-                {
-                    service.destroy();
-                }
-                catch (Exception e)
-                {
-                    Log.log(this, "Could not destroy service " + platformServiceInstanceID, e);
-                }
-                return true;
             }
-        }
-        catch (Exception e)
-        {
-            Log.log(this, "Could not destroy service " + serviceFamily + ":" + serviceMember, e);
+            else
+            {
+                return false;
+            }
         }
         finally
         {
             this.createLock.unlock();
         }
-        return false;
+
+        try
+        {
+            service.destroy();
+            return true;
+        }
+        catch (Exception e)
+        {
+            Log.log(PlatformRegistryAgent.this, "Could not destroy service " + platformServiceInstanceID, e);
+            return false;
+        }
     }
 
     @Override
@@ -749,7 +851,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 if (!this.serviceAvailableListeners.keySet().contains(serviceFamily))
                 {
-                    Log.log(this, "No service available for ", serviceFamily,
+                    Log.log(PlatformRegistryAgent.this, "No service available for ", serviceFamily,
                             (proxy != null ? " (proxy is inactive)" : ""));
                     return null;
                 }
@@ -761,11 +863,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         getPlatformServiceInstanceInfoRecordImageForService(serviceFamily);
                 if (serviceInfoRecord == null)
                 {
-                    Log.log(this, "No service info record available for ", serviceFamily);
+                    Log.log(PlatformRegistryAgent.this, "No service info record available for ", serviceFamily);
                     return null;
                 }
 
-                Log.log(this, "getPlatformServiceProxy serviceInfoRecord is ", serviceInfoRecord.toString());
+                Log.log(PlatformRegistryAgent.this, "getPlatformServiceProxy serviceInfoRecord is ", serviceInfoRecord.toString());
 
                 final ICodec<?> codec = PlatformUtils.getCodecFromServiceInfoRecord(serviceInfoRecord);
                 final String host = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord);
@@ -797,7 +899,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             {
                 if (!this.serviceInstanceAvailableListeners.keySet().contains(serviceInstanceId))
                 {
-                    Log.log(this, "No service instance available for ", serviceInstanceId,
+                    Log.log(PlatformRegistryAgent.this, "No service instance available for ", serviceInstanceId,
                             (proxy != null ? " (proxy is inactive)" : ""));
                     return null;
                 }
@@ -806,7 +908,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         getRemoteRecordImageTimeoutMillis());
                 if (serviceInfoRecord == null)
                 {
-                    Log.log(this, "No service info record available for ", serviceInstanceId);
+                    Log.log(PlatformRegistryAgent.this, "No service info record available for ", serviceInstanceId);
                     return null;
                 }
                 final ICodec<?> codec = PlatformUtils.getCodecFromServiceInfoRecord(serviceInfoRecord);
@@ -818,17 +920,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
                 final IEndPointAddressFactory endPointAddressFactory = () -> {
                     Log.log(this, "Obtaining service info record for '", serviceInstanceId, "'");
-                    final Map<String, IValue> serviceInfoRecord1 = this.registryProxy.getRemoteRecordImage(
+                    final Map<String, IValue> nextServiceInfoRecord = this.registryProxy.getRemoteRecordImage(
                             ServiceInfoRecordFields.SERVICE_INFO_RECORD_NAME_PREFIX + serviceInstanceId,
                             getRemoteRecordImageTimeoutMillis());
-                    if (serviceInfoRecord1 == null)
+                    if (nextServiceInfoRecord == null)
                     {
                         Log.log(this, "No service info record found for '", serviceInstanceId, "'");
                         return null;
                     }
-                    final String node = PlatformUtils.getHostNameFromServiceInfoRecord(serviceInfoRecord1);
-                    final int port1 = PlatformUtils.getPortFromServiceInfoRecord(serviceInfoRecord1);
-                    final EndPointAddress endPointAddress = new EndPointAddress(node, port1);
+                    final String node = PlatformUtils.getHostNameFromServiceInfoRecord(nextServiceInfoRecord);
+                    final int servicePort = PlatformUtils.getPortFromServiceInfoRecord(nextServiceInfoRecord);
+                    final EndPointAddress endPointAddress = new EndPointAddress(node, servicePort);
                     Log.log(this, "Service instance '" + serviceInstanceId, "' ",
                             ObjectUtils.safeToString(endPointAddress));
                     return endPointAddress;
@@ -860,16 +962,26 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         return doDestroyProxy(serviceInstanceId, this.serviceInstanceProxies);
     }
 
-    final boolean doDestroyProxy(String serviceFamily, ConcurrentMap<String, PlatformServiceProxy> proxies)
+    boolean doDestroyProxy(String serviceFamily, ConcurrentMap<String, PlatformServiceProxy> proxies)
     {
+        final PlatformServiceProxy proxy;
         this.createLock.lock();
         try
         {
-            final PlatformServiceProxy proxy = proxies.remove(serviceFamily);
+            proxy = proxies.remove(serviceFamily);
             if (proxy == null)
             {
                 return false;
             }
+        }
+        finally
+        {
+            this.createLock.unlock();
+        }
+
+        // destroy the proxy outside the lock to prevent deadlock
+        try
+        {
             proxy.destroy();
             return true;
         }
@@ -878,10 +990,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             Log.log(this, "Could not destroy proxy to " + serviceFamily, e);
             return false;
         }
-        finally
-        {
-            this.createLock.unlock();
-        }
+
     }
 
     @Override
@@ -892,72 +1001,56 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             return;
         }
 
-        this.createLock.lock();
-        try
+        Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+
+        safeCall(registryConnectionMonitor::destroy);
+        safeCall(serviceAvailableListeners::destroy);
+        safeCall(serviceInstanceAvailableListeners::destroy);
+        safeCall(registryAvailableListeners::destroy);
+
+        if (this.dynamicAttributeUpdateTask != null)
         {
-            Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-
             try
             {
-                this.registryProxy.destroy();
+                this.dynamicAttributeUpdateTask.cancel(false);
             }
             catch (Exception e)
             {
-                Log.log(this, "Could not destroy " + ObjectUtils.safeToString(this.registryProxy), e);
-            }
-
-            this.registryConnectionState.set(DISCONNECTED);
-
-            this.registryConnectionMonitor.destroy();
-
-            try
-            {
-                this.serviceAvailableListeners.destroy();
-                this.serviceInstanceAvailableListeners.destroy();
-                this.registryAvailableListeners.destroy();
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not destroy listener notifiers", e);
-            }
-
-            if (this.dynamicAttributeUpdateTask != null)
-            {
-                try
-                {
-                    this.dynamicAttributeUpdateTask.cancel(false);
-                }
-                catch (Exception e)
-                {
-                    Log.log(this, "Could not cancel dynamicAttributeUpdateTask", e);
-                }
-            }
-
-            for (PlatformServiceInstance service : new HashSet<>(this.localPlatformServiceInstances.values()))
-            {
-                destroyPlatformServiceInstance(service.serviceFamily, service.serviceMember);
-            }
-            for (PlatformServiceProxy proxy : new HashSet<>(this.serviceProxies.values()))
-            {
-                destroyPlatformServiceProxy(proxy.serviceFamily);
-            }
-            for (String serviceInstanceId : new HashSet<>(this.serviceInstanceProxies.keySet()))
-            {
-                destroyPlatformServiceInstanceProxy(serviceInstanceId);
-            }
-
-            try
-            {
-                this.agentExecutor.shutdownNow();
-            }
-            catch (Exception e)
-            {
-                Log.log(this, "Could not shutdown executor", e);
+                Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
             }
         }
-        finally
+
+        for (PlatformServiceInstance service : new HashSet<>(this.localPlatformServiceInstances.values()))
         {
-            this.createLock.unlock();
+            destroyPlatformServiceInstance(service.serviceFamily, service.serviceMember);
+        }
+        for (PlatformServiceProxy proxy : new HashSet<>(this.serviceProxies.values()))
+        {
+            destroyPlatformServiceProxy(proxy.serviceFamily);
+        }
+        for (String serviceInstanceId : new HashSet<>(this.serviceInstanceProxies.keySet()))
+        {
+            destroyPlatformServiceInstanceProxy(serviceInstanceId);
+        }
+
+        // when destroying platform service instances,
+        // we need the registryProxy to call the deregister RPC
+        // so destroy the proxy AFTER
+        safeCall(registryProxy::destroy);
+
+        // shutdown the executor at the end to allow notification caches to finish cleanly
+        safeCall(agentExecutor::shutdown);
+    }
+
+    private void safeCall(Runnable destroy)
+    {
+        try
+        {
+            destroy.run();
+        }
+        catch (Exception e)
+        {
+            Log.log(this, "Could not destroy " + ObjectUtils.safeToString(destroy), e);
         }
     }
 
@@ -1022,7 +1115,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
     @Override
     public String getAgentName()
     {
-        return this.hostQualifiedAgentName;
+        return this.agentName;
     }
 
     @Override
@@ -1082,12 +1175,12 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     }
                     catch (Exception e)
                     {
-                        Log.log(this, "Could not invoke " + PlatformRegistry.RUNTIME_STATIC, e);
+                        Log.log(PlatformRegistryAgent.this, "Could not invoke " + PlatformRegistry.RUNTIME_STATIC, e);
                     }
                 }
                 catch (TimeOutException e1)
                 {
-                    Log.log(this,
+                    Log.log(PlatformRegistryAgent.this,
                             "RPC not available from platform registry: " + PlatformRegistry.RUNTIME_STATIC
                                     + ", rescheduling in " + timeoutMillis + "ms", e1);
 
@@ -1106,13 +1199,14 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (Exception e)
             {
-                Log.log(this, "Could not cancel dynamicAttributeUpdateTask", e);
+                Log.log(PlatformRegistryAgent.this, "Could not cancel dynamicAttributeUpdateTask", e);
             }
         }
 
-        final Runnable dynamicStatsTask = new Runnable()
+        this.dynamicAttributeUpdateTask = this.agentExecutor.scheduleWithFixedDelay(new Runnable()
         {
             final ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
+            long executedFromLastPeriod;
             IRpcInstance rpc;
 
             @Override
@@ -1139,9 +1233,11 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     final double inverseLoggingPeriodSecs =
                             1d / DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS;
                     final long qTotalExecuted = stats[2];
-                    final long eventsPerSec = (long) ((qTotalExecuted) * inverseLoggingPeriodSecs);
+                    final long eventsPerSec = (long) ((qTotalExecuted - this.executedFromLastPeriod)
+                            * inverseLoggingPeriodSecs);
                     final long uptime =
                             (System.currentTimeMillis() - PlatformRegistryAgent.this.startTime) / 1000;
+                    this.executedFromLastPeriod = qTotalExecuted;
                     try
                     {
                         this.rpc.executeNoResponse(TextValue.valueOf(PlatformRegistryAgent.this.agentName),
@@ -1153,19 +1249,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     }
                     catch (Exception e)
                     {
-                        Log.log(this, "Could not invoke " + this.rpc, e);
+                        Log.log(PlatformRegistryAgent.this, "Could not invoke " + this.rpc, e);
                     }
                 }
                 catch (TimeOutException e1)
                 {
-                    Log.log(this,
+                    Log.log(PlatformRegistryAgent.this,
                             "RPC not available from platform registry: " + PlatformRegistry.RUNTIME_DYNAMIC,
                             e1);
                 }
             }
-        };
-        this.dynamicAttributeUpdateTask = this.agentExecutor.scheduleWithFixedDelay(dynamicStatsTask,
-                DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
+        }, DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS,
                 DataFissionProperties.Values.STATS_LOGGING_PERIOD_SECS, TimeUnit.SECONDS);
     }
 
@@ -1182,57 +1276,6 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         return new HashMap<>(this.serviceProxies);
     }
 
-    private void startRegistryConnectionMonitor()
-    {
-        if (this.registryConnectionMonitor == null)
-            // listen for connection status changes in the registry service
-            this.registryConnectionMonitor =
-                    new PlatformServiceConnectionMonitor(this.registryProxy, PlatformRegistry.SERVICE_NAME)
-                    {
-                        @Override
-                        protected void onPlatformServiceReconnecting()
-                        {
-                            onPlatformServiceDisconnected();
-                        }
-
-                        @Override
-                        protected void onPlatformServiceDisconnected()
-                        {
-                            onRegistryDisconnected();
-                        }
-
-                        @Override
-                        protected void onPlatformServiceConnected()
-                        {
-                            onRegistryConnected();
-                        }
-                    };
-    }
-
-    private void reRegisterServiceIfConnectedToRegistry(String serviceInstanceId)
-    {
-        if (this.localPlatformServiceInstances.get(serviceInstanceId) != null)
-        {
-            if (this.registryConnectionState.get() == CONNECTED)
-            {
-                this.agentExecutor.execute(() -> {
-                    // check again in case its removed
-                    final PlatformServiceInstance serviceInstance =
-                            this.localPlatformServiceInstances.get(serviceInstanceId);
-                    if (serviceInstance != null && serviceInstance.isActive())
-                    {
-                        Log.log(this, "Re-registering ", serviceInstanceId);
-                        registerServiceWithRetry(serviceInstance, null);
-                    }
-                });
-            }
-            else
-            {
-                Log.log(this, "Not connected to registry, won't re-register ", serviceInstanceId);
-            }
-        }
-    }
-    
     void registerServiceWithRetry(PlatformServiceInstance platformServiceInstance, final Runnable failureTask)
     {
         final int maxTries = PlatformCoreProperties.Values.PLATFORM_AGENT_MAX_SERVICE_REGISTER_TRIES;
@@ -1247,23 +1290,23 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (RegisterRpcNotAvailableException e)
             {
-                Log.log(this,
+                Log.log(PlatformRegistryAgent.this,
                         "Register RPC not available (is the registry disconnected?), aborting registration of "
                                 + ObjectUtils.safeToString(platformServiceInstance)
                                 + ", if the registry reconnects this service will be re-registered", e);
-                return;
             }
             catch (Exception e)
             {
-                Log.log(this, " (" + tries + "/" + maxTries
-                        + ") Failed attempt registering " + ObjectUtils.safeToString(platformServiceInstance)
+                Log.log(PlatformRegistryAgent.this,
+                    " (" + tries + "/" + maxTries + ") Failed attempt registering "
+                        + ObjectUtils.safeToString(platformServiceInstance)
                         + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"), e);
             }
         }
 
         if (!registered)
         {
-            Log.log(this, "*** ALERT *** Could not register ",
+            Log.log(PlatformRegistryAgent.this, "*** ALERT *** Could not register ",
                     ObjectUtils.safeToString(platformServiceInstance));
             try
             {
@@ -1271,8 +1314,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (Exception e)
             {
-                Log.log(this, "*** ALERT *** Could not destroy " + ObjectUtils.safeToString(
-                        platformServiceInstance), e);
+                Log.log(PlatformRegistryAgent.this,
+                    "*** ALERT *** Could not destroy " + ObjectUtils.safeToString(platformServiceInstance), e);
             }
             finally
             {

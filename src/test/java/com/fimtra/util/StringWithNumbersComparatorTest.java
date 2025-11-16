@@ -42,7 +42,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator1()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("XYZ_10");
         strings.add("XYZ_1");
         Collections.sort(strings, this.candidate);
@@ -52,7 +52,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator2()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("XYZ_10");
         strings.add("XYZ_9");
         Collections.sort(strings, this.candidate);
@@ -62,7 +62,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator3()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("XYZ");
         strings.add("XYZ_10");
         strings.add("");
@@ -73,7 +73,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator4()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("XYZ");
         strings.add("XYZ_15");
         strings.add("XYZ_5");
@@ -88,7 +88,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator5()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("");
         strings.add("10XYZ");
         strings.add(null);
@@ -105,7 +105,7 @@ public class StringWithNumbersComparatorTest
     @Test
     public void testComparator()
     {
-        List<String> strings = new ArrayList<String>();
+        List<String> strings = new ArrayList<>();
         strings.add("XYZ_0");
         strings.add("XYZ_1");
         strings.add("XYZ_10");

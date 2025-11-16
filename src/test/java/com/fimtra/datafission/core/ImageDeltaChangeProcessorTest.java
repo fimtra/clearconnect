@@ -16,9 +16,8 @@
 package com.fimtra.datafission.core;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,7 +55,7 @@ public class ImageDeltaChangeProcessorTest
         this.candidate = new ImageDeltaChangeProcessor();
         this.name = "test-recordName";
         this.record = mock(IRecord.class);
-        when(this.record.getWriteLock()).thenReturn(this.record);
+        when(this.record.getWriteLock()).thenReturn(new Object());
         this.changeToApply = mock(IRecordChange.class);
 
         // simulate we have an image
@@ -72,7 +71,6 @@ public class ImageDeltaChangeProcessorTest
         assertEquals(ImageDeltaChangeProcessor.PUBLISH, this.candidate.processRxChange(this.changeToApply, this.name, this.record));
         verify(this.changeToApply).applyCompleteAtomicChangeToRecord(eq(this.record));
         verifyGetSequenceCalled();
-        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 
@@ -128,7 +126,7 @@ public class ImageDeltaChangeProcessorTest
         // image) BUT the delta sequences are wrong - expect a resync
         
         this.candidate.imageReceived.clear();
-        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
@@ -172,7 +170,7 @@ public class ImageDeltaChangeProcessorTest
         // image)
         
         this.candidate.imageReceived.clear();
-        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<IRecordChange>();
+        final LowGcLinkedList<IRecordChange> deltas = new LowGcLinkedList<>();
         this.candidate.cachedDeltas.put(this.name, deltas);
         IRecordChange change20 = mock(IRecordChange.class);
         IRecordChange change24 = mock(IRecordChange.class);
@@ -203,7 +201,7 @@ public class ImageDeltaChangeProcessorTest
         verify(this.changeToApply).getScope();
         verifyGetSequenceCalled();
         verify(this.record).clear();
-        verify(this.record, times(3)).getWriteLock();
+        verify(this.record).getWriteLock();
         verifyNoMoreInteractions(this.record, this.changeToApply);
     }
 
