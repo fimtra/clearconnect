@@ -53,10 +53,15 @@ public class RemoteContextTelnetServer
         createMapAndStartUpdating(record2);
         createMapAndStartUpdating(record3);
 
-        executor.scheduleAtFixedRate(() -> {
-            context.publishAtomicChange(record1);
-            context.publishAtomicChange(record2);
-            context.publishAtomicChange(record3);
+        executor.scheduleAtFixedRate(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                context.publishAtomicChange(record1);
+                context.publishAtomicChange(record2);
+                context.publishAtomicChange(record3);
+            }
         }, 0, ATOMIC_CHANGE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
 
         System.in.read();
@@ -71,7 +76,7 @@ public class RemoteContextTelnetServer
         }
         executor.scheduleAtFixedRate(new Runnable()
         {
-            final Random random = new Random();
+            Random random = new Random();
 
             @Override
             public void run()

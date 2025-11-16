@@ -16,10 +16,10 @@
 package com.fimtra.clearconnect.config.impl;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
@@ -44,6 +44,7 @@ import com.fimtra.clearconnect.core.PlatformUtils;
 import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRecordConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceAvailableListener;
+import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.TextValue;
 import com.fimtra.tcpchannel.TcpChannelProperties;
 import com.fimtra.tcpchannel.TcpChannelUtils;
@@ -146,8 +147,8 @@ public class ConfigServiceTest
     {
         final IConfig config = this.proxy.getConfig("TestService", "some");
         final IConfig config2 = this.proxy.getConfig("TestService", "instance");
-
-        assertNotEquals(config, config2);
+        
+        assertFalse(config.equals(config2));
     }
     
     @Test
@@ -176,8 +177,10 @@ public class ConfigServiceTest
 
         addFamilyConfigAndVerify(listener, k2, v1);
 
-        final AtomicReference<CountDownLatch> availableLatch = new AtomicReference<>(new CountDownLatch(1));
-        final AtomicReference<CountDownLatch> unavailableLatch = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> availableLatch =
+            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> unavailableLatch =
+            new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         this.agent.addServiceAvailableListener(EventListenerUtils.synchronizedListener(new IServiceAvailableListener()
         {
             @Override
@@ -235,7 +238,7 @@ public class ConfigServiceTest
         this.agent.waitForPlatformService(IConfigServiceProxy.CONFIG_SERVICE);
 
         // wait for the proxy to reconnect
-        final AtomicReference<CountDownLatch> connected = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         this.agent.getPlatformServiceProxy(IConfigServiceProxy.CONFIG_SERVICE).addRecordConnectionStatusListener(
             EventListenerUtils.synchronizedListener(new IRecordConnectionStatusListener()
             {
@@ -272,7 +275,7 @@ public class ConfigServiceTest
     {
         boolean delete = this.proxy.getConfigManager(SERVICE, MEMBER).deleteMemberConfig(k1);
         assertTrue(delete);
-        verify(listener, timeout(TIMEOUT).atLeastOnce()).onPropertyChange(eq(k1), eq(null));
+        verify(listener, timeout(TIMEOUT).atLeastOnce()).onPropertyChange(eq(k1), (IValue) eq(null));
         waitAndReset(listener);
     }
 
@@ -288,7 +291,7 @@ public class ConfigServiceTest
     {
         boolean delete = this.proxy.getConfigManager(SERVICE, MEMBER).deleteFamilyConfig(k1);
         assertTrue(delete);
-        verify(listener, timeout(TIMEOUT).atLeastOnce()).onPropertyChange(eq(k1), eq(null));
+        verify(listener, timeout(TIMEOUT).atLeastOnce()).onPropertyChange(eq(k1), (IValue) eq(null));
         waitAndReset(listener);
     }
 

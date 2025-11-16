@@ -17,7 +17,6 @@ package com.fimtra.datafission;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
 import java.rmi.Remote;
 import java.util.List;
 
@@ -36,7 +35,7 @@ import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
  */
 public interface ICodec<T>
 {
-    enum CommandEnum
+    public enum CommandEnum
     {
             NOOP, SUBSCRIBE, UNSUBSCRIBE, RPC, IDENTIFY, RESYNC
     }
@@ -140,7 +139,7 @@ public interface ICodec<T>
      *            the record name for the RPC result
      * @return the byte[] for the RPC call and details
      * @see Remote for a description of the atomic change structure
-     * @see #getRpcFromRxMessage(Object)
+     * @see #getRpcFromRxMessage(byte[])
      */
     byte[] getTxMessageForRpc(String rpcName, IValue[] args, String resultRecordName);
 
@@ -151,14 +150,14 @@ public interface ICodec<T>
      *            the message to resolve the RPC from
      * @return an {@link IRecordChange} holding the RPC details
      * @see Remote for a description of the atomic change structure
-     * @see #getAtomicChangeFromRxMessage(ByteBuffer)
+     * @see #getAtomicChangeFromRxMessage(byte[])
      */
     IRecordChange getRpcFromRxMessage(T decodedMessage);
 
     /**
      * Decode the ByteBuffer into the data object type
      */
-    T decode(ByteBuffer rxMessage, CharsetDecoder charsetDecoder);
+    T decode(ByteBuffer rxMessage);
 
     /**
      * @return the frame encoding format for the wire protocol for this codec

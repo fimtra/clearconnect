@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013 Ramon Servadei, Fimtra
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *
+ *    
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,9 +22,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -58,10 +57,9 @@ import com.fimtra.clearconnect.event.IServiceConnectionStatusListener;
 import com.fimtra.clearconnect.event.IServiceInstanceAvailableListener;
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.IRecord;
+import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
-import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.ImmutableSnapshotRecord;
-import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import com.fimtra.util.Log;
 import com.fimtra.util.TestUtils;
@@ -80,7 +78,7 @@ import org.junit.rules.TestName;
  * Tests for the {@link PlatformRegistry} and {@link PlatformRegistryAgent}
  * <p>
  * Its big, its ugly....
- *
+ * 
  * @author Ramon Servadei
  */
 @SuppressWarnings({ "boxing", "unused" })
@@ -157,7 +155,7 @@ public class PlatformTest
 
         synchronized void verifyNoMoreInteractions()
         {
-            assertTrue("Got: " + this, this.unavailable.isEmpty() && this.available.isEmpty());
+            assertTrue("Got: " + this, this.unavailable.size() == 0 && this.available.size() == 0);
         }
 
         private synchronized void checkContains(long timeout, List<String> list, String... availableOrder)
@@ -233,7 +231,7 @@ public class PlatformTest
 
         void verifyNoMoreInteractions()
         {
-            assertTrue("Got: " + this, this.unavailable.isEmpty() && this.available.isEmpty());
+            assertTrue("Got: " + this, this.unavailable.size() == 0 && this.available.size() == 0);
         }
 
         private synchronized void checkContains(long timeout, List<String> list, String... availableOrder)
@@ -319,77 +317,27 @@ public class PlatformTest
     {
         Log.log(this, "============== START TEAR DOWN " + this.name.getMethodName() + " =============================");
 
-        ThreadUtils.newThread(() -> {
-            PlatformTest.this.registry.destroy();
-            if (PlatformTest.this.agent != null)
+        ThreadUtils.newThread(new Runnable()
+        {
+            @Override
+            public void run()
             {
-                PlatformTest.this.agent.destroy();
-            }
-            if (PlatformTest.this.agent008 != null)
-            {
-                PlatformTest.this.agent008.destroy();
-            }
+                PlatformTest.this.registry.destroy();
+                if (PlatformTest.this.agent != null)
+                {
+                    PlatformTest.this.agent.destroy();
+                }
+                if (PlatformTest.this.agent008 != null)
+                {
+                    PlatformTest.this.agent008.destroy();
+                }
 
-            Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName()
+                Log.log(PlatformTest.this, "============== END TEAR DOWN " + PlatformTest.this.name.getMethodName()
                     + " =============================");
+            }
         }, "tearDown-" + this.name.getMethodName()).start();
 
         ChannelUtils.WATCHDOG.configure(5000);
-    }
-
-    @Test
-    public void testDoesNotReconnectToDestoyedService() throws IOException, InterruptedException
-    {
-        final String SERVICE1 = logStart();
-        createAgent();
-
-        final CountDownLatch serviceStopped = new CountDownLatch(1);
-        final CountDownLatch serviceStarted = new CountDownLatch(1);
-        registry.context.addObserver((image, atomicChange) -> {
-            System.err.println(image);
-            final Map<String, IValue> servicesForAgent = image.getOrCreateSubMap(agent.getAgentName());
-            if (servicesForAgent.isEmpty())
-            {
-                if (serviceStarted.getCount() == 0)
-                {
-                    // service has stopped
-                    serviceStopped.countDown();
-                }
-            }
-            else
-            {
-                serviceStarted.countDown();
-            }
-        }, PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_AGENT);
-
-        final TestServiceInstanceAvailableListener listener = new TestServiceInstanceAvailableListener();
-        agent.addServiceInstanceAvailableListener(listener);
-
-        assertTrue(
-                this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                        WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        final PlatformServiceInstance platformServiceInstance =
-                (PlatformServiceInstance) agent.getPlatformServiceInstance(SERVICE1, this.primary);
-
-        assertTrue(serviceStarted.await(5, TimeUnit.SECONDS));
-        assertEquals("Got: " + listener.available, 2, listener.available.size());
-
-        assertEquals(1, registry.eventHandler.monitoredServiceInstances.size());
-        final ProxyContext proxy = registry.eventHandler.monitoredServiceInstances.values()
-                .iterator()
-                .next();
-        assertTrue(proxy.isActive());
-
-        // simulate just the network layer disconnecting
-        Log.log(this, ">>>> Destroying: " + platformServiceInstance.publisher);
-        platformServiceInstance.publisher.destroy();
-
-        assertTrue(serviceStopped.await(5, TimeUnit.SECONDS));
-        assertEquals("Got: " + listener.unavailable, 1, listener.unavailable.size());
-
-        // check the registry destroys the proxy to the service
-        assertEquals(0, registry.eventHandler.monitoredServiceInstances.size());
-        assertFalse(proxy.isActive());
     }
 
     @Test
@@ -399,7 +347,7 @@ public class PlatformTest
         createAgent();
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
 
         final TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
         this.agent.addServiceAvailableListener(serviceListener);
@@ -408,14 +356,14 @@ public class PlatformTest
 
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
         serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT,
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // stop the registry
         this.registry.destroy();
 
         serviceListener.verifyOnServiceUnavailableCalled(STD_TIMEOUT, SERVICE1);
         serviceInstanceListener.verifyOnServiceInstanceUnavailableCalled(STD_TIMEOUT,
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
 
         // restart the registry, then check we get our services back
         this.registry = null;
@@ -438,7 +386,7 @@ public class PlatformTest
 
         serviceListener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
         serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT,
-                PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
+            PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary));
     }
 
     @Test(timeout = 30000L)
@@ -448,7 +396,7 @@ public class PlatformTest
         createAgent();
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
         this.agent.waitForPlatformService(SERVICE1);
     }
 
@@ -459,7 +407,7 @@ public class PlatformTest
         createAgent();
         createAgent008();
         this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
         this.agent.waitForPlatformService(null);
     }
 
@@ -470,9 +418,9 @@ public class PlatformTest
         createAgent();
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertEquals(getPlatformName(),
-                this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
     }
 
     @Test
@@ -482,41 +430,12 @@ public class PlatformTest
         createAgent();
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         assertNotSame("Same service instances!", this.agent.getPlatformServiceInstance(SERVICE1, this.primary),
-                this.agent.getPlatformServiceInstance(SERVICE1, this.secondary));
-    }
-
-    @Test
-    public void testLotsOfServices() throws IOException
-    {
-        // this test specifically verifies fragmentation of a record - the serviceInstance record
-        // we have many services here and we want to ensure that the record is fragmented
-
-        createAgent();
-
-        int max = 100;
-        for(int i = 0; i < max; i++)
-        {
-            assertTrue(this.agent.createPlatformServiceInstance("service-" + i,
-                    this.primary, this.agentHost, servicePort++,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
-        }
-
-        createAgent008();
-
-        final TestServiceInstanceAvailableListener listener = new TestServiceInstanceAvailableListener();
-        final TestServiceInstanceAvailableListener listener2 = new TestServiceInstanceAvailableListener();
-        agent008.addServiceInstanceAvailableListener(listener);
-        agent008.addServiceInstanceAvailableListener(listener2);
-
-        listener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, "service-0[PRIMARY]");
-
-        // note: +1 for the platform registry "PlatformRegistry[PlatformTestJUnit-testLotsOfServices]"
-        assertEquals("Got: " + listener2.available, max + 1, listener2.available.size());
+            this.agent.getPlatformServiceInstance(SERVICE1, this.secondary));
     }
 
     @Test
@@ -525,10 +444,10 @@ public class PlatformTest
         final String SERVICE1 = logStart();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         // todo fails here 2x
         assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+            WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
     }
 
     @Test
@@ -539,9 +458,9 @@ public class PlatformTest
         createAgent008();
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+            WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
+            WireProtocolEnum.STRING, RedundancyModeEnum.LOAD_BALANCED));
 
         // wait for both services to be registered
         waitForEvent(new EventChecker()
@@ -550,7 +469,7 @@ public class PlatformTest
             public Object got()
             {
                 final IRecord record = PlatformTest.this.registry.context.getRecord(
-                        PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+                    PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
                 if (record == null)
                 {
                     return null;
@@ -572,20 +491,30 @@ public class PlatformTest
 
         final CountDownLatch s1latch = new CountDownLatch(1);
         IRecordSubscriptionListener s1recordListener =
-                EventListenerUtils.synchronizedListener((subscriptionInfo -> {
+            EventListenerUtils.synchronizedListener((new IRecordSubscriptionListener()
+            {
+                @Override
+                public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+                {
                     if (subscriptionInfo.equals(expectedSubscriptionInfo))
                     {
                         s1latch.countDown();
                     }
-                }));
+                }
+            }));
         final CountDownLatch s2latch = new CountDownLatch(1);
         IRecordSubscriptionListener s2recordListener =
-                EventListenerUtils.synchronizedListener(subscriptionInfo -> {
+            EventListenerUtils.synchronizedListener(new IRecordSubscriptionListener()
+            {
+                @Override
+                public void onRecordSubscriptionChange(SubscriptionInfo subscriptionInfo)
+                {
                     if (subscriptionInfo.equals(expectedSubscriptionInfo))
                     {
                         s2latch.countDown();
                     }
-                });
+                }
+            });
 
         s1.addRecordSubscriptionListener(s1recordListener);
         s2.addRecordSubscriptionListener(s2recordListener);
@@ -611,12 +540,12 @@ public class PlatformTest
         createAgent();
         createAgent008();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         final CountDownLatch latch = new CountDownLatch(1);
 
         final PlatformServiceInstance platformServiceInstance =
-                (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
         platformServiceInstance.addRecordListener((image, change) -> {
             for (String subMapKey : change.getSubMapKeys())
             {
@@ -639,13 +568,13 @@ public class PlatformTest
         platformServiceInstance.doSetFtState(Boolean.FALSE);
 
         verify(listener, timeout(1000).times(1)).onDisconnected(eq(SERVICE1), anyInt());
-        verify(listener, timeout(4000).times(2)).onConnected(eq(SERVICE1), anyInt());
+        verify(listener, timeout(2000).times(2)).onConnected(eq(SERVICE1), anyInt());
         assertTrue(latch.await(1, TimeUnit.SECONDS));
     }
 
     @Test
     public void testFaultToleranceServiceInstanceChangesOverThenDestroyLastService()
-            throws InterruptedException, IOException
+        throws InterruptedException, IOException
     {
         final String SERVICE1 = logStart();
         Log.log(this, ">>>>>> START testServiceInstanceChangesOverThenDestroyLastService");
@@ -657,7 +586,7 @@ public class PlatformTest
             IFtStatusListener ftStatusListener2 = mock(IFtStatusListener.class);
 
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
-                    servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener1);
 
@@ -669,7 +598,7 @@ public class PlatformTest
             // create secondary after primary is confirmed (so we know that secondary is standby for
             // the test)
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost,
-                    servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             // wait for both instances to be registered - otherwise we can get interleaving
             // available-unavailable-available signals in the test which causes false failures
@@ -678,7 +607,7 @@ public class PlatformTest
             final String serviceInstance1 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
             final String serviceInstance2 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
             serviceInstanceListener.verifyOnServiceInstanceAvailableCalled(STD_TIMEOUT, serviceInstance1,
-                    serviceInstance2);
+                serviceInstance2);
 
             TestServiceAvailableListener serviceListener = new TestServiceAvailableListener();
             this.agent.addServiceAvailableListener(serviceListener);
@@ -702,7 +631,7 @@ public class PlatformTest
             Log.log(this, ">>>>> recreating SERVICE1 PRIMARY");
             // recreate the first service instance again
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
-                    servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                servicePort += 1, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             IFtStatusListener ftStatusListener3 = mock(IFtStatusListener.class);
             this.agent.getPlatformServiceInstance(SERVICE1, this.primary).addFtStatusListener(ftStatusListener3);
@@ -738,7 +667,7 @@ public class PlatformTest
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
@@ -757,7 +686,7 @@ public class PlatformTest
         assertTrue(this.agent.addServiceAvailableListener(listener));
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
@@ -786,7 +715,7 @@ public class PlatformTest
         final String SERVICE3 = this.name.getMethodName() + "3";
         createAgent();
         boolean platformService = this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
-                servicePort, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            servicePort, WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
         assertTrue(platformService);
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
@@ -794,7 +723,7 @@ public class PlatformTest
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE2);
 
         boolean destroyPlatformService = this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
@@ -815,10 +744,10 @@ public class PlatformTest
         createAgent008();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         final PlatformServiceInstance service =
-                (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
+            (PlatformServiceInstance) this.agent.getPlatformServiceInstance(SERVICE1, this.primary);
         IProxyConnectionListener listener = mock(IProxyConnectionListener.class);
         service.addProxyConnectionListener(listener);
 
@@ -835,23 +764,23 @@ public class PlatformTest
 
         assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onConnected(
-                eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
 
         assertNotNull(this.agent008.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onConnected(
-                eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
 
         assertTrue(this.agent008.destroyPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onDisconnected(
-                eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent008.getAgentName())));
 
         // test disconnect then instant re-connect
         assertTrue(this.agent.destroyPlatformServiceProxy(SERVICE1));
         assertNotNull(this.agent.getPlatformServiceProxy(SERVICE1));
         verify(listener, timeout(timeout)).onDisconnected(
-                eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
         verify(listener, timeout(timeout).times(2)).onConnected(
-                eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
+            eq(PlatformUtils.composeProxyName(SERVICE1, this.agent.getAgentName())));
     }
 
     @Test
@@ -865,11 +794,11 @@ public class PlatformTest
         assertTrue(this.agent.addServiceAvailableListener(listener));
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE2);
 
         assertTrue(this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary));
@@ -894,9 +823,9 @@ public class PlatformTest
         final String SERVICE1 = logStart();
         createAgent();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
     }
 
     @Test
@@ -907,9 +836,9 @@ public class PlatformTest
         createAgent();
         createAgent008();
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertFalse(this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
     }
 
     @Test
@@ -922,15 +851,15 @@ public class PlatformTest
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         // start another agent, register the service available listener late, check we get all
         // notifications
         TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
         assertFalse(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort2,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort3,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -948,7 +877,7 @@ public class PlatformTest
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         listener.verifyOnServiceAvailableCalled(STD_TIMEOUT, SERVICE1);
 
         // this simulates a 'dirty' shutdown
@@ -971,10 +900,10 @@ public class PlatformTest
         assertTrue(this.agent008.addServiceInstanceAvailableListener(listener2));
 
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         assertTrue(this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort2,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         String serviceInstance1 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.primary);
         String serviceInstance2 = PlatformUtils.composePlatformServiceInstanceID(SERVICE1, this.secondary);
@@ -984,7 +913,7 @@ public class PlatformTest
 
         final String[] familyAndMember = PlatformUtils.decomposePlatformServiceInstanceID(serviceInstance1);
         IPlatformServiceProxy proxy =
-                this.agent.getPlatformServiceInstanceProxy(familyAndMember[0], familyAndMember[1]);
+            this.agent.getPlatformServiceInstanceProxy(familyAndMember[0], familyAndMember[1]);
         proxy.setReconnectPeriodMillis(RECONNECT_PERIOD / 2);
 
         assertNotNull(proxy);
@@ -992,13 +921,11 @@ public class PlatformTest
         // check the RPC for the service appears
         int i = 0;
         int maxCheckCount = 300;
-        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs()
-                .isEmpty()) && i++ < maxCheckCount)
+        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs().size() == 0) && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
-        assertTrue("Got: " + proxy.getAllRpcs(), !proxy.getAllRpcs()
-                .isEmpty());
+        assertTrue("Got: " + proxy.getAllRpcs(), proxy.getAllRpcs().size() > 0);
 
         // this simulates a 'dirty' shutdown
         this.agent.destroyPlatformServiceInstance(SERVICE1, this.primary);
@@ -1008,8 +935,7 @@ public class PlatformTest
 
         // check the RPC disappears
         i = 0;
-        while (!proxy.getAllRpcs()
-                .isEmpty() && i++ < maxCheckCount)
+        while (proxy.getAllRpcs().size() > 0 && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
@@ -1021,7 +947,7 @@ public class PlatformTest
         // re-create service instance 1 - SAME port
         i = 0;
         while (!this.agent008.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT) && i++ < 60)
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT) && i++ < 60)
         {
             Thread.sleep(1000);
         }
@@ -1031,8 +957,7 @@ public class PlatformTest
 
         // check the RPC for the service appears again
         i = 0;
-        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs()
-                .isEmpty()) && i++ < maxCheckCount)
+        while ((proxy.getAllRpcs() == null || proxy.getAllRpcs().size() == 0) && i++ < maxCheckCount)
         {
             Thread.sleep(100);
         }
@@ -1052,7 +977,7 @@ public class PlatformTest
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
@@ -1062,7 +987,7 @@ public class PlatformTest
 
         // re-create
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
         listener.verifyNoMoreInteractions();
@@ -1081,11 +1006,11 @@ public class PlatformTest
             TestServiceAvailableListener listener = new TestServiceAvailableListener();
             assertTrue(this.agent.addServiceAvailableListener(listener));
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
             assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
             assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
             listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1141,17 +1066,17 @@ public class PlatformTest
         });
 
         assertTrue("Agent not connected to registry?",
-                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
         TestServiceAvailableListener listener = new TestServiceAvailableListener();
         assertTrue(this.agent.addServiceAvailableListener(listener));
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
         TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
         assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
         listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1160,7 +1085,7 @@ public class PlatformTest
         this.registry.destroy();
 
         assertTrue("Agent not disconnected from registry?",
-                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
         listener.verifyOnServiceUnavailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
         listener008.verifyOnServiceUnavailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1180,7 +1105,7 @@ public class PlatformTest
     // this is ignored as it only tests an agent re-connecting
     // see testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed
     public void testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed()
-            throws IOException, InterruptedException
+        throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
         Log.log(this, ">>>>> START testWithOneAgentOnlyReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed");
@@ -1190,7 +1115,7 @@ public class PlatformTest
 
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         this.agent =
-                new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         final AtomicReference<CountDownLatch> agentRegistryConnectedLatch = new AtomicReference<>(new CountDownLatch(1));
@@ -1211,7 +1136,7 @@ public class PlatformTest
         });
 
         assertTrue("Agent not connected to registry?",
-                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         agentRegistryConnectedLatch.set(new CountDownLatch(1));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
@@ -1220,12 +1145,12 @@ public class PlatformTest
         {
             this.registry.destroy();
             assertTrue("Agent not disconnected from registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
             // we should be connecting to the other registry...
             assertTrue("Agent not re-connected to other registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryConnectedLatch.set(new CountDownLatch(1));
 
             // restart the old registry
@@ -1234,10 +1159,10 @@ public class PlatformTest
             // destroy the other, check we connect to the new one
             otherRegistry.destroy();
             assertTrue("Agent not disconnected from other registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
             assertTrue("Agent not re-connected to registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         }
         finally
         {
@@ -1248,7 +1173,7 @@ public class PlatformTest
 
     @Test
     public void testReconnectToOtherPlatformRegistryAfterActiveOneIsDestroyed_twoAgents()
-            throws IOException, InterruptedException
+        throws IOException, InterruptedException
     {
         final String SERVICE1 = logStart();
         final String SERVICE2 = this.name.getMethodName() + "2";
@@ -1260,11 +1185,11 @@ public class PlatformTest
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
         this.agent =
-                new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         this.agent008 = new PlatformRegistryAgent(getAgentName() + "_008",
-                new EndPointAddress(this.registryHost, oldPort), alternate);
+            new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent008.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
@@ -1302,11 +1227,11 @@ public class PlatformTest
         });
 
         assertTrue("Agent not connected to registry?",
-                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         agentRegistryConnectedLatch.set(new CountDownLatch(1));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
         assertTrue("Agent008 not connected to registry?",
-                agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         agent008RegistryConnectedLatch.set(new CountDownLatch(1));
         agent008RegistryDisconnectedLatch.set(new CountDownLatch(1));
 
@@ -1316,11 +1241,11 @@ public class PlatformTest
             TestServiceAvailableListener listener = new TestServiceAvailableListener();
             assertTrue(this.agent.addServiceAvailableListener(listener));
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             TestServiceAvailableListener listener008 = new TestServiceAvailableListener();
             assertTrue(this.agent008.createPlatformServiceInstance(SERVICE2, this.primary, this.agentHost, servicePort2,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
             assertTrue(this.agent008.addServiceAvailableListener(listener008));
 
             listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1, SERVICE2);
@@ -1336,18 +1261,18 @@ public class PlatformTest
             Thread.sleep(500);
 
             assertTrue("Agent not disconnected from registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
             assertTrue("Agent008 not disconnected from registry?",
-                    agent008RegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agent008RegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agent008RegistryDisconnectedLatch.set(new CountDownLatch(1));
 
             // we should be connecting to the other registry...
             assertTrue("Agent not re-connected to other registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryConnectedLatch.set(new CountDownLatch(1));
             assertTrue("Agent008 not re-connected to other registry?",
-                    agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agent008RegistryConnectedLatch.set(new CountDownLatch(1));
 
             this.agent.waitForPlatformService(SERVICE2);
@@ -1387,14 +1312,14 @@ public class PlatformTest
 
             otherRegistry.destroy();
             assertTrue("Agent not disconnected from other registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             assertTrue("Agent008 not disconnected from other registry?",
-                    agent008RegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agent008RegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
             assertTrue("Agent not re-connected to registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             assertTrue("Agent008 not re-connected to registry?",
-                    agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agent008RegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
             Log.log(this, ">>>>> this.agent.getPlatformServiceProxy(SERVICE2)");
             this.agent.waitForPlatformService(SERVICE2);
@@ -1436,7 +1361,7 @@ public class PlatformTest
         EndPointAddress alternate = new EndPointAddress(this.registryHost, newPort);
         // construct the agents...
         this.agent =
-                new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
+            new PlatformRegistryAgent(getAgentName(), new EndPointAddress(this.registryHost, oldPort), alternate);
         this.agent.setRegistryReconnectPeriodMillis(RECONNECT_PERIOD);
 
         // setup the registry available listeners
@@ -1458,7 +1383,7 @@ public class PlatformTest
         });
 
         assertTrue("Agent not connected to registry?",
-                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+            agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
         agentRegistryConnectedLatch.set(new CountDownLatch(1));
         agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
@@ -1468,7 +1393,7 @@ public class PlatformTest
             TestServiceAvailableListener listener = new TestServiceAvailableListener();
             assertTrue(this.agent.addServiceAvailableListener(listener));
             assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                    WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
 
             listener.verifyOnServiceAvailableCalled(VERIFY_TIMEOUT, SERVICE1);
 
@@ -1480,12 +1405,12 @@ public class PlatformTest
             Thread.sleep(500);
 
             assertTrue("Agent not disconnected from registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryDisconnectedLatch.set(new CountDownLatch(1));
 
             // we should be connecting to the other registry...
             assertTrue("Agent not re-connected to other registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
             agentRegistryConnectedLatch.set(new CountDownLatch(1));
 
             this.agent.waitForPlatformService(SERVICE1);
@@ -1518,10 +1443,10 @@ public class PlatformTest
 
             otherRegistry.destroy();
             assertTrue("Agent not disconnected from other registry?",
-                    agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryDisconnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
             assertTrue("Agent not re-connected to registry?",
-                    agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
+                agentRegistryConnectedLatch.get().await(STD_TIMEOUT, TimeUnit.MILLISECONDS));
 
             this.agent.waitForPlatformService(SERVICE1);
             service1Proxy = this.agent.getPlatformServiceProxy(SERVICE1);
@@ -1553,9 +1478,9 @@ public class PlatformTest
 
         verifyPlatformName(this.agent);
         assertTrue(this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT));
         assertEquals(getPlatformName(),
-                this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
+            this.agent.getPlatformServiceInstance(SERVICE1, this.primary).getPlatformName());
     }
 
     String getAgentName()
@@ -1580,9 +1505,14 @@ public class PlatformTest
 
         final AtomicReference<CountDownLatch> serviceLatch = new AtomicReference<>(new CountDownLatch(1));
         final AtomicReference<IRecord> serviceRecordImage = new AtomicReference<>();
-        IRecordListener serviceListener = (imageCopy, atomicChange) -> {
-            serviceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
-            serviceLatch.get().countDown();
+        IRecordListener serviceListener = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                serviceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
+                serviceLatch.get().countDown();
+            }
         };
         this.agent.registryProxy.addObserver(serviceListener, PlatformRegistry.IRegistryRecordNames.SERVICES);
 
@@ -1595,16 +1525,21 @@ public class PlatformTest
 
         final AtomicReference<CountDownLatch> serviceInstanceLatch = new AtomicReference<>(new CountDownLatch(2));
         final AtomicReference<IRecord> serviceInstanceRecordImage = new AtomicReference<>();
-        IRecordListener serviceInstanceListener = (imageCopy, atomicChange) -> {
-            serviceInstanceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
-            serviceInstanceLatch.get().countDown();
+        IRecordListener serviceInstanceListener = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                serviceInstanceRecordImage.set(ImmutableSnapshotRecord.create(imageCopy));
+                serviceInstanceLatch.get().countDown();
+            }
         };
         this.agent.registryProxy.addObserver(serviceInstanceListener,
-                PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
+            PlatformRegistry.IRegistryRecordNames.SERVICE_INSTANCES_PER_SERVICE_FAMILY);
 
         // create the first service instance
         this.agent.createPlatformServiceInstance(SERVICE1, this.primary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
 
         assertTrue(serviceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
         assertNotNull("Got: " + serviceRecordImage.get(), serviceRecordImage.get());
@@ -1615,23 +1550,23 @@ public class PlatformTest
         assertNotNull("Got: " + serviceInstanceRecordImage.get(), serviceInstanceRecordImage.get());
         // one service instance is the PlatformRegistry itself
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 2,
-                serviceInstanceRecordImage.get().getSubMapKeys().size());
+            serviceInstanceRecordImage.get().getSubMapKeys().size());
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 1,
-                serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
+            serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
 
         // create a new instance of the same service
         serviceLatch.set(new CountDownLatch(1));
         serviceInstanceLatch.set(new CountDownLatch(1));
         this.agent008.createPlatformServiceInstance(SERVICE1, this.secondary, this.agentHost, servicePort += 1,
-                WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
+            WireProtocolEnum.STRING, RedundancyModeEnum.FAULT_TOLERANT);
 
         assertTrue(serviceInstanceLatch.get().await(timeoutSecs, TimeUnit.SECONDS));
         assertNotNull("Got: " + serviceInstanceRecordImage.get(), serviceInstanceRecordImage.get());
         // one service instance is the PlatformRegistry itself
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 2,
-                serviceInstanceRecordImage.get().getSubMapKeys().size());
+            serviceInstanceRecordImage.get().getSubMapKeys().size());
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 2,
-                serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
+            serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
 
         // destroy an instance of the same service
         serviceLatch.set(new CountDownLatch(1));
@@ -1644,9 +1579,9 @@ public class PlatformTest
         assertNotNull("Got: " + serviceInstanceRecordImage.get(), serviceInstanceRecordImage.get());
         // one service instance is the PlatformRegistry itself
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 2,
-                serviceInstanceRecordImage.get().getSubMapKeys().size());
+            serviceInstanceRecordImage.get().getSubMapKeys().size());
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 1,
-                serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
+            serviceInstanceRecordImage.get().getOrCreateSubMap(SERVICE1).size());
 
         // destroy the last service
         serviceLatch.set(new CountDownLatch(1));
@@ -1680,7 +1615,7 @@ public class PlatformTest
         assertNotNull("Got: " + serviceInstanceRecordImage.get(), serviceInstanceRecordImage.get());
         // one service instance is the PlatformRegistry itself
         assertEquals("Got: " + serviceInstanceRecordImage.get(), 1,
-                serviceInstanceRecordImage.get().getSubMapKeys().size());
+            serviceInstanceRecordImage.get().getSubMapKeys().size());
     }
 
     void waitForPrimaryToBeActive(final String SERVICE1)
@@ -1694,7 +1629,7 @@ public class PlatformTest
     }
 
     private final static void checkFieldLongValue(final IRecord record, final String fieldName, final long expect)
-            throws InterruptedException, EventFailedException
+        throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventChecker()
         {
@@ -1732,7 +1667,7 @@ public class PlatformTest
     }
 
     private static void checkRecordSize(final IRecord record, final int expect)
-            throws InterruptedException, EventFailedException
+        throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventCheckerWithFailureReason()
         {
@@ -1764,7 +1699,7 @@ public class PlatformTest
     }
 
     private static void checkRecordSubmapKeySize(final AtomicReference<IRecord> record, final int expect)
-            throws InterruptedException, EventFailedException
+        throws InterruptedException, EventFailedException
     {
         waitForEvent(new EventCheckerWithFailureReason()
         {

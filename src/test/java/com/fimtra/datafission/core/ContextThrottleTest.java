@@ -55,7 +55,7 @@ public class ContextThrottleTest
         long start = System.currentTimeMillis();
         for (int i = 0; i < LIMIT * 4; i++)
         {
-            this.candidate.eventStart();
+            this.candidate.eventStart("some record name", false);
         }
         time.set(System.currentTimeMillis() - start);
 
@@ -73,17 +73,22 @@ public class ContextThrottleTest
         }
              
         final CountDownLatch latch = new CountDownLatch(5);
-        final Thread t2 = new Thread(() -> {
-            while (ContextThrottleTest.this.candidate.eventCount.get() > 0)
+        final Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
             {
-                ContextThrottleTest.this.candidate.eventFinish();
-                latch.countDown();
-                try
+                while (ContextThrottleTest.this.candidate.eventCount.get() > 0)
                 {
-                    Thread.sleep(1);
-                }
-                catch (InterruptedException e)
-                {
+                    ContextThrottleTest.this.candidate.eventFinish();
+                    latch.countDown();
+                    try
+                    {
+                        Thread.sleep(1);
+                    }
+                    catch (InterruptedException e)
+                    {
+                    }
                 }
             }
         });
@@ -91,7 +96,7 @@ public class ContextThrottleTest
         latch.await();
         
         start = System.currentTimeMillis();
-        this.candidate.eventStart();
+        this.candidate.eventStart("some record name", false);
         time.set(System.currentTimeMillis() - start);
         assertTrue("Was: " + time.get(), time.get() < 100);
         assertEquals("Got: " + this.candidate.exemptThreads, 0, this.candidate.exemptThreads.size());
@@ -100,10 +105,15 @@ public class ContextThrottleTest
     @Test
     public void testUnderLimitNoThrottle() throws InterruptedException
     {
-        Runnable task = () -> {
-            for (int i = 0; i < LIMIT; i++)
+        Runnable task = new Runnable()
+        {
+            @Override
+            public void run()
             {
-                ContextThrottleTest.this.candidate.eventStart();
+                for (int i = 0; i < LIMIT; i++)
+                {
+                    ContextThrottleTest.this.candidate.eventStart("some record name", false);
+                }
             }
         };
         Thread t = new Thread(task);
@@ -112,4 +122,70 @@ public class ContextThrottleTest
         t.join(1000);
         assertEquals(LIMIT, this.candidate.eventCount.get());
     }
+
+    @Test
+    public void testSystemRecordSkipsThrottle() throws InterruptedException
+    {
+        Runnable task = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < LIMIT * 2; i++)
+                {
+                    ContextThrottleTest.this.candidate.eventStart(ISystemRecordNames.CONTEXT_CONNECTIONS, false);
+                }
+            }
+        };
+        Thread t = new Thread(task);
+        t.start();
+
+        t.join(1000);
+        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
+    }
+
+    @Test
+    public void testForceFlagSkipsThrottle() throws InterruptedException
+    {
+        Runnable task = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < LIMIT * 2; i++)
+                {
+                    ContextThrottleTest.this.candidate.eventStart("some record name", true);
+                }
+            }
+        };
+        Thread t = new Thread(task);
+        t.start();
+
+        t.join(1000);
+        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
+    }
+
+    @Test
+    public void testFrameworkThreadSkipsThrottle() throws InterruptedException
+    {
+        final CountDownLatch latch = new CountDownLatch(1);
+        Runnable task = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < LIMIT * 2; i++)
+                {
+                    ContextThrottleTest.this.candidate.eventStart("some record name", false);
+                }
+                latch.countDown();
+            }
+        };
+        ContextUtils.CORE_EXECUTOR.execute(task);
+
+        latch.await(1000, TimeUnit.MILLISECONDS);
+
+        assertEquals(LIMIT * 2, this.candidate.eventCount.get());
+    }
+
 }

@@ -15,9 +15,7 @@
  */
 package com.fimtra.datafission;
 
-import com.fimtra.channel.ITransportChannel;
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.tcpchannel.TcpChannel;
 
 /**
  * An instance of a specific remote procedure call (RPC). The instance can be called multiple times.
@@ -31,7 +29,7 @@ public interface IRpcInstance
      * 
      * @author Ramon Servadei
      */
-    class NotFoundException extends Exception
+    public static class NotFoundException extends Exception
     {
         private static final long serialVersionUID = 1L;
     }
@@ -41,7 +39,7 @@ public interface IRpcInstance
      * 
      * @author Ramon Servadei
      */
-    class TimeOutException extends Exception
+    public static class TimeOutException extends Exception
     {
         private static final long serialVersionUID = 1L;
 
@@ -56,7 +54,7 @@ public interface IRpcInstance
      * 
      * @author Ramon Servadei
      */
-    class ExecutionException extends Exception
+    public static class ExecutionException extends Exception
     {
         private static final long serialVersionUID = 1L;
 
@@ -125,6 +123,7 @@ public interface IRpcInstance
      * @param args
      *            the argument to execute the RPC with
      * @return the result, can be <code>null</code>
+     * @return the response from the RPC
      * @throws IRpcInstance.TimeOutException
      *             if no response is received after a time
      * @throws IRpcInstance.ExecutionException

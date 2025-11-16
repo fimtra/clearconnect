@@ -53,7 +53,7 @@ public class BenchmarkSubscriber
             @Override
             public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                if (imageValidInCallingThreadOnly.keySet().isEmpty())
+                if (imageValidInCallingThreadOnly.keySet().size() == 0)
                 {
                     return;
                 }

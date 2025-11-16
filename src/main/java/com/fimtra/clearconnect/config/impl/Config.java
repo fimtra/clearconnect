@@ -18,7 +18,6 @@ package com.fimtra.clearconnect.config.impl;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.FileSystems;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -143,8 +142,7 @@ final class Config implements IConfig {
 			List<String> configKeys = Collections.list(configResources.getKeys());
 			if (!configKeys.isEmpty()) {
 				Log.log(this, "Using config override file: ", ObjectUtils.safeToString(this.localConfigDir),
-                        FileSystems.getDefault()
-                                .getSeparator(), this.localServiceInstanceIdConfig, ".properties");
+						System.getProperty("file.separator"), this.localServiceInstanceIdConfig, ".properties");
 				for (String configKey : configKeys) {
 					String configValue = configResources.getString(configKey);
 					localProperties.put(configKey, TextValue.valueOf(configValue));
@@ -212,7 +210,7 @@ final class Config implements IConfig {
 		public void onChange(IRecord imageCopy, IRecordChange atomicChange) {
 			Log.log(this, ObjectUtils.safeToString(atomicChange));
 			IRecord memberConfig = null;
-			if (isMemberConfigCheckRequired(imageCopy)) {
+			if (isMemberConfiCheckRequired(imageCopy)) {
 				memberConfig = this.proxyForConfigService.getRecordImage(this.serviceInstanceId,
 						ConfigServiceProperties.Values.DEFAULT_CONFIG_RPC_TIMEOUT_MILLIS);
 			}
@@ -249,7 +247,7 @@ final class Config implements IConfig {
 
 		// The config change is not applicable if it is family config and it is overwritten in member config
 		private boolean isConfigChangeApplicable(IRecord record, String recordKey, IRecord memberConfig) {
-			if (isMemberConfigCheckRequired(record)) {
+			if (isMemberConfiCheckRequired(record)) {
 				if (memberConfig != null && memberConfig.containsKey(recordKey)) {
 					Log.log(this, "Family config with key [", recordKey,
 							"] is overwritten by member config, notification is not applicable.");
@@ -259,7 +257,7 @@ final class Config implements IConfig {
 			return true;
 		}
 
-		private boolean isMemberConfigCheckRequired(IRecord record) {
+		private boolean isMemberConfiCheckRequired(IRecord record) {
 			String[] instanceNameParts = PlatformUtils.decomposePlatformServiceInstanceID(this.serviceInstanceId);
 			if (record != null && record.getName().equals(instanceNameParts[0])) {
 				return true;

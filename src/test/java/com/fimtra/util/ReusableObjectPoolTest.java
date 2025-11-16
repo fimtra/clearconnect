@@ -40,7 +40,21 @@ public class ReusableObjectPoolTest
     @Before
     public void setUp() throws Exception
     {
-        candidate = new SingleThreadReusableObjectPool<>("test", () -> new HashMap(), instance -> instance.clear(), 10);
+        candidate = new SingleThreadReusableObjectPool<Map>("test", new IReusableObjectBuilder<Map>()
+        {
+            @Override
+            public Map newInstance()
+            {
+                return new HashMap();
+            }
+        }, new IReusableObjectFinalizer<Map>()
+        {
+            @Override
+            public void reset(Map instance)
+            {
+                instance.clear();
+            }
+        }, 10);
     }
 
     @Test
@@ -69,7 +83,7 @@ public class ReusableObjectPoolTest
     public void testGrowth()
     {
         int max = candidate.getSize();
-        List<Map> maps = new ArrayList<>(max);
+        List<Map> maps = new ArrayList<Map>(max);
         for (int i = 0; i < max + 2; i++)
         {
             maps.add(candidate.get());

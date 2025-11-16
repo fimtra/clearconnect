@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.fimtra.util.ByteArrayPool;
-import com.fimtra.util.IReusableObject;
 import com.fimtra.util.IReusableObjectBuilder;
 import com.fimtra.util.MultiThreadReusableObjectPool;
 import com.fimtra.util.is;
@@ -35,19 +34,22 @@ import com.fimtra.util.is;
  * @see TxByteArrayFragment
  * @author Ramon Servadei
  */
-class ByteArrayFragment implements IReusableObject
+class ByteArrayFragment
 {
-    static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
-            new MultiThreadReusableObjectPool<>("RxFragmentPool",
-                    new IReusableObjectBuilder<ByteArrayFragment>()
-                    {
-                        @Override
-                        public ByteArrayFragment newInstance()
-                        {
-                            return new ByteArrayFragment(BYTE_ARRAY_FRAGMENT_POOL);
-                        }
-                    }, ByteArrayFragment::reset, TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
 
+    static final MultiThreadReusableObjectPool<ByteArrayFragment> BYTE_ARRAY_FRAGMENT_POOL =
+        new MultiThreadReusableObjectPool<>("RxFragmentPool", new IReusableObjectBuilder<ByteArrayFragment>()
+        {
+            @Override
+            public ByteArrayFragment newInstance()
+            {
+                final ByteArrayFragment byteArrayFragment = new ByteArrayFragment();
+                byteArrayFragment.poolRef = BYTE_ARRAY_FRAGMENT_POOL;
+                return byteArrayFragment;
+            }
+        }, (instance) -> instance.initialise(-1, -1, (byte) -1, null, -1, -1),
+            TcpChannelProperties.Values.RX_FRAGMENT_POOL_MAX_SIZE);
+    
     /**
      * Utility methods exclusive to a {@link ByteArrayFragment}
      * 
@@ -193,29 +195,21 @@ class ByteArrayFragment implements IReusableObject
     int sequenceId;
     byte[] data;
     @SuppressWarnings("rawtypes")
-    final MultiThreadReusableObjectPool poolRef;
+    MultiThreadReusableObjectPool poolRef;
 
-    @SuppressWarnings("rawtypes")
-    ByteArrayFragment(MultiThreadReusableObjectPool poolRef)
+    ByteArrayFragment()
     {
         super();
-        this.poolRef = poolRef;
-    }
-
-    @Override
-    public void reset()
-    {
-        initialise(-1, -1, (byte) -1, null, -1, -1);
     }
 
     final ByteArrayFragment initialise(int id, int sequenceId, byte lastElement, byte[] data, int offset, int len)
     {
         this.id = id;
         this.sequenceId = sequenceId;
+        this.lastElement = lastElement;
+        this.data = data;
         this.offset = offset;
         this.length = len;
-        this.data = data;
-        this.lastElement = lastElement;
         return this;
     }
 
@@ -240,13 +234,12 @@ class ByteArrayFragment implements IReusableObject
         {
             throw new IncorrectSequenceException("Expected " + (this.sequenceId) + " but got " + other.sequenceId);
         }
-
         byte[] d = ByteArrayPool.get(this.length + other.length);
         System.arraycopy(this.data, this.offset, d, 0, this.length);
         System.arraycopy(other.data, other.offset, d, this.length, other.length);
+        this.data = d;
         this.offset = 0;
         this.length += other.length;
-        this.data = d;
         return this;
     }
 
@@ -265,8 +258,8 @@ class ByteArrayFragment implements IReusableObject
             final byte[] d = ByteArrayPool.get(this.length);
             System.arraycopy(this.data, this.offset, d, 0, this.length);
             // don't free the old data byte[] - could be the rxData permanent byte[]
-            this.offset = 0;
             this.data = d;
+            this.offset = 0;
         }
         return ByteBuffer.wrap(this.data, this.offset, this.length);
     }

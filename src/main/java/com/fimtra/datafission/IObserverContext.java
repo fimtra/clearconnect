@@ -47,7 +47,7 @@ public interface IObserverContext
 {
     /**
      * Encapsulates all the system records available in a context. A system record is a special
-     * record that exposes system-level information about a context. There are 5 system records:
+     * record that exposes system-level information about a context. There are 4 system records:
      * <ul>
      * <li>A 'context records' record - this tracks all the record names in the context
      * <li>A 'context subscriptions' record - this tracks which records have observers

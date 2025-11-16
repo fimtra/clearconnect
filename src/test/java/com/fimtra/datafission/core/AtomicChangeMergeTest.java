@@ -16,7 +16,6 @@
 package com.fimtra.datafission.core;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -54,21 +53,21 @@ public class AtomicChangeMergeTest
     public void setUp() throws Exception
     {
         this.name = "mergeTestRec";
-        this.changes = new LinkedList<>();
+        this.changes = new LinkedList<IRecordChange>();
         this.empty = ContextUtils.EMPTY_MAP;
-        this.put1 = new HashMap<>();
-        this.put2 = new HashMap<>();
-        this.overwritten1 = new HashMap<>();
-        this.overwritten2 = new HashMap<>();
-        this.removed1 = new HashMap<>();
-        this.removed2 = new HashMap<>();
+        this.put1 = new HashMap<String, IValue>();
+        this.put2 = new HashMap<String, IValue>();
+        this.overwritten1 = new HashMap<String, IValue>();
+        this.overwritten2 = new HashMap<String, IValue>();
+        this.removed1 = new HashMap<String, IValue>();
+        this.removed2 = new HashMap<String, IValue>();
     }
 
     static AtomicChange createCandidate(String name)
     {
-        final Map<String, IValue> putEntries = new HashMap<>();
-        final Map<String, IValue> overwrittenEntries = new HashMap<>();
-        final Map<String, IValue> removedEntries = new HashMap<>();
+        final Map<String, IValue> putEntries = new HashMap<String, IValue>();
+        final Map<String, IValue> overwrittenEntries = new HashMap<String, IValue>();
+        final Map<String, IValue> removedEntries = new HashMap<String, IValue>();
         return new AtomicChange(name, putEntries, overwrittenEntries, removedEntries);
     }
 
@@ -132,31 +131,6 @@ public class AtomicChangeMergeTest
     }
 
     @Test
-    public void testMergeAtomicChanges_allRemoves()
-    {
-        HashMap<String, IValue> removedEntries = new HashMap<>();
-        removedEntries.put(k[0], v[0]);
-        this.changes.add(new AtomicChange(this.name, this.put1, this.overwritten1, removedEntries));
-
-        removedEntries = new HashMap<>();
-        removedEntries.put(k[1], v[1]);
-        this.changes.add(new AtomicChange(this.name, this.put1, this.overwritten1, removedEntries));
-
-        // blank change
-        AtomicChange result = createCandidate(this.name);
-
-        result.coalesce(this.changes);
-
-        this.removed1.put(k[0], v[0]);
-        this.removed1.put(k[1], v[1]);
-
-        assertEquals(this.name, result.getName());
-        assertNull(result.putEntries);
-        assertNull(result.overwrittenEntries);
-        assertEquals(this.removed1, result.removedEntries);
-    }
-
-    @Test
     public void testMergeAtomicChanges_oneChange()
     {
         // the first update
@@ -190,9 +164,9 @@ public class AtomicChangeMergeTest
         this.changes.add(new AtomicChange(this.name, this.put1, this.overwritten1, this.removed1));
         this.changes.add(new AtomicChange(this.name, this.put2, this.overwritten2, this.removed2));
 
-        Map<String, IValue> expectedPut = new HashMap<>();
-        Map<String, IValue> expectedOverwritten = new HashMap<>();
-        Map<String, IValue> expectedRemoved = new HashMap<>();
+        Map<String, IValue> expectedPut = new HashMap<String, IValue>();
+        Map<String, IValue> expectedOverwritten = new HashMap<String, IValue>();
+        Map<String, IValue> expectedRemoved = new HashMap<String, IValue>();
 
         expectedPut.put(k[2], v[3]);
         expectedPut.put(k[4], v[4]);
@@ -215,7 +189,7 @@ public class AtomicChangeMergeTest
         this.put1.put(k[1], v[1]);
         this.put1.put(k[2], v[2]);
 
-        Map<String, IValue> subPut1 = new HashMap<>();
+        Map<String, IValue> subPut1 = new HashMap<String, IValue>();
         subPut1.put(k[3], v[3]);
         AtomicChange change = new AtomicChange(this.name, this.put1, this.overwritten1, this.removed1);
         change.internalGetSubMapAtomicChange("sdf1").internalGetPutEntries().putAll(subPut1);
@@ -238,7 +212,7 @@ public class AtomicChangeMergeTest
         this.put1.put(k[1], v[1]);
         this.put1.put(k[2], v[2]);
 
-        Map<String, IValue> subPut1 = new HashMap<>();
+        Map<String, IValue> subPut1 = new HashMap<String, IValue>();
         subPut1.put(k[3], v[3]);
         subPut1.put(k[0], v[0]);
         AtomicChange change1 = new AtomicChange(this.name, this.put1, this.overwritten1, this.removed1);
@@ -252,9 +226,9 @@ public class AtomicChangeMergeTest
         this.overwritten2.put(k[2], v[2]);
         this.removed2.put(k[1], v[1]);
 
-        Map<String, IValue> subPut2 = new HashMap<>();
+        Map<String, IValue> subPut2 = new HashMap<String, IValue>();
         subPut2.put(k[3], v[4]);
-        Map<String, IValue> subRemoved2 = new HashMap<>();
+        Map<String, IValue> subRemoved2 = new HashMap<String, IValue>();
         subRemoved2.put(k[0], v[0]);
         AtomicChange change2 = new AtomicChange(this.name, this.put2, this.overwritten2, this.removed2);
         change2.internalGetSubMapAtomicChange("sdf1").internalGetPutEntries().putAll(subPut2);
@@ -263,9 +237,9 @@ public class AtomicChangeMergeTest
 
         this.changes.add(change2);
 
-        Map<String, IValue> expectedPut = new HashMap<>();
-        Map<String, IValue> expectedOverwritten = new HashMap<>();
-        Map<String, IValue> expectedRemoved = new HashMap<>();
+        Map<String, IValue> expectedPut = new HashMap<String, IValue>();
+        Map<String, IValue> expectedOverwritten = new HashMap<String, IValue>();
+        Map<String, IValue> expectedRemoved = new HashMap<String, IValue>();
 
         expectedPut.put(k[2], v[3]);
         expectedPut.put(k[4], v[4]);
@@ -280,7 +254,7 @@ public class AtomicChangeMergeTest
         assertEquals(expectedOverwritten, result.getOverwrittenEntries());
         assertEquals(expectedRemoved, result.getRemovedEntries());
 
-        Map<String, IValue> expectedOverwrittenSub = new HashMap<>();
+        Map<String, IValue> expectedOverwrittenSub = new HashMap<String, IValue>();
         expectedOverwrittenSub.put(k[3], v[3]);
 
         assertEquals(subPut2, result.getSubMapAtomicChange("sdf1").getPutEntries());
@@ -291,13 +265,13 @@ public class AtomicChangeMergeTest
     @Test
     public void testMergeAtomicChanges_twoChangesSubMapsOnly()
     {
-        Map<String, IValue> subPut1 = new HashMap<>();
+        Map<String, IValue> subPut1 = new HashMap<String, IValue>();
         subPut1.put(k[3], v[3]);
         AtomicChange change = new AtomicChange(this.name, this.put1, this.overwritten1, this.removed1);
         change.internalGetSubMapAtomicChange("sdf1").internalGetPutEntries().putAll(subPut1);
         this.changes.add(change);
 
-        Map<String, IValue> subPut2 = new HashMap<>();
+        Map<String, IValue> subPut2 = new HashMap<String, IValue>();
         subPut2.put(k[4], v[4]);
         AtomicChange change2 = new AtomicChange(this.name, this.put1, this.overwritten1, this.removed1);
         change2.internalGetSubMapAtomicChange("sdf1").internalGetPutEntries().putAll(subPut2);

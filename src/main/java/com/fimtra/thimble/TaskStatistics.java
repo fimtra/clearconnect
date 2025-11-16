@@ -15,6 +15,9 @@
  */
 package com.fimtra.thimble;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * Tracks statistics for tasks . The statistics are gathered in intervals. An interval is the time
  * between successive calls to {@link #intervalFinished()}.
@@ -27,17 +30,18 @@ package com.fimtra.thimble;
  * <li>totalSubmitted - the cumulative total number of tasks that were submitted for the context
  * <li>totalExecuted - the cumulative total number of tasks that have been executed for the context
  * </ul>
- *
- * Not thread safe.
- *
+ * 
  * @author Ramon Servadei
+ * @deprecated See {@link com.fimtra.executors.ContextExecutorFactory}
  */
+@Deprecated
 public final class TaskStatistics
 {
     private final Object context;
+    private long currentSubmitted, currentExecuted;
     private long intervalSubmitted, intervalExecuted;
     private long totalSubmitted, totalExecuted;
-    private long submittedMark, executedMark;
+    private final Lock lock = new ReentrantLock();
 
     TaskStatistics(Object context)
     {
@@ -80,12 +84,28 @@ public final class TaskStatistics
 
     void itemSubmitted()
     {
-        this.totalSubmitted++;
+        this.lock.lock();
+        try
+        {
+            this.currentSubmitted++;
+        }
+        finally
+        {
+            this.lock.unlock();
+        }
     }
 
     void itemExecuted()
     {
-        this.totalExecuted++;
+        this.lock.lock();
+        try
+        {
+            this.currentExecuted++;
+        }
+        finally
+        {
+            this.lock.unlock();
+        }
     }
 
     /**
@@ -95,27 +115,27 @@ public final class TaskStatistics
      */
     TaskStatistics intervalFinished()
     {
-        final TaskStatistics snapshot = new TaskStatistics(this.context);
-
-        // just to ensure we read / write
-        synchronized (this)
+        this.lock.lock();
+        try
         {
-            long lastSubmittedMark = this.submittedMark;
-            long lastExecutedMark = this.executedMark;
+            this.intervalSubmitted = this.currentSubmitted;
+            this.currentSubmitted = 0;
+            this.intervalExecuted = this.currentExecuted;
+            this.currentExecuted = 0;
+            this.totalSubmitted += this.intervalSubmitted;
+            this.totalExecuted += this.intervalExecuted;
 
-            this.submittedMark = this.totalSubmitted;
-            this.executedMark = this.totalExecuted;
-
-            this.intervalSubmitted = this.submittedMark - lastSubmittedMark;
-            this.intervalExecuted = this.executedMark - lastExecutedMark;
-
-            snapshot.intervalSubmitted = this.intervalSubmitted;
+            final TaskStatistics snapshot = new TaskStatistics(this.context);
             snapshot.intervalExecuted = this.intervalExecuted;
+            snapshot.intervalSubmitted = this.intervalSubmitted;
             snapshot.totalSubmitted = this.totalSubmitted;
             snapshot.totalExecuted = this.totalExecuted;
+            return snapshot;
         }
-
-        return snapshot;
+        finally
+        {
+            this.lock.unlock();
+        }
     }
 
 }

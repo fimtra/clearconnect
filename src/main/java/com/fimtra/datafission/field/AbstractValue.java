@@ -121,7 +121,7 @@ public abstract class AbstractValue implements IValue
     }
 
     @Override
-    public String toString()
+    public final String toString()
     {
         return toStringAppender().toString();
     }

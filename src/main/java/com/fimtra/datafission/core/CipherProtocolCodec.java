@@ -15,6 +15,9 @@
  */
 package com.fimtra.datafission.core;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 import com.fimtra.datafission.ICodec;
 import com.fimtra.datafission.core.session.EncryptedSessionSyncAndDataProtocol;
 import com.fimtra.tcpchannel.TcpChannel.FrameEncodingFormatEnum;
@@ -29,6 +32,7 @@ import com.fimtra.util.SymmetricCipher;
  */
 public final class CipherProtocolCodec extends GZipProtocolCodec
 {
+    final static Charset ISO_8859_1 = StandardCharsets.ISO_8859_1;
 
     public CipherProtocolCodec()
     {
@@ -45,5 +49,11 @@ public final class CipherProtocolCodec extends GZipProtocolCodec
     public ICodec<char[]> newInstance()
     {
         return new CipherProtocolCodec();
+    }
+
+    @Override
+    public Charset getCharset()
+    {
+        return ISO_8859_1;
     }
 }

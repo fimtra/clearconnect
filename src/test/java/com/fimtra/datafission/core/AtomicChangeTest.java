@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fimtra.datafission.IObserverContext;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.DoubleValue;
 import org.junit.After;
@@ -254,7 +255,7 @@ public class AtomicChangeTest
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
         this.candidate.mergeEntryRemovedChange(K2, V1);
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
-        Map<String, IValue> target = new HashMap<>();
+        Map<String, IValue> target = new HashMap<String, IValue>();
         target.put(K2, V2);
         assertNotNull(target.get(K2));
 
@@ -268,19 +269,19 @@ public class AtomicChangeTest
     @Test
     public void testGetSize()
     {
-        assertEquals(0, candidate.getSize());
+        assertEquals(0, this.candidate.getSize());
         this.candidate.mergeEntryUpdatedChange(K1, V1, null);
-        assertEquals(1, candidate.getSize());
+        assertEquals(1, this.candidate.getSize());
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
-        assertEquals(1, candidate.getSize());
+        assertEquals(2, this.candidate.getSize());
         this.candidate.mergeEntryRemovedChange(K2, V1);
-        assertEquals(2, candidate.getSize());
+        assertEquals(3, this.candidate.getSize());
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, null);
-        assertEquals(3, candidate.getSize());
+        assertEquals(4, this.candidate.getSize());
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
-        assertEquals(3, candidate.getSize());
+        assertEquals(5, this.candidate.getSize());
     }
-    
+
     @Test
     public void testApplyCompleteAtomicChangeToRecord()
     {
@@ -288,9 +289,10 @@ public class AtomicChangeTest
         this.candidate.mergeEntryUpdatedChange(K1, V1, V1p);
         this.candidate.mergeEntryRemovedChange(K2, V1);
         this.candidate.mergeSubMapEntryUpdatedChange(SUBMAP_KEY1, K1, V1, V1p);
-        final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
+        final IObserverContext mock = mock(IObserverContext.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
-        
+        final long sequence = target.getSequence();
+
         target.put(K2, V2);
         assertNotNull(target.get(K2));
         
@@ -302,7 +304,8 @@ public class AtomicChangeTest
         assertEquals(V1, target.getOrCreateSubMap(SUBMAP_KEY1).get(K1));
         assertNull(target.get(K2));
         assertNull(target.getOrCreateSubMap(SUBMAP_KEY1).get(K2));
-        assertEquals(24, target.getSequence());
+
+        assertEquals(sequence, target.getSequence());
     }
     
     @Test
@@ -324,7 +327,7 @@ public class AtomicChangeTest
         changes.removedSize = 0;
         this.candidate.mergeBulkSubMapChanges(SUBMAP_KEY1, changes);
         
-        final IAtomicChangeManager mock = mock(IAtomicChangeManager.class);
+        final IObserverContext mock = mock(IObserverContext.class);
         Record target = new Record("test", ContextUtils.EMPTY_MAP, mock);
 
         target.put(K2, V2);

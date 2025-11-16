@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013 Ramon Servadei 
- *  
+ * Copyright (c) 2013 Ramon Servadei
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
- *    
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,11 +15,10 @@
  */
 package com.fimtra.datafission.core;
 
-import static com.fimtra.datafission.IRecordChange.DELTA_SCOPE_CHAR;
-import static com.fimtra.datafission.IRecordChange.IMAGE_SCOPE_CHAR;
-
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,18 +51,15 @@ import com.fimtra.datafission.IValidator;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ICoalescingRunnable;
-import com.fimtra.thimble.IContextExecutor;
-import com.fimtra.thimble.ISequentialRunnable;
-import com.fimtra.thimble.ThimbleExecutor;
-import com.fimtra.util.CharRef;
+import com.fimtra.executors.ICoalescingRunnable;
+import com.fimtra.executors.IContextExecutor;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.CollectionUtils;
 import com.fimtra.util.DeadlockDetector;
 import com.fimtra.util.DeadlockDetector.ThreadInfoWrapper;
 import com.fimtra.util.FileUtils;
 import com.fimtra.util.LazyObject;
 import com.fimtra.util.Log;
-import com.fimtra.util.LongRef;
 import com.fimtra.util.ObjectUtils;
 import com.fimtra.util.SubscriptionManager;
 import com.fimtra.util.SystemUtils;
@@ -71,23 +67,21 @@ import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.UtilProperties;
 
 /**
- * A context is the home for a group of records. The definition of the context is application
- * specific.
+ * A context is the home for a group of records. The definition of the context is application specific.
  * <p>
- * A context can publish changes to its records to one or more {@link IRecordListener} objects in
- * the local runtime.
+ * A context can publish changes to its records to one or more {@link IRecordListener} objects in the local
+ * runtime.
  * <p>
- * To publish changes to remote observers, a {@link Publisher} must be created and attached to the
- * context. The publisher can then publish changes to one or more {@link ProxyContext} instances.
+ * To publish changes to remote observers, a {@link Publisher} must be created and attached to the context.
+ * The publisher can then publish changes to one or more {@link ProxyContext} instances.
  * <p>
- * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()}
- * associated with the name of the record. This allows operations on different records to run in
- * parallel.
- * 
- * @see IRecord
+ * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()} associated with
+ * the name of the record. This allows operations on different records to run in parallel.
+ *
  * @author Ramon Servadei
+ * @see IRecord
  */
-public final class Context implements IPublisherContext, IAtomicChangeManager
+public final class Context implements IPublisherContext
 {
     /**
      * Controls logging of:
@@ -100,23 +94,23 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
      */
     public static boolean log = SystemUtils.getProperty("log." + Context.class.getCanonicalName(), false);
 
+    static final String GET_REMOTE_RECORD_RPC = "getRemoteRecord";
 
-    private static final AtomicInteger eventCount = new AtomicInteger();
-    private static final CountDownLatch deadLatch = new CountDownLatch(0);
+    static final AtomicInteger eventCount = new AtomicInteger();
 
     static
     {
         if (DataFissionProperties.Values.ENABLE_THREAD_DEADLOCK_CHECK)
         {
-            DeadlockDetector.newDeadlockDetectorTask(DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS,
-                    deadlocks -> {
+            DeadlockDetector.newDeadlockDetectorTask(
+                    DataFissionProperties.Values.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS, deadlocks -> {
                         StringBuilder sb = new StringBuilder();
                         sb.append("DEADLOCKED THREADS FOUND!").append(SystemUtils.lineSeparator());
                         for (ThreadInfoWrapper deadlock : deadlocks)
                         {
                             sb.append(deadlock.toString());
                         }
-                        System.err.println(sb);
+                        System.err.println(sb.toString());
                     }, UtilProperties.Values.USE_ROLLING_THREADDUMP_FILE);
         }
 
@@ -127,7 +121,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             Log.log(Context.class, "JVM shutting down...");
             final String filePrefix = ThreadUtils.getMainMethodClassSimpleName() + "-threadDumpOnExit";
             final File threadDumpOnShutdownFile =
-                FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
+                    FileUtils.createLogFile_yyyyMMddHHmmss(UtilProperties.Values.LOG_DIR, filePrefix);
             final ThreadInfoWrapper[] threads = deadlockDetector.getThreadInfoWrappers();
             if (threads != null)
             {
@@ -149,86 +143,32 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     }
 
     /**
-     * Bypass any checks and get a writable ContextConnections record - <b>only used for internals</b>
+     * Bypass any checks and get a writable record - <b>only used for internals</b>
      */
-    static SystemRecord getContextConnectionsRecordInternal(IObserverContext context)
+    static IRecord getRecordInternal(IObserverContext context, String name)
     {
-        return ((Context) context).systemRecords.get(ISystemRecordNames.CONTEXT_CONNECTIONS);
-    }
-
-    /**
-     * Noop implementation
-     * 
-     * @author Ramon Servadei
-     */
-    static final class NoopAtomicChangeManager implements IAtomicChangeManager
-    {
-        private final String name;
-
-        NoopAtomicChangeManager(String name)
-        {
-            this.name = name;
-        }
-
-        @Override
-        public String getName()
-        {
-            return this.name;
-        }
-
-        @Override
-        public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
-        {
-        }
-
-        @Override
-        public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
-        {
-        }
-
-        @Override
-        public void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key, IValue current,
-            IValue previous)
-        {
-        }
-
-        @Override
-        public void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key, IValue value)
-        {
-        }
-
-        @Override
-        public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
-        {
-        }
-
-        @Override
-        public void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey, ThreadLocalBulkChanges changes)
-        {
-        }
+        return ((Context) context).records.get(name);
     }
 
     /** Holds all records in this context */
-    final ConcurrentMap<String, IRecord> records;
-    final Map<String, SystemRecord> systemRecords;
+    final ConcurrentMap<String, Record> records;
 
     /**
-     * Maintains a map of {@link Record} images and {@link ImmutableRecord} instances backed by the
-     * images. Changes are applied to the images which can be viewed by the immutable instances.
-     * 
+     * Maintains a map of {@link Record} images and {@link ImmutableRecord} instances backed by the images.
+     * Changes are applied to the images which can be viewed by the immutable instances.
+     *
      * @author Ramon Servadei
      */
     final static class ImageCache
     {
         /**
-         * The image of each record that is updated with atomic changes and used to construct an
-         * {@link ImmutableRecord} to pass in to
-         * {@link IRecordListener#onChange(IRecord, IRecordChange)}
+         * The image of each record that is updated with atomic changes and used to construct an {@link
+         * ImmutableRecord} to pass in to {@link IRecordListener#onChange(IRecord, IRecordChange)}
          * <p>
          * <b>NOTE: the images are only ever updated with atomic changes in the
-         * {@link ISequentialRunnable} that notifies the {@link IRecordListener} instances. This
-         * ensures that the listener instances only see an image that reflects the atomic change
-         * that caused the listener to be notified.</b>
+         * {@link ISequentialRunnable} that notifies the {@link IRecordListener} instances. This ensures that
+         * the listener instances only see an image that reflects the atomic change that caused the listener
+         * to be notified.</b>
          */
         final ConcurrentMap<String, Record> images;
 
@@ -243,12 +183,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         void put(String recordName, Record record)
         {
             this.images.put(recordName, record);
+            this.immutableImages.put(recordName, new ImmutableRecord(record));
         }
 
-        void remove(String name)
+        IRecord remove(String name)
         {
             this.immutableImages.remove(name);
-            this.images.remove(name);
+            return this.images.remove(name);
         }
 
         Set<String> keySet()
@@ -256,27 +197,20 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return this.images.keySet();
         }
 
-        IRecord updateInstance(IRecordChange change)
+        IRecord updateInstance(String name, IRecordChange change)
         {
-            final String name = change.getName();
             final Record record = this.images.get(name);
             if (record != null)
             {
-                change.applyCompleteAtomicChangeToRecord(record);
-                // the Record in the images map backs the ImmutableRecord in the immutableImages map
-                // we create an ImmutableRecord only on first update/publish of a record
-                // see Context.getLastPublishedImage_callInRecordContext
-                return this.immutableImages.computeIfAbsent(name, k -> new ImmutableRecord(record));
+                record.applyChangeAndSetSequence(change);
             }
-            else
-            {
-                return null;
-            }
+            // the Record in the images map backs the ImmutableRecord in the immutableImages map
+            return this.immutableImages.get(name);
         }
 
         /**
-         * @return an {@link ImmutableRecord} for the record name, <code>null</code> if the record
-         *         does not exist
+         * @return an {@link ImmutableRecord} for the record name, <code>null</code> if the record does not
+         * exist
          */
         ImmutableRecord getImmutableInstance(String name)
         {
@@ -285,32 +219,19 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     }
 
     /**
-     * Manages the images of the contex's records.
+     * Manages the images of the context's records.
      * <p>
      * <b>NOTE: the images are only ever updated with atomic changes in the
-     * {@link ISequentialRunnable} that notifies the {@link IRecordListener} instances. This ensures
-     * that the listener instances only see an image that reflects the atomic change that caused the
-     * listener to be notified.</b>
+     * {@link ISequentialRunnable} that notifies the {@link IRecordListener} instances. This ensures that the
+     * listener instances only see an image that reflects the atomic change that caused the listener to be
+     * notified.</b>
      */
     final ImageCache imageCache;
 
     /** Tracks the observers for the records in this context */
     final SubscriptionManager<String, IRecordListener> recordObservers;
-    /**
-     * Tracks pending atomic changes to records. An entry for a record only exists if there is an
-     * observer for the record, otherwise there is no need to track changes.
-     * <p>
-     * Access with record lock (locking record)
-     */
-    final Map<String, IAtomicChangeMergingOps> pendingAtomicChanges;
     /** cheap read-write lock semantics */
     volatile Map<String, IRpcInstance> rpcInstances;
-    /**
-     * Tracks sequence per record name
-     * <p>
-     * Access with record lock (locking record)
-     */
-    final Map<String, LongRef> sequences;
     final Set<IValidator> validators;
     volatile boolean active;
     final String name;
@@ -318,9 +239,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final IContextExecutor coreExecutor;
     final IContextExecutor systemExecutor;
     final LazyObject<ScheduledExecutorService> utilityExecutor;
-    final ScheduledExecutorService sharedUtilityExecutor;
     final Object recordCreateLock;
-    final IAtomicChangeManager noopChangeManager;
     /**
      * Tracks what records have been deleted and need to be removed from system records - this is an
      * efficiency optimisation for bulk remove operations
@@ -332,15 +251,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     final Map<String, String> tokenPerRecord;
 
     /**
-     * This is populated when a listener is registered and prevents duplicate updates being sent to
-     * the listener during its phase of receiving initial images whilst any concurrent updates may
-     * also be occurring.
+     * This is populated when a listener is registered and prevents duplicate updates being sent to the
+     * listener during its phase of receiving initial images whilst any concurrent updates may also be
+     * occurring.
      */
     final Map<IRecordListener, Set<String>> listenersToNotifyWithInitialImages;
     volatile int listenersBeingNotifiedWithInitialImages;
 
-    final IEventLifeCycle throttle;
-    final IEventLifeCycle noopThrottle;
+    final ContextThrottle throttle;
 
     /** Construct the context with the given name */
     public Context(String name)
@@ -350,52 +268,41 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     /**
      * Construct the context
-     * 
-     * @param name
-     *            the name of the context
-     * @param eventExecutor
-     *            the executor for handling events, if <code>null</code> the default event executor
-     *            is used
-     * @param rpcExecutor
-     *            the executor for handling RPCs, if <code>null</code> the default RPC executor is
-     *            used
-     * @param utilityExecutor
-     *            the utility {@link ScheduledExecutorService}, if <code>null</code> the default
-     *            utility executor is used
+     *
+     * @param name            the name of the context
+     * @param eventExecutor   the executor for handling events, if <code>null</code> the default event
+     *                        executor is used
+     * @param rpcExecutor     the executor for handling RPCs, if <code>null</code> the default RPC executor is
+     *                        used
+     * @param utilityExecutor the utility {@link ScheduledExecutorService}, if <code>null</code> the default
+     *                        utility executor is used
      */
-    public Context(String name, ThimbleExecutor eventExecutor, ThimbleExecutor rpcExecutor,
-        ScheduledExecutorService utilityExecutor)
+    public Context(String name, IContextExecutor eventExecutor, IContextExecutor rpcExecutor,
+            ScheduledExecutorService utilityExecutor)
     {
         super();
 
         this.name = name;
         this.throttle = new ContextThrottle(DataFissionProperties.Values.PENDING_EVENT_THROTTLE_THRESHOLD,
                 eventCount);
-        this.noopThrottle = new IEventLifeCycle()
-        {
-        };
-        this.noopChangeManager = new NoopAtomicChangeManager(this.name);
         this.rpcExecutor = rpcExecutor == null ? ContextUtils.RPC_EXECUTOR : rpcExecutor;
         this.coreExecutor = eventExecutor == null ? ContextUtils.CORE_EXECUTOR : eventExecutor;
         this.systemExecutor = ContextUtils.SYSTEM_RECORD_EXECUTOR;
-        this.sharedUtilityExecutor = utilityExecutor == null ? ContextUtils.UTILITY_SCHEDULER : utilityExecutor;
-        this.utilityExecutor =
+        this.utilityExecutor = utilityExecutor == null ?
                 new LazyObject<>(() -> ThreadUtils.newScheduledExecutorService(name + "-utility", 1),
-                        ExecutorService::shutdown);
+                        ExecutorService::shutdown) : new LazyObject<>(() -> utilityExecutor, (s) -> {
+        });
         this.recordCreateLock = new Object();
         this.recordObservers = new SubscriptionManager<>(IRecordListener.class);
         this.recordsToRemoveFromSystemRecords = new HashSet<>();
         this.recordsToRemoveContext = "recordsToRemoveFromSystemRecords:" + name
-        // this MUST be added to ensure complete uniqueness for coalescing in case more than one
-        // Context share the same name!
-            + "-" + UUID.randomUUID();
+                // this MUST be added to ensure complete uniqueness for coalescing in case more than one
+                // Context share the same name!
+                + "-" + UUID.randomUUID();
 
         final int initialSize = 1024;
-        this.sequences = new ConcurrentHashMap<>(initialSize);
         this.imageCache = new ImageCache(initialSize);
         this.records = new ConcurrentHashMap<>(initialSize);
-        this.systemRecords = new HashMap<>();
-        this.pendingAtomicChanges = new ConcurrentHashMap<>(initialSize);
         this.tokenPerRecord = new ConcurrentHashMap<>(initialSize);
         this.rpcInstances = new HashMap<>();
         this.validators = new CopyOnWriteArraySet<>();
@@ -410,16 +317,43 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         createSystemRecord(ISystemRecordNames.CONTEXT_CONNECTIONS);
 
         this.active = true;
+
+        // create AFTER setting active
+        createGetRemoteRecordImageAsMapRpc();
+    }
+
+    private void createGetRemoteRecordImageAsMapRpc()
+    {
+        final RpcInstance rpc =
+                new RpcInstance(IValue.TypeEnum.TEXT, GET_REMOTE_RECORD_RPC, IValue.TypeEnum.TEXT);
+        rpc.setHandler(args -> {
+            IRecord record = getRecord(args[0].textValue());
+            if (record != null)
+            {
+                try
+                {
+                    final StringWriter sw = new StringWriter();
+                    ContextUtils.serializeRecordMapToStream(sw, record.asFlattenedMap());
+                    return TextValue.valueOf(sw.toString());
+                }
+                catch (IOException e)
+                {
+                    throw new IRpcInstance.ExecutionException(e);
+                }
+            }
+            return null;
+        });
+        createRpc(rpc);
     }
 
     private void createSystemRecord(String recordName)
     {
-        createRecordAndInfrastructure(recordName, ContextUtils.EMPTY_MAP, true);
+        this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this));
+        final Record record = new Record(recordName, ContextUtils.EMPTY_MAP, this);
+        this.records.put(recordName, record);
 
         // add to the context record
-        this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
-
-        publishSystemRecord(this.systemRecords.get(recordName));
+        this.records.get(ISystemRecordNames.CONTEXT_RECORDS).put(recordName, LongValue.valueOf(0));
     }
 
     @Override
@@ -427,10 +361,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         try
         {
-            if (ContextUtils.UTILITY_SCHEDULER != this.sharedUtilityExecutor)
-            {
-                this.sharedUtilityExecutor.shutdown();
-            }
             this.utilityExecutor.destroy();
             if (ContextUtils.CORE_EXECUTOR != this.coreExecutor)
             {
@@ -440,7 +370,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 this.rpcExecutor.destroy();
             }
-            this.pendingAtomicChanges.clear();
             this.records.clear();
             this.recordObservers.destroy();
             this.active = false;
@@ -479,21 +408,22 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public IRecord createRecord(final String name, Map<String, IValue> initialData)
     {
         if (ContextUtils.isSystemRecordName(name) || ContextUtils.isProtocolPrefixed(name)
-            || AtomicChangeTeleporter.startsWithFragmentPrefix(name))
+                || AtomicChangeTeleporter.startsWithFragmentPrefix(name))
         {
             throw new IllegalArgumentException("The name [" + name + "] contains illegal characters");
         }
 
         // publish the update to the ContextRecords before publishing to observers - one of the
         // observers may check the ContextRecords so the created record MUST be in there before
-        final SystemRecord contextRecords = this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
+        final IRecord contextRecords = this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
         if (!isSystemRecordReady(contextRecords))
         {
             throw new IllegalStateException(
-                "Cannot create new record [" + name + "] in shutdown context " + ObjectUtils.safeToString(this));
+                    "Cannot create new record [" + name + "] in shutdown context " + ObjectUtils.safeToString(
+                            this));
         }
 
-        final IRecord record;
+        final Record record;
         synchronized (this.recordCreateLock)
         {
             record = createRecordInternal_callWithLock(name, initialData);
@@ -504,74 +434,62 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             // important to access subscriptions whilst holding the write lock of CONTEXT_RECORDS -
             // see addDeltaToSubscriptionCount - this ensures we create the record with the correct
             // subscriptions count
-            final IRecord contextSubscriptions = this.systemRecords.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+            final IRecord contextSubscriptions = this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
             final IValue subscriptionCount = contextSubscriptions.get(name);
-            contextRecords.put(name, LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
-            publishSystemRecord(this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS));
+            contextRecords.put(name,
+                    LongValue.valueOf(subscriptionCount == null ? 0 : subscriptionCount.longValue()));
+            publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
         }
 
         // always force a publish for the initial create - guaranteed to be sequence 0
-        publishAtomicChange(name, this.noopThrottle);
+        publishAtomicChange(name, true);
 
         return record;
     }
 
     /**
-     * Create a blank record with this name - no listeners are notified of the record's existence in
-     * this method.
+     * Create a blank record with this name - no listeners are notified of the record's existence in this
+     * method.
      */
     IRecord createRecordSilently_callInRecordContext(final String name)
     {
         synchronized (this.recordCreateLock)
         {
+            /*
+             * This is only called when receiving a non-empty remote record for the first time. We
+             * need to insert a blank image because the sequence will not be 0 so an image would
+             * never be inserted when publishing the change. Note: this method is called in the
+             * record context so the image is inserted by the same thread context as it would be for
+             * the publish change logic.
+             */
+            this.imageCache.put(name, new Record(name, ContextUtils.EMPTY_MAP, this));
             return createRecordInternal_callWithLock(name, ContextUtils.EMPTY_MAP);
         }
     }
 
-    private IRecord createRecordInternal_callWithLock(final String name, Map<String, IValue> initialData)
+    private Record createRecordInternal_callWithLock(final String name, Map<String, IValue> initialData)
     {
         if (this.records.get(name) != null)
         {
-            throw new IllegalStateException("A record with the name [" + name + "] already exists in this context");
+            throw new IllegalStateException(
+                    "A record with the name [" + name + "] already exists in this context");
         }
 
-        final IRecord record = createRecordAndInfrastructure(name, initialData, false);
+        //
+        // DO NOT ALTER THE ORDER OF THESE STATEMENTS
+        //
+
+        final Record record = new Record(name, ContextUtils.EMPTY_MAP, this);
+        this.records.put(name, record);
+
+        record.getPendingAtomicChange().setScope(IRecordChange.IMAGE_SCOPE_CHAR);
+
+        // this will set off an atomic change for the construction
+        record.putAll(initialData);
 
         if (log)
         {
             Log.log(this, "Created record [", record.getName(), "] in ", record.getContextName());
-        }
-
-        return record;
-    }
-
-    private IRecord createRecordAndInfrastructure(String recordName, Map<String, IValue> initialImageData,
-            boolean isSystemRecord)
-    {
-        final int initialSequence = 0;
-
-        this.sequences.put(recordName, new LongRef(initialSequence));
-        this.pendingAtomicChanges.put(recordName,
-                new AtomicChange(recordName, new CharRef(IRecordChange.IMAGE_SCOPE_CHAR),
-                        new LongRef(initialSequence)));
-        this.imageCache.put(recordName,
-                isSystemRecord ? new SystemRecord(recordName, initialImageData, this.noopChangeManager) :
-                        new Record(recordName, initialImageData, this.noopChangeManager));
-        final Record record = isSystemRecord ? new SystemRecord(recordName, ContextUtils.EMPTY_MAP, this) :
-                new Record(recordName, ContextUtils.EMPTY_MAP, this);
-        if (isSystemRecord)
-        {
-            this.systemRecords.put(recordName, (SystemRecord) record);
-        }
-        else
-        {
-            this.records.put(recordName, record);
-        }
-
-        if (!initialImageData.isEmpty())
-        {
-            // this will set off an atomic change for the construction
-            record.putAll(initialImageData);
         }
 
         return record;
@@ -593,8 +511,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 // NOTE: do not remove subscribers - they are INDEPENDENT of record existence
                 // this.recordObservers.removeSubscribersFor(name);
 
-                this.pendingAtomicChanges.remove(name);
-                this.sequences.remove(name);
                 this.imageCache.remove(name);
 
                 if (log)
@@ -618,17 +534,17 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         synchronized (Context.this.recordsToRemoveFromSystemRecords)
                         {
                             recordsToProcess =
-                                CollectionUtils.newHashSet(Context.this.recordsToRemoveFromSystemRecords);
+                                    CollectionUtils.newHashSet(Context.this.recordsToRemoveFromSystemRecords);
                             Context.this.recordsToRemoveFromSystemRecords.clear();
                         }
 
-                        if (recordsToProcess.isEmpty())
+                        if (recordsToProcess.size() == 0)
                         {
                             return;
                         }
 
-                        final SystemRecord contextRecords =
-                                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
+                        final IRecord contextRecords =
+                                Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
                         if (isSystemRecordReady(contextRecords))
                         {
                             synchronized (contextRecords.getWriteLock())
@@ -637,7 +553,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                 {
                                     contextRecords.remove(name);
                                 }
-                                publishSystemRecord(contextRecords);
+                                publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
                             }
                         }
                     }
@@ -656,11 +572,12 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public IRecord getRecord(String name)
     {
+        IRecord record = this.records.get(name);
         if (ContextUtils.isSystemRecordName(name))
         {
-            return this.systemRecords.get(name).getImmutableInstance();
+            return record.getImmutableInstance();
         }
-        return this.records.get(name);
+        return record;
     }
 
     @Override
@@ -692,77 +609,92 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public CountDownLatch publishAtomicChange(IRecord record)
     {
-        return publishAtomicChange(record.getName(), this.throttle);
+        return publishAtomicChange(record.getName());
     }
 
     @Override
     public CountDownLatch publishAtomicChange(final String name)
     {
-        return publishAtomicChange(name, this.throttle);
+        return publishAtomicChange(name, false);
     }
 
-    CountDownLatch publishAtomicChange(final String name, final IEventLifeCycle eventLifeCycle)
+    CountDownLatch publishAtomicChange(final String name, final boolean forcePublish)
     {
-        final IRecord record = this.records.get(name);
-        if (record == null)
+        if (name == null)
         {
-            Log.log(this, "Ignoring publish of non-existent record [", name, "]");
-            return deadLatch;
+            throw new NullPointerException("Null record name not allowed");
         }
 
-        // engage throttle logic only if we have a record,
-        // we need to lock here to ensure no out-of-order publishing of the same record by different threads
-        eventLifeCycle.eventStart();
+        this.throttle.eventStart(name, forcePublish);
+
         try
         {
-            final IAtomicChangeMergingOps atomicChange = getAtomicChangeToPublish(record);
-            final CountDownLatch publishLatch = atomicChange.getPublishLatch();
-            if (publishLatch == null)
+            final CountDownLatch latch = new CountDownLatch(1);
+            final Record record = this.records.get(name);
+            if (record == null)
             {
-                eventLifeCycle.eventFinish();
-                return deadLatch;
+                Log.log(this, "Ignoring publish of non-existent record [", name, "]");
+                latch.countDown();
+                this.throttle.eventFinish();
+                return latch;
             }
-            else
+
+            synchronized (record.getWriteLock())
             {
-                coreExecutor.execute(atomicChange);
-                return publishLatch;
+                final AtomicChange atomicChange = record.atomicChange;
+                record.atomicChange = null;
+
+                // Note: theory for how atomicChange can be null here:
+                // 1. T1 created record
+                // 2. T2 calls publish atomicChange with name - publishes
+                // 3. T1 has created record and finishes createRecord which calls
+                // publishAtomicChange - pending change will have been used
+
+                // update the sequence (version) of the record when publishing
+                if (atomicChange != null)
+                {
+                    record.setSequence(atomicChange.getSequence());
+                }
+
+                // prevent empty changes BUT also allow the initial create if it had blank data
+                if (atomicChange == null || (!forcePublish && atomicChange.isEmpty()))
+                {
+                    latch.countDown();
+                    this.throttle.eventFinish();
+                    return latch;
+                }
+
+
+                atomicChange.preparePublish(latch, this);
+
+                // this will call doPublishChange
+                executeSequentialCoreTask(atomicChange);
+
+                return latch;
             }
         }
         catch (RuntimeException e)
         {
-            eventLifeCycle.eventFinish();
+            this.throttle.eventFinish();
             throw e;
         }
     }
 
-    CountDownLatch publishSystemRecord(SystemRecord record)
-    {
-        final IAtomicChangeMergingOps atomicChange = getAtomicChangeToPublish(record);
-        final CountDownLatch publishLatch = atomicChange.getPublishLatch();
-        if (publishLatch == null)
-        {
-            return deadLatch;
-        }
-        else
-        {
-            systemExecutor.execute(atomicChange);
-            return publishLatch;
-        }
-    }
-
     @Override
-    public Future<Map<String, Boolean>> addObserver(final IRecordListener observer, final String... recordNames)
+    public Future<Map<String, Boolean>> addObserver(final IRecordListener observer,
+            final String... recordNames)
     {
         return addObserver(IPermissionFilter.DEFAULT_PERMISSION_TOKEN, observer, recordNames);
     }
 
     @Override
-    public Future<Map<String, Boolean>> addObserver(final String permissionToken, final IRecordListener observer,
-        final String... recordNames)
+    public Future<Map<String, Boolean>> addObserver(final String permissionToken,
+            final IRecordListener observer, final String... recordNames)
     {
         if (recordNames == null || recordNames.length == 0)
         {
-            throw new IllegalArgumentException("Null or zero-length subscriptions " + Arrays.toString(recordNames));
+            throw new IllegalArgumentException(
+                    "Null or zero-length subscriptions " + Arrays.toString(recordNames));
         }
 
         final Map<String, Boolean> resultMap = new HashMap<>(recordNames.length);
@@ -770,10 +702,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             final List<String> permissionedRecords = new LinkedList<>();
             for (String recordName : recordNames)
             {
-                if (recordName != null && permissionTokenValidForRecord(permissionToken, recordName))
+                final String checkedPermissionToken =
+                        permissionToken == null ? IPermissionFilter.DEFAULT_PERMISSION_TOKEN :
+                                permissionToken;
+                if (recordName != null && permissionTokenValidForRecord(checkedPermissionToken, recordName))
                 {
                     permissionedRecords.add(recordName);
-                    Context.this.tokenPerRecord.put(recordName, permissionToken);
+                    Context.this.tokenPerRecord.put(recordName, checkedPermissionToken);
                     resultMap.put(recordName, Boolean.TRUE);
                 }
                 else
@@ -834,7 +769,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 if (log)
                 {
-                    Log.log(this, "Added listener to [", name, "] listener=", ObjectUtils.safeToString(observer));
+                    Log.log(this, "Added listener to [", name, "] listener=",
+                            ObjectUtils.safeToString(observer));
                 }
 
                 executeSequentialCoreTask(new ISequentialRunnable()
@@ -853,7 +789,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                             if (log)
                             {
                                 Log.log(this, "Notifying initial image [", name, "], listener=",
-                                    ObjectUtils.safeToString(observer));
+                                        ObjectUtils.safeToString(observer));
                             }
 
                             final IRecord imageSnapshot = getLastPublishedImage_callInRecordContext(name);
@@ -862,14 +798,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                                 final long start = System.nanoTime();
                                 observer.onChange(imageSnapshot, new AtomicChange(imageSnapshot));
                                 ContextUtils.measureTask(name, "record image-on-subscribe", observer,
-                                    (System.nanoTime() - start));
+                                        (System.nanoTime() - start));
                             }
                             else
                             {
                                 if (log)
                                 {
                                     Log.log(this, "No initial image available [", name, "], listener=",
-                                        ObjectUtils.safeToString(observer));
+                                            ObjectUtils.safeToString(observer));
                                 }
                             }
                         }
@@ -911,8 +847,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 synchronized (initialImagePending)
                 {
-                    // note: this is faster than set.removeAll(list) as set.removeAll can do a contains check
-                    Arrays.asList(names).forEach(initialImagePending::remove);
+                    initialImagePending.removeAll(Arrays.asList(names));
                     updateListenerCountsForInitialImages(observer, initialImagePending);
                 }
             }
@@ -925,7 +860,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     if (log)
                     {
                         Log.log(this, "Removed listener from [", name, "] listener=",
-                            ObjectUtils.safeToString(observer));
+                                ObjectUtils.safeToString(observer));
                     }
                     toRemove.add(name);
                 }
@@ -944,8 +879,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     void addDeltaToSubscriptionCount(final int delta, final Collection<String> recordNames)
     {
         final Map<String, LongValue> countsPerRecord = new HashMap<>(recordNames.size());
-        final SystemRecord contextSubscriptions =
-                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
+        final IRecord contextSubscriptions =
+                Context.this.records.get(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
         if (isSystemRecordReady(contextSubscriptions))
         {
             synchronized (contextSubscriptions.getWriteLock())
@@ -971,11 +906,10 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                     }
                     countsPerRecord.put(recordName, observerCount);
                 }
-                publishSystemRecord(contextSubscriptions);
+                publishAtomicChange(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS);
             }
         }
-        final SystemRecord contextRecords =
-                Context.this.systemRecords.get(ISystemRecordNames.CONTEXT_RECORDS);
+        final IRecord contextRecords = Context.this.records.get(ISystemRecordNames.CONTEXT_RECORDS);
         if (isSystemRecordReady(contextRecords))
         {
             synchronized (contextRecords.getWriteLock())
@@ -987,71 +921,20 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                         contextRecords.put(recordName, countsPerRecord.get(recordName));
                     }
                 }
-                publishSystemRecord(contextRecords);
+                publishAtomicChange(ISystemRecordNames.CONTEXT_RECORDS);
             }
         }
     }
 
-    @Override
-    public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeBulkChanges(changes);
-    }
-
-    @Override
-    public void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey,
-            ThreadLocalBulkChanges changes)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeBulkSubMapChanges(subMapKey, changes);
-    }
-
-    @Override
-    public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeEntryUpdatedChange(key, current, previous);
-    }
-
-    @Override
-    public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeEntryRemovedChange(key, value);
-    }
-
-    @Override
-    public void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key,
-            IValue current, IValue previous)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
-    }
-
-    @Override
-    public void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key,
-            IValue value)
-    {
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeSubMapEntryRemovedChange(subMapKey, key, value);
-    }
-
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
     {
-        final SystemRecord contextStatus = this.systemRecords.get(ISystemRecordNames.CONTEXT_STATUS);
+        final IRecord contextStatus = this.records.get(ISystemRecordNames.CONTEXT_STATUS);
         if (isSystemRecordReady(contextStatus))
         {
             synchronized (contextStatus.getWriteLock())
             {
                 IStatusAttribute.Utils.setStatus(statusAttribute, contextStatus);
-                publishSystemRecord(contextStatus);
+                publishAtomicChange(ISystemRecordNames.CONTEXT_STATUS);
             }
         }
     }
@@ -1059,20 +942,22 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void createRpc(IRpcInstance rpc)
     {
-        final SystemRecord contextRpcs = this.systemRecords.get(ISystemRecordNames.CONTEXT_RPCS);
+        final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
             synchronized (contextRpcs.getWriteLock())
             {
                 if (this.rpcInstances.containsKey(rpc.getName()))
                 {
-                    throw new IllegalStateException("An RPC already exists with name [" + rpc.getName() + "]");
+                    throw new IllegalStateException(
+                            "An RPC already exists with name [" + rpc.getName() + "]");
                 }
                 final Map<String, IRpcInstance> copy = new HashMap<>(this.rpcInstances);
                 copy.put(rpc.getName(), rpc);
                 this.rpcInstances = copy;
-                contextRpcs.put(rpc.getName(), TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
-                publishSystemRecord(contextRpcs);
+                contextRpcs.put(rpc.getName(),
+                        TextValue.valueOf(RpcInstance.constructDefinitionFromInstance(rpc)));
+                publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
                 Log.log(this, "Created RPC ", ObjectUtils.safeToString(rpc), " in ", getName());
             }
         }
@@ -1081,7 +966,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void removeRpc(String rpcName)
     {
-        final SystemRecord contextRpcs = this.systemRecords.get(ISystemRecordNames.CONTEXT_RPCS);
+        final IRecord contextRpcs = this.records.get(ISystemRecordNames.CONTEXT_RPCS);
         if (isSystemRecordReady(contextRpcs))
         {
             synchronized (contextRpcs.getWriteLock())
@@ -1092,8 +977,8 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
                 if (rpc != null)
                 {
                     Log.log(this, "Removing RPC ", ObjectUtils.safeToString(rpc), " from ", getName());
-                    contextRpcs.remove(rpcName);
-                    publishSystemRecord(contextRpcs);
+                    this.records.get(ISystemRecordNames.CONTEXT_RPCS).remove(rpcName);
+                    publishAtomicChange(ISystemRecordNames.CONTEXT_RPCS);
                 }
             }
         }
@@ -1105,14 +990,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return this.rpcInstances.get(name);
     }
 
-    /**
-     * Used by internal framework components for utility operations
-     */
-    public ScheduledExecutorService getSharedUtilityExecutor()
-    {
-        return this.sharedUtilityExecutor;
-    }
-
     @Override
     public ScheduledExecutorService getUtilityExecutor()
     {
@@ -1122,21 +999,20 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     @Override
     public void resubscribe(String... recordNames)
     {
-        ContextUtils.resubscribeRecordsForContext(this, this.recordObservers, this.tokenPerRecord, recordNames);
+        ContextUtils.resubscribeRecordsForContext(this, this.recordObservers, this.tokenPerRecord,
+                recordNames);
     }
 
     /**
      * <b>ONLY CALL THIS IN AN {@link ISequentialRunnable} RUNNING IN THE SAME CONTEXT AS THE RECORD
      * NAME! OTHERWISE YOU ARE NOT GUARANTEED TO GET THE LAST PUBLISHED IMAGE.</b>
-     * <P>
-     * Get an immutable record that represents the state of the named record at the last time the
-     * {@link #publishAtomicChange(IRecord)} was called on it.
+     * <p>
+     * Get an immutable record that represents the state of the named record at the last time the {@link
+     * #publishAtomicChange(IRecord)} was called on it.
      *
-     * @param name
-     *            the name of the record
-     * @return an immutable record that represents the state of the record at the last time of a
-     *         call to {@link #publishAtomicChange(IRecord)}, <code>null</code> if no image has been
-     *         published
+     * @param name the name of the record
+     * @return an immutable record that represents the state of the record at the last time of a call to
+     * {@link #publishAtomicChange(IRecord)}, <code>null</code> if no image has been published
      */
     IRecord getLastPublishedImage_callInRecordContext(String name)
     {
@@ -1207,12 +1083,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public void executeSequentialCoreTask(ISequentialRunnable sequentialRunnable)
     {
         final Object context = sequentialRunnable.context();
-        if (context == sequentialRunnable)
-        {
-            throw new IllegalArgumentException(
-                    "Sequential runnable [" + sequentialRunnable + "] is coalescing on itself!");
-        }
-
         if (context instanceof String && ContextUtils.isSystemRecordName(context.toString()))
         {
             this.systemExecutor.execute(sequentialRunnable);
@@ -1228,19 +1098,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.rpcExecutor.execute(sequentialRunnable);
     }
 
-    /**
-     * Provides the means for a {@link ProxyContext} to tell its internal {@link Context} what
-     * sequence to use when processing a received record change
-     */
-    void copySequenceFromRemote(String recordName, long sequence)
-    {
-        this.sequences.get(recordName).set(sequence);
-        // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .setSequence(sequence);
-    }
-
-    boolean permissionTokenValidForRecord(String permissionToken, String recordName)
+    final boolean permissionTokenValidForRecord(String permissionToken, String recordName)
     {
         if (ContextUtils.isSystemRecordName(recordName) || RpcInstance.isRpcResultRecord(recordName))
         {
@@ -1259,14 +1117,14 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         this.permissionFilter = filter;
     }
 
-    boolean isSystemRecordReady(SystemRecord systemRecord)
+    final boolean isSystemRecordReady(IRecord systemRecord)
     {
         return systemRecord != null && this.active;
     }
 
-    void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
+    final void updateListenerCountsForInitialImages(IRecordListener listener, Set<String> initialImagePending)
     {
-        if (initialImagePending.isEmpty())
+        if (initialImagePending.size() == 0)
         {
             synchronized (this.listenersToNotifyWithInitialImages)
             {
@@ -1281,10 +1139,15 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         return Collections.unmodifiableMap(this.rpcInstances);
     }
 
-    void doPublishChange(final IRecordChange atomicChange)
+    void doPublishChange(final String recordName, final IRecordChange atomicChange, long sequence)
     {
+        if (sequence == 0)
+        {
+            this.imageCache.put(recordName, new Record(recordName, ContextUtils.EMPTY_MAP, this));
+        }
+
         // update the image with the atomic changes in the runnable
-        final IRecord notifyImage = this.imageCache.updateInstance(atomicChange);
+        final IRecord notifyImage = this.imageCache.updateInstance(recordName, atomicChange);
 
         // this can happen if there is a concurrent delete
         if (notifyImage == null)
@@ -1292,7 +1155,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return;
         }
 
-        if (!this.validators.isEmpty())
+        if (this.validators.size() > 0)
         {
             for (IValidator validator : this.validators)
             {
@@ -1301,7 +1164,6 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         }
 
         long start;
-        final String recordName = atomicChange.getName();
 
         // NOTE: always get the subscribers to notify in the context of the handling the record
         // change! If we had a snapshot of the subscribers taken outside of the context, we would
@@ -1343,99 +1205,13 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             {
                 start = System.nanoTime();
                 listener.onChange(notifyImage, atomicChange);
-                ContextUtils.measureTask(recordName, "local record update", listener, (System.nanoTime() - start));
+                ContextUtils.measureTask(recordName, "local record update", listener,
+                        (System.nanoTime() - start));
             }
             catch (Exception e)
             {
                 Log.log(this, "Could not notify " + listener + " with " + atomicChange, e);
             }
         }
-    }
-
-    private IAtomicChangeMergingOps getAtomicChangeToPublish(IRecord record)
-    {
-        synchronized (record.getWriteLock())
-        {
-            final String name = record.getName();
-            final IAtomicChangeMergingOps atomicChangeToPublish = this.pendingAtomicChanges.get(name);
-            if (!atomicChangeToPublish.isEmpty() || atomicChangeToPublish.getScope() == IMAGE_SCOPE_CHAR)
-            {
-                // setup the next atomic change
-                pendingAtomicChanges.put(name, new AtomicChange(name, new CharRef(DELTA_SCOPE_CHAR),
-                        new LongRef(this.sequences.get(name)
-                                .incrementAndGet())));
-
-                // update the sequence (version) of the record when publishing
-                ((Record) record).setSequence(atomicChangeToPublish.getSequence());
-                atomicChangeToPublish.preparePublish(this);
-            }
-            return atomicChangeToPublish;
-        }
-    }
-}
-
-/**
- * This is an internal interface for managing the adding/removing atomic changes for a record.
- * 
- * @author Ramon Servadei
- */
-interface IAtomicChangeManager
-{
-    String getName();
-
-    void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous);
-
-    void addEntryRemovedToAtomicChange(String recordName, String key, IValue value);
-
-    void addSubMapEntryUpdatedToAtomicChange(String recordName, String subMapKey, String key, IValue current,
-        IValue previous);
-
-    void addSubMapEntryRemovedToAtomicChange(String recordName, String subMapKey, String key, IValue value);
-
-    void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes);
-
-    void addBulkSubMapChangesToAtomicChange(String recordName, String subMapKey, ThreadLocalBulkChanges changes);
-}
-
-/**
- * Operations for merging changes into an atomic ahgne
- *
- * @author Ramon Servadei
- */
-interface IAtomicChangeMergingOps extends IRecordChange, ISequentialRunnable
-{
-    void mergeBulkChanges(ThreadLocalBulkChanges changes);
-
-    void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes);
-
-    void mergeEntryUpdatedChange(String key, IValue current, IValue previous);
-
-    void mergeEntryRemovedChange(String key, IValue value);
-
-    void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous);
-
-    void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value);
-
-    void preparePublish(Context context);
-
-    /**
-     * @return the publish latch, null if this change is not ready to publish
-     */
-    CountDownLatch getPublishLatch();
-}
-
-/**
- * Provides methods to signal start and end of an event, typically used for throttle logic
- *
- * @author Ramon Servadei
- */
-interface IEventLifeCycle
-{
-    default void eventStart()
-    {
-    }
-
-    default void eventFinish()
-    {
     }
 }

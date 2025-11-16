@@ -15,8 +15,6 @@
  */
 package com.fimtra.clearconnect.config;
 
-import java.nio.file.FileSystems;
-
 import com.fimtra.clearconnect.PlatformCoreProperties;
 import com.fimtra.clearconnect.config.impl.ConfigService;
 import com.fimtra.clearconnect.config.impl.IConfigPersist;
@@ -91,8 +89,7 @@ public abstract class ConfigServiceProperties {
 		 * 
 		 * @see Names#CONFIG_DIR
 		 */
-		String CONFIG_DIR = System.getProperty(Names.CONFIG_DIR, System.getProperty("user.dir") + FileSystems.getDefault()
-                .getSeparator()
+		String CONFIG_DIR = System.getProperty(Names.CONFIG_DIR, System.getProperty("user.dir") + System.getProperty("file.separator")
 				+ "config");
 
 		/**

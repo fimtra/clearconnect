@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,8 +72,13 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
     final List<IRecord> records;
     final List<String> fieldIndexes;
     final Map<String, AtomicInteger> fieldIndexLookupMap;
-    ICellUpdateHandler cellUpdateHandler = (row, column) -> {
-        // noop
+    ICellUpdateHandler cellUpdateHandler = new ICellUpdateHandler()
+    {
+        @Override
+        public void cellUpdated(int row, int column)
+        {
+            // noop
+        }
     };
 
     // these members handle batching up of updates and removes
@@ -110,7 +116,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
         // add these by hand
         this.fieldIndexes.add(RecordTableUtils.NAME);
-        this.fieldIndexLookupMap.put(RecordTableUtils.NAME, new AtomicInteger(0));
+        this.fieldIndexLookupMap.put(RecordTableUtils.NAME, new AtomicInteger(this.fieldIndexes.size() - 1));
         this.fieldIndexes.add(RecordTableUtils.CONTEXT);
         this.fieldIndexLookupMap.put(RecordTableUtils.CONTEXT, new AtomicInteger(this.fieldIndexes.size() - 1));
     }
@@ -126,11 +132,16 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
     {
         if (!this.recordRemovedListeners.containsKey(context.getName()))
         {
-            final IRecordListener observer = (imageCopy, atomicChange) -> {
-                final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
-                if (!removedRecords.isEmpty())
+            final IRecordListener observer = new IRecordListener()
+            {
+                @Override
+                public void onChange(IRecord imageCopy, IRecordChange atomicChange)
                 {
-                    recordUnsubscribedBatch(new HashSet<>(removedRecords), context.getName());
+                    final Set<String> removedRecords = atomicChange.getRemovedEntries().keySet();
+                    if (removedRecords.size() > 0)
+                    {
+                        recordUnsubscribedBatch(new HashSet<>(removedRecords), context.getName());
+                    }
                 }
             };
             this.recordRemovedListeners.put(context.getName(), observer);
@@ -229,15 +240,17 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
         int startInsert = -1;
         int endInsert = -1;
-        Pair<String, String> nameAndContext;
-        IRecord imageCopy;
+        Map.Entry<Pair<String, String>, IRecord> entry = null;
+        Pair<String, String> nameAndContext = null;
+        IRecord imageCopy = null;
         Integer index;
-        int rowIndex;
-        int colIndex;
+        int rowIndex = 0;
+        int colIndex = 0;
         IRecordChange atomicChange;
 
-        for (Map.Entry<Pair<String, String>, IRecord> entry : recordImages.entrySet())
+        for (Iterator<Map.Entry<Pair<String, String>, IRecord>> it = recordImages.entrySet().iterator(); it.hasNext();)
         {
+            entry = it.next();
             nameAndContext = entry.getKey();
             imageCopy = entry.getValue();
 
@@ -247,7 +260,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 // its new
                 rowIndex = this.records.size();
                 this.records.add(imageCopy);
-                this.recordIndexByName.put(getRecordLookupKey(imageCopy), rowIndex);
+                this.recordIndexByName.put(getRecordLookupKey(imageCopy), Integer.valueOf(rowIndex));
                 for (String key : imageCopy.keySet())
                 {
                     colIndex = checkAddColumn(key, stuctureChanged);
@@ -261,24 +274,27 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 if (startInsert == -1)
                 {
                     startInsert = rowIndex;
+                    endInsert = rowIndex;
                 }
-                endInsert = rowIndex;
+                else
+                {
+                    endInsert = rowIndex;
+                }
             }
             else
             {
                 // an update
-                rowIndex = index;
+                rowIndex = index.intValue();
                 this.records.set(rowIndex, imageCopy);
                 atomicChange = recordAtomicChanges.get(nameAndContext);
 
                 // first handle removed fields
-                for (String removedKey : atomicChange.getRemovedEntries()
-                        .keySet())
+                for (String removedKey : atomicChange.getRemovedEntries().keySet())
                 {
                     boolean exists = false;
                     for (IRecord record : this.records)
                     {
-                        if (record.containsKey(removedKey))
+                        if (record.keySet().contains(removedKey))
                         {
                             exists = true;
                             break;
@@ -289,18 +305,16 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                         fieldsToDelete.add(removedKey);
                     }
                 }
-                if (!fieldsToDelete.isEmpty())
+                if (fieldsToDelete.size() > 0)
                 {
-                    RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes,
-                            this.fieldIndexLookupMap);
+                    RecordTableUtils.deleteIndexedFields(fieldsToDelete, this.fieldIndexes, this.fieldIndexLookupMap);
                     // NOTE: when a column is deleted, we need to process as a structure change
                     stuctureChanged.set(true);
                 }
 
                 // now handle updates
                 // first handle adding any new fields...
-                for (String changedKey : atomicChange.getPutEntries()
-                        .keySet())
+                for (String changedKey : atomicChange.getPutEntries().keySet())
                 {
                     checkAddColumn(changedKey, stuctureChanged);
                 }
@@ -308,15 +322,14 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
                 {
                     checkAddColumn(changedKey, stuctureChanged);
                 }
-
+                
                 if (stuctureChanged.getAndSet(false))
                 {
                     fireTableStructureChanged();
                 }
 
                 // now flash updates
-                for (String changedKey : atomicChange.getPutEntries()
-                        .keySet())
+                for (String changedKey : atomicChange.getPutEntries().keySet())
                 {
                     colIndex = checkAddColumn(changedKey, stuctureChanged);
                     cellUpdated(rowIndex, colIndex);
@@ -353,24 +366,35 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
     {
         synchronized (this.pendingBatchRemoves)
         {
-            this.pendingBatchRemoves.computeIfAbsent(contextName,
-                    k -> new ArrayList<>(recordNames.size()))
-                    .addAll(recordNames);
+            List<String> list = this.pendingBatchRemoves.get(contextName);
+            if (list == null)
+            {
+                list = new ArrayList<>(recordNames.size());
+                this.pendingBatchRemoves.put(contextName, list);
+            }
+            list.addAll(recordNames);
 
             if (!this.batchRemoveScheduled.getAndSet(true))
             {
-                RecordTableUtils.cellUpdater.schedule(this::scheduleHandlePendingRemoves, RecordTableUtils.RECORD_DELETE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
+                RecordTableUtils.cellUpdater.schedule(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        scheduleHandlePendingRemoves();
+                    }
+                }, RecordTableUtils.RECORD_DELETE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
     }
 
     void scheduleHandlePendingRemoves()
     {
-        final Map<String, List<String>> local;
+        final Map<String, List<String>> local = new HashMap<>();
 
         synchronized (this.pendingBatchRemoves)
         {
-            local = new HashMap<>(this.pendingBatchRemoves);
+            local.putAll(this.pendingBatchRemoves);
 
             this.pendingBatchRemoves.clear();
             this.batchRemoveScheduled.set(false);
@@ -378,18 +402,29 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
 
         final Set<Pair<String, String>> nameAndContextToRemove = new HashSet<>();
 
-        List<String> listOfRecordNames;
+        Map.Entry<String, List<String>> entry = null;
+        String contextName = null;
+        List<String> listOfRecordNames = null;
         int i;
-        for (Map.Entry<String, List<String>> entry : local.entrySet())
+        for (Iterator<Map.Entry<String, List<String>>> it = local.entrySet().iterator(); it.hasNext();)
         {
+            entry = it.next();
+            contextName = entry.getKey();
             listOfRecordNames = entry.getValue();
             for (i = 0; i < listOfRecordNames.size(); i++)
             {
-                nameAndContextToRemove.add(getRecordLookupKey(listOfRecordNames.get(i), entry.getKey()));
+                nameAndContextToRemove.add(getRecordLookupKey(listOfRecordNames.get(i), contextName));
             }
         }
 
-        SwingUtilities.invokeLater(() -> handlePendingRemoves(nameAndContextToRemove));
+        SwingUtilities.invokeLater(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                handlePendingRemoves(nameAndContextToRemove);
+            }
+        });
     }
 
     void handlePendingRemoves(final Set<Pair<String, String>> nameAndContextToRemove)
@@ -403,7 +438,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
             final Integer index = this.recordIndexByName.get(nameAndContextToRemove.iterator().next());
             if (index != null)
             {
-                singleIndex = index;
+                singleIndex = index.intValue();
             }
         }
 
@@ -424,7 +459,7 @@ public final class RowOrientedRecordTableModel extends AbstractTableModel implem
         this.recordIndexByName.clear();
         for (i = 0; i < this.records.size(); i++)
         {
-            this.recordIndexByName.put(getRecordLookupKey(this.records.get(i)), i);
+            this.recordIndexByName.put(getRecordLookupKey(this.records.get(i)), Integer.valueOf(i));
         }
 
         if (singleIndex > -1)

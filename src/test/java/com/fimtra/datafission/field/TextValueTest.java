@@ -73,7 +73,7 @@ public class TextValueTest
     @Test(expected=IllegalArgumentException.class)
     public void testFromCharsWithNull()
     {
-        TextValue.valueOf(null, 0, 1);
+        TextValue.valueOf((char[]) null, 0, 1);
     }
 
     @Test

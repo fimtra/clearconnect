@@ -122,7 +122,7 @@ public final class TextValue extends AbstractValue
         {
             throw new IllegalArgumentException("null values are not allowed");
         }
-        if (value.isEmpty())
+        if (value.length() == 0)
         {
             this.value = EMPTY;
         }
@@ -141,7 +141,7 @@ public final class TextValue extends AbstractValue
     @Override
     public long longValue()
     {
-        return (this.value == NULL || this.value == EMPTY) ? 0 : Long.parseLong(this.value);
+        return (this.value == NULL || this.value == EMPTY) ? 0 : Long.valueOf(this.value).longValue();
     }
 
     @Override
@@ -149,7 +149,7 @@ public final class TextValue extends AbstractValue
     {
         try
         {
-            return (this.value == NULL || this.value == EMPTY) ? Double.NaN : Double.parseDouble(this.value);
+            return (this.value == NULL || this.value == EMPTY) ? Double.NaN : Double.valueOf(this.value).doubleValue();
         }
         catch (NumberFormatException e)
         {
@@ -164,36 +164,38 @@ public final class TextValue extends AbstractValue
     }
     
     @Override
-    public StringAppender toStringAppender()
+    public final StringAppender toStringAppender()
     {
-        return appendTo(new StringAppender(this.value.length()
-                // for the TEXT_CODE
-                + 1));
+        return appendTo(new StringAppender(this.value.length()));
     }
 
     @Override
     public int hashCode()
     {
-        return ((this.value == null) ? 0 : this.value.hashCode());
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((this.value == null) ? 0 : this.value.hashCode());
+        return result;
     }
 
     @Override
     public boolean equals(Object obj)
     {
-        if (this == obj)
+        if (is.same(this, obj))
         {
             return true;
         }
-        if (!(obj instanceof TextValue))
+        if (is.differentClass(this, obj))
         {
             return false;
         }
-        return is.eq(this.value, ((TextValue) obj).value);
+        TextValue other = (TextValue) obj;
+        return is.eq(this.value, other.value);
     }
 
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return stringAppender.append(IValue.TEXT_CODE, this.value);
+        return stringAppender.append(getType().toString()).append(this.value);
     }
 }

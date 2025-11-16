@@ -15,15 +15,14 @@
  */
 package com.fimtra.datafission;
 
-import java.util.concurrent.ConcurrentHashMap;
-
 import com.fimtra.datafission.IObserverContext.ISystemRecordNames;
 import com.fimtra.datafission.core.Context;
 import com.fimtra.datafission.core.ProxyContext;
 import com.fimtra.datafission.core.Publisher;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
-import com.fimtra.thimble.ThimbleExecutor;
+import com.fimtra.executors.ContextExecutorFactory;
+import com.fimtra.executors.IContextExecutor;
 import com.fimtra.util.SystemUtils;
 
 /**
@@ -31,27 +30,17 @@ import com.fimtra.util.SystemUtils;
  *
  * @author Ramon Servadei
  */
-public abstract class DataFissionProperties
-{
+public abstract class DataFissionProperties {
     /**
      * The names of the properties
      *
      * @author Ramon Servadei
      */
-    public interface Names
-    {
+    public interface Names {
         String BASE = "dataFission.";
 
         /**
-         * The system property name to define the number of threads used in the system record
-         * {@link ThimbleExecutor} used by all {@link Context} instances in the runtime.
-         * <br>
-         * E.g. <code>-DdataFission.systemThreadCount=2</code>
-         */
-        String SYSTEM_THREAD_COUNT = BASE + "systemThreadCount";
-
-        /**
-         * The system property name to define the number of threads used in the core {@link ThimbleExecutor}
+         * The system property name to define the number of threads used in the core {@link IContextExecutor}
          * used by all DataFission {@link Context} instances in the runtime.
          * <br>
          * E.g. <code>-DdataFission.coreThreadCount=8</code>
@@ -59,7 +48,7 @@ public abstract class DataFissionProperties
         String CORE_THREAD_COUNT = BASE + "coreThreadCount";
 
         /**
-         * The system property name to define the number of threads used in the {@link ThimbleExecutor} for
+         * The system property name to define the number of threads used in the {@link IContextExecutor} for
          * RPCs used by all DataFission {@link Context} instances in the runtime.<br> E.g.
          * <code>-DdataFission.rpcThreadCount=4</code>
          */
@@ -111,21 +100,28 @@ public abstract class DataFissionProperties
 
         /**
          * The system property name to define the threshold, in nanos, for defining a slow task (and thus
-         * logging a message indicating the task was slow).<br> E.g.
-         * <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
+         * logging a message indicating the task was slow).<br> E.g. <code>-DdataFission.slowTaskThresholdNanos=50000000</code>
          */
         String SLOW_TASK_THRESHOLD_NANOS = BASE + "slowTaskThresholdNanos";
 
         /**
-         * The system property name to define the number of threads assigned to the runtime-wide reconnect
-         * task scheduler used by all {@link ProxyContext} instances.<br> E.g.
-         * <code>-DdataFission.reconnectThreadCount=2</code>
+         * The system property name to define the threshold, in nanos, for logging a slow publish.<br> E.g.
+         * <code>-DdataFission.slowPublishNanos=10000000</code>
          */
-        String RECONNECT_THREAD_COUNT = BASE + "reconnectThreadCount";
+        String SLOW_PUBLISH_THRESHOLD_NANOS = BASE + "slowPublishNanos";
 
         /**
-         * The system property name to define the size of the {@link LongValue} pool. E.g.
-         * <code>-DdataFission.longValuePoolSize=2048</code>
+         * The system property name to define the maximum size of the keys pool used for record keys.<br>
+         * E.g.
+         * <code>-DdataFission.keysPoolMaxSize=200</code>
+         */
+        String KEYS_POOL_MAX = BASE + "keysPoolMaxSize";
+
+        /**
+         * The system property name to define the size of the {@link LongValue} pool.
+         * <p>
+         * <b>MUST BE AN EVEN NUMBER.</b> <br>
+         * E.g. <code>-DdataFission.longValuePoolSize=2048</code>
          */
         String LONG_VALUE_POOL_SIZE = BASE + "longValuePoolSize";
 
@@ -140,14 +136,6 @@ public abstract class DataFissionProperties
          * {@link TextValue} pool.<br> E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>
          */
         String STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = BASE + "textLengthLimitForTextValuePool";
-
-        /**
-         * The system property name to define the estimated maximum number of concurrent threads that will
-         * access {@link IRecord} objects in the runtime. This is used to specify the concurrency of the
-         * {@link ConcurrentHashMap} components backing the records.<br> E.g.
-         * <code>-DdataFission.maxRecordConcurrency=2</code>
-         */
-        String MAX_RECORD_CONCURRENCY = BASE + "maxRecordConcurrency";
 
         /**
          * The coalescing window (in milliseconds) for system record publishing. This helps to control the
@@ -179,10 +167,9 @@ public abstract class DataFissionProperties
         String SUBSCRIBE_BATCH_SIZE = BASE + "subscribeBatchSize";
 
         /**
-         * The maximum pending event queue size before a thread will wait in
-         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.
-         * Only affects application threads. <br> E.g.
-         * <code>-DdataFission.pendingEventThrottleThreshold=200</code>
+         * The maximum pending event queue size before a thread will wait in {@link
+         * IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value. Only
+         * affects application threads. <br> E.g. <code>-DdataFission.pendingEventThrottleThreshold=200</code>
          */
         String PENDING_EVENT_THROTTLE_THRESHOLD = BASE + "pendingEventThrottleThreshold";
 
@@ -231,12 +218,6 @@ public abstract class DataFissionProperties
          * <br> E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>
          */
         String EXCLUDE_RPC_LOGGING = BASE + "excludeRpcLogging";
-
-        /**
-         * The name of the system property to define using the classic double value codec.
-         * <br> E.g. <code>-DdataFission.useClassicDoubleValueCodec=true</code>
-         */
-        String USE_CLASSIC_DOUBLE_VALUE_CODEC = BASE + "useClassicDoubleValueCodec";
     }
 
     /**
@@ -244,19 +225,10 @@ public abstract class DataFissionProperties
      *
      * @author Ramon Servadei
      */
-    public interface Values
-    {
+    public interface Values {
         /**
-         * The number of threads used in the system record {@link ThimbleExecutor} used by all DataFission
-         * {@link Context} instances in the runtime.
-         *
-         * @see Names#SYSTEM_THREAD_COUNT
-         */
-        int SYSTEM_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.SYSTEM_THREAD_COUNT, 2);
-
-        /**
-         * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission
-         * {@link Context} instances in the runtime.
+         * The number of threads used in the core {@link IContextExecutor} used by all DataFission {@link
+         * Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:
          * <ul>
@@ -268,11 +240,11 @@ public abstract class DataFissionProperties
          * @see Names#CORE_THREAD_COUNT
          */
         int CORE_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.CORE_THREAD_COUNT,
-                SystemUtils.getRuntimeSupportedThreadCount());
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : SystemUtils.getRuntimeSupportedThreadCount());
 
         /**
-         * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all DataFission
-         * {@link Context} instances in the runtime.
+         * The number of threads used in the {@link IContextExecutor} for RPCs used by all DataFission {@link
+         * Context} instances in the runtime.
          * <p>
          * These are the defaults for the following processor counts:
          * <ul>
@@ -284,7 +256,7 @@ public abstract class DataFissionProperties
          * @see Names#RPC_THREAD_COUNT
          */
         int RPC_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.RPC_THREAD_COUNT,
-                SystemUtils.getRuntimeSupportedThreadCount());
+                ContextExecutorFactory.POOL_ACTIVE ? 1 : SystemUtils.getRuntimeSupportedThreadCount());
 
         /**
          * The timeout to wait for an RPC to start.
@@ -352,21 +324,29 @@ public abstract class DataFissionProperties
          */
         long SLOW_TASK_THRESHOLD_NANOS =
                 SystemUtils.getPropertyAsLong(Names.SLOW_TASK_THRESHOLD_NANOS, 50_000_000);
+        /**
+         * The threshold value for logging when a publish is slow, in nanos
+         * <p>
+         * Default is: 10000000 (10ms)
+         *
+         * @see Names#SLOW_PUBLISH_THRESHOLD_NANOS
+         */
+        long SLOW_PUBLISH_THRESHOLD_NANOS =
+                SystemUtils.getPropertyAsLong(Names.SLOW_PUBLISH_THRESHOLD_NANOS, 10_000_000);
 
         /**
-         * The number of threads used in the shared reconnect task scheduler used by all DataFission
-         * {@link ProxyContext} instances in the runtime.
+         * The maximum size for the keys pool for records.
          * <p>
-         * Default is 2.
+         * Default is 0 (unlimited).
          *
-         * @see Names#RECONNECT_THREAD_COUNT
+         * @see Names#KEYS_POOL_MAX
          */
-        int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, "1"));
+        int KEYS_POOL_MAX = SystemUtils.getPropertyAsInt(Names.KEYS_POOL_MAX, 0);
 
         /**
          * The size for the {@link LongValue} pool.
          * <p>
-         * Default is 2048.
+         * Default is 2048 (1024 to -1023).
          *
          * @see Names#LONG_VALUE_POOL_SIZE
          */
@@ -390,16 +370,6 @@ public abstract class DataFissionProperties
          */
         int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL =
                 SystemUtils.getPropertyAsInt(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, 5);
-
-        /**
-         * The estimated maximum number of concurrent threads that would access an {@link IRecord}. This is
-         * used in constructing the {@link ConcurrentHashMap} components backing the records.
-         * <p>
-         * Default is 2.
-         *
-         * @see Names#MAX_RECORD_CONCURRENCY
-         */
-        int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, "2"));
 
         /**
          * The coalescing window (in milliseconds) for system record publishing.
@@ -440,9 +410,9 @@ public abstract class DataFissionProperties
         int SUBSCRIBE_BATCH_SIZE = SystemUtils.getPropertyAsInt(Names.SUBSCRIBE_BATCH_SIZE, 50);
 
         /**
-         * The maximum pending event queue size before a thread will wait in
-         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.
-         * Only affects application threads.
+         * The maximum pending event queue size before a thread will wait in {@link
+         * IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value. Only
+         * affects application threads.
          * <p>
          * Default is 200.
          *
@@ -452,8 +422,8 @@ public abstract class DataFissionProperties
                 SystemUtils.getPropertyAsInt(Names.PENDING_EVENT_THROTTLE_THRESHOLD, 200);
 
         /**
-         * The period, in milliseconds, for a {@link Publisher} to publish updates to the
-         * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
+         * The period, in milliseconds, for a {@link Publisher} to publish updates to the {@link
+         * ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>
          * <p>
          * Default is 30000.
          *
@@ -483,8 +453,8 @@ public abstract class DataFissionProperties
         boolean ENABLE_THREAD_DEADLOCK_CHECK = SystemUtils.getProperty(Names.ENABLE_THREAD_DEADLOCK_CHECK, false);
 
         /**
-         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if
-         * {@link #ENABLE_THREAD_DEADLOCK_CHECK} is true.
+         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if {@link
+         * #ENABLE_THREAD_DEADLOCK_CHECK} is true.
          * <p>
          * Default is 300000 (5 mins).
          *
@@ -516,14 +486,6 @@ public abstract class DataFissionProperties
          */
         String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,
                 "runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister");
-
-        /**
-         * Defines if the classic double value codec is used.
-         * <p>
-         * Default is false.
-         */
-        boolean USE_CLASSIC_DOUBLE_VALUE_CODEC =
-                SystemUtils.getProperty(Names.USE_CLASSIC_DOUBLE_VALUE_CODEC, false);
     }
 
     private DataFissionProperties()

@@ -16,7 +16,6 @@
 package com.fimtra.datafission.field;
 
 import java.io.Serializable;
-import java.util.Arrays;
 
 import com.fimtra.datafission.IValue;
 import com.fimtra.util.Log;
@@ -112,6 +111,8 @@ public final class BlobValue extends AbstractValue
                 case 2:
                     POS_HEX_CODES[b] = hexString.toCharArray();
                     break;
+                default :
+                    POS_HEX_CODES[b] = (hexString.substring(6)).toCharArray();
             }
         }
         int index;
@@ -119,46 +120,70 @@ public final class BlobValue extends AbstractValue
         {
             hexString = Integer.toHexString(-i);
             index = NEG_HEX_CODES.length - i;
-            // negative hex codes always start ffffff80, we want 80
-            NEG_HEX_CODES[index] = hexString.substring(6).toCharArray();
+            switch(hexString.length())
+            {
+                case 1:
+                    NEG_HEX_CODES[index] = ("0" + hexString).toCharArray();
+                    break;
+                case 2:
+                    NEG_HEX_CODES[index] = hexString.toCharArray();
+                    break;
+                default :
+                    NEG_HEX_CODES[index] = hexString.substring(6).toCharArray();
+            }
         }
     }
 
-    /** maps char to hex value for the 4 least-significant bits (LSB) of a byte */
-    static final byte[] LSB_HEX_VALS = new byte[103];
-    /** decode for the 4 most-significant bits (msb) of a byte */
-    static final byte[] MSB_HEX_VALS = new byte[103];
-    static
+    private static byte decodeHex(char c)
     {
-        Arrays.fill(LSB_HEX_VALS, (byte) -1);
-
-        LSB_HEX_VALS['0'] = 0x0;
-        LSB_HEX_VALS['1'] = 0x1;
-        LSB_HEX_VALS['2'] = 0x2;
-        LSB_HEX_VALS['3'] = 0x3;
-        LSB_HEX_VALS['4'] = 0x4;
-        LSB_HEX_VALS['5'] = 0x5;
-        LSB_HEX_VALS['6'] = 0x6;
-        LSB_HEX_VALS['7'] = 0x7;
-        LSB_HEX_VALS['8'] = 0x8;
-        LSB_HEX_VALS['9'] = 0x9;
-        LSB_HEX_VALS['a'] = 0xa;
-        LSB_HEX_VALS['b'] = 0xb;
-        LSB_HEX_VALS['c'] = 0xc;
-        LSB_HEX_VALS['d'] = 0xd;
-        LSB_HEX_VALS['e'] = 0xe;
-        LSB_HEX_VALS['f'] = 0xf;
-        LSB_HEX_VALS['A'] = 0xa;
-        LSB_HEX_VALS['B'] = 0xb;
-        LSB_HEX_VALS['C'] = 0xc;
-        LSB_HEX_VALS['D'] = 0xd;
-        LSB_HEX_VALS['E'] = 0xe;
-        LSB_HEX_VALS['F'] = 0xf;
-
-        for (int c = 0; c < MSB_HEX_VALS.length; c++)
+        switch(c)
         {
-            MSB_HEX_VALS[c] = (byte) (LSB_HEX_VALS[c] << 4);
+            case '0':
+                return 0x0;
+            case '1':
+                return 0x1;
+            case '2':
+                return 0x2;
+            case '3':
+                return 0x3;
+            case '4':
+                return 0x4;
+            case '5':
+                return 0x5;
+            case '6':
+                return 0x6;
+            case '7':
+                return 0x7;
+            case '8':
+                return 0x8;
+            case '9':
+                return 0x9;
+            case 'a':
+                return 0xa;
+            case 'b':
+                return 0xb;
+            case 'c':
+                return 0xc;
+            case 'd':
+                return 0xd;
+            case 'e':
+                return 0xe;
+            case 'f':
+                return 0xf;
+            case 'A':
+                return 0xa;
+            case 'B':
+                return 0xb;
+            case 'C':
+                return 0xc;
+            case 'D':
+                return 0xd;
+            case 'E':
+                return 0xe;
+            case 'F':
+                return 0xf;
         }
+        throw new IllegalArgumentException("Unhandled char:" + c);
     }
 
     /**
@@ -244,19 +269,31 @@ public final class BlobValue extends AbstractValue
     @Override
     public String textValue()
     {
-        final char[] cbuf = new char[this.value.length << 1];
         // note: a full array copy happens when constructing the string
-        return new String(fillCharArray(cbuf, 0));
+        return new String(charArrValue());
     }
 
-    private char[] fillCharArray(char[] cbuf, int bufPtr)
+    char[] charArrValue()
     {
+        final char[] cbuf = new char[this.value.length * 2];
         char[] code;
-        for (byte b : this.value)
+        byte val;
+        int bufPtr = 0;
+        for (int i = 0; i < this.value.length; i++)
         {
-            code = (b & 0x80) == 0x80 ? NEG_HEX_CODES[b & 0x7f] : POS_HEX_CODES[b];
-            cbuf[bufPtr++] = code[0];
-            cbuf[bufPtr++] = code[1];
+            val = this.value[i];
+            if (val < 0)
+            {
+                code = NEG_HEX_CODES[val & 0x7f];
+                cbuf[bufPtr++] = code[0];
+                cbuf[bufPtr++] = code[1];
+            }
+            else
+            {
+                code = (POS_HEX_CODES[val]);
+                cbuf[bufPtr++] = code[0];
+                cbuf[bufPtr++] = code[1];
+            }
         }
         return cbuf;
     }
@@ -264,67 +301,52 @@ public final class BlobValue extends AbstractValue
     @Override
     public StringAppender toStringAppender()
     {
-        final int len = (this.value.length << 1);
-        final StringAppender stringAppender = new StringAppender(len + 1);
-        final char[] chars = stringAppender.reserveAndGet(len + 1);
-        chars[0] = IValue.BLOB_CODE;
-        fillCharArray(chars, 1);
-        return stringAppender;
+        return appendTo(new StringAppender((this.value.length * 2) + 1));
     }
     
     void fromChars(char[] chars, int start, int len)
     {
-        if ((len & 0x1) != 0)
+        if (len % 2 != 0)
         {
             throw new IllegalStateException("BlobValue text length should be divisible by 2");
         }
-        this.value = new byte[len >> 1];
+        this.value = new byte[len / 2];
         int j = 0;
-        for (int i = start; i < len; )
+        for (int i = start; i < len;)
         {
-            this.value[j++] = (byte) (MSB_HEX_VALS[chars[i++]] | LSB_HEX_VALS[chars[i++]]);
+            this.value[j++] = (byte) ((byte) (decodeHex(chars[i++]) << 4) | decodeHex(chars[i++]));
         }
     }
 
     @Override
     public int hashCode()
     {
-        if (this.value == null)
-        {
-            return 0;
-        }
-
+        final int prime = 31;
         int result = 1;
-        for (byte element : this.value)
-        {
-            result = 31 * result + element;
-        }
-
+        result = prime * result + ((this.value == null) ? 0 : this.value.hashCode());
         return result;
     }
 
     @Override
     public boolean equals(Object obj)
     {
-        if (this == obj)
+        if (is.same(this, obj))
         {
             return true;
         }
-        if (!(obj instanceof BlobValue))
+        if (is.differentClass(this, obj))
         {
             return false;
         }
-        return is.eq(this.value, ((BlobValue) obj).value);
+        BlobValue other = (BlobValue) obj;
+        return is.eq(this.value, other.value);
     }
 
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        int start = stringAppender.getLength();
-        final int len = this.value.length << 1;
-        final char[] chars = stringAppender.reserveAndGet(len + 1);
-        chars[start++] = IValue.BLOB_CODE;
-        fillCharArray(chars, start);
-        return stringAppender;
+        final String type = getType().toString();
+        final char[] charArrValue = charArrValue();
+        return stringAppender.append(type).append(charArrValue);
     }
 }

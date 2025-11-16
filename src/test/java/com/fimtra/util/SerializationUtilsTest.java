@@ -18,6 +18,7 @@ package com.fimtra.util;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.junit.After;
@@ -42,7 +43,7 @@ public class SerializationUtilsTest
     }
     
     @Test
-    public void test() throws IOException, ClassNotFoundException
+    public void test() throws FileNotFoundException, IOException, ClassNotFoundException
     {
         File file = new File(".", "SerializationUtilsTest.bin");
         String expected = "result string";

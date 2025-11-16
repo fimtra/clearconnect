@@ -15,6 +15,8 @@
  */
 package com.fimtra.util;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,9 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,18 +40,30 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author Ramon Servadei
  */
-public abstract class ThreadUtils
-{
-    public static final ScheduledExecutorService UTILS_EXECUTOR =
-            ThreadUtils.newPermanentScheduledExecutorService("util-executor", 1);
+public abstract class ThreadUtils {
+    private static final String PREFIX = System.getProperty("threadUtils.prefix", "clearconnect-");
 
     static final Thread.UncaughtExceptionHandler UNCAUGHT_EXCEPTION_HANDLER =
-            new Thread.UncaughtExceptionHandler()
-            {
+            new Thread.UncaughtExceptionHandler() {
                 @Override
                 public void uncaughtException(Thread t, Throwable e)
                 {
-                    Log.log(this, "Thread: " + t.getName(), e);
+                    try
+                    {
+                        Log.log(this, "Thread: " + t.getName(), e);
+                    }
+                    catch (Throwable problem)
+                    {
+                        final StringWriter stringWriter = new StringWriter(1024);
+                        try (final PrintWriter pw = new PrintWriter(stringWriter))
+                        {
+                            pw.println("Could not log uncaught exception in thread: " + t.getName());
+                            e.printStackTrace(pw);
+                            pw.print("Exception that occurred when trying to log this: ");
+                            problem.printStackTrace(pw);
+                        }
+                        System.err.println(stringWriter.toString());
+                    }
                 }
             };
 
@@ -64,13 +76,27 @@ public abstract class ThreadUtils
                 threadLocalCleanup);
     }
 
+    private static final ScheduledExecutorService SCHEDULER =
+            ThreadUtils.newPermanentScheduledExecutorService("threadutils-scheduler", 1);
+
+    public static ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
+            TimeUnit unit)
+    {
+        return SCHEDULER.scheduleWithFixedDelay(command, initialDelay, period, unit);
+    }
+
+    public static ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
+            TimeUnit unit)
+    {
+        return SCHEDULER.scheduleWithFixedDelay(command, initialDelay, delay, unit);
+    }
+
     /**
      * Logs the exception generated in the run method of a delegate runnable.
      *
      * @author Ramon Servadei
      */
-    public static final class ExceptionLoggingRunnable implements Runnable
-    {
+    public static final class ExceptionLoggingRunnable implements Runnable {
         private final Runnable command;
 
         public ExceptionLoggingRunnable(Runnable command)
@@ -194,8 +220,7 @@ public abstract class ThreadUtils
      */
     public static ThreadFactory newDaemonThreadFactory(final String threadName)
     {
-        return new ThreadFactory()
-        {
+        return new ThreadFactory() {
             private final AtomicInteger threadNumber = new AtomicInteger();
 
             @Override
@@ -227,123 +252,7 @@ public abstract class ThreadUtils
     public static ScheduledExecutorService newScheduledExecutorService(final String threadName,
             final int threadCount)
     {
-        return new ScheduledExecutorService()
-        {
-            final ScheduledExecutorService delegate =
-                    new ScheduledThreadPoolExecutor(threadCount, newDaemonThreadFactory(threadName),
-                            new ThreadPoolExecutor.DiscardPolicy());
-
-            @Override
-            public ScheduledFuture<?> schedule(final Runnable command, long delay, TimeUnit unit)
-            {
-                return this.delegate.schedule(new ExceptionLoggingRunnable(command), delay, unit);
-            }
-
-            @Override
-            public void execute(Runnable command)
-            {
-                this.delegate.execute(new ExceptionLoggingRunnable(command));
-            }
-
-            @Override
-            public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit)
-            {
-                return this.delegate.schedule(callable, delay, unit);
-            }
-
-            @Override
-            public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
-                    TimeUnit unit)
-            {
-                return this.delegate.scheduleAtFixedRate(new ExceptionLoggingRunnable(command), initialDelay,
-                        period, unit);
-            }
-
-            @Override
-            public void shutdown()
-            {
-                this.delegate.shutdown();
-            }
-
-            @Override
-            public List<Runnable> shutdownNow()
-            {
-                return this.delegate.shutdownNow();
-            }
-
-            @Override
-            public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
-                    TimeUnit unit)
-            {
-                return this.delegate.scheduleWithFixedDelay(new ExceptionLoggingRunnable(command),
-                        initialDelay, delay, unit);
-            }
-
-            @Override
-            public boolean isShutdown()
-            {
-                return this.delegate.isShutdown();
-            }
-
-            @Override
-            public boolean isTerminated()
-            {
-                return this.delegate.isTerminated();
-            }
-
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException
-            {
-                return this.delegate.awaitTermination(timeout, unit);
-            }
-
-            @Override
-            public <T> Future<T> submit(Callable<T> task)
-            {
-                return this.delegate.submit(task);
-            }
-
-            @Override
-            public <T> Future<T> submit(Runnable task, T result)
-            {
-                return this.delegate.submit(new ExceptionLoggingRunnable(task), result);
-            }
-
-            @Override
-            public Future<?> submit(Runnable task)
-            {
-                return this.delegate.submit(new ExceptionLoggingRunnable(task));
-            }
-
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException
-            {
-                return this.delegate.invokeAll(tasks);
-            }
-
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
-                    TimeUnit unit) throws InterruptedException
-            {
-                return this.delegate.invokeAll(tasks, timeout, unit);
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException, ExecutionException
-            {
-                return this.delegate.invokeAny(tasks);
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
-                    throws InterruptedException, ExecutionException, TimeoutException
-            {
-                return this.delegate.invokeAny(tasks, timeout, unit);
-            }
-
-        };
+        return getScheduledExecutorService(threadName, threadCount, true);
     }
 
     /**
@@ -384,7 +293,7 @@ public abstract class ThreadUtils
                 }
             }
         });
-        thread.setName(threadName);
+        thread.setName(PREFIX + threadName);
         thread.setUncaughtExceptionHandler(UNCAUGHT_EXCEPTION_HANDLER);
         return thread;
     }
@@ -410,7 +319,7 @@ public abstract class ThreadUtils
         }
         catch (InterruptedException e)
         {
-            ExceptionUtils.handleInterruptedException(ThreadUtils.class, e, "interrupted during sleep");
+            Log.log(ThreadUtils.class, "interrupted during sleep", e);
         }
     }
 
@@ -421,131 +330,152 @@ public abstract class ThreadUtils
     public static ScheduledExecutorService newPermanentScheduledExecutorService(final String threadName,
             final int threadCount)
     {
-        return new ScheduledExecutorService()
-        {
-            private final ScheduledExecutorService delegate =
-                    newScheduledExecutorService(threadName, threadCount);
-            private final String name = threadName;
+        return getScheduledExecutorService(threadName, threadCount, false);
+    }
+
+    private static ScheduledExecutorService getScheduledExecutorService(String threadName, int threadCount,
+            boolean canShutdown)
+    {
+        return new ScheduledExecutorService() {
+            final ScheduledExecutorService newScheduledThreadPool =
+                    Executors.newScheduledThreadPool(threadCount, newDaemonThreadFactory(threadName));
 
             @Override
-            public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit)
+            public ScheduledFuture<?> schedule(final Runnable command, long delay, TimeUnit unit)
             {
-                return this.delegate.schedule(command, delay, unit);
+                return this.newScheduledThreadPool.schedule(new ExceptionLoggingRunnable(command), delay,
+                        unit);
             }
 
             @Override
             public void execute(Runnable command)
             {
-                this.delegate.execute(command);
+                this.newScheduledThreadPool.execute(new ExceptionLoggingRunnable(command));
             }
 
             @Override
             public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit)
             {
-                return this.delegate.schedule(callable, delay, unit);
+                return this.newScheduledThreadPool.schedule(callable, delay, unit);
             }
 
             @Override
             public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period,
                     TimeUnit unit)
             {
-                return this.delegate.scheduleAtFixedRate(command, initialDelay, period, unit);
+                return this.newScheduledThreadPool.scheduleAtFixedRate(new ExceptionLoggingRunnable(command),
+                        initialDelay, period, unit);
             }
 
             @Override
             public void shutdown()
             {
-                Log.log(this, ObjectUtils.safeToString(this),
-                        " is a 'permanent' service and cannot be shutdown");
+                if (canShutdown)
+                {
+                    this.newScheduledThreadPool.shutdown();
+                }
+                else
+                {
+                    Log.log(this, ObjectUtils.safeToString(this),
+                            " is a 'permanent' service and cannot be shutdown");
+                }
             }
 
             @Override
             public List<Runnable> shutdownNow()
             {
-                Log.log(this, ObjectUtils.safeToString(this),
-                        " is a 'permanent' service and cannot be shutdown");
-                return Collections.emptyList();
+                if (canShutdown)
+                {
+                    return this.newScheduledThreadPool.shutdownNow();
+                }
+                else
+                {
+                    Log.log(this, ObjectUtils.safeToString(this),
+                            " is a 'permanent' service and cannot be shutdown");
+                    return Collections.emptyList();
+                }
             }
 
             @Override
             public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
                     TimeUnit unit)
             {
-                return this.delegate.scheduleWithFixedDelay(command, initialDelay, delay, unit);
+                return this.newScheduledThreadPool.scheduleWithFixedDelay(
+                        new ExceptionLoggingRunnable(command), initialDelay, delay, unit);
             }
 
             @Override
             public boolean isShutdown()
             {
-                return this.delegate.isShutdown();
+                return this.newScheduledThreadPool.isShutdown();
             }
 
             @Override
             public boolean isTerminated()
             {
-                return this.delegate.isTerminated();
+                return this.newScheduledThreadPool.isTerminated();
             }
 
             @Override
             public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException
             {
-                Log.log(this, ObjectUtils.safeToString(this),
-                        " is a 'permanent' service and will not terminate");
-                return false;
+                if (canShutdown)
+                {
+                    return this.newScheduledThreadPool.awaitTermination(timeout, unit);
+                }
+                else
+                {
+                    Log.log(this, ObjectUtils.safeToString(this),
+                            " is a 'permanent' service and will not terminate");
+                    return false;
+                }
             }
 
             @Override
             public <T> Future<T> submit(Callable<T> task)
             {
-                return this.delegate.submit(task);
+                return this.newScheduledThreadPool.submit(task);
             }
 
             @Override
             public <T> Future<T> submit(Runnable task, T result)
             {
-                return this.delegate.submit(task, result);
+                return this.newScheduledThreadPool.submit(new ExceptionLoggingRunnable(task), result);
             }
 
             @Override
             public Future<?> submit(Runnable task)
             {
-                return this.delegate.submit(task);
+                return this.newScheduledThreadPool.submit(new ExceptionLoggingRunnable(task));
             }
 
             @Override
             public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
                     throws InterruptedException
             {
-                return this.delegate.invokeAll(tasks);
+                return this.newScheduledThreadPool.invokeAll(tasks);
             }
 
             @Override
             public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
                     TimeUnit unit) throws InterruptedException
             {
-                return this.delegate.invokeAll(tasks, timeout, unit);
+                return this.newScheduledThreadPool.invokeAll(tasks, timeout, unit);
             }
 
             @Override
             public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
                     throws InterruptedException, ExecutionException
             {
-                return this.delegate.invokeAny(tasks);
+                return this.newScheduledThreadPool.invokeAny(tasks);
             }
 
             @Override
             public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
                     throws InterruptedException, ExecutionException, TimeoutException
             {
-                return this.delegate.invokeAny(tasks, timeout, unit);
-            }
-
-            @Override
-            public String toString()
-            {
-                return "ScheduledExecutorService[" + this.name + "]";
+                return this.newScheduledThreadPool.invokeAny(tasks, timeout, unit);
             }
         };
     }
-
 }

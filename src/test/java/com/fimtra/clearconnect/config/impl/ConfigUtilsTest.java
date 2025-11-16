@@ -17,6 +17,7 @@ package com.fimtra.clearconnect.config.impl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -75,7 +76,7 @@ public class ConfigUtilsTest {
 		String host = null;
 		String configPort = "112233";
 		// default port is 0 (use ephemeral port)
-        assertEquals(0, ConfigUtils.getPort(this.config, host));
+		assertTrue(ConfigUtils.getPort(this.config, host) == 0);
 		when(this.config.getProperty(ConfigProperties.CONFIG_KEY_INSTANCE_PORT)).thenReturn(TextValue.valueOf(configPort));
 		assertEquals(Integer.parseInt(configPort), ConfigUtils.getPort(this.config, host));
 	}
@@ -92,7 +93,7 @@ public class ConfigUtilsTest {
 	public void shouldGetPropertyAsInt() {
 		String testPropertyKey = "propertyKey";
 		int defaultValue = 11;
-		long numericConfigValue = 12L;
+		long numericConfigValue = 12l;
 		String stringConfigValue = "" + numericConfigValue;
 		assertEquals(defaultValue, ConfigUtils.getPropertyAsInt(this.config, testPropertyKey, defaultValue));
 		when(this.config.getProperty(testPropertyKey)).thenReturn(TextValue.valueOf("not an int"));

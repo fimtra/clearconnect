@@ -28,7 +28,7 @@ import com.fimtra.util.Log;
  * 
  * @author Ramon Servadei
  */
-class ContextThrottle implements IEventLifeCycle
+class ContextThrottle
 {
     private static final int ONE_SECOND_NANOS = 1000000000;
 
@@ -49,8 +49,9 @@ class ContextThrottle implements IEventLifeCycle
     }
 
     /**
-     * Tracks the start of an event. If the event count is below the {@link #threshold} then this method adds
-     * to the event count and returns. If the count is above the threshold, the method blocks until either:
+     * Tracks the start of an event. If the event count is below the {@link #threshold} then this
+     * method adds to the event count and returns. If the count is above the threshold, the method
+     * blocks until either:
      * <ul>
      * <li>A time period has elapsed (default is 1 second) <b>OR</b>
      * <li>The event count goes down by at least 1
@@ -59,46 +60,53 @@ class ContextThrottle implements IEventLifeCycle
      * granted an "exemption" from throttling for 1 second. This is to protect from deadlocks where
      * the thread generating the events is holding a resource that the queue draining threads are
      * waiting to obtain before being able to execute the next tasks in the queue.
+     * 
+     * @param recordName
+     * @param forcePublish
      */
-    @Override
-    public void eventStart()
+    void eventStart(String recordName, boolean forcePublish)
     {
-        final int eventCountAtStart = this.eventCount.get();
-        if (eventCountAtStart > this.threshold
-            // throttling only activated for application threads
-            && !ContextUtils.isFrameworkThread())
+        if (!forcePublish)
         {
-            final Long threadId = Long.valueOf(Thread.currentThread().getId());
-            final Long exemptionStartNanos = this.exemptThreads.get(threadId);
-            if (exemptionStartNanos == null ||
-            // has the exemption expired?
-                System.nanoTime() - exemptionStartNanos.longValue() > ONE_SECOND_NANOS)
+            final int eventCountAtStart = this.eventCount.get();
+            if (eventCountAtStart > this.threshold
+                // throttling only activated for application threads
+                && !ContextUtils.isFrameworkThread()
+                // throttling only activated for non-system records
+                && !ContextUtils.isSystemRecordName(recordName))
             {
-                final long startTimeNanos = System.nanoTime();
-                long loopTimeNanos = 0;
-                do
+                final Long threadId = Long.valueOf(Thread.currentThread().getId());
+                final Long exemptionStartNanos = this.exemptThreads.get(threadId);
+                if (exemptionStartNanos == null ||
+                // has the exemption expired?
+                    System.nanoTime() - exemptionStartNanos.longValue() > ONE_SECOND_NANOS)
                 {
-                    LockSupport.parkNanos(eventCountAtStart);
-                }
-                while (
-                // the event count has not gone down since the loop started
-                this.eventCount.get() >= eventCountAtStart &&
-                // the loop has been going for less than 1 second
-                    ((loopTimeNanos = (System.nanoTime() - startTimeNanos)) < ONE_SECOND_NANOS));
-
-                if (loopTimeNanos >= ONE_SECOND_NANOS && this.eventCount.get() >= eventCountAtStart)
-                {
-                    // mark the thread exempt to prevent event processing deadlock
-                    Log.log(this, "Adding thread to throttle exemptions, eventCount=",
-                        Integer.toString(this.eventCount.get()));
-                    this.exemptThreads.put(threadId, Long.valueOf(System.nanoTime()));
-                }
-                else
-                {
-                    if (exemptionStartNanos != null)
+                    final long startTimeNanos = System.nanoTime();
+                    long loopTimeNanos = 0;
+                    do
                     {
-                        Log.log(this, "Removing thread from throttle exemptions");
-                        this.exemptThreads.remove(threadId);
+                        LockSupport.parkNanos(eventCountAtStart);
+                    }
+                    while (
+                    // the event count has not gone down since the loop started
+                    this.eventCount.get() >= eventCountAtStart &&
+                    // the loop has been going for less than 1 second
+                        ((loopTimeNanos = (System.nanoTime() - startTimeNanos)) < ONE_SECOND_NANOS));
+
+                    if (loopTimeNanos >= ONE_SECOND_NANOS && this.eventCount.get() >= eventCountAtStart)
+                    {
+                        // mark the thread exempt to prevent event processing deadlock
+                        Log.log(this, "Adding thread to throttle exemptions, eventCount=",
+                            Integer.toString(this.eventCount.get()));
+                        this.exemptThreads.put(threadId, Long.valueOf(System.nanoTime()));
+                    }
+                    else
+                    {
+                        if (exemptionStartNanos != null)
+                        {
+                            Log.log(this, "Removing thread from throttle exemptions");
+                            this.exemptThreads.remove(threadId);
+                        }
                     }
                 }
             }
@@ -110,8 +118,7 @@ class ContextThrottle implements IEventLifeCycle
     /**
      * Tracks when an event finishes.
      */
-    @Override
-    public void eventFinish()
+    void eventFinish()
     {
         this.eventCount.decrementAndGet();
     }

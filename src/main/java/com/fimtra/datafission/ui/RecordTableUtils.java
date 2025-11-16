@@ -16,9 +16,12 @@
 package com.fimtra.datafission.ui;
 
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,12 +64,12 @@ abstract class RecordTableUtils
     static final String CONTEXT = "Context";
     static final String FIELD = "Field";
 
-    interface ICellUpdateHandler
+    static interface ICellUpdateHandler
     {
         void cellUpdated(int row, int column);
     }
 
-    interface ICoalescedUpdatesHandler
+    static interface ICoalescedUpdatesHandler
     {
         void handleCoalescedUpdates(Map<Pair<String, String>, IRecord> recordImages,
             Map<Pair<String, String>, IRecordChange> recordAtomicChanges);
@@ -183,21 +186,34 @@ abstract class RecordTableUtils
 
             if (!batchUpdateScheduled.getAndSet(true))
             {
-                cellUpdater.schedule(() -> {
-                    final Map<Pair<String, String>, IRecord> recordImages;
-                    final Map<Pair<String, String>, IRecordChange> recordAtomicChanges;
-                    synchronized (pendingBatchUpdates)
+                cellUpdater.schedule(new Runnable()
+                {
+                    @Override
+                    public void run()
                     {
-                        recordImages = new HashMap<>(pendingBatchUpdates);
-                        recordAtomicChanges = new HashMap<>(pendingBatchAtomicChanges);
+                        final Map<Pair<String, String>, IRecord> recordImages =
+                            new HashMap<>();
+                        final Map<Pair<String, String>, IRecordChange> recordAtomicChanges =
+                            new HashMap<>();
+                        synchronized (pendingBatchUpdates)
+                        {
+                            recordImages.putAll(pendingBatchUpdates);
+                            recordAtomicChanges.putAll(pendingBatchAtomicChanges);
 
-                        pendingBatchUpdates.clear();
-                        pendingBatchAtomicChanges.clear();
-                        batchUpdateScheduled.set(false);
+                            pendingBatchUpdates.clear();
+                            pendingBatchAtomicChanges.clear();
+                            batchUpdateScheduled.set(false);
+                        }
+
+                        SwingUtilities.invokeLater(new Runnable()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                handler.handleCoalescedUpdates(recordImages, recordAtomicChanges);
+                            }
+                        });
                     }
-
-                    SwingUtilities.invokeLater(
-                            () -> handler.handleCoalescedUpdates(recordImages, recordAtomicChanges));
                 }, RECORD_UPDATE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
@@ -230,9 +246,15 @@ abstract class RecordTableUtils
         model.addColumn("Value");
 
         // populate the model
-        for (Map.Entry<String, IValue> entry : subMapData.entrySet())
+        Map.Entry<String, IValue> entry = null;
+        String key = null;
+        IValue value = null;
+        for (Iterator<Map.Entry<String, IValue>> it = subMapData.entrySet().iterator(); it.hasNext();)
         {
-            model.addRow(new Object[] { entry.getKey(), entry.getValue() });
+            entry = it.next();
+            key = entry.getKey();
+            value = entry.getValue();
+            model.addRow(new Object[] { key, value });
         }
 
         JTable table = new JTable(model);
@@ -250,9 +272,14 @@ abstract class RecordTableUtils
 
         submapPopup.add(new JLabel("Submap: " + subMapKey));
         JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(e -> {
-            submapPopup.setVisible(false);
-            submapPopup.removeAll();
+        closeButton.addActionListener(new ActionListener()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                submapPopup.setVisible(false);
+                submapPopup.removeAll();
+            }
         });
         submapPopup.add(closeButton);
         submapPopup.add(new JScrollPane(table));

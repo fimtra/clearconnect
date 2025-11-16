@@ -16,9 +16,7 @@
 package com.fimtra.datafission.core;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
@@ -71,22 +69,10 @@ public class GZipProtocolCodec extends StringProtocolCodec
     }
 
     @Override
-    public char[] decode(ByteBuffer data, CharsetDecoder charsetDecoder)
+    public char[] decode(ByteBuffer data)
     {
         final ByteBuffer uncompressed = GZipUtils.uncompress(this.sessionSyncProtocol.decode(data));
-        if (uncompressed == null)
-        {
-            throw new RuntimeException("Could not uncompress data");
-        }
-        final char[] decoded;
-        try
-        {
-            decoded = charsetDecoder.decode(uncompressed).array();
-        }
-        catch (CharacterCodingException e)
-        {
-            throw new RuntimeException(e);
-        }
+        final char[] decoded = StandardCharsets.ISO_8859_1.decode(uncompressed).array();
         ByteArrayPool.offer(uncompressed.array());
         return decoded;
     }

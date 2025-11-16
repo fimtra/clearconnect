@@ -15,23 +15,21 @@
  */
 package com.fimtra.datafission.core;
 
-import static com.fimtra.util.CollectionUtils.newMap;
-import static com.fimtra.util.CollectionUtils.newSet;
-import static com.fimtra.util.CollectionUtils.noopMap;
-
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IValue;
-import com.fimtra.util.CharRef;
-import com.fimtra.util.LongRef;
+import com.fimtra.executors.ISequentialRunnable;
 import com.fimtra.util.is;
 
 /**
@@ -39,14 +37,13 @@ import com.fimtra.util.is;
  * 
  * @author Ramon Servadei
  */
-public final class AtomicChange implements IAtomicChangeMergingOps
+public final class AtomicChange implements IRecordChange, ISequentialRunnable
 {
-    private static final long SEQ_INIT = -1L;
+    private static final Long SEQ_INIT = Long.valueOf(-1);
 
-    private static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(newMap(0));
-    private static final Map<String, IValue> NOOP_MAP = noopMap();
+    static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(ContextUtils.EMPTY_MAP);
 
-    private static final IAtomicChangeMergingOps NULL_CHANGE = new IAtomicChangeMergingOps()
+    final static IRecordChange NULL_CHANGE = new IRecordChange()
     {
         @Override
         public boolean isEmpty()
@@ -132,64 +129,16 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         {
             return 0;
         }
-
-        @Override
-        public void run()
-        {
-        }
-
-        @Override
-        public Object context()
-        {
-            return "null";
-        }
-
-        @Override
-        public void mergeBulkChanges(ThreadLocalBulkChanges changes)
-        {
-        }
-
-        @Override
-        public void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
-        {
-        }
-
-        @Override
-        public void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
-        {
-        }
-
-        @Override
-        public void mergeEntryRemovedChange(String key, IValue value)
-        {
-        }
-
-        @Override
-        public void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current,
-                IValue previous)
-        {
-        }
-
-        @Override
-        public void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
-        {
-        }
-
-        @Override
-        public void preparePublish(Context context)
-        {
-        }
-
-        @Override
-        public CountDownLatch getPublishLatch()
-        {
-            return null;
-        }
     };
 
+    static <K, V> Map<K, V> newMap()
+    {
+        return new HashMap<>();
+    }
+
     final String name;
-    final CharRef scope;
-    final LongRef sequence;
+    AtomicReference<Character> scope = new AtomicReference<>(DELTA_SCOPE);
+    AtomicReference<Long> sequence = new AtomicReference<>(SEQ_INIT);
 
     Map<String, IValue> putEntries;
     Map<String, IValue> overwrittenEntries;
@@ -208,26 +157,24 @@ public final class AtomicChange implements IAtomicChangeMergingOps
      */
     public AtomicChange(IRecord image)
     {
-        this(image.getName(), new CharRef(IMAGE_SCOPE_CHAR), new LongRef(image.getSequence()));
-        synchronized (image.getWriteLock())
+        this(image.getName());
+        internalGetPutEntries().putAll(image);
+        for (String subMapKey : image.getSubMapKeys())
         {
-            if (!image.isEmpty())
-            {
-                internalGetPutEntries().putAll(image);
-            }
-            for (String subMapKey : image.getSubMapKeys())
-            {
-                internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(
-                        image.getOrCreateSubMap(subMapKey));
-            }
+            internalGetSubMapAtomicChange(subMapKey).internalGetPutEntries().putAll(image.getOrCreateSubMap(subMapKey));
         }
+        this.scope.set(IMAGE_SCOPE);
+        this.sequence.set(Long.valueOf(image.getSequence()));
     }
 
     public AtomicChange(String name, Map<String, IValue> putEntries, Map<String, IValue> overwrittenEntries,
-            Map<String, IValue> removedEntries)
+        Map<String, IValue> removedEntries)
     {
-        this(name, putEntries, overwrittenEntries, removedEntries, new CharRef(DELTA_SCOPE_CHAR),
-                new LongRef(SEQ_INIT));
+        super();
+        this.name = name;
+        this.putEntries = putEntries;
+        this.overwrittenEntries = overwrittenEntries;
+        this.removedEntries = removedEntries;
     }
 
     AtomicChange(String name)
@@ -235,36 +182,12 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         this(name, null, null, null);
     }
 
-    AtomicChange(String name, CharRef scope, LongRef sequence)
-    {
-        this(name, null, null, null, scope, sequence);
-    }
-
-    private AtomicChange(String name, Map<String, IValue> putEntries, Map<String, IValue> overwrittenEntries,
-            Map<String, IValue> removedEntries, CharRef scope, LongRef sequence)
-    {
-        super();
-        this.name = name;
-        this.putEntries = putEntries;
-        this.overwrittenEntries = overwrittenEntries;
-        this.removedEntries = removedEntries;
-        this.scope = scope;
-        this.sequence = sequence;
-    }
-
     // ==== methods used to support use as the ISequentialRunnable
 
-    @Override
-    public void preparePublish(Context context)
+    void preparePublish(CountDownLatch latch, Context context)
     {
-        this.latch = new CountDownLatch(1);
+        this.latch = latch;
         this.context = context;
-    }
-
-    @Override
-    public CountDownLatch getPublishLatch()
-    {
-        return latch;
     }
 
     @Override
@@ -272,7 +195,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     {
         try
         {
-            this.context.doPublishChange(this);
+            this.context.doPublishChange(this.name, this, this.sequence.get().longValue());
         }
         finally
         {
@@ -302,7 +225,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(putEntries);
+        return Collections.unmodifiableMap(internalGetPutEntries());
     }
 
     @Override
@@ -312,7 +235,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(overwrittenEntries);
+        return Collections.unmodifiableMap(internalGetOverwrittenEntries());
     }
 
     @Override
@@ -322,48 +245,40 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         {
             return EMPTY_MAP;
         }
-        return Collections.unmodifiableMap(removedEntries);
+        return Collections.unmodifiableMap(internalGetRemovedEntries());
     }
 
     @Override
     public boolean isEmpty()
     {
-        if (!(putEntries == null || putEntries.isEmpty()))
+        boolean dataEmpty = noOverwrittenEntries() && noPutEntries() && noRemovedEntries();
+        if (dataEmpty && this.subMapAtomicChanges != null)
         {
-            return false;
-        }
-        if (!(removedEntries == null || removedEntries.isEmpty()))
-        {
-            return false;
-        }
-        // check submaps
-        if (this.subMapAtomicChanges != null)
-        {
-            for (Map.Entry<String, AtomicChange> entry : subMapAtomicChanges.entrySet())
+            for (Iterator<Map.Entry<String, AtomicChange>> it = this.subMapAtomicChanges.entrySet().iterator(); it.hasNext()
+                    && dataEmpty;)
             {
-                if (!entry.getValue()
-                        .isEmpty())
-                {
-                    return false;
-                }
+                dataEmpty &= it.next().getValue().isEmpty();
             }
         }
-        return true;
+        return dataEmpty;
     }
 
     @Override
     public int getSize()
     {
         int size = this.putEntries == null ? 0 : this.putEntries.size();
+        size += this.overwrittenEntries == null ? 0 : this.overwrittenEntries.size();
         size += this.removedEntries == null ? 0 : this.removedEntries.size();
 
         if (this.subMapAtomicChanges != null)
         {
-            AtomicChange value;
-            for (Map.Entry<String, AtomicChange> entry : this.subMapAtomicChanges.entrySet())
+            AtomicChange value = null;
+            for (Iterator<Map.Entry<String, AtomicChange>> it =
+                this.subMapAtomicChanges.entrySet().iterator(); it.hasNext();)
             {
-                value = entry.getValue();
+                value = it.next().getValue();
                 size += value.putEntries == null ? 0 : value.putEntries.size();
+                size += value.overwrittenEntries == null ? 0 : value.overwrittenEntries.size();
                 size += value.removedEntries == null ? 0 : value.removedEntries.size();
             }
         }
@@ -388,11 +303,11 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     @Override
     public void coalesce(List<IRecordChange> subsequentChanges)
     {
-        Map<String, IValue> putEntries = null;
-        Map<String, IValue> overwrittenEntries = null;
-        Map<String, IValue> removedEntries = null;
-        Set<String> ultimatelyRemovedKeys = null;
-        Set<String> ultimatelyAddedKeys = null;
+        final Map<String, IValue> putEntries = newMap();
+        final Map<String, IValue> overwrittenEntries = newMap();
+        final Map<String, IValue> removedEntries = newMap();
+        final Set<String> ultimatelyRemovedKeys = new HashSet<>();
+        final Set<String> ultimatelyAddedKeys = new HashSet<>();
         Map<String, IValue> newPutEntries;
         Map<String, IValue> newOverwrittenEntries;
         Map<String, IValue> newRemovedEntries;
@@ -402,16 +317,21 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         Iterator<String> subMapKeysToMergeIterator;
         Map<String, List<IRecordChange>> subMapChangesToMerge = null;
 
+        List<IRecordChange> subMapChangesList;
         String subMapKey;
 
         // add self AT THE BEGINNING to the changes so we merge on top of ourself
         subsequentChanges.add(0, this);
 
         boolean isImage = false;
-        boolean newPutEntriesExist;
+        boolean newPutEntriesSizeGreaterThan0;
+        boolean newRemovedEntriesSizeGreaterThan0;
         // process the changes in order, building up an aggregated atomic change
-        for (IRecordChange subsequentChange : subsequentChanges)
+        IRecordChange subsequentChange;
+        for (int i = 0; i < subsequentChanges.size(); i++)
         {
+            subsequentChange = subsequentChanges.get(i);
+
             if (subsequentChange == NULL_CHANGE || subsequentChange == null)
             {
                 continue;
@@ -424,13 +344,9 @@ public final class AtomicChange implements IAtomicChangeMergingOps
 
             if (subsequentChange instanceof AtomicChange)
             {
-                // on-demand assignment of collections
-                final AtomicChange atomicChange = (AtomicChange) subsequentChange;
-                newPutEntries = atomicChange.putEntries == null ? NOOP_MAP : atomicChange.putEntries;
-                newOverwrittenEntries =
-                        atomicChange.overwrittenEntries == null ? NOOP_MAP : atomicChange.overwrittenEntries;
-                newRemovedEntries =
-                        atomicChange.removedEntries == null ? NOOP_MAP : atomicChange.removedEntries;
+                newPutEntries = ((AtomicChange) subsequentChange).internalGetPutEntries();
+                newOverwrittenEntries = ((AtomicChange) subsequentChange).internalGetOverwrittenEntries();
+                newRemovedEntries = ((AtomicChange) subsequentChange).internalGetRemovedEntries();
             }
             else
             {
@@ -439,94 +355,82 @@ public final class AtomicChange implements IAtomicChangeMergingOps
                 newRemovedEntries = subsequentChange.getRemovedEntries();
             }
 
-            newPutEntriesExist = !newPutEntries.isEmpty();
+            newPutEntriesSizeGreaterThan0 = newPutEntries.size() > 0;
+            newRemovedEntriesSizeGreaterThan0 = newRemovedEntries.size() > 0;
 
-            // NOTE: it is NOT possible to optimise this by grouping all the put/remove size > 0 checks as
-            //       the order of adding/removing must be maintained to ensure the ultimatelyAdded/Removed
-            //       keys are correct
-            if (newPutEntriesExist)
+            // NOTE: it is not possible to optimise this by grouping by the put/remove size > 0
+            // checks - the order of adding/removing must be maintained to ensure the
+            // ultimatelyAdded/Removed keys are correct
+            if (newPutEntriesSizeGreaterThan0)
             {
-                // on-demand assignment of collections
-                (putEntries == null ? (putEntries = newMap()) : putEntries).putAll(newPutEntries);
-                (ultimatelyAddedKeys == null ? (ultimatelyAddedKeys = newSet()) : ultimatelyAddedKeys).addAll(
-                        newPutEntries.keySet());
-
-                // overwritten entries cannot exist if there is no put so we only check for new put entries
-                if (!newOverwrittenEntries.isEmpty())
-                {
-                    (overwrittenEntries == null ? (overwrittenEntries = newMap()) : overwrittenEntries).putAll(
-                            newOverwrittenEntries);
-                }
+                putEntries.putAll(newPutEntries);
             }
-            // handle any newly removed entries
-            if (!newRemovedEntries.isEmpty())
+            if (newOverwrittenEntries.size() > 0)
             {
-                // on-demand assignment of collections
-                (removedEntries == null ? (removedEntries = newMap()) : removedEntries).putAll(
-                        newRemovedEntries);
-                (ultimatelyRemovedKeys == null ? (ultimatelyRemovedKeys = newSet()) :
-                        ultimatelyRemovedKeys).addAll(newRemovedEntries.keySet());
-
-                // remove new removed entries from ultimatelyAddedKeys
-                if (ultimatelyAddedKeys != null)
-                {
-                    ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
-                }
+                overwrittenEntries.putAll(newOverwrittenEntries);
             }
-            // remove new put entries from ultimatelyRemovedKeys - MUST do this AFTER checking new removes
-            if (newPutEntriesExist)
+            if (newRemovedEntriesSizeGreaterThan0)
             {
-                if (ultimatelyRemovedKeys != null)
-                {
-                    ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
-                }
+                removedEntries.putAll(newRemovedEntries);
+            }
+
+            if (newPutEntriesSizeGreaterThan0)
+            {
+                ultimatelyAddedKeys.addAll(newPutEntries.keySet());
+            }
+            if (newRemovedEntriesSizeGreaterThan0)
+            {
+                ultimatelyAddedKeys.removeAll(newRemovedEntries.keySet());
+            }
+
+            if (newRemovedEntriesSizeGreaterThan0)
+            {
+                ultimatelyRemovedKeys.addAll(newRemovedEntries.keySet());
+            }
+            if (newPutEntriesSizeGreaterThan0)
+            {
+                ultimatelyRemovedKeys.removeAll(newPutEntries.keySet());
             }
 
             // build up the map of the list of sub-map changes, keyed by sub-map key
             // this VASTLY improves performance of merging
             subMapKeysToMerge = subsequentChange.getSubMapKeys();
-            if (!subMapKeysToMerge.isEmpty())
+            if (subMapKeysToMerge.size() > 0)
             {
                 if (subMapChangesToMerge == null)
                 {
                     subMapChangesToMerge = newMap();
                 }
-                for (subMapKeysToMergeIterator =
-                             subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext(); )
+                for (subMapKeysToMergeIterator = subMapKeysToMerge.iterator(); subMapKeysToMergeIterator.hasNext();)
                 {
                     subMapKey = subMapKeysToMergeIterator.next();
-                    subMapChangesToMerge.computeIfAbsent(subMapKey, k -> new ArrayList<>(1)).add(
-                            subsequentChange.getSubMapAtomicChange(subMapKey));
+                    subMapChangesList = subMapChangesToMerge.get(subMapKey);
+                    if (subMapChangesList == null)
+                    {
+                        subMapChangesList = new ArrayList<>(1);
+                        subMapChangesToMerge.put(subMapKey, subMapChangesList);
+                    }
+                    subMapChangesList.add(subsequentChange.getSubMapAtomicChange(subMapKey));
                 }
             }
         }
 
         // determine what keys were ultimately added - remove them from the removedEntries
-        if (ultimatelyAddedKeys != null )
+        if (ultimatelyRemovedKeys.size() > 0)
         {
-            if (ultimatelyRemovedKeys != null)
+            ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
+            // remove any puts/overwritten that were ultimately removed
+            for (String removedKey : ultimatelyRemovedKeys)
             {
-                ultimatelyAddedKeys.removeAll(ultimatelyRemovedKeys);
-
-                // remove any puts/overwritten that were ultimately removed
-                for (String removedKey : ultimatelyRemovedKeys)
-                {
-                    putEntries.remove(removedKey);
-                }
-                if (overwrittenEntries != null)
-                {
-                    for (String removedKey : ultimatelyRemovedKeys)
-                    {
-                        overwrittenEntries.remove(removedKey);
-                    }
-                }
+                putEntries.remove(removedKey);
+                overwrittenEntries.remove(removedKey);
             }
-            if (removedEntries != null)
+        }
+        if (ultimatelyAddedKeys.size() > 0)
+        {
+            for (String addedKey : ultimatelyAddedKeys)
             {
-                for (String addedKey : ultimatelyAddedKeys)
-                {
-                    removedEntries.remove(addedKey);
-                }
+                removedEntries.remove(addedKey);
             }
         }
 
@@ -543,10 +447,13 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         setSequence(subsequentChanges.get(subsequentChanges.size() - 1).getSequence());
 
         // now coalesce the sub-maps in each list per sub-map key
-        if (subMapChangesToMerge != null && !subMapChangesToMerge.isEmpty())
+        if (subMapChangesToMerge != null && subMapChangesToMerge.size() > 0)
         {
-            for (Map.Entry<String, List<IRecordChange>> entry : subMapChangesToMerge.entrySet())
+            Map.Entry<String, List<IRecordChange>> entry = null;
+            for (Iterator<Map.Entry<String, List<IRecordChange>>> it =
+                subMapChangesToMerge.entrySet().iterator(); it.hasNext();)
             {
+                entry = it.next();
                 internalGetSubMapAtomicChange(entry.getKey()).coalesce(entry.getValue());
             }
         }
@@ -555,77 +462,62 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     @Override
     public void setScope(char scope)
     {
-        this.scope.set(scope);
+        this.scope.set(Character.valueOf(scope));
     }
 
     @Override
     public void setSequence(long sequence)
     {
-        this.sequence.set(sequence);
+        this.sequence.set(Long.valueOf(sequence));
     }
 
     @Override
     public char getScope()
     {
-        return this.scope.get();
+        return this.scope.get().charValue();
     }
 
     @Override
     public long getSequence()
     {
-        return this.sequence.get();
+        return this.sequence.get().longValue();
     }
 
-    @Override
-    public void mergeBulkChanges(ThreadLocalBulkChanges changes)
+    void mergeBulkChanges(ThreadLocalBulkChanges changes)
     {
-        synchronized (this)
+        final Map<String, IValue> internalPutEntries = internalGetPutEntries();
+        final Map<String, IValue> internalOverwrittenEntries = internalGetOverwrittenEntries();
+        final Map<String, IValue> internalRemovedEntries = internalGetRemovedEntries();
+
+        for (int i = 0; i < changes.putSize; i++)
         {
-            // on-demand assignment of collections
-            final Map<String, IValue> _putEntries = noPutEntries() ?
-                    (changes.putSize > 0 ? (putEntries = newMap()) : NOOP_MAP) : putEntries;
-            final Map<String, IValue> _removedEntries = noRemovedEntries() ?
-                    (changes.removedSize > 0 ? (removedEntries = newMap()) : NOOP_MAP) :
-                    removedEntries;
-
-            for (int i = 0; i < changes.putSize; i++)
+            internalPutEntries.put(changes.putKeys[i], changes.putValues[i][0]);
+            if (changes.putValues[i][1] != null)
             {
-                _putEntries.put(changes.putKeys[i], changes.putValues[i][0]);
-                if (changes.putValues[i][1] != null)
-                {
-                    if (overwrittenEntries == null)
-                    {
-                        overwrittenEntries = newMap();
-                    }
-                    overwrittenEntries.put(changes.putKeys[i], changes.putValues[i][1]);
-                }
-                // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
-                // a put MUST overrule any previous remove, otherwise the atomic change has a put +
-                // remove which can cause problems if the put vs removes are applied in different
-                // orders
-                _removedEntries.remove(changes.putKeys[i]);
+                internalOverwrittenEntries.put(changes.putKeys[i], changes.putValues[i][1]);
             }
+            // VERY IMPORTANT: when adding a field, if the atomic change has not been completed,
+            // a put MUST overrule any previous remove, otherwise the atomic change has a put +
+            // remove which can cause problems if the put vs removes are applied in different
+            // orders
+            internalRemovedEntries.remove(changes.putKeys[i]);
+        }
 
-            // now do removes
-            final Map<String, IValue> _overwrittenEntries =
-                    noOverwrittenEntries() ? NOOP_MAP : overwrittenEntries;
-            for (int i = 0; i < changes.removedSize; i++)
-            {
-                _putEntries.remove(changes.removedKeys[i]);
-                _overwrittenEntries.remove(changes.removedKeys[i]);
-                _removedEntries.put(changes.removedKeys[i], changes.removedValues[i]);
-            }
+        // now do removes
+        for (int i = 0; i < changes.removedSize; i++)
+        {
+            internalPutEntries.remove(changes.removedKeys[i]);
+            internalOverwrittenEntries.remove(changes.removedKeys[i]);
+            internalRemovedEntries.put(changes.removedKeys[i], changes.removedValues[i]);
         }
     }
 
-    @Override
-    public void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
+    void mergeBulkSubMapChanges(String subMapKey, ThreadLocalBulkChanges changes)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeBulkChanges(changes);
     }
 
-    @Override
-    public void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
+    void mergeEntryUpdatedChange(String key, IValue current, IValue previous)
     {
         internalGetPutEntries().put(key, current);
         if (previous != null)
@@ -635,35 +527,32 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         // VERY IMPORTANT: when adding a field, if the atomic change has not been completed, a put
         // MUST overrule any previous remove, otherwise the atomic change has a put + remove which
         // can cause problems if the put vs removes are applied in different orders
-        if (removedEntries != null)
-        {
-            removedEntries.remove(key);
-        }
+        internalGetRemovedEntries().remove(key);
     }
 
-    @Override
-    public void mergeEntryRemovedChange(String key, IValue value)
+    void addEntry_onlyCallFromCodec(String key, IValue current)
     {
-        if (putEntries != null)
-        {
-            putEntries.remove(key);
-        }
-        if (overwrittenEntries != null)
-        {
-            overwrittenEntries.remove(key);
-        }
-        // putting needs the map to exist!
+        this.putEntries.put(key, current);
+    }
+
+    void mergeEntryRemovedChange(String key, IValue value)
+    {
+        internalGetPutEntries().remove(key);
+        internalGetOverwrittenEntries().remove(key);
         internalGetRemovedEntries().put(key, value);
     }
 
-    @Override
-    public void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
+    void removeEntry_onlyCallFromCodec(String key, IValue value)
+    {
+        this.removedEntries.put(key, value);
+    }
+
+    void mergeSubMapEntryUpdatedChange(String subMapKey, String key, IValue current, IValue previous)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeEntryUpdatedChange(key, current, previous);
     }
 
-    @Override
-    public void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
+    void mergeSubMapEntryRemovedChange(String subMapKey, String key, IValue value)
     {
         internalGetSubMapAtomicChange(subMapKey).mergeEntryRemovedChange(key, value);
     }
@@ -676,7 +565,11 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         }
         synchronized (this)
         {
-            return (putEntries == null ? (putEntries = newMap()) : putEntries);
+            if (this.putEntries == null)
+            {
+                this.putEntries = newMap();
+            }
+            return this.putEntries;
         }
     }
 
@@ -688,7 +581,11 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         }
         synchronized (this)
         {
-            return (removedEntries == null ? (removedEntries = newMap()) : removedEntries);
+            if (this.removedEntries == null)
+            {
+                this.removedEntries = newMap();
+            }
+            return this.removedEntries;
         }
     }
 
@@ -700,7 +597,11 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         }
         synchronized (this)
         {
-            return (overwrittenEntries == null ? (overwrittenEntries = newMap()) : overwrittenEntries);
+            if (this.overwrittenEntries == null)
+            {
+                this.overwrittenEntries = newMap();
+            }
+            return this.overwrittenEntries;
         }
     }
 
@@ -713,8 +614,15 @@ public final class AtomicChange implements IAtomicChangeMergingOps
                 this.subMapAtomicChanges = newMap();
                 this.subMapKeys = Collections.unmodifiableSet(this.subMapAtomicChanges.keySet());
             }
-            return this.subMapAtomicChanges.computeIfAbsent(subMapKey,
-                    k -> new AtomicChange(k, this.scope, this.sequence));
+            AtomicChange subMapAtomicChange = this.subMapAtomicChanges.get(subMapKey);
+            if (subMapAtomicChange == null)
+            {
+                subMapAtomicChange = new AtomicChange(subMapKey);
+                subMapAtomicChange.scope = this.scope;
+                subMapAtomicChange.sequence = this.sequence;
+                this.subMapAtomicChanges.put(subMapKey, subMapAtomicChange);
+            }
+            return subMapAtomicChange;
         }
     }
 
@@ -724,6 +632,18 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         if (this.subMapAtomicChanges != null)
         {
             return this.subMapKeys;
+        }
+        else
+        {
+            return ContextUtils.EMPTY_STRING_SET;
+        }
+    }
+
+    Set<String> internalGetSubMapKeys()
+    {
+        if (this.subMapAtomicChanges != null)
+        {
+            return this.subMapAtomicChanges.keySet();
         }
         else
         {
@@ -766,12 +686,6 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     {
         synchronized (record.getWriteLock())
         {
-            // user code should not be able to set sequences, hence the instance-of check
-            if (record instanceof Record)
-            {
-                ((Record) record).setSequence(this.sequence.get());
-            }
-
             applyTo(record);
 
             if (this.subMapAtomicChanges != null)
@@ -781,7 +695,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
                 {
                     subMap = record.getOrCreateSubMap(subMapKey);
                     getSubMapAtomicChange(subMapKey).applyTo(subMap);
-                    if (subMap.isEmpty())
+                    if (subMap.size() == 0)
                     {
                         record.removeSubMap(subMapKey);
                     }
@@ -811,8 +725,8 @@ public final class AtomicChange implements IAtomicChangeMergingOps
         final int prime = 31;
         int result = 1;
         result = prime * result + ((this.name == null) ? 0 : this.name.hashCode());
-        result = prime * result + ((this.scope == null) ? 0 : this.scope.hashCode());
-        result = prime * result + ((this.sequence == null) ? 0 : this.sequence.hashCode());
+        result = prime * result + ((this.scope.get() == null) ? 0 : this.scope.get().hashCode());
+        result = prime * result + ((this.sequence.get() == null) ? 0 : this.sequence.get().hashCode());
         return result;
     }
 
@@ -842,8 +756,15 @@ public final class AtomicChange implements IAtomicChangeMergingOps
  */
 final class ThreadLocalBulkChanges
 {
-    static final ThreadLocal<ThreadLocalBulkChanges> THREAD_LOCAL =
-            ThreadLocal.withInitial(ThreadLocalBulkChanges::new);
+    static final ThreadLocal<ThreadLocalBulkChanges> THREAD_LOCAL = new ThreadLocal<ThreadLocalBulkChanges>()
+    {
+        @SuppressWarnings("synthetic-access")
+        @Override
+        protected ThreadLocalBulkChanges initialValue()
+        {
+            return new ThreadLocalBulkChanges();
+        }
+    };
 
     static ThreadLocalBulkChanges get()
     {

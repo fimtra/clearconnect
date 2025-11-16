@@ -30,17 +30,13 @@ public final class Pair<T1 extends Serializable, T2 extends Serializable> implem
 
     final T1 first;
     final T2 second;
-    int hashCode = -1;
+    final int hashCode;
 
     public Pair(T1 first, T2 second)
     {
         super();
         this.first = first;
         this.second = second;
-    }
-
-    private void computeHashCode()
-    {
         final int prime = 31;
         int result = 1;
         result = prime * result + ((this.first == null) ? 0 : this.first.hashCode());
@@ -51,10 +47,6 @@ public final class Pair<T1 extends Serializable, T2 extends Serializable> implem
     @Override
     public int hashCode()
     {
-        if (hashCode == -1)
-        {
-            computeHashCode();
-        }
         return this.hashCode;
     }
 

@@ -32,21 +32,21 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.fimtra.datafission.DataFissionProperties;
-import com.fimtra.thimble.ContextExecutorFactory;
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.util.LazyObject.IDestructor;
 
 /**
- * Utility that caches data and notifies listeners of a specific type when data is added or removed. Listeners
- * are notified asynchronously and with different threads; initial images occur on separate threads to
- * updates. There will be no concurrent or duplicate updates received.
+ * Utility that caches data and notifies listeners of a specific type when data is added or removed.
+ * Listeners are notified asynchronously and with different threads; initial images occur on
+ * separate threads to updates. There will be no concurrent or duplicate updates received.
  * <p>
- * This maintains an internal cache of the data that has been added/removed. The {@link #getCacheSnapshot()}
- * method returns a <b>clone</b> of the cache data so is expensive to call.
+ * This maintains an internal cache of the data that has been added/removed. The
+ * {@link #getCacheSnapshot()} method returns a <b>clone</b> of the cache data so is expensive to
+ * call.
  * <p>
  * <b>Threading:</b> all listeners are notified with initial images using an internal
- * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the cache are
- * notified using the respective thread model used for cache construction.
+ * {@link NotifyingCache#IMAGE_NOTIFIER} executor. After this, any additions/removals to/from the
+ * cache are notified using the respective thread model used for cache construction.
  * <p>
  * A notifying cache should be equal by object reference only.
  *
@@ -54,24 +54,13 @@ import com.fimtra.util.LazyObject.IDestructor;
  */
 public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 {
-    private static final Executor IMAGE_NOTIFIER = ThreadUtils.newCachedThreadPoolExecutor("image-notifier");
-
-    private static final class UpdateNotifier
-    {
-        static final Executor INSTANCE = ContextExecutorFactory.create("update-notifier",
-                DataFissionProperties.Values.CORE_THREAD_COUNT);
-    }
+    private static final Executor IMAGE_NOTIFIER = ContextExecutorFactory.create("image-notifier");
+    private static final Executor UPDATE_NOTIFIER = ContextExecutorFactory.create("update-notifier");
 
     @SuppressWarnings("rawtypes")
     private static final IDestructor NOOP_DESTRUCTOR = (ref) -> {
         // noop
     };
-
-    private static Executor getUpdateNotifier()
-    {
-        return UtilProperties.Values.NOTIFYING_CACHE_USE_UPDATE_THREADS ? UpdateNotifier.INSTANCE :
-                Runnable::run;
-    }
 
     private static boolean isLatest(String key, Long sequence, Map<String, Long> notifySequences)
     {
@@ -100,15 +89,15 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     /**
      * This tracks the notification sequence number per data key per listener.
      * <p>
-     * This is populated when a listener is registered and prevents duplicate updates being sent to the
-     * listener during its phase of receiving initial images whilst any concurrent updates may also be
-     * occurring.
+     * This is populated when a listener is registered and prevents duplicate updates being sent to
+     * the listener during its phase of receiving initial images whilst any concurrent updates may
+     * also be occurring.
      */
     final Map<LISTENER_CLASS, Map<String, Long>> listenerSequences;
 
     /**
-     * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still not lose
-     * update order
+     * Holds the order for notifying tasks - ensures the executor can be multi-threaded and still
+     * not lose update order
      */
     final List<Runnable> notifyTasks;
     final Runnable notifyingTasksRunner;
@@ -127,7 +116,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     @SuppressWarnings("unchecked")
     public NotifyingCache()
     {
-        this(NOOP_DESTRUCTOR, getUpdateNotifier());
+        this(NOOP_DESTRUCTOR, UPDATE_NOTIFIER);
     }
 
     /**
@@ -135,7 +124,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
      */
     public NotifyingCache(IDestructor<NotifyingCache<LISTENER_CLASS, DATA>> destructor)
     {
-        this(destructor, getUpdateNotifier());
+        this(destructor, UPDATE_NOTIFIER);
     }
 
     /**
@@ -159,10 +148,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         this.notifyTasks = Collections.synchronizedList(new LowGcLinkedList<>());
         final Object runnerLock = new Object();
         this.notifyingTasksRunner = () -> {
-            if (!this.notifyTasks.isEmpty())
+            if (this.notifyTasks.size() > 0)
             {
-                // lock to ensure only 1 task runs at any time
-                // (ensures ordering if the executor is multi-threaded)
+                // lock to ensure only 1 task runs at any time (ensures ordering if the executor is multi-threaded)
                 synchronized (runnerLock)
                 {
                     final Runnable task = this.notifyTasks.remove(0);
@@ -342,8 +330,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
         }
         catch (InterruptedException e)
         {
-            ExceptionUtils.handleInterruptedException(NotifyingCache.this, e,
-                    "Interrupted waiting for initial image");
+            // ignored
         }
         return result.get();
     }
@@ -375,8 +362,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners with the new data. The notification is done using the internal
-     * executor.
+     * Notify all registered listeners with the new data. The notification is done using the
+     * internal executor.
      *
      * @return <code>true</code> if the data was added (it was not already contained),
      * <code>false</code> if it was already in the cache (no listeners are notified in this
@@ -460,8 +447,8 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
     }
 
     /**
-     * Notify all registered listeners that the data for this key is removed. The notification is done using
-     * the internal executor.
+     * Notify all registered listeners that the data for this key is removed. The notification is
+     * done using the internal executor.
      *
      * @param key the key for the data that is removed
      * @return <code>true</code> if the data was found and removed, <code>false</code> if it was not
@@ -498,9 +485,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
                                 }
                                 for (Map<String, Long> map : notificationSequences)
                                 {
-                                    // note: the map is only mutated whilst holding either the
-                                    // updateLock or
-                                    // imageLock
+                                    // note: the map is only mutated whilst holding either the updateLock or imageLock
                                     map.remove(key);
                                 }
 
@@ -543,6 +528,7 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
 
     private long updateLockFailed(final String key, long start)
     {
+        // todo maybe wait 1ms?
         LockSupport.parkNanos(10);
 
         if ((System.nanoTime() - start) / 1_000_000 > 1000)
@@ -596,6 +582,11 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             this.writeLock.lock();
             try
             {
+                // remove all data from the cache and trigger listeners
+                for (String key : new HashSet<>(this.cache.keySet()))
+                {
+                    notifyListenersDataRemoved(key);
+                }
                 this.listeners = Collections.emptyList();
                 this.cache.clear();
             }

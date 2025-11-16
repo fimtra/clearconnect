@@ -221,8 +221,7 @@ public class FastDateFormatTest
             }
             long fdfTime = System.currentTimeMillis() - now;
             now = System.currentTimeMillis();
-            System.err.println(
-                    "Calendar with formatting took " + sdfTime + ", FastDateFormat took " + fdfTime);
+            System.err.println("Calendar with formatting took " + sdfTime + ", FastDateFormat took " + fdfTime);
             assertTrue(fdfTime < sdfTime);
         }
     }

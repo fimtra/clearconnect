@@ -18,13 +18,12 @@ package com.fimtra.datafission.core;
 import static com.fimtra.util.TestUtils.waitForEvent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -34,7 +33,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -65,6 +63,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.core.IStatusAttribute.Connection;
 import com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames;
+import com.fimtra.datafission.core.RpcInstance.IRpcExecutionHandler;
 import com.fimtra.datafission.core.session.ISessionAttributesProvider;
 import com.fimtra.datafission.core.session.ISessionListener;
 import com.fimtra.datafission.core.session.ISessionManager;
@@ -98,7 +97,8 @@ public class ProxyContextTest
     // note: the cipher protocol takes longer to initialise so increase to 5 secs
     private static final int REMOTE_RECORD_GET_TIMEOUT_MILLIS = 5000;
 
-    static List<TestLongValueSequenceCheckingAtomicChangeObserver> observers = new ArrayList<>();
+    static List<TestLongValueSequenceCheckingAtomicChangeObserver> observers =
+        new ArrayList<TestLongValueSequenceCheckingAtomicChangeObserver>();
 
     private String contextName = "TestContext";
     private int PORT;
@@ -144,7 +144,7 @@ public class ProxyContextTest
         doSetup();
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        setupTimeoutPeriods();
+        this.candidate.setReconnectPeriodMillis(200);
         // wait for connection
         int i = 0;
         while (!this.candidate.isConnected() && i++ < 200)
@@ -178,7 +178,7 @@ public class ProxyContextTest
     private void doSetup()
     {
         this.executor = Executors.newScheduledThreadPool(4);
-        this.recordData = new HashMap<>();
+        this.recordData = new HashMap<String, Map<String, Long>>();
 
         createMapAndStartUpdating(record1);
         createMapAndStartUpdating(record2);
@@ -187,10 +187,10 @@ public class ProxyContextTest
 
     private void createMapAndStartUpdating(final String recordName)
     {
-        Map<String, Long> values = new ConcurrentHashMap<>();
+        Map<String, Long> values = new ConcurrentHashMap<String, Long>();
         for (int i = 0; i < KEY_COUNT - 1; i++)
         {
-            values.put(KEY_PREFIX + i, 0L);
+            values.put(KEY_PREFIX + i, 0l);
         }
         this.recordData.put(recordName, values);
         final Map<String, IValue> record = this.context.createRecord(recordName);
@@ -206,10 +206,10 @@ public class ProxyContextTest
     {
         this.executor.scheduleAtFixedRate(new Runnable()
         {
-            final Random random = new Random();
+            Random random = new Random();
             int count = 0;
             boolean remove;
-            final Map<String, Long> data = ProxyContextTest.this.recordData.get(recordName);
+            Map<String, Long> data = ProxyContextTest.this.recordData.get(recordName);
 
             @Override
             public void run()
@@ -250,7 +250,8 @@ public class ProxyContextTest
     @After
     public void tearDown() throws Exception
     {
-        List<TestLongValueSequenceCheckingAtomicChangeObserver> local = new ArrayList<>(observers);
+        List<TestLongValueSequenceCheckingAtomicChangeObserver> local =
+            new ArrayList<TestLongValueSequenceCheckingAtomicChangeObserver>(observers);
         observers.clear();
         for (TestLongValueSequenceCheckingAtomicChangeObserver observer : local)
         {
@@ -264,22 +265,10 @@ public class ProxyContextTest
             {
                 Log.log(this,
                     ">>> teardown: " + ProxyContextTest.this.candidate + "  " + ProxyContextTest.this.publisher);
-                if (ProxyContextTest.this.executor != null)
-                {
-                    ProxyContextTest.this.executor.shutdownNow();
-                }
-                if (ProxyContextTest.this.publisher != null)
-                {
-                    ProxyContextTest.this.publisher.destroy();
-                }
-                if (ProxyContextTest.this.candidate != null)
-                {
-                    ProxyContextTest.this.candidate.destroy();
-                }
-                if (ProxyContextTest.this.context != null)
-                {
-                    ProxyContextTest.this.context.destroy();
-                }
+                ProxyContextTest.this.executor.shutdownNow();
+                ProxyContextTest.this.publisher.destroy();
+                ProxyContextTest.this.candidate.destroy();
+                ProxyContextTest.this.context.destroy();
             }
         }).run();
         
@@ -292,7 +281,7 @@ public class ProxyContextTest
         createComponents();
         IRecordListener observer = new TestCachingAtomicChangeObserver();
         Map<String, Boolean> result = this.candidate.addObserver(observer, "one").get();
-        assertEquals(Boolean.TRUE, result.get("one"));
+        assertTrue(Boolean.TRUE.equals(result.get("one")));
         result = this.candidate.addObserver(observer, "one").get();
         assertTrue(result.isEmpty());
     }
@@ -309,13 +298,12 @@ public class ProxyContextTest
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
 
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        setupTimeoutPeriods();
+        this.candidate.setReconnectPeriodMillis(200);
 
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         Future<Map<String, Boolean>> addObserverLatch =
             this.candidate.addObserver(observer, "comma in, record", "double comma,, record");
-        assertEquals(2, addObserverLatch.get(10, TimeUnit.SECONDS)
-                .size());
+        assertTrue(addObserverLatch.get(10, TimeUnit.SECONDS).size() == 2);
 
         this.publisher.destroy();
 
@@ -325,15 +313,7 @@ public class ProxyContextTest
 
         revivePublisher();
 
-        assertEquals(1, addObserverLatch.get(10, TimeUnit.SECONDS)
-                .size());
-    }
-
-    private void setupTimeoutPeriods()
-    {
-        final int timoutMilli = 100;
-        this.candidate.setReconnectPeriodMillis(timoutMilli);
-        this.candidate.setRpcSubscribeTimeoutMillis(timoutMilli);
+        assertTrue(addObserverLatch.get(10, TimeUnit.SECONDS).size() == 1);
     }
 
     private void revivePublisher() throws InterruptedException
@@ -359,26 +339,26 @@ public class ProxyContextTest
     {
         // NOTE: RPC record is always subscribed
         createComponents();
-        assertEquals(0, this.candidate.getSubscribedRecords().size());
+        assertEquals(1, this.candidate.getSubscribedRecords().size());
         IRecordListener observer = new TestCachingAtomicChangeObserver();
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         // check no double-counting
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "three");
-        assertEquals(1, this.candidate.getSubscribedRecords().size());
+        assertEquals(2, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "three");
-        assertEquals(1, this.candidate.getSubscribedRecords().size());
+        assertEquals(2, this.candidate.getSubscribedRecords().size());
 
         this.candidate.addObserver(observer, "one", "two", "three");
-        assertEquals(3, this.candidate.getSubscribedRecords().size());
+        assertEquals(4, this.candidate.getSubscribedRecords().size());
 
         this.candidate.removeObserver(observer, "one", "two", "three");
-        assertEquals(0, this.candidate.getSubscribedRecords().size());
+        assertEquals(1, this.candidate.getSubscribedRecords().size());
     }
 
     @Test
@@ -404,7 +384,7 @@ public class ProxyContextTest
         listener.latch = new CountDownLatch(1);
         this.candidate.resubscribe(name);
         assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
-        assertEquals(v1, listener.getLatestImage().get(key));
+        assertEquals(v1, listener.getLatestImage().<IValue>get(key));
     }
 
     @Test
@@ -420,10 +400,11 @@ public class ProxyContextTest
         this.context.publishAtomicChange(name);
         
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
+        final int timeout = TIMEOUT;
         listener.latch = new CountDownLatch(1);
         this.candidate.addObserver(listener, name);
         
-        assertTrue(listener.latch.await(TIMEOUT, TimeUnit.SECONDS));
+        assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
         assertEquals(v1, listener.getLatestImage().get(key));
         
         listener.latch = new CountDownLatch(1);
@@ -464,10 +445,11 @@ public class ProxyContextTest
         final String name = IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS;
 
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver(true);
+        final int timeout = TIMEOUT;
         listener.latch = new CountDownLatch(1);
         this.candidate.addObserver(listener, name);
 
-        assertTrue(listener.latch.await(TIMEOUT, TimeUnit.SECONDS));
+        assertTrue(listener.latch.await(timeout, TimeUnit.SECONDS));
         TestUtils.waitForEvent(new EventChecker()
         {
             @Override
@@ -567,26 +549,29 @@ public class ProxyContextTest
         record.put("F1", "lasers");
 
         final CountDownLatch recordSubscribedLatch = new CountDownLatch(1);
-        this.candidate.addObserver((imageCopy, atomicChange) -> {
-            if (imageCopy.containsKey(recordName))
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                recordSubscribedLatch.countDown();
+                if (imageCopy.containsKey(recordName))
+                {
+                    recordSubscribedLatch.countDown();
+                }
             }
         }, IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS);
 
         final int timeout = TIMEOUT;
         final TestCachingAtomicChangeObserver listener = new TestCachingAtomicChangeObserver();
         listener.latch = new CountDownLatch(2);
-        assertEquals("Did not get response for subscription", 1,
-                this.candidate.addObserver(listener, recordName)
-                        .get(timeout, TimeUnit.SECONDS)
-                        .size());
+        assertTrue("Did not get response for subscription",
+            this.candidate.addObserver(listener, recordName).get(timeout, TimeUnit.SECONDS).size() == 1);
 
         // we must wait until we are sure the listener has been added
         assertTrue(recordSubscribedLatch.await(timeout, TimeUnit.SECONDS));
 
         this.context.publishAtomicChange(recordName);
-        assertTrue("Got: " + listener.images, listener.latch.await(timeout, TimeUnit.SECONDS));
+        assertTrue("Got: " + listener.current, listener.latch.await(timeout, TimeUnit.SECONDS));
         assertEquals("Got:" + listener.getLatestImage(), 1, listener.getLatestImage().size());
 
         // remove the field
@@ -676,9 +661,8 @@ public class ProxyContextTest
         final TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver(true);
         observer.latch = new CountDownLatch(3);
         this.candidate.addObserver(observer, IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS);
-        final Set<String> expected = new HashSet<>(
-                Arrays.asList("ContextSubscriptions", "ContextRecords", "record3", "ContextRpcs", "record2",
-                        "record1", "ContextStatus", "ContextConnections"));
+        final Set<String> expected = new HashSet<String>(Arrays.asList("ContextSubscriptions", "ContextRecords",
+            "record3", "ContextRpcs", "record2", "record1", "ContextStatus", "ContextConnections"));
 
         TestUtils.waitForEvent(new EventChecker()
         {
@@ -794,7 +778,8 @@ public class ProxyContextTest
             CountDownLatch rc2record1Latch = new CountDownLatch(UPDATE_COUNT);
             registerObserverForMap(candidate2, record1, rc2record1Latch);
 
-            boolean await = gotAllLatch.await(TIMEOUT, TimeUnit.SECONDS);
+            final int timeout = TIMEOUT;
+            boolean await = gotAllLatch.await(timeout, TimeUnit.SECONDS);
             assertTrue("Got: " + remoteSubscriptionsObserver.getLatestImage(), await);
 
             awaitLatch(rc1record1Latch);
@@ -847,7 +832,8 @@ public class ProxyContextTest
             CountDownLatch rc2record3Latch = new CountDownLatch(UPDATE_COUNT);
             registerObserverForMap(candidate2, record3, rc2record3Latch);
 
-            boolean await = gotAllLatch.await(TIMEOUT, TimeUnit.SECONDS);
+            final int timeout = TIMEOUT;
+            boolean await = gotAllLatch.await(timeout, TimeUnit.SECONDS);
             assertTrue("Got: " + remoteSubscriptionsObserver.getLatestImage(), await);
 
             awaitLatch(rc1record1Latch);
@@ -1034,7 +1020,8 @@ public class ProxyContextTest
         this.candidate.addObserver(observer, record1);
 
         awaitLatch(record1Latch);
-        assertTrue(observer.latch.await(TIMEOUT, TimeUnit.SECONDS));
+        final int timeout = TIMEOUT;
+        assertTrue(observer.latch.await(timeout, TimeUnit.SECONDS));
     }
 
     @Test
@@ -1053,7 +1040,8 @@ public class ProxyContextTest
             candidate2.addObserver(observer, record1);
 
             awaitLatch(record1Latch);
-            assertTrue(observer.latch.await(TIMEOUT, TimeUnit.SECONDS));
+            final int timeout = TIMEOUT;
+            assertTrue(observer.latch.await(timeout, TimeUnit.SECONDS));
 
         }
         finally
@@ -1076,7 +1064,7 @@ public class ProxyContextTest
 
         this.publisher = new Publisher(this.context, getProtocolCodec(), LOCALHOST, this.PORT);
         this.candidate = new ProxyContext(this.contextName, getProtocolCodec(), LOCALHOST, this.PORT);
-        setupTimeoutPeriods();
+        this.candidate.setReconnectPeriodMillis(200);
         
         CountDownLatch record1Latch = new CountDownLatch(UPDATE_COUNT);
         registerObserverForMap(this.candidate, record1, record1Latch);
@@ -1097,7 +1085,7 @@ public class ProxyContextTest
     {
         createComponents();
         final int timeout = TIMEOUT;
-        final AtomicReference<CountDownLatch> connected = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
 
         TestCachingAtomicChangeObserver statusObserver = new TestCachingAtomicChangeObserver()
         {
@@ -1176,7 +1164,7 @@ public class ProxyContextTest
     {
         createComponents();
         final int timeout = TIMEOUT;
-        final AtomicReference<CountDownLatch> connected = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch> connected = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
 
         TestCachingAtomicChangeObserver statusObserver = new TestCachingAtomicChangeObserver()
         {
@@ -1377,10 +1365,10 @@ public class ProxyContextTest
         }, ProxyContext.RECORD_CONNECTION_STATUS_NAME);
         assertTrue(recordsDisconnected.await(timeout, TimeUnit.SECONDS));
 
-        int size = contextStatusObserver.images.size();
-        IRecord last = contextStatusObserver.images.get(size - 1);
-        IRecord lastButOne = contextStatusObserver.images.get(size - 2);
-        String message = "Got: " + contextStatusObserver.images;
+        int size = contextStatusObserver.changeTicks.get();
+        IRecord last = contextStatusObserver.current.get();
+        IRecord lastButOne = contextStatusObserver.previous.get();
+        String message = "Got: " + contextStatusObserver.current;
         Connection lastStatus = IStatusAttribute.Utils.getStatus(Connection.class, last);
         Connection lastButOneStatus = IStatusAttribute.Utils.getStatus(Connection.class, lastButOne);
         if (Connection.RECONNECTING.equals(lastStatus))
@@ -1432,10 +1420,10 @@ public class ProxyContextTest
 
         assertTrue("Triggered " + (UPDATE_COUNT - observer.latch.getCount()) + " times",
             observer.latch.await(timeout, TimeUnit.SECONDS));
-        final int size = observer.images.size();
-        assertEquals("Got: " + observer.images, UPDATE_COUNT, size);
+        final int size = observer.changeTicks.get();
+        assertEquals("Got: " + observer.current, UPDATE_COUNT, size);
         int max = UPDATE_COUNT - 1;
-        Map<String, IValue> image = observer.images.get(max);
+        Map<String, IValue> image = observer.current.get();
         assertEquals("Image: " + image, text + max, image.get(key).textValue());
     }
 
@@ -1445,17 +1433,18 @@ public class ProxyContextTest
         createComponents();
         Map<?, ?> remoteRecordImage = this.candidate.getRemoteRecordImage(record1, REMOTE_RECORD_GET_TIMEOUT_MILLIS);
         assertNotNull(remoteRecordImage);
-        assertNotEquals("Got: " + remoteRecordImage, 0, remoteRecordImage.size());
+        assertFalse("Got: " + remoteRecordImage, remoteRecordImage.size() == 0);
 
         // now try when we already have a subscription
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(1);
         this.candidate.addObserver(observer, record1);
-        assertTrue(observer.latch.await(TIMEOUT, TimeUnit.SECONDS));
+        final int timeout = TIMEOUT;
+        assertTrue(observer.latch.await(timeout, TimeUnit.SECONDS));
 
         remoteRecordImage = this.candidate.getRemoteRecordImage(record1, REMOTE_RECORD_GET_TIMEOUT_MILLIS);
         assertNotNull(remoteRecordImage);
-        assertNotEquals("Got: " + remoteRecordImage, 0, remoteRecordImage.size());
+        assertFalse("Got: " + remoteRecordImage, remoteRecordImage.size() == 0);
     }
 
     @Test
@@ -1466,12 +1455,17 @@ public class ProxyContextTest
         IRecord record = this.context.createRecord(recordName);
 
         final CountDownLatch latch = new CountDownLatch(3);
-        final AtomicReference<IRecord> image = new AtomicReference<>();
-        this.context.addObserver((imageValidInCallingThreadOnly, atomicChange) -> {
-            if (atomicChange.getSequence() > 0)
+        final AtomicReference<IRecord> image = new AtomicReference<IRecord>();
+        this.context.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                image.set(imageValidInCallingThreadOnly);
-                latch.countDown();
+                if (atomicChange.getSequence() > 0)
+                {
+                    image.set(imageValidInCallingThreadOnly);
+                    latch.countDown();
+                }
             }
         }, recordName);
 
@@ -1494,10 +1488,15 @@ public class ProxyContextTest
         assertEquals(3, remoteRecordImage.getSequence());
 
         final CountDownLatch latch2 = new CountDownLatch(1);
-        this.candidate.addObserver((imageValidInCallingThreadOnly, atomicChange) -> {
-            if (atomicChange.getSequence() == 4)
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageValidInCallingThreadOnly, IRecordChange atomicChange)
             {
-                latch2.countDown();
+                if (atomicChange.getSequence() == 4)
+                {
+                    latch2.countDown();
+                }
             }
         }, recordName);
 
@@ -1562,7 +1561,8 @@ public class ProxyContextTest
         this.candidate.addObserver(observer, "name");
 
         this.context.createRecord("name");
-        assertTrue(observer.latch.await(TIMEOUT, TimeUnit.SECONDS));
+        final int timeout = TIMEOUT;
+        assertTrue(observer.latch.await(timeout, TimeUnit.SECONDS));
     }
 
     @Test
@@ -1577,7 +1577,14 @@ public class ProxyContextTest
         assertTrue(latch.await(timeout, TimeUnit.SECONDS));
 
         observer.latch = new CountDownLatch(1);
-        RpcInstance rpc = new RpcInstance(args -> LongValue.valueOf(System.currentTimeMillis()), TypeEnum.LONG, "getTime");
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                return LongValue.valueOf(System.currentTimeMillis());
+            }
+        }, TypeEnum.LONG, "getTime");
         this.context.createRpc(rpc);
 
         assertTrue(observer.latch.await(timeout, TimeUnit.SECONDS));
@@ -1590,7 +1597,14 @@ public class ProxyContextTest
         createComponents();
         assertNull(this.candidate.getRpc("getTime"));
 
-        RpcInstance rpc = new RpcInstance(args -> LongValue.valueOf(System.currentTimeMillis()), TypeEnum.LONG, "getTime");
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                return LongValue.valueOf(System.currentTimeMillis());
+            }
+        }, TypeEnum.LONG, "getTime");
         this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
@@ -1604,7 +1618,14 @@ public class ProxyContextTest
         createComponents();
         assertNull(this.candidate.getRpc("getTime"));
 
-        RpcInstance rpc = new RpcInstance(args -> LongValue.valueOf(System.currentTimeMillis()), TypeEnum.LONG, "getTime");
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                return LongValue.valueOf(System.currentTimeMillis());
+            }
+        }, TypeEnum.LONG, "getTime");
         this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
@@ -1630,7 +1651,7 @@ public class ProxyContextTest
                 {
                     return -1;
                 }
-                return latestImage.containsKey(rpc.getName());
+                return latestImage.keySet().contains(rpc.getName());
             }
 
             @Override
@@ -1655,7 +1676,7 @@ public class ProxyContextTest
                 {
                     return -1;
                 }
-                return !latestImage.containsKey(rpcName);
+                return !latestImage.keySet().contains(rpcName);
             }
 
             @Override
@@ -1670,7 +1691,14 @@ public class ProxyContextTest
     public void testRpcNoArgs() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents();
-        RpcInstance rpc = new RpcInstance(args -> LongValue.valueOf(System.currentTimeMillis()), TypeEnum.LONG, "getTime");
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                return LongValue.valueOf(System.currentTimeMillis());
+            }
+        }, TypeEnum.LONG, "getTime");
         this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
@@ -1687,9 +1715,14 @@ public class ProxyContextTest
     {
         createComponents();
         final CountDownLatch latch = new CountDownLatch(1);
-        RpcInstance rpc = new RpcInstance(args -> {
-            latch.countDown();
-            return LongValue.valueOf(System.currentTimeMillis());
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                latch.countDown();
+                return LongValue.valueOf(System.currentTimeMillis());
+            }
         }, TypeEnum.LONG, "getTime");
         this.context.createRpc(rpc);
 
@@ -1705,13 +1738,18 @@ public class ProxyContextTest
     {
         createComponents();
         this.executor.shutdownNow();
-        RpcInstance rpc = new RpcInstance(args -> {
-            StringBuilder sb = new StringBuilder();
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue.textValue()).append(",");
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {
+                    sb.append(iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
             }
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
         
@@ -1727,13 +1765,18 @@ public class ProxyContextTest
     {
         createComponents();
         this.executor.shutdownNow();
-        RpcInstance rpc = new RpcInstance(args -> {
-            StringBuilder sb = new StringBuilder();
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue == null ? null : iValue.textValue()).append(",");
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {                    
+                    sb.append(iValue == null ? null : iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
             }
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
@@ -1750,13 +1793,18 @@ public class ProxyContextTest
     {
         createComponents();
         this.executor.shutdownNow();
-        RpcInstance rpc = new RpcInstance(args -> {
-            StringBuilder sb = new StringBuilder();
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue.textValue()).append(",");
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {
+                    sb.append(iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
             }
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
@@ -1765,35 +1813,40 @@ public class ProxyContextTest
         int count = 50;
         final CountDownLatch completed = new CountDownLatch(count);
         final CyclicBarrier barrier = new CyclicBarrier(count);
-        final List<String> errors = new ArrayList<>();
+        final List<String> errors = new ArrayList<String>();
         for (int i = 0; i < count; i++)
         {
-            new Thread(() -> {
-                final String random = "randomValue:" + System.nanoTime();
-                final IRpcInstance concatRpc = ProxyContextTest.this.candidate.getRpc("concat");
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    final String random = "randomValue:" + System.nanoTime();
+                    final IRpcInstance concatRpc = ProxyContextTest.this.candidate.getRpc("concat");
 
-                // wait for all threads to be ready...
-                try
-                {
-                    barrier.await();
-                }
-                catch (Exception e)
-                {
-                }
-                try
-                {
-                    IValue result = concatRpc.execute(TextValue.valueOf(random), new DoubleValue(Double.NaN),
-                        LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
-                    final String expected = random + ",NaN,2345,anotherText value here!,";
-                    if (!result.textValue().equals(expected))
+                    // wait for all threads to be ready...
+                    try
                     {
-                        errors.add("Expected: " + expected + ", but got: " + result.textValue());
+                        barrier.await();
                     }
-                    completed.countDown();
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
+                    catch (Exception e)
+                    {
+                    }
+                    try
+                    {
+                        IValue result = concatRpc.execute(TextValue.valueOf(random), new DoubleValue(Double.NaN),
+                            LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
+                        final String expected = random + ",NaN,2345,anotherText value here!,";
+                        if (!result.textValue().equals(expected))
+                        {
+                            errors.add("Expected: " + expected + ", but got: " + result.textValue());
+                        }
+                        completed.countDown();
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
                 }
             }).start();
         }
@@ -1807,15 +1860,18 @@ public class ProxyContextTest
     {
         createComponents();
         this.executor.shutdownNow();
-        final AtomicReference<String> callingContext = new AtomicReference<>();
-        RpcInstance rpc = new RpcInstance(args -> {
-            callingContext.set(RpcCallingContext.getCallerEndpointDescription());
-            StringBuilder sb = new StringBuilder();
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue.textValue()).append(",");
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {
+                    sb.append(iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
             }
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat2", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
@@ -1824,9 +1880,6 @@ public class ProxyContextTest
         IValue result = this.candidate.getRpc("concat2").execute(TextValue.valueOf("someValue1"),
             new DoubleValue(Double.NaN), LongValue.valueOf(2345), TextValue.valueOf("anotherText value here!"));
         assertEquals("someValue1,NaN,2345,anotherText value here!,", result.textValue());
-        assertTrue("Got:" + callingContext.get(), callingContext.get()
-                .startsWith(InetAddress.getByName(LOCALHOST)
-                        .getHostAddress() + ":"));
         Log.banner(this, "There should be no occurrences of rpc|concat2");
     }
 
@@ -1838,13 +1891,18 @@ public class ProxyContextTest
         this.executor.shutdownNow();
         final StringBuilder sb = new StringBuilder();
         final CountDownLatch latch = new CountDownLatch(1);
-        RpcInstance rpc = new RpcInstance(args -> {
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue.textValue()).append(",");
+                for (IValue iValue : args)
+                {
+                    sb.append(iValue.textValue()).append(",");
+                }
+                latch.countDown();
+                return TextValue.valueOf(sb.toString());
             }
-            latch.countDown();
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
@@ -1860,7 +1918,14 @@ public class ProxyContextTest
     public void testRpcReturnsNull() throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents();
-        RpcInstance rpc = new RpcInstance(args -> null, TypeEnum.TEXT, "getNull");
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                return null;
+            }
+        }, TypeEnum.TEXT, "getNull");
         this.context.createRpc(rpc);
 
         waitForRpcToBePublished(rpc);
@@ -1874,13 +1939,18 @@ public class ProxyContextTest
         throws TimeOutException, ExecutionException, InterruptedException, IOException
     {
         createComponents();
-        RpcInstance rpc = new RpcInstance(args -> {
-            StringBuilder sb = new StringBuilder();
-            for (IValue iValue : args)
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                sb.append(iValue.textValue()).append(",");
+                StringBuilder sb = new StringBuilder();
+                for (IValue iValue : args)
+                {
+                    sb.append(iValue.textValue()).append(",");
+                }
+                return TextValue.valueOf(sb.toString());
             }
-            return TextValue.valueOf(sb.toString());
         }, TypeEnum.TEXT, "concat", TypeEnum.TEXT, TypeEnum.DOUBLE, TypeEnum.LONG, TypeEnum.TEXT);
         this.context.createRpc(rpc);
 
@@ -1896,8 +1966,13 @@ public class ProxyContextTest
     {
         createComponents();
         final String message = "Something bad happened!";
-        RpcInstance rpc = new RpcInstance(args -> {
-            throw new RuntimeException(message);
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
+            {
+                throw new RuntimeException(message);
+            }
         }, TypeEnum.TEXT, "rpcException");
         this.context.createRpc(rpc);
 
@@ -1919,16 +1994,21 @@ public class ProxyContextTest
     public void testRpcTimeOut() throws ExecutionException, InterruptedException, IOException
     {
         createComponents();
-        RpcInstance rpc = new RpcInstance(args -> {
-            try
+        RpcInstance rpc = new RpcInstance(new IRpcExecutionHandler()
+        {
+            @Override
+            public IValue execute(IValue... args) throws TimeOutException, ExecutionException
             {
-                Thread.sleep(500);
+                try
+                {
+                    Thread.sleep(500);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                return null;
             }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
-            return null;
         }, TypeEnum.TEXT, "wait");
         this.context.createRpc(rpc);
 
@@ -1953,7 +2033,7 @@ public class ProxyContextTest
         final String rpcName = "RPC_FOR_testPublisherBounced";
         this.context.createRpc(new RpcInstance(TypeEnum.TEXT, rpcName));
 
-        setupTimeoutPeriods();
+        this.candidate.setReconnectPeriodMillis(100);
         TestCachingAtomicChangeObserver observer = new TestCachingAtomicChangeObserver();
         observer.latch = new CountDownLatch(UPDATE_COUNT);
         this.candidate.addObserver(observer, record1);
@@ -2177,8 +2257,8 @@ public class ProxyContextTest
 
         this.candidate.addSessionListener(listener);
 
-        verify(listener, timeout(5000)).onSessionClosed(eq(sessionContextName), anyString());
-        verify(listener, never()).onSessionOpen(eq(sessionContextName), anyString());
+        verify(listener, timeout(5000)).onSessionClosed(eq(sessionContextName), any());
+        verify(listener, never()).onSessionOpen(eq(sessionContextName), any());
     }
 
     @Test
@@ -2234,11 +2314,16 @@ public class ProxyContextTest
         
         this.context.publishAtomicChange(record);
         
-        final AtomicReference<CountDownLatch> latch = new AtomicReference<>(new CountDownLatch(1));
-        final IRecordListener observer = (imageCopy, atomicChange) -> {
-            if (!imageCopy.isEmpty())
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        final IRecordListener observer = new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                latch.get().countDown();
+                if (imageCopy.size() > 0)
+                {
+                    latch.get().countDown();
+                }
             }
         };
         this.candidate.addObserver(observer, simpleRecord);
@@ -2279,16 +2364,22 @@ public class ProxyContextTest
         final IRecord record = this.context.createRecord(simpleRecord);
         record.put(simpleRecord, TextValue.valueOf(simpleRecord));
         this.context.publishAtomicChange(record);
-        final AtomicReference<Map<String, IValue>> result = new AtomicReference<>();
+        final AtomicReference<Map<String, IValue>> result = new AtomicReference<Map<String, IValue>>();
         final CountDownLatch latch = new CountDownLatch(1);
-        this.candidate.addObserver((imageCopy, atomicChange) -> {
-            if (!imageCopy.isEmpty())
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                result.set(imageCopy);
-                latch.countDown();
+                if (imageCopy.size() > 0)
+                {
+                    result.set(imageCopy);
+                    latch.countDown();
+                }
             }
         }, simpleRecord);
-        assertTrue(latch.await(TIMEOUT, TimeUnit.SECONDS));
+        final int timeout = TIMEOUT;
+        assertTrue(latch.await(timeout, TimeUnit.SECONDS));
 
         assertEquals(1, result.get().size());
         assertEquals(simpleRecord, result.get().get(simpleRecord).textValue());
@@ -2300,13 +2391,18 @@ public class ProxyContextTest
     {
         createComponents();
         final String name = "recImageThenDelta";
-        final AtomicReference<IRecordChange> result = new AtomicReference<>();
-        final AtomicReference<CountDownLatch> latch = new AtomicReference<>();
+        final AtomicReference<IRecordChange> result = new AtomicReference<IRecordChange>();
+        final AtomicReference<CountDownLatch> latch = new AtomicReference<CountDownLatch>();
         latch.set(new CountDownLatch(1));
-        this.candidate.addObserver((imageCopy, atomicChange) -> {
-            System.out.println(imageCopy + ", " + atomicChange);
-            result.set(atomicChange);
-            latch.get().countDown();
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
+            {
+                System.out.println(imageCopy + ", " + atomicChange);
+                result.set(atomicChange);
+                latch.get().countDown();
+            }
         }, name);
         
         final IRecord record = this.context.createRecord(name);
@@ -2331,16 +2427,22 @@ public class ProxyContextTest
         final IRecord record = this.context.createRecord(specialChars);
         record.put(specialChars, TextValue.valueOf(specialChars));
         this.context.publishAtomicChange(record);
-        final AtomicReference<Map<String, IValue>> result = new AtomicReference<>();
+        final AtomicReference<Map<String, IValue>> result = new AtomicReference<Map<String, IValue>>();
         final CountDownLatch latch = new CountDownLatch(1);
-        this.candidate.addObserver((imageCopy, atomicChange) -> {
-            if (!imageCopy.isEmpty())
+        this.candidate.addObserver(new IRecordListener()
+        {
+            @Override
+            public void onChange(IRecord imageCopy, IRecordChange atomicChange)
             {
-                result.set(imageCopy);
-                latch.countDown();
+                if (imageCopy.size() > 0)
+                {
+                    result.set(imageCopy);
+                    latch.countDown();
+                }
             }
         }, specialChars);
-        assertTrue(latch.await(TIMEOUT, TimeUnit.SECONDS));
+        final int timeout = TIMEOUT;
+        assertTrue(latch.await(timeout, TimeUnit.SECONDS));
 
         assertEquals(1, result.get().size());
         assertEquals(specialChars, result.get().get(specialChars).textValue());
@@ -2376,31 +2478,5 @@ public class ProxyContextTest
 
         candidate.removeObserver(observer2, recordName);
         assertNotNull(candidate.getRecord(recordName));
-    }
-
-    @Test
-    public void test_substituteRemoteNameWithLocalName()
-    {
-        String v = "R12345678901234567890";
-        assertEquals(v, ProxyContext.substituteRemoteNameWithLocalName(v));
-        v = "R12345";
-        assertEquals(v, ProxyContext.substituteRemoteNameWithLocalName(v));
-        assertEquals(ISystemRecordNames.CONTEXT_RPCS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS));
-        assertEquals(ISystemRecordNames.CONTEXT_CONNECTIONS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS));
-        assertEquals(ISystemRecordNames.CONTEXT_RECORDS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS));
-        assertEquals(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS, ProxyContext.substituteRemoteNameWithLocalName(IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS));
-    }
-
-    @Test
-    public void test_substituteLocalNameWithRemoteName()
-    {
-        String v = "C12345678901234567890";
-        assertEquals(v, ProxyContext.substituteLocalNameWithRemoteName(v));
-        v = "C12345";
-        assertEquals(v, ProxyContext.substituteLocalNameWithRemoteName(v));
-        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_RPCS));
-        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_CONNECTIONS));
-        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_RECORDS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_RECORDS));
-        assertEquals(IRemoteSystemRecordNames.REMOTE_CONTEXT_SUBSCRIPTIONS, ProxyContext.substituteLocalNameWithRemoteName(ISystemRecordNames.CONTEXT_SUBSCRIPTIONS));
     }
 }

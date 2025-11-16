@@ -208,7 +208,9 @@ class SDF
         }
         else if (!this.s.equals(other.s))
             return false;
-        return this.sh == other.sh;
+        if (this.sh != other.sh)
+            return false;
+        return true;
     }
 
     @Override
@@ -253,7 +255,9 @@ class SDF2 extends SDF
         if (getClass() != obj.getClass())
             return false;
         SDF2 other = (SDF2) obj;
-        return l == other.l;
+        if (l != other.l)
+            return false;
+        return true;
     }
 
     @Override

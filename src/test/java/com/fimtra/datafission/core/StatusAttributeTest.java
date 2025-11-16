@@ -35,7 +35,7 @@ public class StatusAttributeTest
     @Test
     public void testSetGetStatus()
     {
-        Map<String, IValue> record = new HashMap<>();
+        Map<String, IValue> record = new HashMap<String, IValue>();
         IStatusAttribute.Utils.setStatus(Connection.DISCONNECTED, record);
         assertEquals(Connection.DISCONNECTED, IStatusAttribute.Utils.getStatus(Connection.class, record));
     }
@@ -43,7 +43,7 @@ public class StatusAttributeTest
     @Test
     public void testGetNullStatus()
     {
-        Map<String, IValue> record = new HashMap<>();
+        Map<String, IValue> record = new HashMap<String, IValue>();
         assertNull(IStatusAttribute.Utils.getStatus(Connection.class, record));
     }
 }

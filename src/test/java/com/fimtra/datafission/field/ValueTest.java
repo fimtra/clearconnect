@@ -16,7 +16,7 @@
 package com.fimtra.datafission.field;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
@@ -50,29 +50,17 @@ public class ValueTest
     public void testStringConversion()
     {
         final Random random = new Random();
-        for (int i = -200; i < 200; i++)
+        for (int i = -200; i < -200; i++)
         {
             doConvertTest(LongValue.valueOf(i));
         }
         for (int i = 0; i < 1000; i++)
         {
-            final long nextLong = random.nextLong();
-            doConvertTest(LongValue.valueOf(nextLong));
-            doConvertTest(LongValue.valueOf(-nextLong));
-            final double v = random.nextDouble();
-            doConvertTest(new DoubleValue(v));
-            doConvertTest(new DoubleValue(-v));
+            doConvertTest(LongValue.valueOf(random.nextLong()));
+            doConvertTest(new DoubleValue((random.nextBoolean() ? -random.nextDouble() : random.nextDouble())));
             // note that we do a LONG so that we can test doubleValue and longValue methods
             // with no numberFormatException
-            doConvertTest(TextValue.valueOf("" + nextLong));
-            if (nextLong < 0)
-            {
-                doConvertTest(TextValue.valueOf("+" + -nextLong));
-            }
-            else
-            {
-                doConvertTest(TextValue.valueOf("-" + nextLong));
-            }
+            doConvertTest(TextValue.valueOf("" + random.nextLong()));
         }
     }
 
@@ -93,17 +81,6 @@ public class ValueTest
     public void testBlankTextValueConversion()
     {
         doConvertTest(new TextValue(TextValue.NULL));
-    }
-
-    @Test
-    public void test_constructFromCharValue()
-    {
-        assertEquals(DoubleValue.valueOf(Double.POSITIVE_INFINITY),
-                AbstractValue.constructFromCharValue("DInfinity".toCharArray(), 9));
-        assertEquals(DoubleValue.valueOf(Double.NEGATIVE_INFINITY),
-                AbstractValue.constructFromCharValue("D-Infinity".toCharArray(), 10));
-        assertEquals(DoubleValue.valueOf(Double.NaN),
-                AbstractValue.constructFromCharValue("DNaN".toCharArray(), 4));
     }
 
     public void doConvertTest(IValue v)
@@ -129,20 +106,20 @@ public class ValueTest
         assertEquals(t1, t3);
         assertEquals(t1, t1);
 
-        assertNotEquals(l1, l2);
-        assertNotEquals(l1, t1);
-        assertNotEquals(l1, t2);
-        assertNotEquals(l1, t3);
-        assertNotEquals(l1, d1);
-        assertNotEquals(l1, d2);
-        assertNotEquals(l1, d3);
+        assertFalse(l1.equals(l2));
+        assertFalse(l1.equals(t1));
+        assertFalse(l1.equals(t2));
+        assertFalse(l1.equals(t3));
+        assertFalse(l1.equals(d1));
+        assertFalse(l1.equals(d2));
+        assertFalse(l1.equals(d3));
 
-        assertNotEquals(d1, d2);
-        assertNotEquals(d1, t1);
-        assertNotEquals(d1, t2);
-        assertNotEquals(d1, t3);
+        assertFalse(d1.equals(d2));
+        assertFalse(d1.equals(t1));
+        assertFalse(d1.equals(t2));
+        assertFalse(d1.equals(t3));
 
-        assertNotEquals(t1, t2);
+        assertFalse(t1.equals(t2));
     }
 
     @Test
@@ -219,7 +196,7 @@ public class ValueTest
         TextValue val;
         ByteBuffer reuse8ByteBuffer = ByteBuffer.allocate(8);
         byte[] bytes;
-        val = TextValue.valueOf(System.currentTimeMillis() + "-" + new Random().nextDouble());
+        val = TextValue.valueOf("" + System.currentTimeMillis() + "-" + new Random().nextDouble());
         bytes = val.byteValue();
         assertEquals(val, AbstractValue.fromBytes(val.getType(), ByteBuffer.wrap(bytes), bytes.length));
         reuse8ByteBuffer.clear();

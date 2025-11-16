@@ -75,10 +75,10 @@ public class TestSelectorProcessor
     {
         this.candidate.setInterest(this.key);
 
-        SelectorProcessor.resetInterest(this.key);
+        this.candidate.resetInterest(this.key);
         assertEquals(0, this.channel.keyFor(this.candidate.selector).interestOps());
 
-        SelectorProcessor.resetInterest(this.key);
+        this.candidate.resetInterest(this.key);
         assertEquals(0, this.channel.keyFor(this.candidate.selector).interestOps());
     }
 
@@ -123,7 +123,7 @@ public class TestSelectorProcessor
         }
         try
         {
-            SelectorProcessor.resetInterest(this.key);
+            this.candidate.resetInterest(this.key);
             fail("should throw CancelledKeyException");
         }
         catch (CancelledKeyException e)

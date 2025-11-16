@@ -139,7 +139,7 @@ public enum TransportTechnologyEnum
         {
             case SOLACE:
                 // number of millis since ~15:21 on 15-Nov-2015 GMT
-                return System.identityHashCode(SOLACE) + (int) (System.currentTimeMillis() - 1447600859369L);
+                return System.identityHashCode(SOLACE) + (int) (System.currentTimeMillis() - 1447600859369l);
             case TCP:
                 // use an ephemeral port
                 return 0;

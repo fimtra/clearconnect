@@ -36,6 +36,7 @@ import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
 import com.fimtra.datafission.field.BlobValue;
 import com.fimtra.datafission.field.TextValue;
+import com.fimtra.executors.ContextExecutorFactory;
 import com.fimtra.util.Log;
 import com.fimtra.util.SerializationUtils;
 import com.fimtra.util.SystemUtils;
@@ -105,7 +106,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
          * @param args
          *            the arguments to execute the RPC with - <b>Note:</b> some or all of the
          *            arguments can be <code>null</code>
-         * @return the response from the RPC, can be <code>null</code>
+         * @return the result, can be <code>null</code>
          * @throws TimeOutException
          *             if no response is received after a time
          * @throws ExecutionException
@@ -206,15 +207,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         {
                             throw new NullPointerException("RPC [" + rpcName + "] does not exist");
                         }
-                        RpcCallingContext.set(this.caller.getEndPointDescription());
-                        try
-                        {
-                            rpc.execute(args);
-                        }
-                        finally
-                        {
-                            RpcCallingContext.remove();
-                        }
+                        rpc.execute(args);
                     }
                     catch (Exception e)
                     {
@@ -241,16 +234,8 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         {
                             throw new NullPointerException("RPC [" + rpcName + "] does not exist");
                         }
-                        RpcCallingContext.set(this.caller.getEndPointDescription());
-                        try
-                        {
-                            IValue result = rpc.execute(args);
-                            resultEntries.put(RESULT, result);
-                        }
-                        finally
-                        {
-                            RpcCallingContext.remove();
-                        }
+                        IValue result = rpc.execute(args);
+                        resultEntries.put(RESULT, result);
                     }
                     catch (Exception e)
                     {
@@ -320,7 +305,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 final CountDownLatch executionStartedLatch = new CountDownLatch(1);
                 final CountDownLatch executionCompleteLatch = new CountDownLatch(1);
                 final AtomicReference<Map<String, IValue>> result = new AtomicReference<>();
-                final boolean noAck = args.length != 0 && args[args.length - 1] == NO_ACK;
+                final boolean noAck = args.length == 0 ? false : args[args.length - 1] == NO_ACK;
                 final String resultMapName =
                     noAck ? NO_ACK.textValue() : RPC_RECORD_RESULT_PREFIX + this.rpcName + ":"
                         + System.identityHashCode(this) + ":" + System.currentTimeMillis() + ":"
@@ -385,8 +370,8 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                                     resultMapName);
                             }
                         }
-                        
-                        if (ContextUtils.isFrameworkThread())
+
+                        if (!ContextExecutorFactory.POOL_ACTIVE && ContextUtils.isFrameworkThread())
                         {
                             Log.log(this, "*** WARNING *** RPC ", this.rpcName,
                                 " is being called using a core/system/RPC thread - this can lead to a stall.");
@@ -398,27 +383,24 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                         try
                         {
                             // wait for acknowledgement that execution has started
-                            if (!executionStartedLatch.await(this.remoteExecutionStartTimeoutMillis.get(),
+                            if (!executionStartedLatch.await(this.remoteExecutionStartTimeoutMillis.get().longValue(),
                                 TimeUnit.MILLISECONDS))
                             {
                                 throw new TimeOutException("The RPC execution did not start after "
-                                    + this.remoteExecutionStartTimeoutMillis.get() + "ms");
+                                    + this.remoteExecutionStartTimeoutMillis.get().longValue() + "ms");
                             }
                             // wait for completion
                             if (!executionCompleteLatch.await(
-                                this.remoteExecutionCompletedTimeoutMillis.get(), TimeUnit.MILLISECONDS))
+                                this.remoteExecutionCompletedTimeoutMillis.get().longValue(), TimeUnit.MILLISECONDS))
                             {
                                 throw new TimeOutException("The RPC has started but has not completed after "
-                                    + this.remoteExecutionCompletedTimeoutMillis.get()
+                                    + this.remoteExecutionCompletedTimeoutMillis.get().longValue()
                                     + "ms, is more time needed to allow for completion?");
                             }
                         }
                         catch (InterruptedException e)
                         {
-                            if (Thread.interrupted())
-                            {
-                                throw new ExecutionException("Local thread interrupted: " + e.getMessage());
-                            }
+                            throw new ExecutionException("Local thread interrupted: " + e.getMessage());
                         }
 
                         if (result.get() == null)
@@ -482,8 +464,8 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     {
         final StringBuilder args = new StringBuilder();
         final StringBuilder argNames = new StringBuilder();
-        final boolean argNamesExist = instance.getArgNames() != null
-                && instance.getArgNames().length == instance.getArgTypes().length;
+        final boolean argNamesExist =
+            instance.getArgNames() == null ? false : instance.getArgNames().length == instance.getArgTypes().length;
         if (instance.getArgTypes() != null)
         {
             for (int i = 0; i < instance.getArgTypes().length; i++)
@@ -503,7 +485,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
                 }
             }
         }
-        return ARGS + args + (argNamesExist ? (ARG_NAMES + argNames) : "") + RETURNS
+        return ARGS + args.toString() + (argNamesExist ? (ARG_NAMES + argNames.toString()) : "") + RETURNS
             + instance.getReturnType().name() + CLOSE_CHAR;
     }
 
@@ -620,9 +602,9 @@ public final class RpcInstance implements IRpcInstance, Cloneable
             throw new IllegalArgumentException("Cannot have a null return type");
         }
         this.argTypes = argTypes;
-        for (int i = 0; i < argTypes.length; i++)
+        for (TypeEnum argType : argTypes)
         {
-            if (argTypes[i] == null)
+            if (argType == null)
             {
                 throw new IllegalArgumentException("Some argTypes were null:" + Arrays.toString(argTypes));
             }
@@ -669,9 +651,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         }
         else if (!this.name.equals(other.name))
             return false;
-        if (this.retType != other.retType)
-            return false;
-        return true;
+        return this.retType == other.retType;
     }
 
     @Override
@@ -723,7 +703,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         catch (Exception e)
         {
             Log.log(RpcInstance.class,
-                "Could not execute " + this + " with arguments: " + Arrays.toString(args), e);
+                "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
             if (e instanceof ExecutionException)
             {
                 throw (ExecutionException) e;
@@ -755,7 +735,7 @@ public final class RpcInstance implements IRpcInstance, Cloneable
         catch (Exception e)
         {
             Log.log(RpcInstance.class,
-                "Could not execute " + this + " with arguments: " + Arrays.toString(args), e);
+                "Could not execute " + this.toString() + " with arguments: " + Arrays.toString(args), e);
             throw new ExecutionException(e.getMessage());
         }
     }
@@ -796,13 +776,13 @@ public final class RpcInstance implements IRpcInstance, Cloneable
     @Override
     public void setRemoteExecutionStartTimeoutMillis(long remoteExecutionStartTimeoutMillis)
     {
-        this.remoteExecutionStartTimeoutMillis.set(remoteExecutionStartTimeoutMillis);
+        this.remoteExecutionStartTimeoutMillis.set(Long.valueOf(remoteExecutionStartTimeoutMillis));
     }
 
     @Override
     public void setRemoteExecutionDurationTimeoutMillis(long remoteExecutionDurationTimeoutMillis)
     {
-        this.remoteExecutionDurationTimeoutMillis.set(remoteExecutionDurationTimeoutMillis);
+        this.remoteExecutionDurationTimeoutMillis.set(Long.valueOf(remoteExecutionDurationTimeoutMillis));
     }
 
     @Override

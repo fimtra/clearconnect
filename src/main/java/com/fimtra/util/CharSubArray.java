@@ -20,41 +20,29 @@ package com.fimtra.util;
  *
  * @author Ramon Servadei
  */
-final class CharSubArray
+public final class CharSubArray
 {
     final char[] ref;
     final int start;
     final int end;
-    final int hashcode;
+    int hashcode;
 
-    CharSubArray(char[] carray, int offset, int len)
+    public CharSubArray(char[] carray, int offset, int len)
     {
         this.ref = carray;
         this.start = offset;
         this.end = offset + len;
 
-        // compute hashcode upfront based on revese order of chars
-        int h = 0;
-        if (len > 6)
+        // compute hashcode upfront
+        int h = this.hashcode;
+        if (this.end > this.start)
         {
-            int i = end;
-            // use LAST 6 chars
-            h = this.ref[--i];
-            h = 31 * h + this.ref[--i];
-            h = 31 * h + this.ref[--i];
-            h = 31 * h + this.ref[--i];
-            h = 31 * h + this.ref[--i];
-            h = 31 * h + this.ref[--i];
-        }
-        else
-        {
-            for (int i = end - 1; i >= offset; i--)
+            for (int i = this.start; i < this.end; i++)
             {
                 h = 31 * h + this.ref[i];
             }
+            this.hashcode = h;
         }
-
-        this.hashcode = h;
     }
 
     @Override
@@ -66,25 +54,30 @@ final class CharSubArray
     @Override
     public boolean equals(Object obj)
     {
-        // this is only called in the context of a Map key lookup
-        // and CharSubArray is only used in a CharSubArrayKeyedPool
-        // a map key lookup will check for hashcode first, then object reference then call equals
-        // so we skip null, hashcode and object reference checks
-        // and we assume the object is a CharSubArray
-        // (also obj will never be null as CharSubArrayKeyedPool only uses CharSubArray instances)
+        if (this == obj)
+        {
+            return true;
+        }
+        if (obj == null)
+        {
+            return false;
+        }
+        if (getClass() != obj.getClass())
+        {
+            return false;
+        }
+
         final CharSubArray other = (CharSubArray) obj;
 
-        if ((this.end - this.start) != other.end)
+        if ((this.end - this.start) != (other.end - other.start))
         {
             return false;
         }
 
         int j = 0;
-        // note: obj is ALWAYS a key in a map constructed with a clean array so obj.start is always 0
-        // see CharSubArrayKeyedPool.get
         for (int i = this.start; i < this.end; i++)
         {
-            if (this.ref[i] != other.ref[j++])
+            if (this.ref[i] != other.ref[other.start + j++])
             {
                 return false;
             }

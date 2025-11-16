@@ -26,14 +26,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.field.LongValue;
 import com.fimtra.datafission.field.TextValue;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
 
 /**
  * Tests for the {@link ImmutableRecord}
@@ -42,12 +39,11 @@ import org.junit.rules.TestName;
  */
 public class ImmutableRecordTest
 {
-    @Rule
-    public TestName name = new TestName();
 
     private static final LongValue SUB_MAP_V1 = LongValue.valueOf(546);
     static final String CTX_NAME = "ctx1";
     private static final Context CONTEXT = new Context(CTX_NAME);
+    static final String NAME = "imRec1";
     private static final LongValue V2 = LongValue.valueOf(34);
     private static final LongValue V1 = LongValue.valueOf(12);
     private static final TextValue VALUE_3 = TextValue.valueOf("value3");
@@ -60,7 +56,7 @@ public class ImmutableRecordTest
     private static final String SUB_MAP_KEY2 = "submapkey2";
     ImmutableRecord candidate;
     Map<String, IValue> image;
-    IRecord template;
+    Record template;
 
     /**
      * @throws java.lang.Exception
@@ -68,12 +64,12 @@ public class ImmutableRecordTest
     @Before
     public void setUp() throws Exception
     {
-        this.image = new HashMap<>();
+        this.image = new HashMap<String, IValue>();
         this.image.put(KEY1, V1);
         this.image.put(KEY2, V2);
-        this.template = CONTEXT.createRecord(name.getMethodName(), this.image);
+        this.template = new Record(NAME, this.image, CONTEXT);
         this.template.getOrCreateSubMap(SUB_MAP_KEY).put(KEY1, SUB_MAP_V1);
-        this.candidate = new ImmutableRecord((Record) this.template);
+        this.candidate = new ImmutableRecord(this.template);
     }
 
     /**
@@ -203,7 +199,7 @@ public class ImmutableRecordTest
     @Test
     public void testValues()
     {
-        assertEquals(new HashSet<>(this.image.values()), new HashSet<Object>(this.candidate.values()));
+        assertEquals(new HashSet<IValue>(this.image.values()), new HashSet<Object>(this.candidate.values()));
     }
 
     /**
@@ -254,9 +250,9 @@ public class ImmutableRecordTest
     @Test
     public void testEqualsObject()
     {
-        final Record other = new Record(name.getMethodName(), this.image, CONTEXT);
+        final Record other = new Record(NAME, this.image, CONTEXT);
         other.getOrCreateSubMap(SUB_MAP_KEY).put(KEY1, SUB_MAP_V1);
-        assertEquals(this.candidate, other);
+        assertTrue(this.candidate.equals(other));
     }
 
     /**
@@ -265,7 +261,7 @@ public class ImmutableRecordTest
     @Test
     public void testGetName()
     {
-        assertEquals(name.getMethodName(), this.candidate.getName());
+        assertEquals(NAME, this.candidate.getName());
     }
 
     /**
@@ -284,7 +280,7 @@ public class ImmutableRecordTest
     @Test(expected = UnsupportedOperationException.class)
     public void testPutStringLong()
     {
-        this.candidate.put(KEY1, 3L);
+        this.candidate.put(KEY1, 3l);
     }
 
     /**
@@ -370,10 +366,10 @@ public class ImmutableRecordTest
     @Test
     public void testLiveImmutableSeesRecordChanges_createdBeforeSubMap()
     {
-        this.template = new Record(name.getMethodName(), new HashMap<>(), CONTEXT);
-        this.candidate = new ImmutableRecord((Record) this.template);
+        this.template = new Record(NAME, new HashMap<String, IValue>(), CONTEXT);
+        this.candidate = new ImmutableRecord(this.template);
 
-        assertEquals(0, this.candidate.size());
+        assertEquals(0, this.candidate.keySet().size());
         assertEquals(0, this.candidate.getSubMapKeys().size());
 
         // alter the source record
@@ -382,28 +378,28 @@ public class ImmutableRecordTest
         this.template.getOrCreateSubMap(SUB_MAP_KEY).put(KEY1, SUB_MAP_V1);
         this.template.getOrCreateSubMap(SUB_MAP_KEY2).put(KEY_4, VALUE_4);
 
-        assertEquals(1, this.candidate.size());
+        assertEquals(1, this.candidate.keySet().size());
         assertEquals(2, this.candidate.getSubMapKeys().size());
     }
 
     @Test
     public void testLiveImmutableSeesRecordChanges()
     {
-        assertEquals(2, this.candidate.size());
+        assertEquals(2, this.candidate.keySet().size());
         assertEquals(1, this.candidate.getSubMapKeys().size());
         assertTrue(this.candidate.getSubMapKeys().contains(SUB_MAP_KEY));
 
         this.template.put(KEY_3, VALUE_3);
         Map<String, IValue> subMap2 = this.template.getOrCreateSubMap(SUB_MAP_KEY2);
         subMap2.put(KEY_4, VALUE_4);
-        assertEquals(3, this.candidate.size());
+        assertEquals(3, this.candidate.keySet().size());
         assertEquals(2, this.candidate.getSubMapKeys().size());
     }
     
     @Test
     public void testSnapshotOfLiveImmutableDoesNotSeeRecordChanges()
     {
-        assertEquals(2, this.candidate.size());
+        assertEquals(2, this.candidate.keySet().size());
         assertEquals(1, this.candidate.getSubMapKeys().size());
         assertTrue(this.candidate.getSubMapKeys().contains(SUB_MAP_KEY));
 
@@ -413,11 +409,11 @@ public class ImmutableRecordTest
         this.template.put(KEY_3, VALUE_3);
         Map<String, IValue> subMap2 = this.template.getOrCreateSubMap(SUB_MAP_KEY2);
         subMap2.put(KEY_4, VALUE_4);
-        assertEquals(3, this.candidate.size());
+        assertEquals(3, this.candidate.keySet().size());
         assertEquals(2, this.candidate.getSubMapKeys().size());
         
         // check the snapshot does not
-        assertEquals(2, snapshot.size());
+        assertEquals(2, snapshot.keySet().size());
         assertEquals(1, snapshot.getSubMapKeys().size());
         assertEquals(this.candidate.getContextName(), snapshot.getContextName());
     }
@@ -433,7 +429,7 @@ public class ImmutableRecordTest
         Map<String, IValue> subMap2 = this.template.getOrCreateSubMap(SUB_MAP_KEY2);
         subMap2.put(KEY_4, VALUE_4);
 
-        assertEquals(2, this.candidate.size());
+        assertEquals(2, this.candidate.keySet().size());
         assertEquals(1, this.candidate.getSubMapKeys().size());
     }
 }

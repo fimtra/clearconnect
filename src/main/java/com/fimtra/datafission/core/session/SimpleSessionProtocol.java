@@ -98,7 +98,7 @@ public class SimpleSessionProtocol implements ISessionProtocol
                 try
                 {
                     this.sessionId = SessionContexts.getSessionManager(fromProxy.sessionContext).createSession(
-                            SerializationUtils.fromByteArray(((FromProxy) fromByteArray).sessionAttrs));
+                        (String[]) SerializationUtils.fromByteArray(((FromProxy) fromByteArray).sessionAttrs));
                 }
                 catch (Exception e)
                 {
@@ -146,12 +146,14 @@ public class SimpleSessionProtocol implements ISessionProtocol
 
                         return new SyncComplete(null);
                     }
+
+                    return new SyncFailed(null);
                 }
                 else
                 {
                     Log.log(this, "Incorrect session sync data: " + fromByteArray, new Exception());
+                    return new SyncFailed(null);
                 }
-                return new SyncFailed(null);
             }
         }
         catch (Exception e)

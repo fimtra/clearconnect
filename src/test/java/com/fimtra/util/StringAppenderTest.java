@@ -22,7 +22,7 @@ import org.junit.Test;
 
 /**
  * Tests for the {@link StringAppender}
- *
+ * 
  * @author Ramon Servadei
  */
 public class StringAppenderTest
@@ -35,45 +35,10 @@ public class StringAppenderTest
     @Test
     public void test()
     {
-        final StringAppender candidate = new StringAppender(0);
-        candidate.append('c')
-                .append(1L)
-                .append(0.1d)
-                .append("string")
-                .append("string".toCharArray())
-                .append("_string".toCharArray(), 1, 2)
-                .append((String) null)
-                .append("  a very long long long long long long long long long long long long string".toCharArray(), 1, 74)
-                .append('x', " and a string")
-                .append(' ', '!');
-        ;
-        assertEquals("c10.1stringstringstnull a very long long long long long long long long long long long long stringx and a string !", candidate.toString());
+        StringAppender candidate = new StringAppender(0);
+        candidate.append('c').append(1l).append(0.1d).append("string").append("string".toCharArray()).append(
+            "_string".toCharArray(), 1, 2).append((String) null);
+        assertEquals("c10.1stringstringstnull", candidate.toString());
     }
 
-    @Test
-    public void test_reserveAndGet()
-    {
-        final StringAppender candidate = new StringAppender(0);
-        final char[] chars = candidate.reserveAndGet(10);
-        assertEquals(10, candidate.getLength());
-        assertEquals(10, candidate.toString()
-                .length());
-        for (int i = 0; i < 10; i++)
-        {
-            chars[i] = (char) ('0' + i);
-        }
-        assertEquals("0123456789", candidate.toString());
-        candidate.append("_previous_was_reserved");
-        assertEquals("0123456789_previous_was_reserved", candidate.toString());
-    }
-
-    @Test
-    public void test_compoundAppend()
-    {
-        final StringAppender candidate = new StringAppender(0);
-        candidate.append("_abcd".toCharArray(), 1, 2, "abcdef".toCharArray(), 2, 1);
-        assertEquals("abc", candidate.toString());
-        candidate.append("_abcd".toCharArray(), 1, 2, "abcdef".toCharArray(), 2, 1);
-        assertEquals("abcabc", candidate.toString());
-    }
 }

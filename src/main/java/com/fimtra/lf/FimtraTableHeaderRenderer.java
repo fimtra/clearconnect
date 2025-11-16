@@ -28,8 +28,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 	private Icon sortArrow;
 	private EmptyIcon emptyIcon = new EmptyIcon();
 	
-	private Border defaultBorder = new CompoundBorder(
-            new HeaderBorder(Color.decode("#91969c")), new EmptyBorder(2, 4, 3, 4));
+	private Border defaultBorder = new CompoundBorder(new HeaderBorder(Color.decode("#91969c")), new EmptyBorder(2, 4, 3, 4));
 	private Color defaultColor1 = Color.decode("#edf0f6");
 	private Color defaultColor2 = Color.decode("#dddfe4");
 	private Color focusedColor1 = Color.decode("#ffffff");
@@ -138,7 +137,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 	        int h = getHeight(); 
 	        GradientPaint gp = new GradientPaint(
 	                0, 0, color1,
-	                0, (float) h /2, color2, true);
+	                0, h/2, color2, true);
 	        
 
 	        g2d.setPaint(gp);
@@ -212,7 +211,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 		}
 		java.util.List<? extends RowSorter.SortKey> sortKeys = table
 				.getRowSorter().getSortKeys();
-		if (!sortKeys.isEmpty()
+		if (sortKeys.size() > 0
 				&& sortKeys.get(0).getColumn() == table
 						.convertColumnIndexToModel(column)) {
 			rv = sortKeys.get(0).getSortOrder();
@@ -220,7 +219,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 		return rv;
 	}
 
-	private static class EmptyIcon implements Icon, Serializable {
+	private class EmptyIcon implements Icon, Serializable {
 		private static final long serialVersionUID = 1L;
 
 		int width = 0;
@@ -242,7 +241,7 @@ public class FimtraTableHeaderRenderer extends DefaultTableCellRenderer {
 
 	}
 
-	private static class HeaderBorder extends LineBorder{
+	private class HeaderBorder extends LineBorder{
 
 		private static final long serialVersionUID = 1L;
 

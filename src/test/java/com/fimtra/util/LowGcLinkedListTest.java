@@ -37,7 +37,7 @@ public class LowGcLinkedListTest
     @Before
     public void setUp() throws Exception
     {
-        candidate = new LowGcLinkedList<>();
+        candidate = new LowGcLinkedList<String>();
     }
 
     @Test
