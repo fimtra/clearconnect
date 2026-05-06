@@ -19,6 +19,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
+import java.util.List;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -103,6 +105,17 @@ public class LowGcLinkedListTest
         
         candidate.offer("6");
         assertNull(candidate.spare);
+    }
+
+    @Test
+    public void testReverse()
+    {
+        for(int i = 0; i < 6; i++)
+        {
+            candidate.offer("" + i);
+        }
+        final List<String> reversed = candidate.reversed();
+        assertEquals("[5, 4, 3, 2, 1, 0]", reversed.toString());
     }
 
 }
