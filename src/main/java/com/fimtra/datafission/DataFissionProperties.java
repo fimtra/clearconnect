@@ -231,12 +231,6 @@ public abstract class DataFissionProperties
          * <br> E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>
          */
         String EXCLUDE_RPC_LOGGING = BASE + "excludeRpcLogging";
-
-        /**
-         * The name of the system property to define using the classic double value codec.
-         * <br> E.g. <code>-DdataFission.useClassicDoubleValueCodec=true</code>
-         */
-        String USE_CLASSIC_DOUBLE_VALUE_CODEC = BASE + "useClassicDoubleValueCodec";
     }
 
     /**
@@ -516,14 +510,6 @@ public abstract class DataFissionProperties
          */
         String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,
                 "runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister");
-
-        /**
-         * Defines if the classic double value codec is used.
-         * <p>
-         * Default is false.
-         */
-        boolean USE_CLASSIC_DOUBLE_VALUE_CODEC =
-                SystemUtils.getProperty(Names.USE_CLASSIC_DOUBLE_VALUE_CODEC, false);
     }
 
     private DataFissionProperties()

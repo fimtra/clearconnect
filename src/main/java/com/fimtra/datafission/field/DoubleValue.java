@@ -65,7 +65,7 @@ public class DoubleValue extends AbstractValue
 
     DoubleValue(char[] chars, int start, int len)
     {
-        this.value = DoubleValueCodeAdapter.fromCharArray(chars, start, len);
+        this.value = Double.parseDouble(new String(chars, start, len));
     }
 
     @Override
@@ -89,7 +89,7 @@ public class DoubleValue extends AbstractValue
     @Override
     public String textValue()
     {
-        return DoubleValueCodeAdapter.textValue(value);
+        return Double.toString(value);
     }
     
     @Override
@@ -122,6 +122,7 @@ public class DoubleValue extends AbstractValue
     @Override
     public StringAppender appendTo(StringAppender stringAppender)
     {
-        return DoubleValueCodeAdapter.appendTo(stringAppender, this.value);
+        return stringAppender.append(DOUBLE_CODE)
+                .append(this.value);
     }
 }

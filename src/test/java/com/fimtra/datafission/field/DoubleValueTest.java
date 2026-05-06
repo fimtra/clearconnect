@@ -16,10 +16,6 @@
 package com.fimtra.datafission.field;
 
 import static com.fimtra.datafission.DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;
-import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
-import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
-import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
-import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
@@ -29,14 +25,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-
-import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.IValue.TypeEnum;
-import com.fimtra.util.StringAppender;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -47,7 +36,7 @@ import org.junit.Test;
  */
 public class DoubleValueTest
 {
-    static final int LOOPS = LongValueTest.LOOPS;
+    static final double delta = 0.000000001d;
 
     @Before
     public void setUp() throws Exception
@@ -107,13 +96,13 @@ public class DoubleValueTest
     @Test
     public void testInitialisedWithNaN()
     {
-        assertEquals(NaN, new DoubleValue().doubleValue(), DoubleValueCodecTest.delta);
+        assertEquals(NaN, new DoubleValue().doubleValue(), delta);
     }
 
     @Test
     public void testGet()
     {
-        assertEquals(1.0, DoubleValue.get(DoubleValue.valueOf(1), -1), DoubleValueCodecTest.delta);
+        assertEquals(1.0, DoubleValue.get(DoubleValue.valueOf(1), -1), delta);
         assertTrue(Double.isNaN(DoubleValue.get(null, NaN)));
         assertTrue(Double.isNaN(DoubleValue.get(LongValue.valueOf(1), NaN)));
         assertTrue(Double.isNaN(DoubleValue.get(TextValue.valueOf("1"), NaN)));
@@ -140,180 +129,12 @@ public class DoubleValueTest
         assertEquals("99.0001", DoubleValue.valueOf(99.0001)
                 .textValue());
     }
-
-    @Test
-    public void testStringToDouble_largeDecimal()
-    {
-        assertEquals(Double.parseDouble("0.12345678901234567890"),
-                DoubleValueCodec.fromCharArray("0.12345678901234567890".toCharArray(), 0, 22),
-                DoubleValueCodecTest.delta);
-    }
-
-    @Test
-    public void test_copilot_bitwiseChar09()
-    {
-        for (int i = 0; i < 128; i++)
-        {
-            char c = (char) i;
-            if (c >= '0' && c <= '9')
-            {
-                assertEquals("Char '" + c + "'", 0, getIsDigitIb(c));
-            }
-            else
-            {
-                assertEquals("Char '" + c + "' code=" + i, 1, getIsDigitIb(c));
-            }
-        }
-
-    }
-
-    private static int getIsDigitIb(char c)
-    {
-        final int x = (c - '0');
-        return ((x | (~(x - 10))) >>> 31);
-    }
-
-    @Test
-    public synchronized void test_performance_charsToDouble()
-    {
-        List<long[]> times;
-        int tries = 0;
-        do
-        {
-            tries++;
-            times = new ArrayList<>();
-            final Random random = new Random();
-            for (int i = 0; i < 19; i++)
-            {
-                final double random3dp = (double) random.nextInt(1000) / 1000;
-                final String sVal = "" + ((double) random.nextInt(100_000_000) + random3dp);
-                doPerfTestCharsToDouble(sVal, times);
-            }
-        }
-        while (!checkNormalVsOptimisedResults(times, "test_performance_charsToDouble", tries));
-    }
-
-    @Test
-    public void test_performance_doubleToAppender()
-    {
-        List<long[]> times;
-        int tries = 0;
-        do
-        {
-            tries++;
-            times = new ArrayList<>();
-            doPerfTestWriteToAppender(-2.3056918340057303E18, times);
-            //        doPerfTestWriteToString(99.00, times);
-            //        doPerfTestWriteToString(99.1, times);
-            //        doPerfTestWriteToString(99.01, times);
-            //        doPerfTestWriteToString(99.001, times);
-            //        doPerfTestWriteToString(99.0001, times);
-            //        doPerfTestWriteToString(Double.MAX_VALUE, times);
-            //        doPerfTestWriteToString(Double.MIN_VALUE, times);
-            //        doPerfTestWriteToString(POSITIVE_INFINITY, times);
-            //        doPerfTestWriteToString(NEGATIVE_INFINITY, times);
-            //        doPerfTestWriteToString(NaN, times);
-
-            final Random random = new Random();
-            for (int i = 0; i < 5; i++)
-            {
-                final double value = random.nextLong() + random.nextDouble();
-                doPerfTestWriteToAppender(value, times);
-                doPerfTestWriteToAppender(-value, times);
-            }
-        }
-        while (!checkNormalVsOptimisedResults(times, "test_performance_doubleToAppender", tries));
-    }
-
-    private static void doPerfTestWriteToAppender(double value, List<long[]> times)
-    {
-        //        System.err.println("==================== " + value + "-to-string loops:" + LOOPS + "===============");
-
-        final StringAppender appender = new StringAppender();
-        final DoubleValue doubleValue = DoubleValue.valueOf(value);
-
-        for (int i = 0; i < LOOPS; i++)
-        {
-            appender.setLength(0);
-            doubleValue.appendTo(appender);
-            appender.setLength(0);
-            appender.append(IValue.DOUBLE_CODE)
-                    .append(Double.toString(value));
-        }
-
-        for (int j = 0; j < REPEAT_RUNS; j++)
-        {
-            prepareForPerfTestStep();
-
-            long tDoubleValue = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                appender.setLength(0);
-                doubleValue.appendTo(appender);
-            }
-            tDoubleValue = System.nanoTime() - tDoubleValue;
-
-            prepareForPerfTestStep();
-
-            long tDouble = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                appender.setLength(0);
-                appender.append(IValue.DOUBLE_CODE)
-                        .append(Double.toString(value));
-            }
-            tDouble = System.nanoTime() - tDouble;
-
-            final String doubleString = Double.toString(value);
-            final String doubleValueString = doubleValue.textValue();
-            assertEquals(Double.parseDouble(doubleString), Double.parseDouble(doubleValueString),
-                    DoubleValueCodecTest.delta);
-
-            //        System.err.println(" tDouble=" + tDouble + " tDoubleValue=" + tDoubleValue);
-
-            saveQuickestTimes(times, tDouble, tDoubleValue);
-        }
-    }
-
-    private static void doPerfTestCharsToDouble(String sVal, List<long[]> times)
-    {
-        final char[] chars = sVal.toCharArray();
-
-        //        System.err.println("==================== " + sVal + "-toDouble loops:" + LOOPS + "===============");
-
-        // warmup
-        for (int i = 0; i < LOOPS; i++)
-        {
-            Double.parseDouble(sVal);
-            DoubleValueCodec.fromCharArray(chars, 0, chars.length);
-        }
-
-        for (int j = 0; j < REPEAT_RUNS; j++)
-        {
-            prepareForPerfTestStep();
-
-            long tDoubleValue = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                DoubleValueCodec.fromCharArray(chars, 0, chars.length);
-            }
-            tDoubleValue = System.nanoTime() - tDoubleValue;
-
-            prepareForPerfTestStep();
-
-            long tDouble = System.nanoTime();
-            for (int i = 0; i < LOOPS; i++)
-            {
-                Double.parseDouble(sVal);
-            }
-            tDouble = System.nanoTime() - tDouble;
-
-            assertEquals(Double.parseDouble(sVal), DoubleValueCodec.fromCharArray(chars, 0, chars.length),
-                    DoubleValueCodecTest.delta);
-
-            //        System.err.println(" tDouble=" + tDouble + " tDoubleValue=" + tDoubleValue);
-
-            saveQuickestTimes(times, tDouble, tDoubleValue);
-        }
-    }
 }
+
+
+
+
+
+
+
+
