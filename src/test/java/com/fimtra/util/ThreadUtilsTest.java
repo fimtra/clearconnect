@@ -43,12 +43,28 @@ public class ThreadUtilsTest
             return "";
         });
 
-        Thread t = ThreadUtils.newThread(tl::get, "test_registerThreadLocalCleanup");
+        final CountDownLatch startLatch = new CountDownLatch(1);
+        final CountDownLatch endLatch = new CountDownLatch(1);
+        Thread t = ThreadUtils.newThread(() ->{
+            tl.get();
+            startLatch.countDown();
+            try
+            {
+                endLatch.await();
+            }
+            catch (InterruptedException e)
+            {
+                throw new RuntimeException(e);
+            }
+        }, "test_registerThreadLocalCleanup");
         t.start();
+        assertTrue(startLatch.await(1, TimeUnit.SECONDS));
+        assertTrue(ThreadUtils.THREAD_LOCAL_CLEANUP.containsKey(t));
+        endLatch.countDown();
         t.join();
 
         assertTrue(latch.await(1, TimeUnit.SECONDS));
-        assertEquals(0, ThreadUtils.THREAD_LOCAL_CLEANUP.size());
+        assertFalse(ThreadUtils.THREAD_LOCAL_CLEANUP.containsKey(t));
     }
 
     @Test

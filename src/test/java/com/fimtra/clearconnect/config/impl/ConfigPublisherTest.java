@@ -18,7 +18,7 @@ package com.fimtra.clearconnect.config.impl;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -46,7 +46,7 @@ public class ConfigPublisherTest {
 	@Test
 	public void shouldNotPublishRecord() {
 		this.configPublisher.run();
-		verifyZeroInteractions(this.platformServiceInstance);
+        verifyNoInteractions(this.platformServiceInstance);
 	}
 
 	@Test

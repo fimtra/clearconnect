@@ -1,8 +1,10 @@
 package com.fimtra.util;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 /**
  * Co-pilot generated test class for the class {@link LongRef}
