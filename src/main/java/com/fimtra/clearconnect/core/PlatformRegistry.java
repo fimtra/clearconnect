@@ -15,6 +15,7 @@
  */
 package com.fimtra.clearconnect.core;
 
+import static com.fimtra.clearconnect.PlatformCoreProperties.Values.REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE;
 import static com.fimtra.clearconnect.core.PlatformServiceInstance.RPC_FT_SERVICE_STATUS;
 import static com.fimtra.clearconnect.core.PlatformServiceInstance.SERVICE_STATS_RECORD_NAME;
 import static com.fimtra.datafission.core.ProxyContext.IRemoteSystemRecordNames.REMOTE_CONTEXT_CONNECTIONS;
@@ -807,6 +808,7 @@ final class EventHandler
     final Set<String> pendingPublish;
     final ScheduledExecutorService publishExecutor;
     final ExecutorService ioExecutor;
+    final IContextExecutor destructor;
     /**
      * Tracks services that are pending registration completion
      * 
@@ -848,6 +850,7 @@ final class EventHandler
             new ScheduledThreadPoolExecutor(1, PUBLISH_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
         this.ioExecutor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.SECONDS, new SynchronousQueue<>(),
             IO_EXECUTOR_THREAD_FACTORY, new ThreadPoolExecutor.DiscardPolicy());
+        this.destructor = ContextExecutorFactory.create("destructor", REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE);
     }
 
     void execute(String description, Object context, Runnable runnable)
@@ -887,6 +890,7 @@ final class EventHandler
     {
         this.publishExecutor.shutdown();
         PlatformServiceConnectionMonitor monitor = null;
+        // note: we synchronously destroy the monitors when the registry is shutdown
         for (RegistrationToken registrationToken : this.connectionMonitors.keySet())
         {
             try
@@ -894,6 +898,7 @@ final class EventHandler
                 monitor = this.connectionMonitors.remove(registrationToken);
                 if (monitor != null)
                 {
+                    // sync destroy
                     monitor.destroy();
                 }
             }
@@ -903,6 +908,7 @@ final class EventHandler
             }
         }
         ProxyContext proxy = null;
+        // note: we synchronously destroy the proxies when the registry is shutdown
         for (RegistrationToken registrationToken : this.monitoredServiceInstances.keySet())
         {
             try
@@ -910,6 +916,7 @@ final class EventHandler
                 proxy = this.monitoredServiceInstances.remove(registrationToken);
                 if (proxy != null)
                 {
+                    // sync destroy
                     proxy.destroy();
                 }
             }
@@ -918,6 +925,7 @@ final class EventHandler
                 Log.log(this, "Could not destroy " + ObjectUtils.safeToString(proxy), e);
             }
         }
+        this.destructor.destroy();
     }
 
     void executeRpcRuntimeDynamic(final IValue... args)
@@ -1159,7 +1167,7 @@ final class EventHandler
         if (connectionMonitor != null)
         {
             Log.log(this, "Destroying connection monitor for ", ObjectUtils.safeToString(registrationToken));
-            connectionMonitor.destroy();
+            runAsyncDestroyTask(registrationToken, connectionMonitor::destroy);
         }
         else
         {
@@ -1183,7 +1191,8 @@ final class EventHandler
      */
     void removeUnregisteredProxiesAndMonitors()
     {
-        final Collection<RegistrationToken> registrationTokens = this.registrationTokenPerInstance.values();
+        final Collection<RegistrationToken> registrationTokens =
+                new HashSet<>(this.registrationTokenPerInstance.values());
         RegistrationToken registrationToken;
 
         {
@@ -1221,7 +1230,8 @@ final class EventHandler
                         ObjectUtils.safeToString(registrationToken));
                     try
                     {
-                        entry.getValue().destroy();
+                        final PlatformServiceConnectionMonitor connectionMonitor = entry.getValue();
+                        runAsyncDestroyTask(registrationToken, connectionMonitor::destroy);
                         it.remove();
                     }
                     catch (Exception e)
@@ -1242,7 +1252,7 @@ final class EventHandler
 
         banner(this, "Deregistering " + registrationToken + " (was monitored with " + proxy.getChannelString() + ")");
 
-        proxy.destroy();
+        runAsyncDestroyTask(registrationToken, proxy::destroy);
 
         // remove the service instance info record
         this.registry.context.removeRecord(
@@ -1340,6 +1350,24 @@ final class EventHandler
         publishTimed(this.registry.serviceInstancesPerAgent);
 
         removeServiceStats(serviceInstanceId);
+    }
+
+    private void runAsyncDestroyTask(RegistrationToken registrationToken, final Runnable destroyTask)
+    {
+        destructor.execute(new ISequentialRunnable()
+        {
+            @Override
+            public Object context()
+            {
+                return registrationToken;
+            }
+
+            @Override
+            public void run()
+            {
+                destroyTask.run();
+            }
+        });
     }
 
     private void executeTaskWithIO(Runnable runnable)

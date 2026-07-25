@@ -101,6 +101,12 @@ public abstract class PlatformCoreProperties
          * <br> E.g. <code>-Dplatform.simplePlatformRegistry=true</code><br>
          */
         String SIMPLE_PLATFORM_REGISTRY = BASE + "simplePlatformRegistry";
+
+        /**
+         * The system property name to define the number of destructor threads in the registry.
+         * <br> E.g. <code>-Dplatform.registry.destructorThreadPoolSize=4</code><br>
+         */
+        String REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE = BASE + "registry.destructorThreadPoolSize";
     }
 
     /**
@@ -212,6 +218,14 @@ public abstract class PlatformCoreProperties
          */
         boolean SIMPLE_PLATFORM_REGISTRY = SystemUtils.getProperty(Names.SIMPLE_PLATFORM_REGISTRY,
                 true);
+
+        /**
+         * Defines the size of the registry destructor thread pool.
+         *
+         * @see Names#REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE
+         */
+        int REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE =
+                SystemUtils.getPropertyAsInt(Names.REGISTRY_DESTRUCTOR_THREAD_POOL_SIZE, 4);
     }
 
     private PlatformCoreProperties()
