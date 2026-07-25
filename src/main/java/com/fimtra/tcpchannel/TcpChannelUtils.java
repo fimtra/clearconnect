@@ -15,15 +15,20 @@
  */
 package com.fimtra.tcpchannel;
 
+import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
+
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -409,10 +414,29 @@ public abstract class TcpChannelUtils
         }
         try
         {
-            socketChannel.configureBlocking(true);
-            socketChannel.connect(new InetSocketAddress(host, port));
             socketChannel.configureBlocking(false);
-            return socketChannel;
+            socketChannel.connect(new InetSocketAddress(host, port));
+            try (final Selector connectionSelector = Selector.open())
+            {
+                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
+                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
+                {
+                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
+                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
+                    {
+                        selectionKey.cancel();
+                        return socketChannel;
+                    }
+                    throw new ConnectException("Selection key not connectable or socket not connected");
+                }
+                else
+                {
+                    // timeout
+                    throw new SocketTimeoutException(
+                            "Did not connect to " + host + ":" + port + " after waiting "
+                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
+                }
+            }
         }
         catch (ConnectException e)
         {
@@ -460,56 +484,42 @@ public abstract class TcpChannelUtils
     {
         String key;
         String value;
+        final Socket socket = socketChannel.socket();
         for (Map.Entry<String, String> entry : SOCKET_OPTIONS.entrySet())
         {
             key = entry.getKey();
             value = entry.getValue();
             try
             {
-                if (key.equals("TCP_NODELAY"))
+                switch(key)
                 {
-                    socketChannel.socket().setTcpNoDelay(Boolean.valueOf(value).booleanValue());
-                    continue;
-                }
-                if (key.equals("SO_REUSEADDR"))
-                {
-                    socketChannel.socket().setReuseAddress(Boolean.valueOf(value).booleanValue());
-                    continue;
-                }
-                if (key.equals("IP_TOS"))
-                {
-                    socketChannel.socket().setTrafficClass(Integer.valueOf(value).intValue());
-                    continue;
-                }
-                if (key.equals("SO_LINGER"))
-                {
-                    socketChannel.socket().setSoLinger(true, Integer.valueOf(value).intValue());
-                    continue;
-                }
-                if (key.equals("SO_TIMEOUT"))
-                {
-                    socketChannel.socket().setSoTimeout(Integer.valueOf(value).intValue());
-                    continue;
-                }
-                if (key.equals("SO_SNDBUF"))
-                {
-                    socketChannel.socket().setSendBufferSize(Integer.valueOf(value).intValue());
-                    continue;
-                }
-                if (key.equals("SO_RCVBUF"))
-                {
-                    socketChannel.socket().setReceiveBufferSize(Integer.valueOf(value).intValue());
-                    continue;
-                }
-                if (key.equals("SO_KEEPALIVE"))
-                {
-                    socketChannel.socket().setKeepAlive(Boolean.valueOf(value).booleanValue());
-                    continue;
-                }
-                if (key.equals("SO_OOBINLINE"))
-                {
-                    socketChannel.socket().setOOBInline(Boolean.valueOf(value).booleanValue());
-                    continue;
+                    case "TCP_NODELAY":
+                        socket.setTcpNoDelay(Boolean.parseBoolean(value));
+                        continue;
+                    case "SO_REUSEADDR":
+                        socket.setReuseAddress(Boolean.parseBoolean(value));
+                        continue;
+                    case "IP_TOS":
+                        socket.setTrafficClass(Integer.parseInt(value));
+                        continue;
+                    case "SO_LINGER":
+                        socket.setSoLinger(true, Integer.parseInt(value));
+                        continue;
+                    case "SO_TIMEOUT":
+                        socket.setSoTimeout(Integer.parseInt(value));
+                        continue;
+                    case "SO_SNDBUF":
+                        socket.setSendBufferSize(Integer.parseInt(value));
+                        continue;
+                    case "SO_RCVBUF":
+                        socket.setReceiveBufferSize(Integer.parseInt(value));
+                        continue;
+                    case "SO_KEEPALIVE":
+                        socket.setKeepAlive(Boolean.parseBoolean(value));
+                        continue;
+                    case "SO_OOBINLINE":
+                        socket.setOOBInline(Boolean.parseBoolean(value));
+                        continue;
                 }
                 Log.log(TcpChannelUtils.class, "Unhandled socket option: ", key);
             }

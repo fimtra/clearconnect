@@ -211,6 +211,13 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.ephemeralPortRangeEnd=33333</code>
          */
         String EPHEMERAL_PORT_RANGE_END = BASE + "ephemeralPortRangeEnd";
+
+        /**
+         * The system property name to define the timeout in milliseconds for TCP socket connections.
+         * <p>
+         * E.g. <code>-DtcpChannel.connectionTimeoutMillis=5000</code>
+         */
+        String CONNECTION_TIMEOUT_MILLIS = BASE + "connectionTimeoutMillis";
     }
 
     /**
@@ -404,6 +411,13 @@ public abstract class TcpChannelProperties
          * Default is: -1 (no range)
          */
         int EPHEMERAL_PORT_RANGE_END = SystemUtils.getPropertyAsInt(Names.EPHEMERAL_PORT_RANGE_END, -1);
+
+        /**
+         * The system property to define the TCP socket connection timeout in milliseconds
+         * <p>
+         * Default is: 5000
+         */
+        int CONNECTION_TIMEOUT_MILLIS = SystemUtils.getPropertyAsInt(Names.CONNECTION_TIMEOUT_MILLIS, 5000);
     }
 
     private TcpChannelProperties()

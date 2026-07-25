@@ -387,9 +387,10 @@ public class TcpChannel implements ITransportChannel
     private void finishConstruction() throws ConnectException
     {
         // this can be overridden by system properties
+        final Socket socket = this.socketChannel.socket();
         try
         {
-            this.socketChannel.socket().setTcpNoDelay(true);
+            socket.setTcpNoDelay(true);
         }
         catch (SocketException e1)
         {
@@ -435,8 +436,46 @@ public class TcpChannel implements ITransportChannel
 
         ChannelUtils.WATCHDOG.addChannel(this);
 
+        final StringBuilder sockedOptions = new StringBuilder();
+        try
+        {
+            sockedOptions.append(", socket options {")
+                    .append("TCP_NODELAY=")
+                    .append(socket.getTcpNoDelay())
+                    .append(" ")
+                    .append("SO_REUSEADDR=")
+                    .append(socket.getReuseAddress())
+                    .append(" ")
+                    .append("IP_TOS=")
+                    .append(socket.getTrafficClass())
+                    .append(" ")
+                    .append("SO_LINGER=")
+                    .append(socket.getSoLinger())
+                    .append(" ")
+                    .append("SO_TIMEOUT=")
+                    .append(socket.getSoTimeout())
+                    .append(" ")
+                    .append("SO_SNDBUF=")
+                    .append(socket.getSendBufferSize())
+                    .append(" ")
+                    .append("SO_RCVBUF=")
+                    .append(socket.getReceiveBufferSize())
+                    .append(" ")
+                    .append("SO_KEEPALIVE=")
+                    .append(socket.getKeepAlive())
+                    .append(" ")
+                    .append("SO_OOBINLINE=")
+                    .append(socket.getOOBInline())
+                    .append("}");
+        }
+        catch (Exception e)
+        {
+            Log.log(this, "Could not log socket options " + ObjectUtils.safeToString(socket), e);
+        }
+
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this),
-            this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode");
+                this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode",
+                sockedOptions.toString());
     }
 
     @Override
