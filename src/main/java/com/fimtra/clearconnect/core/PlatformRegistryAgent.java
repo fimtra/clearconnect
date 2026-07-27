@@ -74,6 +74,7 @@ import com.fimtra.util.FastDateFormat;
 import com.fimtra.util.Log;
 import com.fimtra.util.NotifyingCache;
 import com.fimtra.util.ObjectUtils;
+import com.fimtra.util.SystemUtils;
 import com.fimtra.util.ThreadUtils;
 import com.fimtra.util.is;
 
@@ -1283,6 +1284,17 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         boolean registered = false;
         while (!registered && tries++ < maxTries && platformServiceInstance.isActive())
         {
+            // this method runs asynchronously so if the registry is bouncing/switching between shadow,
+            // we could get to here and the registry is not connected
+            if (!registryProxy.isConnected())
+            {
+                Log.log(PlatformRegistryAgent.this,
+                        "Registry not connected, aborting registration of " + ObjectUtils.safeToString(
+                                platformServiceInstance)
+                                + ", if the registry reconnects this service will be re-registered");
+                return;
+            }
+
             try
             {
                 registerService(platformServiceInstance);
@@ -1290,17 +1302,21 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
             }
             catch (RegisterRpcNotAvailableException e)
             {
+                final int timeoutMillis =
+                        SystemUtils.getPropertyAsInt("platform.registerRpcNotAvailableTimeoutMillis", 1000);
                 Log.log(PlatformRegistryAgent.this,
-                        "Register RPC not available (is the registry disconnected?), aborting registration of "
-                                + ObjectUtils.safeToString(platformServiceInstance)
-                                + ", if the registry reconnects this service will be re-registered", e);
+                        "Register RPC not available (is the registry disconnected?), cannot register "
+                                + ObjectUtils.safeToString(platformServiceInstance) + ", waiting "
+                                + timeoutMillis + "ms", e);
+                // pause for a bit else there will be no chance for the RPC to appear during the while loop
+                ThreadUtils.sleep(timeoutMillis);
             }
             catch (Exception e)
             {
                 Log.log(PlatformRegistryAgent.this,
-                    " (" + tries + "/" + maxTries + ") Failed attempt registering "
-                        + ObjectUtils.safeToString(platformServiceInstance)
-                        + (tries < maxTries ? "...retrying" : "...MAX ATTEMPTS REACHED"), e);
+                        " (" + tries + "/" + maxTries + ") Failed attempt registering "
+                                + ObjectUtils.safeToString(platformServiceInstance) + (tries < maxTries ?
+                                "...retrying" : "...MAX ATTEMPTS REACHED"), e);
             }
         }
 
