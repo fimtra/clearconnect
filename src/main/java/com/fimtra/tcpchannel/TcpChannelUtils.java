@@ -15,14 +15,18 @@
  */
 package com.fimtra.tcpchannel;
 
+import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
+
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -378,10 +382,34 @@ public abstract class TcpChannelUtils
         }
         try
         {
-            socketChannel.configureBlocking(true);
-            socketChannel.connect(new InetSocketAddress(host, port));
             socketChannel.configureBlocking(false);
-            return socketChannel;
+            socketChannel.connect(new InetSocketAddress(host, port));
+            final Selector connectionSelector = Selector.open();
+            try
+            {
+                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
+                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
+                {
+                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
+                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
+                    {
+                        selectionKey.cancel();
+                        return socketChannel;
+                    }
+                    throw new ConnectException("Selection key not connectable or socket not connected");
+                }
+                else
+                {
+                    // timeout
+                    throw new SocketTimeoutException(
+                            "Did not connect to " + host + ":" + port + " after waiting "
+                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
+                }
+            }
+            finally
+            {
+                connectionSelector.close();
+            }
         }
         catch (ConnectException e)
         {

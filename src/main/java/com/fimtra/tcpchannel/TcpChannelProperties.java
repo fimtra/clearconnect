@@ -163,6 +163,13 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.rxFrameResolverPoolMaxSize=1000</code>
          */
         String RX_FRAME_RESOLVER_POOL_MAX_SIZE = BASE + "rxFrameResolverPoolMaxSize";
+
+        /**
+         * The system property name to define the timeout in milliseconds for TCP socket connections.
+         * <p>
+         * E.g. <code>-DtcpChannel.connectionTimeoutMillis=5000</code>
+         */
+        String CONNECTION_TIMEOUT_MILLIS = BASE + "connectionTimeoutMillis";
     }
 
     /**
@@ -311,6 +318,13 @@ public abstract class TcpChannelProperties
          * Default is: 1000
          */
         int RX_FRAME_RESOLVER_POOL_MAX_SIZE = Integer.parseInt(System.getProperty(Names.RX_FRAME_RESOLVER_POOL_MAX_SIZE, "1000"));
+
+        /**
+         * The system property to define the TCP socket connection timeout in milliseconds
+         * <p>
+         * Default is: 5000
+         */
+        int CONNECTION_TIMEOUT_MILLIS = Integer.parseInt(System.getProperty(Names.CONNECTION_TIMEOUT_MILLIS, "5000"));
     }
 
     private TcpChannelProperties()
