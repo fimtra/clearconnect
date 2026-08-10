@@ -35,6 +35,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -155,7 +156,7 @@ public class TcpChannel implements ITransportChannel
          * equal-sending-opportunity mechanism. The list is traversed from start to end, each
          * channel has one frame sent, looping back to the start and continuing sending one frame
          * for each channel. If a channel has no more frames to sent, it is unlinked by
-         * {@link #unlinkChannel_callWithChainLock(TcpChannel)}
+         * {@link #unlinkChannel(TcpChannel)}
          */
         volatile TcpChannel first;
         /**
@@ -175,60 +176,51 @@ public class TcpChannel implements ITransportChannel
      *
      * @param channel
      *            the channel to add
-     * @return <code>true</code> if this is the first channel to be added into the chain - and thus
-     *         the {@link SelectorProcessor} needs to be triggered for writing
      */
-    private static boolean linkChannel_callWithChainLock(TcpChannel channel)
+    private static void linkChannel(TcpChannel channel)
     {
         final SendChannelChain chain = channel.sendChannelChain;
-        if (channel.prev == null && channel.next == null && chain.first != channel)
+        synchronized (chain)
         {
-            if (chain.first == null)
+            if (channel.prev == null && channel.next == null && chain.first != channel)
             {
-                chain.first = channel;
+                if (chain.first == null)
+                {
+                    chain.first = channel;
+                }
+                else
+                {
+                    chain.last.next = channel;
+                    channel.prev = chain.last;
+                }
                 chain.last = channel;
-                return true;
-            }
-            else
-            {
-                chain.last.next = channel;
-                channel.prev = chain.last;
-                chain.last = channel;
-                return false;
             }
         }
-        return false;
     }
 
-    private static void unlinkChannel_callWithChainLock(TcpChannel channel)
+    private static void unlinkChannel(TcpChannel channel)
     {
-        switch(channel.state)
+        final SendChannelChain chain = channel.sendChannelChain;
+        synchronized (chain)
         {
-            case DESTROYED:
-            case IDLE:
-
-                if (channel.next != null)
-                {
-                    channel.next.prev = channel.prev;
-                }
-                if (channel.prev != null)
-                {
-                    channel.prev.next = channel.next;
-                }
-                final SendChannelChain chain = channel.sendChannelChain;
-                if (channel == chain.first)
-                {
-                    chain.first = channel.next;
-                }
-                if (channel == chain.last)
-                {
-                    chain.last = channel.prev;
-                }
-                channel.prev = null;
-                channel.next = null;
-                break;
-            default:
-                break;
+            if (channel.next != null)
+            {
+                channel.next.prev = channel.prev;
+            }
+            if (channel.prev != null)
+            {
+                channel.prev.next = channel.next;
+            }
+            if (channel == chain.first)
+            {
+                chain.first = channel.next;
+            }
+            if (channel == chain.last)
+            {
+                chain.last = channel.prev;
+            }
+            channel.prev = null;
+            channel.next = null;
         }
     }
 
@@ -422,7 +414,7 @@ public class TcpChannel implements ITransportChannel
                 }
                 catch (BufferOverflowException e)
                 {
-                    TcpChannel.this.destroy("Buffer overflow during frame decode", e);
+                    destroy("Buffer overflow during frame decode", e);
                     throw e;
                 }
             });
@@ -474,8 +466,7 @@ public class TcpChannel implements ITransportChannel
         }
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this),
-                this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode",
-                sockedOptions.toString());
+            this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode");
     }
 
     @Override
@@ -486,7 +477,8 @@ public class TcpChannel implements ITransportChannel
             final TxByteArrayFragment[] byteFragmentsToSend =
                 TxByteArrayFragment.getFragmentsForTxData(toSend, TX_SEND_SIZE);
 
-            for (int i = 0; i < byteFragmentsToSend.length; i++)
+            int i;
+            for (i = 0; i < byteFragmentsToSend.length; i++)
             {
                 this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);
             }
@@ -495,33 +487,26 @@ public class TcpChannel implements ITransportChannel
             synchronized (this.lock)
             {
                 pendingTxFrames = this.txFrames[this.pendingQueue];
-                for (int i = 0; i < byteFragmentsToSend.length; i++)
+                for (i = 0; i < byteFragmentsToSend.length; i++)
                 {
                     pendingTxFrames.offer(byteFragmentsToSend[i]);
                 }
 
                 if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)
                 {
-                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1],
-                            this.readerWriter.getWriteBufferToSocketCount()))
+                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1], this.readerWriter.getWriteBufferToSocketCount()))
                     {
                         destroy("Queue too large");
                     }
                 }
-
                 switch(this.state)
                 {
                     case DESTROYED:
                         throw new ClosedChannelException();
                     case IDLE:
                         this.state = StateEnum.SENDING;
-                        synchronized (this.sendChannelChain)
-                        {
-                            if (linkChannel_callWithChainLock(this))
-                            {
-                                this.writer.setInterest(this.writerKey);
-                            }
-                        }
+                        linkChannel(this);
+                        this.writer.setInterest(this.writerKey);
                         break;
                     case SENDING:
                     default :
@@ -768,26 +753,20 @@ public class TcpChannel implements ITransportChannel
                         switch(channel.state)
                         {
                             case DESTROYED:
-                                synchronized (channel.sendChannelChain)
-                                {
-                                    unlinkChannel_callWithChainLock(channel);
-                                }
+                                unlinkChannel(channel);
                                 continue;
                             case IDLE:
-                                synchronized (channel.sendChannelChain)
+                                unlinkChannel(channel);
+                                try
                                 {
-                                    unlinkChannel_callWithChainLock(channel);
-                                    try
-                                    {
-                                        SelectorProcessor.resetInterest(channel.writerKey);
-                                    }
-                                    catch (CancelledKeyException e)
-                                    {
-                                        channel.destroy("Socket has been closed", e);
-                                    }
+                                    SelectorProcessor.resetInterest(channel.writerKey);
+                                }
+                                catch (CancelledKeyException e)
+                                {
+                                    channel.destroy("Socket has been closed", e);
                                 }
                                 continue;
-                            default :
+                            default:
                                 break;
                         }
                     }
@@ -826,6 +805,7 @@ public class TcpChannel implements ITransportChannel
             }
         }
     }
+
 
     @Override
     public boolean isConnected()
@@ -867,14 +847,7 @@ public class TcpChannel implements ITransportChannel
                 this.txFrames[this.sendingQueue].clear();
                 this.rxByteBuffer.clear();
 
-                // finalizer sometimes sees this as null - its not clear why/how this can happen
-                if (this.sendChannelChain != null)
-                {
-                    synchronized (this.sendChannelChain)
-                    {
-                        unlinkChannel_callWithChainLock(this);
-                    }
-                }
+                unlinkChannel(this);
             }
 
             if (this.socketChannel != null)
