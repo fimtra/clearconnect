@@ -971,8 +971,14 @@ final class EventHandler
         final RegistrationToken _registrationToken;
         if (registrationToken == null)
         {
-            _registrationToken = this.registrationTokenPerInstance.get(serviceInstanceId);
-            Log.log(this, "Found ", ObjectUtils.safeToString(_registrationToken));
+            _registrationToken = this.registrationTokenPerInstance.containsKey(serviceInstanceId) ?
+                    this.registrationTokenPerInstance.get(serviceInstanceId) : null;
+            if (_registrationToken == null)
+            {
+                Log.log(this, "No registration token found, nothing to deregister");
+                return;
+            }
+            Log.log(this, "Found token=", ObjectUtils.safeToString(_registrationToken));
         }
         else
         {
@@ -1144,15 +1150,21 @@ final class EventHandler
     {
         Log.log(this, "Deregister '", serviceInstanceId, "', token=", ObjectUtils.safeToString(registrationToken));
 
-        try
+        // run these async and coalesced - this is basically a clean-up for any dangling zombie connections...
+        destructor.execute(new ICoalescingRunnable()
         {
-            removeUnregisteredProxiesAndMonitors();
-        }
-        catch (Exception e)
-        {
-            Log.log(this,
-                "Could not purge any unregistered connections, continuing with deregister of " + registrationToken, e);
-        }
+            @Override
+            public Object context()
+            {
+                return "removeUnregisteredProxiesAndMonitors";
+            }
+
+            @Override
+            public void run()
+            {
+                removeUnregisteredProxiesAndMonitors();
+            }
+        });
 
         if (!this.registrationTokenPerInstance.remove(serviceInstanceId, registrationToken))
         {
@@ -1352,14 +1364,14 @@ final class EventHandler
         removeServiceStats(serviceInstanceId);
     }
 
-    private void runAsyncDestroyTask(RegistrationToken registrationToken, final Runnable destroyTask)
+    private void runAsyncDestroyTask(Object context, final Runnable destroyTask)
     {
         destructor.execute(new ISequentialRunnable()
         {
             @Override
             public Object context()
             {
-                return registrationToken;
+                return context;
             }
 
             @Override
