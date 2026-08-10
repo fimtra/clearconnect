@@ -138,6 +138,7 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
     final ScheduledExecutorService agentExecutor;
     final PlatformServiceConnectionMonitor registryConnectionMonitor;
+    final Thread shutdownHook;
 
     /**
      * Construct the agent connecting to the registry service on the specified host and use the
@@ -342,7 +343,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                     "Registry name has not been received from " + registryAddresses[0]);
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::destroy, agentName + "-shutdownHook"));
+        shutdownHook = new Thread(this::destroy, agentName + "-shutdownHook");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
 
         Log.log(this, "Constructed ", ObjectUtils.safeToString(this));
     }
@@ -735,11 +737,16 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                         if (is.eq(this.agentName, details.agentName) && is.eq(details.port,
                                 serviceInstance.endPointAddress.getPort()) && is.eq(details.nodeName,
                                 serviceInstance.endPointAddress.getNode()) && is.eq(details.redundancyMode,
-                                serviceInstance.getRedundancyMode().toString()))
+                                serviceInstance.getRedundancyMode()
+                                        .toString()))
                         // NOTE: we're not checking the transport tech or wire protocol
                         {
                             Log.log(PlatformRegistryAgent.this, "Registry has already registered ",
                                     ObjectUtils.safeToString(serviceInstance));
+                        }
+                        else
+                        {
+                            throw e;
                         }
                     }
                     else
@@ -1041,6 +1048,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
 
         // shutdown the executor at the end to allow notification caches to finish cleanly
         safeCall(agentExecutor::shutdown);
+
+        Runtime.getRuntime().removeShutdownHook(shutdownHook);
     }
 
     private void safeCall(Runnable destroy)
