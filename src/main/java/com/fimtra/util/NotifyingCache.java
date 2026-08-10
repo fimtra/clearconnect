@@ -598,6 +598,9 @@ public abstract class NotifyingCache<LISTENER_CLASS, DATA>
             {
                 this.listeners = Collections.emptyList();
                 this.cache.clear();
+                this.sequences.clear();
+                this.notifyTasks.clear();
+                this.listenerSequences.clear();
             }
             finally
             {
