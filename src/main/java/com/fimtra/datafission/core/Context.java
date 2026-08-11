@@ -83,7 +83,7 @@ import com.fimtra.util.UtilProperties;
  * Operations that mutate any record are performed using the {@link IRecord#getWriteLock()}
  * associated with the name of the record. This allows operations on different records to run in
  * parallel.
- * 
+ *
  * @see IRecord
  * @author Ramon Servadei
  */
@@ -158,7 +158,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     /**
      * Noop implementation
-     * 
+     *
      * @author Ramon Servadei
      */
     static final class NoopAtomicChangeManager implements IAtomicChangeManager
@@ -215,7 +215,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     /**
      * Maintains a map of {@link Record} images and {@link ImmutableRecord} instances backed by the
      * images. Changes are applied to the images which can be viewed by the immutable instances.
-     * 
+     *
      * @author Ramon Servadei
      */
     final static class ImageCache
@@ -350,7 +350,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
 
     /**
      * Construct the context
-     * 
+     *
      * @param name
      *            the name of the context
      * @param eventExecutor
@@ -996,8 +996,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     public void addBulkChangesToAtomicChange(String recordName, ThreadLocalBulkChanges changes)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeBulkChanges(changes);
+        getAtomicChange(recordName).mergeBulkChanges(changes);
     }
 
     @Override
@@ -1005,24 +1004,21 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             ThreadLocalBulkChanges changes)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeBulkSubMapChanges(subMapKey, changes);
+        getAtomicChange(recordName).mergeBulkSubMapChanges(subMapKey, changes);
     }
 
     @Override
     public void addEntryUpdatedToAtomicChange(String recordName, String key, IValue current, IValue previous)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeEntryUpdatedChange(key, current, previous);
+        getAtomicChange(recordName).mergeEntryUpdatedChange(key, current, previous);
     }
 
     @Override
     public void addEntryRemovedToAtomicChange(String recordName, String key, IValue value)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeEntryRemovedChange(key, value);
+        getAtomicChange(recordName).mergeEntryRemovedChange(key, value);
     }
 
     @Override
@@ -1030,8 +1026,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             IValue current, IValue previous)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
+        getAtomicChange(recordName).mergeSubMapEntryUpdatedChange(subMapKey, key, current, previous);
     }
 
     @Override
@@ -1039,8 +1034,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             IValue value)
     {
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .mergeSubMapEntryRemovedChange(subMapKey, key, value);
+        getAtomicChange(recordName).mergeSubMapEntryRemovedChange(subMapKey, key, value);
     }
 
     void updateContextStatusAndPublishChange(IStatusAttribute statusAttribute)
@@ -1236,8 +1230,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
     {
         this.sequences.get(recordName).set(sequence);
         // called always whilst holding the record lock
-        this.pendingAtomicChanges.get(recordName)
-                .setSequence(sequence);
+        getAtomicChange(recordName).setSequence(sequence);
     }
 
     boolean permissionTokenValidForRecord(String permissionToken, String recordName)
@@ -1357,7 +1350,7 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
         synchronized (record.getWriteLock())
         {
             final String name = record.getName();
-            final IAtomicChangeMergingOps atomicChangeToPublish = this.pendingAtomicChanges.get(name);
+            final IAtomicChangeMergingOps atomicChangeToPublish = getAtomicChange(name);
             if (!atomicChangeToPublish.isEmpty() || atomicChangeToPublish.getScope() == IMAGE_SCOPE_CHAR)
             {
                 // setup the next atomic change
@@ -1372,11 +1365,16 @@ public final class Context implements IPublisherContext, IAtomicChangeManager
             return atomicChangeToPublish;
         }
     }
+
+    private IAtomicChangeMergingOps getAtomicChange(String recordName)
+    {
+        return this.pendingAtomicChanges.getOrDefault(recordName, AtomicChange.NULL_CHANGE);
+    }
 }
 
 /**
  * This is an internal interface for managing the adding/removing atomic changes for a record.
- * 
+ *
  * @author Ramon Servadei
  */
 interface IAtomicChangeManager

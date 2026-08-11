@@ -46,7 +46,7 @@ public final class AtomicChange implements IAtomicChangeMergingOps
     private static final Map<String, IValue> EMPTY_MAP = Collections.unmodifiableMap(newMap(0));
     private static final Map<String, IValue> NOOP_MAP = noopMap();
 
-    private static final IAtomicChangeMergingOps NULL_CHANGE = new IAtomicChangeMergingOps()
+    static final IAtomicChangeMergingOps NULL_CHANGE = new IAtomicChangeMergingOps()
     {
         @Override
         public boolean isEmpty()
