@@ -16,6 +16,7 @@
 package com.fimtra.tcpchannel;
 
 import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
+import static com.fimtra.tcpchannel.TcpChannelProperties.Values.NON_BLOCKING_CONNECT;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -390,8 +391,8 @@ public abstract class TcpChannelUtils
     }
 
     /**
-     * Create a {@link SocketChannel}, connect in blocking mode to the given TCP server host and port and then
-     * set the socket channel to non-blocking mode.
+     * Create a {@link SocketChannel}, connect in blocking mode by default to the given TCP server host and
+     * port and then set the socket channel to non-blocking mode.
      *
      * @param host the host name of the target TCP server socket to connect to
      * @param port the port of the target TCP server socket to connect to
@@ -401,50 +402,17 @@ public abstract class TcpChannelUtils
     static SocketChannel createAndConnectNonBlockingSocketChannel(String host, int port)
             throws ConnectException
     {
-        final SocketChannel socketChannel;
+        final SocketChannel socketChannel = openSocketChanel(host, port);
         try
         {
-            socketChannel = SocketChannel.open();
-        }
-        catch (IOException e)
-        {
-            final String message = "Could not create socket channel for " + host + ":" + port;
-            Log.log(TcpChannelUtils.class, message, e);
-            throw new ConnectException(message);
-        }
-        try
-        {
-            socketChannel.configureBlocking(false);
-            socketChannel.connect(new InetSocketAddress(host, port));
-            try (final Selector connectionSelector = Selector.open())
+            if (NON_BLOCKING_CONNECT)
             {
-                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
-                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
-                {
-                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
-                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
-                    {
-                        selectionKey.cancel();
-                        return socketChannel;
-                    }
-                    throw new ConnectException("Selection key not connectable or socket not connected");
-                }
-                else
-                {
-                    // timeout
-                    throw new SocketTimeoutException(
-                            "Did not connect to " + host + ":" + port + " after waiting "
-                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
-                }
+                return nonBlockingConnect(host, port, socketChannel);
             }
-        }
-        catch (ConnectException e)
-        {
-            closeChannel(socketChannel);
-            final String message =
-                    "Could not connect socket channel to " + host + ":" + port + " (" + e + ")";
-            throw new ConnectException(message);
-
+            else
+            {
+                return blockingConnect(host, port, socketChannel);
+            }
         }
         catch (Exception e)
         {
@@ -452,6 +420,67 @@ public abstract class TcpChannelUtils
                     "Could not connect socket channel to " + host + ":" + port + " (" + e + ")";
             Log.log(TcpChannelUtils.class, message, e);
             closeChannel(socketChannel);
+            throw new ConnectException(message);
+        }
+    }
+
+    private static SocketChannel blockingConnect(String host, int port, SocketChannel socketChannel)
+            throws IOException
+    {
+        // blocking mode connect
+        socketChannel.configureBlocking(true);
+        socketChannel.connect(new InetSocketAddress(host, port));
+        socketChannel.configureBlocking(false);
+        return socketChannel;
+    }
+
+    private static SocketChannel nonBlockingConnect(String host, int port, SocketChannel socketChannel)
+            throws IOException
+    {
+        socketChannel.configureBlocking(false);
+        if (!socketChannel.connect(new InetSocketAddress(host, port)))
+        {
+            try (final Selector connectionSelector = Selector.open())
+            {
+                final SelectionKey connectKey =
+                        socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
+                try
+                {
+                    if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
+                    {
+                        if (connectKey.isConnectable() && socketChannel.finishConnect())
+                        {
+                            return socketChannel;
+                        }
+                        throw new ConnectException("Selection key not connectable or socket not connected");
+                    }
+                    else
+                    {
+                        // timeout
+                        throw new SocketTimeoutException(
+                                "Did not connect to " + host + ":" + port + " after waiting "
+                                        + CONNECTION_TIMEOUT_MILLIS + "ms");
+                    }
+                }
+                finally
+                {
+                    connectKey.cancel();
+                }
+            }
+        }
+        return socketChannel;
+    }
+
+    private static SocketChannel openSocketChanel(String host, int port) throws ConnectException
+    {
+        try
+        {
+            return SocketChannel.open();
+        }
+        catch (IOException e)
+        {
+            final String message = "Could not create socket channel for " + host + ":" + port;
+            Log.log(TcpChannelUtils.class, message, e);
             throw new ConnectException(message);
         }
     }

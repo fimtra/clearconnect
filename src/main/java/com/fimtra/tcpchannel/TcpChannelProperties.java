@@ -218,6 +218,14 @@ public abstract class TcpChannelProperties
          * E.g. <code>-DtcpChannel.connectionTimeoutMillis=5000</code>
          */
         String CONNECTION_TIMEOUT_MILLIS = BASE + "connectionTimeoutMillis";
+
+        /**
+         * The system property name to define if TCP sockets connect using non-blocking connect (the socket
+         * will still be in non-blocking mode regardless of the connect paradigm).
+         * <p>
+         * E.g. <code>-DtcpChannel.nonBlockingConnect=false</code>
+         */
+        String NON_BLOCKING_CONNECT = BASE + "nonBlockingConnect";
     }
 
     /**
@@ -418,6 +426,14 @@ public abstract class TcpChannelProperties
          * Default is: 5000
          */
         int CONNECTION_TIMEOUT_MILLIS = SystemUtils.getPropertyAsInt(Names.CONNECTION_TIMEOUT_MILLIS, 5000);
+
+        /**
+         * The system property to define if TCP sockets connect using non-blocking connect (the socket will
+         * still be in non-blocking mode regardless of the connect paradigm).
+         * <p>
+         * Default is: false
+         */
+        boolean NON_BLOCKING_CONNECT = SystemUtils.getProperty(Names.NON_BLOCKING_CONNECT, false);
     }
 
     private TcpChannelProperties()
