@@ -28,6 +28,7 @@ import com.fimtra.clearconnect.RedundancyModeEnum;
 import com.fimtra.clearconnect.WireProtocolEnum;
 import com.fimtra.clearconnect.event.EventListenerUtils;
 import com.fimtra.clearconnect.event.IRegistryAvailableListener;
+import com.fimtra.datafission.IRpcInstance;
 import com.fimtra.tcpchannel.TcpChannelUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -57,7 +58,8 @@ public class PlatformRegistryAgentTest
     }
 
     @Test
-    public void testRetryForReRegistering() throws IOException, InterruptedException
+    public void testRetryForReRegistering()
+            throws IOException, InterruptedException, IRpcInstance.TimeOutException, IRpcInstance.ExecutionException
     {
         this.candidate = new PlatformRegistryAgent("test", new EndPointAddress("localhost", 54322),
             new EndPointAddress("localhost", 54321));
@@ -72,6 +74,9 @@ public class PlatformRegistryAgentTest
 
 
         Thread.sleep(1000);
+
+        // try re-registering the same - nothing should go wrong (it will be ignored)
+        candidate.registerService((PlatformServiceInstance) platformServiceInstance1);
 
         // restart the registry
         this.registry.destroy();

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015 Ramon Servadei, Fimtra
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,7 +46,7 @@ import org.junit.Test;
 
 /**
  * Tests for the {@link PlatformRegistry}
- * 
+ *
  * @author Ramon Servadei
  */
 public class PlatformRegistryTest
@@ -82,29 +82,34 @@ public class PlatformRegistryTest
         for (int i = 0; i < MAX; i++)
         {
             final String suffix = i + "-" + System.nanoTime();
-            agents[i] = new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i] =
+                    new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
             agents[i].setRegistryReconnectPeriodMillis(500);
             agents[i].addRegistryAvailableListener(
-                EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
-                {
-                    @Override
-                    public void onRegistryDisconnected()
+                    EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
                     {
-                        disconnectedLatch.get().countDown();
-                    }
+                        @Override
+                        public void onRegistryDisconnected()
+                        {
+                            disconnectedLatch.get()
+                                    .countDown();
+                        }
 
-                    @Override
-                    public void onRegistryConnected()
-                    {
-                        connectedLatch.get().countDown();
-                    }
-                }));
+                        @Override
+                        public void onRegistryConnected()
+                        {
+                            connectedLatch.get()
+                                    .countDown();
+                        }
+                    }));
         }
         try
         {
-            assertTrue(connectedLatch.get().await(5, TimeUnit.SECONDS));
+            assertTrue(connectedLatch.get()
+                    .await(5, TimeUnit.SECONDS));
             this.candidate.destroy();
-            assertTrue(disconnectedLatch.get().await(5, TimeUnit.SECONDS));
+            assertTrue(disconnectedLatch.get()
+                    .await(5, TimeUnit.SECONDS));
 
             connectedLatch.set(new CountDownLatch(MAX));
 
@@ -115,7 +120,8 @@ public class PlatformRegistryTest
                 try
                 {
                     this.candidate =
-                        new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP, regPort);
+                            new PlatformRegistry("PlatformRegistryTest", TcpChannelUtils.LOCALHOST_IP,
+                                    regPort);
                 }
                 catch (Exception e)
                 {
@@ -124,9 +130,64 @@ public class PlatformRegistryTest
                 }
             }
 
-            final boolean await = connectedLatch.get().await(5, TimeUnit.SECONDS);
-            assertTrue("Only got: " + (MAX - connectedLatch.get().getCount()), await);
+            final boolean await = connectedLatch.get()
+                    .await(5, TimeUnit.SECONDS);
+            assertTrue("Only got: " + (MAX - connectedLatch.get()
+                    .getCount()), await);
 
+        }
+        finally
+        {
+            for (PlatformRegistryAgent agent : agents)
+            {
+                agent.destroy();
+            }
+        }
+    }
+
+    @Test
+    public void testMultipleConnections_bounceOfAgents() throws IOException, InterruptedException
+    {
+        final int MAX = 100;
+        createAgentsAndServicesThenDestroy(MAX);
+        createAgentsAndServicesThenDestroy(MAX);
+        createAgentsAndServicesThenDestroy(MAX);
+    }
+
+    private static void createAgentsAndServicesThenDestroy(int MAX) throws IOException, InterruptedException
+    {
+        final AtomicReference<CountDownLatch> connectedLatch = new AtomicReference<>();
+        connectedLatch.set(new CountDownLatch(MAX));
+        PlatformRegistryAgent[] agents = new PlatformRegistryAgent[MAX];
+        for (int i = 0; i < MAX; i++)
+        {
+            final String suffix = i + "-" + System.nanoTime();
+            agents[i] =
+                    new PlatformRegistryAgent("Test-Agent-" + suffix, TcpChannelUtils.LOCALHOST_IP, regPort);
+            agents[i].setRegistryReconnectPeriodMillis(500);
+            agents[i].addRegistryAvailableListener(
+                    EventListenerUtils.synchronizedListener(new IRegistryAvailableListener()
+                    {
+                        @Override
+                        public void onRegistryDisconnected()
+                        {
+
+                        }
+
+                        @Override
+                        public void onRegistryConnected()
+                        {
+                            connectedLatch.get()
+                                    .countDown();
+                        }
+                    }));
+            agents[i].createPlatformServiceInstance("svcFamily", suffix, TcpChannelUtils.LOCALHOST_IP,
+                    WireProtocolEnum.GZIP, RedundancyModeEnum.FAULT_TOLERANT);
+        }
+        try
+        {
+            assertTrue(connectedLatch.get()
+                    .await(5, TimeUnit.SECONDS));
         }
         finally
         {
@@ -190,8 +251,9 @@ public class PlatformRegistryTest
 
         checkEmpty();
 
-        assertEquals(0, candidate.context.getRecord(
-                IRegistryRecordNames.PLATFORM_CONNECTIONS).getSubMapKeys().size());
+        assertEquals(0, candidate.context.getRecord(IRegistryRecordNames.PLATFORM_CONNECTIONS)
+                .getSubMapKeys()
+                .size());
     }
 
     void checkEmpty() throws InterruptedException
@@ -217,14 +279,16 @@ public class PlatformRegistryTest
     void publishRecordAndRpc(final String suffix, final IPlatformServiceInstance service)
     {
         ((PlatformServiceInstance) service).publisher.publishContextConnectionsRecordAtPeriod(100);
-        final IRecord record = service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
+        final IRecord record =
+                service.getOrCreateRecord("record-" + System.currentTimeMillis() + "-" + suffix);
         record.put("field", System.currentTimeMillis());
         service.publishRecord(record);
-        service.publishRPC(new RpcInstance(TypeEnum.DOUBLE, "rpc-" + System.currentTimeMillis() + "-" + suffix));
+        service.publishRPC(
+                new RpcInstance(TypeEnum.DOUBLE, "rpc-" + System.currentTimeMillis() + "-" + suffix));
     }
 
     private static void checkSize(final int expectedRecordFieldCount, final int expectedSubMapSize,
-        final IRecord record) throws EventFailedException, InterruptedException
+            final IRecord record) throws EventFailedException, InterruptedException
     {
         TestUtils.waitForEvent(new EventCheckerWithFailureReason()
         {
@@ -252,7 +316,8 @@ public class PlatformRegistryTest
             @Override
             public Object got()
             {
-                return record.getSubMapKeys().size();
+                return record.getSubMapKeys()
+                        .size();
             }
 
             @Override
