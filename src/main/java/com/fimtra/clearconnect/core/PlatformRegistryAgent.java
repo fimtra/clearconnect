@@ -1049,7 +1049,8 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
         // shutdown the executor at the end to allow notification caches to finish cleanly
         safeCall(agentExecutor::shutdown);
 
-        Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        safeCall(() -> Runtime.getRuntime()
+                .removeShutdownHook(shutdownHook));
     }
 
     private void safeCall(Runnable destroy)
