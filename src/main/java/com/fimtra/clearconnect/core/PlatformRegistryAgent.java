@@ -1053,15 +1053,15 @@ public final class PlatformRegistryAgent implements IPlatformRegistryAgent
                 .removeShutdownHook(shutdownHook));
     }
 
-    private void safeCall(Runnable destroy)
+    private void safeCall(Runnable runnable)
     {
         try
         {
-            destroy.run();
+            runnable.run();
         }
         catch (Exception e)
         {
-            Log.log(this, "Could not destroy " + ObjectUtils.safeToString(destroy), e);
+            Log.log(this, "Could not complete " + ObjectUtils.safeToString(runnable), e);
         }
     }
 
