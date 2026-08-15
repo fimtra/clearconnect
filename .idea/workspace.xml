@@ -1,0 +1,1235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AIAssistantCustomInstructionsStorage">
+    <option name="instructions">
+      <map>
+        <entry key="AIAssistant.General.ProjectPrompt">
+          <value>
+            <AIAssistantStoredInstruction>
+              <option name="actionId" value="AIAssistant.General.ProjectPrompt" />
+              <option name="content" value="Lasers! Lets go!!!!" />
+            </AIAssistantStoredInstruction>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="AnalysisUIOptions">
+    <option name="ANALYZE_INJECTED_CODE" value="false" />
+    <option name="SCOPE_TYPE" value="8" />
+    <option name="CUSTOM_SCOPE_NAME" value="Project Test Files" />
+  </component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="7f0505cc-d7ca-4809-bdb8-45f79d934ebb" name="Changes" comment="uUpdate to 3.16.18">
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+    </list>
+    <list id="c84a02b0-c890-4de8-9bd1-52ce9324a3d3" name="multiple connections manual tests" comment="multiple connections manual tests">
+      <change afterPath="$PROJECT_DIR$/src/test/java/RunMultipleRegistryConnections.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/java/RunRegistry.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ChangesViewManager">
+    <option name="groupingKeys">
+      <option value="directory" />
+    </option>
+  </component>
+  <component name="CoverageOptionsProvider">
+    <option name="myAddOrReplace" value="0" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="JUnit3 Test Class" />
+        <option value="Interface" />
+        <option value="JUnit4 Test Class" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="3.16.1-h" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;ramonservadei&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/fimtra/clearconnect.git&quot;,
+    &quot;accountId&quot;: &quot;377d9cc5-4190-4578-b1e1-a7b6d258d9d6&quot;
+  }
+}</component>
+  <component name="HierarchyBrowserManager">
+    <option name="IS_AUTOSCROLL_TO_SOURCE" value="true" />
+    <option name="SORT_ALPHABETICALLY" value="true" />
+    <option name="SCOPE" value="All" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/lang/Double.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/lang/Long.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/lang/Object.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/math/SignedMutableBigInteger.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/util/AbstractMap.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/util/HashMap.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/util/function/Function.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/java/util/stream/Collectors.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/sun/misc/DoubleConsts.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/sun/misc/FDBigInteger.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.jdks/azul-1.8.0_382/src.zip!/sun/misc/FloatingDecimal.java" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/src/main/java/com/fimtra/clearconnect/core/PlatformRegistry.java" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/src/main/java/com/fimtra/clearconnect/core/PlatformRegistryAgent.java" root0="SKIP_INSPECTION" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="2cUkuyC5lQa9ENPj6VGSx3EECge" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="autoscrollFromSource" value="true" />
+    <option name="autoscrollToSource" value="true" />
+    <option name="flattenModules" value="true" />
+    <option name="flattenPackages" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="openDirectoriesWithSingleClick" value="true" />
+    <option name="showLibraryContents" value="true" />
+    <option name="showVisibilityIcons" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.BenchmarkPublisher.executor": "Run",
+    "Application.BenchmarkService.executor": "Run",
+    "Application.BenchmarkSubscriber.executor": "Run",
+    "Application.DoubleToString.executor": "Run",
+    "Application.DoubleToStringTester.executor": "Run",
+    "Application.EchoService.executor": "Run",
+    "Application.EnhancedForLoopTest.executor": "Run",
+    "Application.LongRefVsVolatileTest.executor": "Run",
+    "Application.LotsOfRecordsPublisher.executor": "Run",
+    "Application.LotsOfRecordsSubscriber.executor": "Run",
+    "Application.LotsOfServicesTest type1.executor": "Run",
+    "Application.LotsOfServicesTest.executor": "Run",
+    "Application.MultiplyTest.executor": "Run",
+    "Application.NetworkTest.executor": "Run",
+    "Application.PerformanceTest (1).executor": "Run",
+    "Application.PerformanceTest.executor": "Run",
+    "Application.PlatformDesktop.executor": "Run",
+    "Application.PlatformRegistry.executor": "Run",
+    "Application.RunMultipleRegistryConnections.executor": "Run",
+    "Application.RunRegistry.executor": "Run",
+    "Application.TestDoubleValuePlain.executor": "Run",
+    "Application.TestDoubleValueWithArray.executor": "Run",
+    "JUnit.ActiveElementTrackerTest.executor": "Coverage",
+    "JUnit.AtomicChangeMergeTest.executor": "Run",
+    "JUnit.AtomicChangeMergeTest.testMergeAtomicChanges_allRemoves.executor": "Run",
+    "JUnit.AtomicChangeTeleporterTest.executor": "Run",
+    "JUnit.AtomicChangeTeleporterTest.testMultipleParts.executor": "Run",
+    "JUnit.AtomicChangeTest.executor": "Run",
+    "JUnit.AtomicChangeTest.testGetSize.executor": "Run",
+    "JUnit.BackwardsRecursionLogicTest.executor": "Run",
+    "JUnit.BlobValueTest.executor": "Run",
+    "JUnit.BlobValueTest.testFromCharCapitals.executor": "Run",
+    "JUnit.BlobValueTest.test_perf_decodeVsArray.executor": "Run",
+    "JUnit.BlobValueTest.test_perf_switchVsArray.executor": "Run",
+    "JUnit.BlobValueTest.test_perf_switchVsCompute.executor": "Run",
+    "JUnit.BlobValueTest.test_toStringAppender.executor": "Run",
+    "JUnit.CharRefTest.executor": "Run",
+    "JUnit.CharSubArrayTest.executor": "Run",
+    "JUnit.CharSubArrayTest.testHashCodeAndEquals.executor": "Run",
+    "JUnit.CharSubArrayTest.testHashCodeAndEquals_7chars.executor": "Run",
+    "JUnit.CharSubArrayTest.testMapGet.executor": "Coverage",
+    "JUnit.CoalescingRecordListenerTest.testHeavyLoadCoalescing_100000_updates.executor": "Run",
+    "JUnit.CoalescingRecordListenerTest.testSimpleCoalescing.executor": "Run",
+    "JUnit.CollectionUtilsTest.noopMap.executor": "Run",
+    "JUnit.CollectionUtilsTest.test_emptyIfNull.executor": "Run",
+    "JUnit.ContextPerformanceTest.executor": "Run",
+    "JUnit.ContextPerformanceTest.testPublishSubscribePerformance.executor": "Run",
+    "JUnit.ContextTest [*].executor": "Run",
+    "JUnit.ContextTest.executor": "Run",
+    "JUnit.ContextTest.testAddObserverAfterCreating [*].executor": "Run",
+    "JUnit.ContextTest.testAddObserverAfterCreating.executor": "Run",
+    "JUnit.ContextTest.testAddObserverBeforeCreating [*].executor": "Run",
+    "JUnit.ContextTest.testAddObserverBeforeCreating.executor": "Run",
+    "JUnit.ContextTest.testAddObserverForSameObserver.executor": "Run",
+    "JUnit.ContextTest.testAddSingleObserverBeforeCreating [*].executor": "Run",
+    "JUnit.ContextTest.testAddSingleObserverBeforeCreating.executor": "Run",
+    "JUnit.ContextTest.testContextStatusCreated.executor": "Run",
+    "JUnit.ContextTest.testContextSubscriptionsListsObserversForMap.executor": "Run",
+    "JUnit.ContextTest.testContextSubscriptionsListsObserversForMapWhenAddingObserverBerforeCreatingMap.executor": "Run",
+    "JUnit.ContextTest.testExecuteSequentialCoreTask.executor": "Run",
+    "JUnit.ContextTest.testGetSubscribedRecords.executor": "Run",
+    "JUnit.ContextTest.testPublishAtomicChange.executor": "Run",
+    "JUnit.ContextTest.testResubscribe [*].executor": "Run",
+    "JUnit.ContextTest.testResubscribe.executor": "Run",
+    "JUnit.ContextUtilsTest.executor": "Run",
+    "JUnit.ContextUtilsTest.test_serializeRecordMapToStream_simple.executor": "Run",
+    "JUnit.DoubleStringCodecTest.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.executor": "Coverage",
+    "JUnit.DoubleToCharArrayCodecTest.test_100_million_6dp.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_100_million_takes_4mins.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_DoubleToSTring_populateAppender_specialCase_1.executor": "Debug",
+    "JUnit.DoubleToCharArrayCodecTest.test_DoubleToSTring_populateAppender_specialCase_2.executor": "Debug",
+    "JUnit.DoubleToCharArrayCodecTest.test_DoubleToString_populateAppender_specialCase_3.executor": "Debug",
+    "JUnit.DoubleToCharArrayCodecTest.test_DoubleToString_populateAppender_specialCases.executor": "Debug",
+    "JUnit.DoubleToCharArrayCodecTest.test_DoubleToString_roundup_specialCases.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_computeDouble_specialCase_1.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_fromCharArray.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_from_to_double.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_invalidInput_7.executor": "Coverage",
+    "JUnit.DoubleToCharArrayCodecTest.test_multipleDecPoints_4.executor": "Run",
+    "JUnit.DoubleToCharArrayCodecTest.test_workbench.executor": "Debug",
+    "JUnit.DoubleToCharArrayCodecTest.test_workbench2.executor": "Run",
+    "JUnit.DoubleValueCodecTest.executor": "Run",
+    "JUnit.DoubleValueCodecTest.testParseDouble.executor": "Coverage",
+    "JUnit.DoubleValueCodecTest.testPerformance.executor": "Run",
+    "JUnit.DoubleValueCodecTest.testPerformance_multiplicationVsBitwise.executor": "Run",
+    "JUnit.DoubleValueCodecTest.testPerformance_operatorVsBitwise.executor": "Run",
+    "JUnit.DoubleValueCodecTest.testPerformance_operatorVsBitwise2.executor": "Run",
+    "JUnit.DoubleValueCodecTest.test_MAIN.executor": "Debug",
+    "JUnit.DoubleValueCodecTest.test_workbench.executor": "Debug",
+    "JUnit.DoubleValueTest.executor": "Run",
+    "JUnit.DoubleValueTest.testPerformanceToString.executor": "Run",
+    "JUnit.DoubleValueTest.testPerformanceToString_decimals.executor": "Run",
+    "JUnit.DoubleValueTest.testPerformanceToString_integralNumbers.executor": "Run",
+    "JUnit.DoubleValueTest.testStringToDouble.executor": "Run",
+    "JUnit.DoubleValueTest.testStringToDouble_largeDecimal.executor": "Run",
+    "JUnit.DoubleValueTest.testToFromString.executor": "Run",
+    "JUnit.DoubleValueTest.testToString.executor": "Run",
+    "JUnit.DoubleValueTest.test_charFromInt.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_bitwiseChar09.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_bitwiseChar09_final.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_charsToDouble.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_hallucinating.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_is_not_hallucinating.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_logic.executor": "Run",
+    "JUnit.DoubleValueTest.test_copilot_logic_2.executor": "Run",
+    "JUnit.DoubleValueTest.test_divideAndMod.executor": "Run",
+    "JUnit.DoubleValueTest.test_performance_charsToDouble.executor": "Run",
+    "JUnit.DoubleValueTest.test_performance_doubleToAppender.executor": "Run",
+    "JUnit.DoubleValueTest.test_performance_doubleToString.executor": "Debug",
+    "JUnit.DoubleValueTest.test_performance_multiply10.executor": "Run",
+    "JUnit.DoubleValueTest.test_performance_writeToString.executor": "Run",
+    "JUnit.ExceptionUtilsTest.test_handleInterruptedException.executor": "Run",
+    "JUnit.FastDateFormatTest.executor": "Run",
+    "JUnit.GZipProtocolCodecTest.executor": "Run",
+    "JUnit.GZipProtocolProxyContextTest.executor": "Run",
+    "JUnit.IfVsExceptionTest.executor": "Run",
+    "JUnit.IfVsExceptionTest.testIfVsException.executor": "Run",
+    "JUnit.ImageDeltaChangeProcessorTest.executor": "Run",
+    "JUnit.ImageDeltaChangeProcessorTest.testProcessRxChange_Image_Sequence_Behind.executor": "Run",
+    "JUnit.ImageDeltaChangeProcessorTest.testProcessRxChange_Image_Sequence_SAME.executor": "Run",
+    "JUnit.ImmutableRecordTest.executor": "Run",
+    "JUnit.LongCharArrayConverterTest.executor": "Run",
+    "JUnit.LongCharArrayConverterTest.test_perf.executor": "Run",
+    "JUnit.LongRefTest.executor": "Run",
+    "JUnit.LongRefTest.testIncrementAndGet.executor": "Run",
+    "JUnit.LongToCharArrayCodecTest.executor": "Coverage",
+    "JUnit.LongToCharArrayCodecTest.test_invalidInputs.executor": "Coverage",
+    "JUnit.LongToCharArrayCodecTest.test_workbench.executor": "Run",
+    "JUnit.LongValueCharArrayUtilsTest.executor": "Run",
+    "JUnit.LongValueCharArrayUtilsTest.test_stringSize.executor": "Coverage",
+    "JUnit.LongValueCharArrayUtilsTest.test_to_from_charArray.executor": "Coverage",
+    "JUnit.LongValueCodecTest.compare_stringSize_implementations.executor": "Run",
+    "JUnit.LongValueCodecTest.executor": "Run",
+    "JUnit.LongValueCodecTest.testArrayVsCompute.executor": "Run",
+    "JUnit.LongValueCodecTest.test_performance_loop_vs_array.executor": "Run",
+    "JUnit.LongValueCodecTest.test_performance_stringSize_variants.executor": "Run",
+    "JUnit.LongValueCodecTest.test_to_from_charArray.executor": "Run",
+    "JUnit.LongValueTest.executor": "Run",
+    "JUnit.LongValueTest.testCache.executor": "Run",
+    "JUnit.LongValueTest.test_parseDouble.executor": "Run",
+    "JUnit.LongValueTest.test_parseLong.executor": "Run",
+    "JUnit.LongValueTest.test_parseLong_exception2.executor": "Run",
+    "JUnit.LongValueTest.test_parseLong_exception_BIG_INT.executor": "Run",
+    "JUnit.LongValueTest.test_parseLong_exception_just_plus_something.executor": "Run",
+    "JUnit.LongValueTest.test_perf.executor": "Run",
+    "JUnit.LongValueTest.test_perf_charsToDouble.executor": "Run",
+    "JUnit.LongValueTest.test_perf_charsToLong.executor": "Run",
+    "JUnit.LongValueTest.test_perf_writeToString.executor": "Run",
+    "JUnit.LongValueTest.test_performance_charsToLong.executor": "Run",
+    "JUnit.LongValueTest.test_performance_longToAppender.executor": "Run",
+    "JUnit.LongValueTest.test_performance_longToString.executor": "Run",
+    "JUnit.LongValueTest.test_performance_writeToString.executor": "Run",
+    "JUnit.LongValueTest.test_toString.executor": "Debug",
+    "JUnit.LongValueToCharArrayTest.executor": "Run",
+    "JUnit.LongValueToCharArrayTest.testPerf_loop_vs_array.executor": "Run",
+    "JUnit.LongValueToCharArrayTest.test_perf.executor": "Run",
+    "JUnit.LongValueToCharArrayTest.test_stringSize.executor": "Run",
+    "JUnit.LowGcLinkedListTest.executor": "Run",
+    "JUnit.LowGcLinkedListTest.testReverse.executor": "Run",
+    "JUnit.LruElementTrackerTest.executor": "Run",
+    "JUnit.LruElementTrackerTest.testAddElement.executor": "Debug",
+    "JUnit.LruElementTrackerTest.testAddElement_exceedSize.executor": "Run",
+    "JUnit.LruElementTrackerTest.testAddElement_swappingHeadTail.executor": "Run",
+    "JUnit.NodeComputeEngineTest.executor": "Run",
+    "JUnit.NotifyingCacheTest.executor": "Run",
+    "JUnit.PairTest.executor": "Run",
+    "JUnit.PlatformPerformanceTest.testPublishSubscribePerformance.executor": "Run",
+    "JUnit.PlatformRegistryAgentTest.addProcId.executor": "Run",
+    "JUnit.PlatformRegistryAgentTest.executor": "Debug",
+    "JUnit.PlatformRegistryAgentTest.testDeadlock.executor": "Debug",
+    "JUnit.PlatformRegistryAgentTest.testReRegistering.executor": "Run",
+    "JUnit.PlatformRegistryAgentTest.testRetryForReRegistering.executor": "Run",
+    "JUnit.PlatformRegistryTest.executor": "Debug",
+    "JUnit.PlatformRegistryTest.testMultipleConnections_bounceOfAgents.executor": "Run",
+    "JUnit.PlatformRegistryTest.testNoLeakage.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.testAddAndRemoveRecordConnectionStatusListener.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.testAddAndRemoveRecordSubscriptionListener.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.testGetAllSubscriptions.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.testServiceConnectionStatusListener.executor": "Run",
+    "JUnit.PlatformServiceProxyTest.testUpdateRecord_bounceService.executor": "Run",
+    "JUnit.PlatformServiceTest.executor": "Debug",
+    "JUnit.PlatformServiceTest.testAddRpcAvailableListener.executor": "Run",
+    "JUnit.PlatformServiceTest.testGetAllRecordNames.executor": "Run",
+    "JUnit.PlatformTest.executor": "Debug",
+    "JUnit.PlatformTest.testBounceRegistry.executor": "Run",
+    "JUnit.PlatformTest.testConnectionsToFaultToleranceService.executor": "Run",
+    "JUnit.PlatformTest.testFaultToleranceServiceInstanceChangesOverThenDestroyLastService [*].executor": "Run",
+    "JUnit.PlatformTest.testFaultToleranceServiceInstanceChangesOverThenDestroyLastService.executor": "Run",
+    "JUnit.PlatformTest.testGetPlatformName.executor": "Run",
+    "JUnit.PlatformTest.testLocalServiceAddRemove.executor": "Run",
+    "JUnit.PlatformTest.testLotsOfServices [*].executor": "Run",
+    "JUnit.PlatformTest.testLotsOfServices.executor": "Run",
+    "JUnit.PlatformTest.testPlatformConnections.executor": "Run",
+    "JUnit.PlatformTest.test_does_not_reconnect_to_destoyed_proxy [*].executor": "Run",
+    "JUnit.PlatformTest.test_does_not_reconnect_to_destoyed_proxy.executor": "Run",
+    "JUnit.PlatformUtilsTest.executor": "Coverage",
+    "JUnit.PlatformUtilsTest.testAddProcessId.executor": "Coverage",
+    "JUnit.PlatformUtilsTest.test_composeHostQualifiedName.executor": "Debug",
+    "JUnit.ProcessUtilsTest.executor": "Run",
+    "JUnit.ProxyContextTest.executor": "Run",
+    "JUnit.ProxyContextTest.substituteLocalNameWithRemoteName.executor": "Run",
+    "JUnit.ProxyContextTest.substituteRemoteNameWithLocalName.executor": "Run",
+    "JUnit.ProxyContextTest.test2Publishers [*].executor": "Run",
+    "JUnit.ProxyContextTest.test2Publishers.executor": "Run",
+    "JUnit.ProxyContextTest.testContextStatusReflectsMultipleRemoteContexts.executor": "Run",
+    "JUnit.ProxyContextTest.testCreateThenUpdateRecord_imageFirstThenDelta.executor": "Run",
+    "JUnit.ProxyContextTest.testGetRemoteRecordImage.executor": "Run",
+    "JUnit.ProxyContextTest.testIncorrectSequenceTriggeringResync.executor": "Run",
+    "JUnit.ProxyContextTest.testPublisherBounced.executor": "Debug",
+    "JUnit.ProxyContextTest.testRecordNameWithSpecialChars.executor": "Run",
+    "JUnit.ProxyContextTest.testRecordSubscribe_bounceContext.executor": "Debug",
+    "JUnit.ProxyContextTest.testRemoteRecordUpdateSequenceTracksLocal.executor": "Run",
+    "JUnit.ProxyContextTest.testRemoteRecordUpdateSequenceTracksLocal_2.executor": "Run",
+    "JUnit.ProxyContextTest.testResubscribe.executor": "Run",
+    "JUnit.ProxyContextTest.testResync.executor": "Debug",
+    "JUnit.ProxyContextTest.testResyncForIncorrectSequence.executor": "Run",
+    "JUnit.ProxyContextTest.testResyncSystemRecord.executor": "Run",
+    "JUnit.ProxyContextTest.testRpcWithSimpleArgs.executor": "Run",
+    "JUnit.ProxyContextTest.testRpcWithSimpleArgsNoLogging.executor": "Run",
+    "JUnit.ProxyContextTest.testSession.executor": "Run",
+    "JUnit.ProxyContextTest.testSessionRejectedByPublisher.executor": "Run",
+    "JUnit.ProxyContextTest.testSimpleRecordName.executor": "Run",
+    "JUnit.ProxyContextTest.testSingleRemoteContextWithUnsubscribing.executor": "Run",
+    "JUnit.ProxyContextTest.testSubscribeForRpcAfterRpcIsCreated.executor": "Run",
+    "JUnit.ProxyContextTest.testSubscribeForRpcAfterRpcIsCreatedAndDestroyed.executor": "Run",
+    "JUnit.ProxyContextTest.testSubscribe_record_updating_no_resync.executor": "Run",
+    "JUnit.ProxyContextTest.testTextValueWithCRLF.executor": "Run",
+    "JUnit.RecordTest.executor": "Run",
+    "JUnit.RecordTest.testCloneRecord.executor": "Run",
+    "JUnit.RecordTest.testCloneRecordAndSubMap.executor": "Run",
+    "JUnit.RecordTest.testPutWithNullKeyAndValue.executor": "Debug",
+    "JUnit.RpcInstanceTest.executor": "Run",
+    "JUnit.RpcInstanceTest.testGetCaller.executor": "Run",
+    "JUnit.ShadowRegistryTest.executor": "Debug",
+    "JUnit.StringAppenderTest.executor": "Run",
+    "JUnit.StringAppenderTest.test.executor": "Run",
+    "JUnit.StringAppenderTest.test_compoundAppend.executor": "Coverage",
+    "JUnit.StringAppenderWriterTest.executor": "Run",
+    "JUnit.StringProtocolCodecTest.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_empty.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_emptyImage.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_failureScenario.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_lotsOfSubmaps_teleporter.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_preamble.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_preamble_noArgs.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_simple.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_singleBlobValue.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_singleTextValue.executor": "Debug",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_singleTextValue_specialChars.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_withSubmap.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_withSubmapSpecialCharInName.executor": "Debug",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_withSubmapSpecialCharInName_2.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeAtomicChange_withSubmap_services.executor": "Debug",
+    "JUnit.StringProtocolCodecTest.testEncodeDecodeValueWithTextValue.executor": "Debug",
+    "JUnit.StringProtocolCodecTest.testFragmentedAtomicChange.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testGetCommandMessageForRecordNames.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testGetCommandMessageForRecordNames_LARGE.executor": "Debug",
+    "JUnit.StringProtocolCodecTest.testGetTxMessageForAtomicChangeWithNullData.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testGetTxMessageForAtomicChangeWithNullKeyAndData (1).executor": "Run",
+    "JUnit.StringProtocolCodecTest.testGetTxMessageForAtomicChangeWithNullKeyAndData.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testGetTxMessageForAtomicChangeWithNullOverwrittenEntries.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testTxAndRxChangeWithNoAddOrRemove.executor": "Run",
+    "JUnit.StringProtocolCodecTest.testTxAndRxChangeWithSubMaps.executor": "Run",
+    "JUnit.SystemUtilsTest.executor": "Run",
+    "JUnit.TestChannelWatchdog.executor": "Coverage",
+    "JUnit.TestTcpChannel.testOrbitingThePlanetAtMaximumVelocity.executor": "Run",
+    "JUnit.TestTcpServer.executor": "Run",
+    "JUnit.TestTcpServer.testGetConnectionHistogram.executor": "Run",
+    "JUnit.TestTcpServerWithLengthBasedFrameEncodingFormat.executor": "Run",
+    "JUnit.ThimbleExecutorTest [*].executor": "Run",
+    "JUnit.ThimbleExecutorTest.executor": "Run",
+    "JUnit.ThimbleExecutorTest.testExecuteCoalescingAndSequential [*].executor": "Run",
+    "JUnit.ThimbleExecutorTest.testExecuteCoalescingAndSequential.executor": "Run",
+    "JUnit.ThimblePerfTest.executor": "Run",
+    "JUnit.ThreadUtilsTest.executor": "Run",
+    "JUnit.ThreadUtilsTest.test_registerThreadLocalCleanup.executor": "Run",
+    "JUnit.ValueTest.executor": "Run",
+    "JUnit.ValueTest.testBlankDoubleValueConversion.executor": "Run",
+    "JUnit.ValueTest.testStringConversion.executor": "Run",
+    "JUnit.ValueTest.test_constructFromCharValue.executor": "Run",
+    "JUnit._DoubleStringConverterTest.executor": "Coverage",
+    "JUnit._FloatingDecimalTest.executor": "Run",
+    "JUnit.clearconnect core.executor": "Run",
+    "JUnit.com.fimtra.datafission.field in clearconnect.executor": "Run",
+    "JUnit.core in clearconnect (1).executor": "Run",
+    "JUnit.core in clearconnect.executor": "Run",
+    "JUnit.datafission core.executor": "Run",
+    "JUnit.field in clearconnect.executor": "Run",
+    "JUnit.java in clearconnect.executor": "Run",
+    "JUnit.util in clearconnect.executor": "Run",
+    "Maven.clearconnect [clean].executor": "Run",
+    "Maven.clearconnect [compile].executor": "Run",
+    "Maven.clearconnect [test].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "ShowUsagesActions.previewPropertyKey": "true",
+    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit4",
+    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit3": "junit.framework.TestCase",
+    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit4": "",
+    "create.test.in.the.same.root": "true",
+    "extract.method.default.visibility": "public",
+    "git-widget-placeholder": "forks/sigma/3.16.19",
+    "ignore.virus.scanning.warn.message": "true",
+    "introduce.parameter.lambda": "true",
+    "last_opened_file_path": "C:/Users/ramon/CloudStation/dev/var/code/github/clearconnect/src/test/java/com/fimtra/tcpchannel",
+    "onboarding.tips.debug.path": "C:/Users/ramon/CloudStation/dev/var/code/current/cascade/cascade/src/main/java/org/servader/Main.java",
+    "project.structure.last.edited": "SDKs",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "run.code.analysis.last.selected.profile": "pProject Default",
+    "settings.editor.selected.configurable": "editor.breadcrumbs",
+    "vcs.patch.path": "C:/Users/ramon/CloudStation/dev/tmp/patches"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\ramon\CloudStation\dev\var\code\github\clearconnect\src\test\java\com\fimtra\tcpchannel" />
+      <recent name="C:\Users\ramon\CloudStation\dev\var\code\github\clearconnect\src\main\java\com\fimtra\tcpchannel" />
+    </key>
+    <key name="CreateTestDialog.Recents.Supers">
+      <recent name="" />
+      <recent name="junit.framework.TestCase" />
+    </key>
+    <key name="MoveMembersDialog.RECENTS_KEY">
+      <recent name="com.fimtra.util.ProcessUtils" />
+      <recent name="com.fimtra.datafission.field.LongToCharArrayCodec" />
+      <recent name="com.fimtra.datafission.field.LongValueConversionUtils" />
+      <recent name="com.fimtra.datafission.field.LongStringConverter" />
+      <recent name="com.fimtra.datafission.field._FloatingDecimal" />
+    </key>
+    <key name="ExtractSuperBase.RECENT_KEYS">
+      <recent name="com.fimtra.datafission.core" />
+      <recent name="com.fimtra.datafission.field" />
+    </key>
+    <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
+      <recent name="com.fimtra.datafission.core" />
+      <recent name="com.fimtra.datafission.field" />
+    </key>
+    <key name="CreateTestDialog.RecentsKey">
+      <recent name="org.servader.graph" />
+      <recent name="graph" />
+      <recent name="com.fimtra.util" />
+      <recent name="com.fimtra.clearconnect.core" />
+      <recent name="com.fimtra.datafission.core" />
+    </key>
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="" />
+      <recent name="com.fimtra.util" />
+    </key>
+  </component>
+  <component name="RunManager" selected="JUnit.ThimblePerfTest">
+    <configuration name="PlatformRegistryTest.testMultipleConnections_bounceOfAgents" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="clearconnect" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.fimtra.clearconnect.core.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.fimtra.clearconnect.core" />
+      <option name="MAIN_CLASS_NAME" value="com.fimtra.clearconnect.core.PlatformRegistryTest" />
+      <option name="METHOD_NAME" value="testMultipleConnections_bounceOfAgents" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="PlatformTest.testConnectionsToFaultToleranceService" type="JUnit" factoryName="JUnit" nameIsGenerated="true" repeat_mode="Until Failure">
+      <module name="clearconnect" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.fimtra.clearconnect.core.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.fimtra.clearconnect.core" />
+      <option name="MAIN_CLASS_NAME" value="com.fimtra.clearconnect.core.PlatformTest" />
+      <option name="METHOD_NAME" value="testConnectionsToFaultToleranceService" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ProxyContextTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="clearconnect" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.fimtra.datafission.core.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.fimtra.datafission.core" />
+      <option name="MAIN_CLASS_NAME" value="com.fimtra.datafission.core.ProxyContextTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <dir value="$PROJECT_DIR$/src/test/java" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="TestTcpChannel.testOrbitingThePlanetAtMaximumVelocity" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="clearconnect" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.fimtra.tcpchannel.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.fimtra.tcpchannel" />
+      <option name="MAIN_CLASS_NAME" value="com.fimtra.tcpchannel.TestTcpChannel" />
+      <option name="METHOD_NAME" value="testOrbitingThePlanetAtMaximumVelocity" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ThimblePerfTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="clearconnect" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.fimtra.thimble.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.fimtra.thimble" />
+      <option name="MAIN_CLASS_NAME" value="com.fimtra.thimble.ThimblePerfTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="java in clearconnect" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="clearconnect" />
+      <option name="TEST_OBJECT" value="directory" />
+      <dir value="$PROJECT_DIR$/src/test/java" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="JUnit.PlatformTest.testConnectionsToFaultToleranceService" />
+      <item itemvalue="JUnit.ProxyContextTest" />
+      <item itemvalue="JUnit.ThimblePerfTest" />
+      <item itemvalue="JUnit.PlatformRegistryTest.testMultipleConnections_bounceOfAgents" />
+      <item itemvalue="JUnit.TestTcpChannel.testOrbitingThePlanetAtMaximumVelocity" />
+      <item itemvalue="JUnit.java in clearconnect" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="JUnit.ThimblePerfTest" />
+        <item itemvalue="JUnit.java in clearconnect" />
+        <item itemvalue="JUnit.PlatformRegistryTest.testMultipleConnections_bounceOfAgents" />
+        <item itemvalue="JUnit.ProxyContextTest" />
+        <item itemvalue="JUnit.TestTcpChannel.testOrbitingThePlanetAtMaximumVelocity" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="7f0505cc-d7ca-4809-bdb8-45f79d934ebb" name="Changes" comment="Update to 3.16.16-SNAPSHOT" />
+      <changelist id="c84a02b0-c890-4de8-9bd1-52ce9324a3d3" name="multiple connections manual tests" comment="" />
+      <created>1708173771230</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1734629265532</updated>
+    </task>
+    <task id="LOCAL-00014" summary="PlatformServiceInstance - fix incorrect sequential task binding">
+      <created>1732393870048</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1732395077330</updated>
+    </task>
+    <task id="LOCAL-00018" summary="PlatformDesktop - direct service connect for reccord subscribe">
+      <created>1732398324604</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1732399369867</updated>
+    </task>
+    <task id="LOCAL-00021" summary="ProxyContext - missed change from 3.16.1-e">
+      <created>1732466018235</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1732467980733</updated>
+    </task>
+    <task id="LOCAL-00025" summary="StringProtocolCodec - optimise access to change maps">
+      <created>1732484141511</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1732484628129</updated>
+    </task>
+    <task id="LOCAL-00027" summary="Improve atomic change merging">
+      <created>1732547786428</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1732810008526</updated>
+    </task>
+    <task id="LOCAL-00028" summary="Add ActiveElementTracker">
+      <created>1732810008457</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1732810326451</updated>
+    </task>
+    <task id="LOCAL-00030" summary="Publisher - txImageCache">
+      <created>1732810527178</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1734629265532</updated>
+    </task>
+    <task id="LOCAL-00031" summary="ChannelWatchdog - remove late heartbeat logic">
+      <created>1732814747181</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1732913524003</updated>
+    </task>
+    <task id="LOCAL-00032" summary="Pair - add lazy hashcode">
+      <created>1732818887574</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1732818926021</updated>
+    </task>
+    <task id="LOCAL-00116" summary="Context - replace array for-loops with enhanced for">
+      <option name="closed" value="true" />
+      <created>1754823083826</created>
+      <option name="number" value="00116" />
+      <option name="presentableId" value="LOCAL-00116" />
+      <option name="project" value="LOCAL" />
+      <updated>1754823083826</updated>
+    </task>
+    <task id="LOCAL-00117" summary="AtomicChange - optimise isEmpty()">
+      <option name="closed" value="true" />
+      <created>1754823541844</created>
+      <option name="number" value="00117" />
+      <option name="presentableId" value="LOCAL-00117" />
+      <option name="project" value="LOCAL" />
+      <updated>1754823541844</updated>
+    </task>
+    <task id="LOCAL-00118" summary="Context - Add IAtomicChangeMergingOps to encapsulate atomic change logic">
+      <option name="closed" value="true" />
+      <created>1754824535433</created>
+      <option name="number" value="00118" />
+      <option name="presentableId" value="LOCAL-00118" />
+      <option name="project" value="LOCAL" />
+      <updated>1754824535433</updated>
+    </task>
+    <task id="LOCAL-00119" summary="Context - streamline atomic change publish logic&#10;&#10;- guaranteed non-null pending atomicChange&#10;    - removes need for atomicChange==null checks&#10;- AtomicChange constructs the CountDownLatch during preparePublish">
+      <option name="closed" value="true" />
+      <created>1754832866595</created>
+      <option name="number" value="00119" />
+      <option name="presentableId" value="LOCAL-00119" />
+      <option name="project" value="LOCAL" />
+      <updated>1754832866595</updated>
+    </task>
+    <task id="LOCAL-00120" summary="StringProtocolCodec - small optimisations&#10;&#10;- use StringAppender.append(char, char) to reduce 2x append calls&#10;- remove redundant assignments and statics">
+      <option name="closed" value="true" />
+      <created>1754833307904</created>
+      <option name="number" value="00120" />
+      <option name="presentableId" value="LOCAL-00120" />
+      <option name="project" value="LOCAL" />
+      <updated>1754833307904</updated>
+    </task>
+    <task id="LOCAL-00121" summary="Record - optimise (previous == null || !previous.equals(value))&#10;&#10;- replace with (!value.equals(previous))">
+      <option name="closed" value="true" />
+      <created>1754834581000</created>
+      <option name="number" value="00121" />
+      <option name="presentableId" value="LOCAL-00121" />
+      <option name="project" value="LOCAL" />
+      <updated>1754834581000</updated>
+    </task>
+    <task id="LOCAL-00122" summary="Record - remove key caching">
+      <option name="closed" value="true" />
+      <created>1754834738718</created>
+      <option name="number" value="00122" />
+      <option name="presentableId" value="LOCAL-00122" />
+      <option name="project" value="LOCAL" />
+      <updated>1754834738718</updated>
+    </task>
+    <task id="LOCAL-00123" summary="DoubleValue - remove internal caching">
+      <option name="closed" value="true" />
+      <created>1754834843097</created>
+      <option name="number" value="00123" />
+      <option name="presentableId" value="LOCAL-00123" />
+      <option name="project" value="LOCAL" />
+      <updated>1754834843097</updated>
+    </task>
+    <task id="LOCAL-00124" summary="DoubleValue - remove internal caching">
+      <option name="closed" value="true" />
+      <created>1754835116733</created>
+      <option name="number" value="00124" />
+      <option name="presentableId" value="LOCAL-00124" />
+      <option name="project" value="LOCAL" />
+      <updated>1754835116733</updated>
+    </task>
+    <task id="LOCAL-00125" summary="TextValue - optimisation and fixup&#10;&#10;- fix missing size when constructing StringAppender&#10;- optimise appendTo using StringAppender.append(char, char)">
+      <option name="closed" value="true" />
+      <created>1754835296840</created>
+      <option name="number" value="00125" />
+      <option name="presentableId" value="LOCAL-00125" />
+      <option name="project" value="LOCAL" />
+      <updated>1754835296840</updated>
+    </task>
+    <task id="LOCAL-00126" summary="LongValue - revert previous changes back to using stringSize approach">
+      <option name="closed" value="true" />
+      <created>1754836098968</created>
+      <option name="number" value="00126" />
+      <option name="presentableId" value="LOCAL-00126" />
+      <option name="project" value="LOCAL" />
+      <updated>1754836098968</updated>
+    </task>
+    <task id="LOCAL-00127" summary="LongValueCodec - refactor stringSize to include size for the 'L'&#10;&#10;- unit tests altered with -1 to compensate">
+      <option name="closed" value="true" />
+      <created>1754836987887</created>
+      <option name="number" value="00127" />
+      <option name="presentableId" value="LOCAL-00127" />
+      <option name="project" value="LOCAL" />
+      <updated>1754836987887</updated>
+    </task>
+    <task id="LOCAL-00128" summary="Add PerformanceTest">
+      <option name="closed" value="true" />
+      <created>1754837441847</created>
+      <option name="number" value="00128" />
+      <option name="presentableId" value="LOCAL-00128" />
+      <option name="project" value="LOCAL" />
+      <updated>1754837441847</updated>
+    </task>
+    <task id="LOCAL-00129" summary="update to 3.16.14">
+      <option name="closed" value="true" />
+      <created>1754839843620</created>
+      <option name="number" value="00129" />
+      <option name="presentableId" value="LOCAL-00129" />
+      <option name="project" value="LOCAL" />
+      <updated>1754839843620</updated>
+    </task>
+    <task id="LOCAL-00130" summary="update to 3.16.15-SNAPSHOT">
+      <option name="closed" value="true" />
+      <created>1754839937312</created>
+      <option name="number" value="00130" />
+      <option name="presentableId" value="LOCAL-00130" />
+      <option name="project" value="LOCAL" />
+      <updated>1754839937312</updated>
+    </task>
+    <task id="LOCAL-00131" summary="Update mockito to 4.11.0">
+      <option name="closed" value="true" />
+      <created>1778097750511</created>
+      <option name="number" value="00131" />
+      <option name="presentableId" value="LOCAL-00131" />
+      <option name="project" value="LOCAL" />
+      <updated>1778097750511</updated>
+    </task>
+    <task id="LOCAL-00132" summary="Preparation for J11+&#10;&#10;- Remove DoubleValueCodec (legacy use of sun.misc.FDBigInteger)">
+      <option name="closed" value="true" />
+      <created>1778099963659</created>
+      <option name="number" value="00132" />
+      <option name="presentableId" value="LOCAL-00132" />
+      <option name="project" value="LOCAL" />
+      <updated>1778099963659</updated>
+    </task>
+    <task id="LOCAL-00133" summary="J25 preparation&#10;&#10;- LowGcLinkedList &#10;    - add reversed() implementation&#10;    - add implements Cloneable">
+      <option name="closed" value="true" />
+      <created>1778101704104</created>
+      <option name="number" value="00133" />
+      <option name="presentableId" value="LOCAL-00133" />
+      <option name="project" value="LOCAL" />
+      <updated>1778101704104</updated>
+    </task>
+    <task id="LOCAL-00134" summary="Update to 3.16.15">
+      <option name="closed" value="true" />
+      <created>1778173247130</created>
+      <option name="number" value="00134" />
+      <option name="presentableId" value="LOCAL-00134" />
+      <option name="project" value="LOCAL" />
+      <updated>1778173247130</updated>
+    </task>
+    <task id="LOCAL-00135" summary="Update to 3.16.16-SNAPSHOT">
+      <option name="closed" value="true" />
+      <created>1778173411544</created>
+      <option name="number" value="00135" />
+      <option name="presentableId" value="LOCAL-00135" />
+      <option name="project" value="LOCAL" />
+      <updated>1778173411544</updated>
+    </task>
+    <task id="LOCAL-00136" summary="TcpChannel - refactor to construct with timeout&#10;&#10;- TcpChannelUtils - add timeout feature for socket connect (5secs)&#10;- TcpChannel - log socket options">
+      <option name="closed" value="true" />
+      <created>1785010829586</created>
+      <option name="number" value="00136" />
+      <option name="presentableId" value="LOCAL-00136" />
+      <option name="project" value="LOCAL" />
+      <updated>1785010829586</updated>
+    </task>
+    <task id="LOCAL-00137" summary="PlatformRegistry - async destroy of proxies and monitors for services">
+      <option name="closed" value="true" />
+      <created>1785011992668</created>
+      <option name="number" value="00137" />
+      <option name="presentableId" value="LOCAL-00137" />
+      <option name="project" value="LOCAL" />
+      <updated>1785011992668</updated>
+    </task>
+    <task id="LOCAL-00138" summary="Update to 3.16.16">
+      <option name="closed" value="true" />
+      <created>1785073370630</created>
+      <option name="number" value="00138" />
+      <option name="presentableId" value="LOCAL-00138" />
+      <option name="project" value="LOCAL" />
+      <updated>1785073370630</updated>
+    </task>
+    <task id="LOCAL-00139" summary="Update to 3.16.17-SNAPSHOT">
+      <option name="closed" value="true" />
+      <created>1785073482015</created>
+      <option name="number" value="00139" />
+      <option name="presentableId" value="LOCAL-00139" />
+      <option name="project" value="LOCAL" />
+      <updated>1785073482016</updated>
+    </task>
+    <task id="LOCAL-00140" summary="PlatformRegistryAgent - fixes for registry reconnect activities&#10;&#10;- check connection to registry before registering&#10;- add a delay between loop attempts when register RPC is not available">
+      <option name="closed" value="true" />
+      <created>1785183584418</created>
+      <option name="number" value="00140" />
+      <option name="presentableId" value="LOCAL-00140" />
+      <option name="project" value="LOCAL" />
+      <updated>1785183584418</updated>
+    </task>
+    <task id="LOCAL-00141" summary="Update to 3.16.17">
+      <option name="closed" value="true" />
+      <created>1785183613791</created>
+      <option name="number" value="00141" />
+      <option name="presentableId" value="LOCAL-00141" />
+      <option name="project" value="LOCAL" />
+      <updated>1785183613791</updated>
+    </task>
+    <task id="LOCAL-00142" summary="Update to 3.16.18-SNAPSHOT">
+      <option name="closed" value="true" />
+      <created>1785183678168</created>
+      <option name="number" value="00142" />
+      <option name="presentableId" value="LOCAL-00142" />
+      <option name="project" value="LOCAL" />
+      <updated>1785183678168</updated>
+    </task>
+    <task id="LOCAL-00143" summary="3.16.1-h - non-blocking socket connect&#10;&#10;- async destroy of proxies in registry">
+      <option name="closed" value="true" />
+      <created>1785446881213</created>
+      <option name="number" value="00143" />
+      <option name="presentableId" value="LOCAL-00143" />
+      <option name="project" value="LOCAL" />
+      <updated>1785446881213</updated>
+    </task>
+    <task id="LOCAL-00144" summary="TcpChannel - fix bug where message would not be sent&#10;&#10;- main fix: when going from IDLE to SENDING, &#10;    linkChannel_callWithChainLock(this) returning false would not set &#10;    interest for writing leaving unwritten data.&#10;    Revert to always calling this.writer.setInterest(this.writerKey)&#10;    when switching to sending.&#10;- other fixes: grab chain lock inside link/unlinkChannel">
+      <option name="closed" value="true" />
+      <created>1786394153598</created>
+      <option name="number" value="00144" />
+      <option name="presentableId" value="LOCAL-00144" />
+      <option name="project" value="LOCAL" />
+      <updated>1786394153599</updated>
+    </task>
+    <task id="LOCAL-00145" summary="NotifyingCache - clear internal sequences and tasks on destroy()">
+      <option name="closed" value="true" />
+      <created>1786394678091</created>
+      <option name="number" value="00145" />
+      <option name="presentableId" value="LOCAL-00145" />
+      <option name="project" value="LOCAL" />
+      <updated>1786394678091</updated>
+    </task>
+    <task id="LOCAL-00146" summary="PlatformRegistryAgent - ensure shutdown hook is removed on destroy()&#10;&#10;- fix bug not re-throwing AlreadyRegisteredException if params don't &#10;  match">
+      <option name="closed" value="true" />
+      <created>1786395314373</created>
+      <option name="number" value="00146" />
+      <option name="presentableId" value="LOCAL-00146" />
+      <option name="project" value="LOCAL" />
+      <updated>1786395314373</updated>
+    </task>
+    <task id="LOCAL-00147" summary="PlatformRegistry - skip deregister if no registration token found&#10;&#10;- coalesce calls to cleanup method removeUnregisteredProxiesAndMonitors">
+      <option name="closed" value="true" />
+      <created>1786396028373</created>
+      <option name="number" value="00147" />
+      <option name="presentableId" value="LOCAL-00147" />
+      <option name="project" value="LOCAL" />
+      <updated>1786396028373</updated>
+    </task>
+    <task id="LOCAL-00148" summary="Context - return NULL_CHANGE when no atomic change found">
+      <option name="closed" value="true" />
+      <created>1786480636577</created>
+      <option name="number" value="00148" />
+      <option name="presentableId" value="LOCAL-00148" />
+      <option name="project" value="LOCAL" />
+      <updated>1786480636577</updated>
+    </task>
+    <task id="LOCAL-00149" summary="TcpChannelUtils - option for non-blocking socket connect">
+      <option name="closed" value="true" />
+      <created>1786652910227</created>
+      <option name="number" value="00149" />
+      <option name="presentableId" value="LOCAL-00149" />
+      <option name="project" value="LOCAL" />
+      <updated>1786652910229</updated>
+    </task>
+    <task id="LOCAL-00150" summary="ProxyContext - remove contention on lock for reconnects&#10;&#10;- make following volatile: &#10;    connected, channel, codec, currentEndPoint">
+      <option name="closed" value="true" />
+      <created>1786805851499</created>
+      <option name="number" value="00150" />
+      <option name="presentableId" value="LOCAL-00150" />
+      <option name="project" value="LOCAL" />
+      <updated>1786805851499</updated>
+    </task>
+    <task id="LOCAL-00151" summary="Improve tests">
+      <option name="closed" value="true" />
+      <created>1786805882824</created>
+      <option name="number" value="00151" />
+      <option name="presentableId" value="LOCAL-00151" />
+      <option name="project" value="LOCAL" />
+      <updated>1786805882824</updated>
+    </task>
+    <task id="LOCAL-00152" summary="PlatformRegistryAgent - add safeCall for removing shutdown hook">
+      <option name="closed" value="true" />
+      <created>1786806938148</created>
+      <option name="number" value="00152" />
+      <option name="presentableId" value="LOCAL-00152" />
+      <option name="project" value="LOCAL" />
+      <updated>1786806938149</updated>
+    </task>
+    <task id="LOCAL-00153" summary="PlatformRegistryAgent - fixup safeCall exception log">
+      <option name="closed" value="true" />
+      <created>1786806986501</created>
+      <option name="number" value="00153" />
+      <option name="presentableId" value="LOCAL-00153" />
+      <option name="project" value="LOCAL" />
+      <updated>1786806986501</updated>
+    </task>
+    <task id="LOCAL-00154" summary="PlatformRegistryTest - revert previous change&#10;&#10;- removed testMultipleConnections_bounceOfAgents">
+      <option name="closed" value="true" />
+      <created>1786807323582</created>
+      <option name="number" value="00154" />
+      <option name="presentableId" value="LOCAL-00154" />
+      <option name="project" value="LOCAL" />
+      <updated>1786807323582</updated>
+    </task>
+    <task id="LOCAL-00155" summary="uUpdate to 3.16.18">
+      <option name="closed" value="true" />
+      <created>1786811432762</created>
+      <option name="number" value="00155" />
+      <option name="presentableId" value="LOCAL-00155" />
+      <option name="project" value="LOCAL" />
+      <updated>1786811432762</updated>
+    </task>
+    <option name="localTasksCounter" value="156" />
+    <servers />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ID_ORDER">
+      <list>
+        <option value="Default.Root" />
+        <option value="Default.Author" />
+        <option value="Default.Date" />
+        <option value="Default.Subject" />
+      </list>
+    </option>
+    <option name="COLUMN_ID_VISIBILITY">
+      <map>
+        <entry key="Table.Default.Hash.ColumnIdVisibility" value="false" />
+        <entry key="Table.Git.CommitSignature.ColumnIdVisibility" value="false" />
+      </map>
+    </option>
+    <option name="COLUMN_ID_WIDTH">
+      <map>
+        <entry key="Table.Default.Date.ColumnIdWidth" value="163" />
+      </map>
+    </option>
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="HEAD" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="3.16.1-e" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="forks/sigma/3.16.8" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="SHOW_DETAILS" value="true" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="HEAD" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="master" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+        <entry key="Paths">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="file:$PROJECT_DIR$/src/main/java/com/fimtra/clearconnect/core/PlatformDesktop.java" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="CUSTOM_BOOLEAN_PROPERTIES">
+                <map>
+                  <entry key="Show.Git.Branches" value="true" />
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
+    <confirmRemoveEmptyChangelist value="2" />
+    <option name="WRAP_WHEN_TYPING_REACHES_RIGHT_MARGIN" value="true" />
+    <MESSAGE value="Update to 3.16.15" />
+    <MESSAGE value="Update to 3.16.16-SNAPSHOT" />
+    <MESSAGE value="async destroy of proxies in registry (3.16.1-f)" />
+    <MESSAGE value="TcpChannel - refactor to construct with timeout&#10;&#10;- TcpChannelUtils - add timeout feature for socket connect (5secs)&#10;- TcpChannel - log socket options" />
+    <MESSAGE value="PlatformRegistry - async destroy of proxies and monitors for services" />
+    <MESSAGE value="Update to 3.16.16" />
+    <MESSAGE value="Update to 3.16.17-SNAPSHOT" />
+    <MESSAGE value="PlatformRegistryAgent - fixes for registry reconnect activities&#10;&#10;- check connection to registry before registering&#10;- add a delay between loop attempts when register RPC is not available" />
+    <MESSAGE value="Update to 3.16.17" />
+    <MESSAGE value="Update to 3.16.18-SNAPSHOT" />
+    <MESSAGE value="registry async destroy of proxies" />
+    <MESSAGE value="3.16.1-h - non-blocking socket connect&#10;&#10;- async destroy of proxies in registry" />
+    <MESSAGE value="TcpChannel revert to 3.16.1" />
+    <MESSAGE value="TcpChannel - fix bug where message would not be sent&#10;&#10;- main fix: when going from IDLE to SENDING, &#10;    linkChannel_callWithChainLock(this) returning false would not set &#10;    interest for writing leaving unwritten data.&#10;    Revert to always calling this.writer.setInterest(this.writerKey)&#10;    when switching to sending.&#10;- other fixes: grab chain lock inside link/unlinkChannel" />
+    <MESSAGE value="NotifyingCache - clear internal sequences and tasks on destroy()" />
+    <MESSAGE value="PlatformRegistryAgent - ensure shutdown hook is removed on destroy()&#10;&#10;- fix bug not re-throwing AlreadyRegisteredException if params don't &#10;  match" />
+    <MESSAGE value="PlatformRegistry - skip deregister if no registration token found&#10;&#10;- coalesce calls to cleanup method removeUnregisteredProxiesAndMonitors" />
+    <MESSAGE value="Context - return NULL_CHANGE when no atomic change found" />
+    <MESSAGE value="TcpChannelUtils - option for non-blocking socket connect" />
+    <MESSAGE value="ProxyContext - remove contention on lock for reconnects&#10;&#10;- make following volatile: &#10;    connected, channel, codec, currentEndPoint" />
+    <MESSAGE value="Improve tests" />
+    <MESSAGE value="PlatformRegistryAgent - add safeCall for removing shutdown hook" />
+    <MESSAGE value="PlatformRegistryAgent - fixup safeCall exception log" />
+    <MESSAGE value="PlatformRegistryTest - revert previous change&#10;&#10;- removed testMultipleConnections_bounceOfAgents" />
+    <MESSAGE value="uUpdate to 3.16.18" />
+    <option name="LAST_COMMIT_MESSAGE" value="uUpdate to 3.16.18" />
+    <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints-defaults>
+        <breakpoint suspend="THREAD" type="java-line" />
+      </breakpoints-defaults>
+    </breakpoint-manager>
+    <pin-to-top-manager>
+      <pinned-members>
+        <PinnedItemInfo parentTag="com.fimtra.datafission.core.Record" memberName="subMaps" />
+      </pinned-members>
+    </pin-to-top-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/clearconnect$StringAppenderTest.ic" NAME="StringAppenderTest Coverage Results" MODIFIED="1733674725874" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongToCharArrayCodecTest.ic" NAME="LongToCharArrayCodecTest Coverage Results" MODIFIED="1734292849135" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleValueTest.ic" NAME="DoubleValueTest Coverage Results" MODIFIED="1741203468824" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$ProxyContextTest_testResync.ic" NAME="ProxyContextTest.testResync Coverage Results" MODIFIED="1742749209893" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongValueTest.ic" NAME="LongValueTest Coverage Results" MODIFIED="1734292251907" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$ActiveElementTrackerTest.ic" NAME="ActiveElementTrackerTest Coverage Results" MODIFIED="1732913499354" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$CharSubArrayTest.ic" NAME="CharSubArrayTest Coverage Results" MODIFIED="1741446101436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest_test_DoubleToString_populateAppender_specialCases.ic" NAME="DoubleToCharArrayCodecTest.test_DoubleToString_populateAppender_specialCases Coverage Results" MODIFIED="1734277566461" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest_test_DoubleToSTring_populateAppender_specialCase_1.ic" NAME="DoubleToCharArrayCodecTest.test_DoubleToSTring_populateAppender_specialCase_1 Coverage Results" MODIFIED="1734276226410" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$datafission_core.ic" NAME="datafission core Coverage Results" MODIFIED="1742748942858" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true" />
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest_test_invalidInput_7.ic" NAME="DoubleToCharArrayCodecTest.test_invalidInput_7 Coverage Results" MODIFIED="1734270256265" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongToCharArrayCodecTest_test_invalidInputs.ic" NAME="LongToCharArrayCodecTest.test_invalidInputs Coverage Results" MODIFIED="1734292833076" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongValueCharArrayUtilsTest_test_stringSize.ic" NAME="LongValueCharArrayUtilsTest.test_stringSize Coverage Results" MODIFIED="1733671475338" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$PlatformUtilsTest_testAddProcessId.ic" NAME="PlatformUtilsTest.testAddProcessId Coverage Results" MODIFIED="1744231199306" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.clearconnect.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongValueTest_test_perf_charsToDouble.ic" NAME="LongValueTest.test_perf_charsToDouble Coverage Results" MODIFIED="1733606766366" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest_test_from_to_double.ic" NAME="DoubleToCharArrayCodecTest.test_from_to_double Coverage Results" MODIFIED="1734262370001" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleValueCodecTest.ic" NAME="DoubleValueCodecTest Coverage Results" MODIFIED="1734383460549" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$AtomicChangeTest.ic" NAME="AtomicChangeTest Coverage Results" MODIFIED="1734726784802" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleStringConverterTest.ic" NAME="DoubleStringConverterTest Coverage Results" MODIFIED="1733508590579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$ProxyContextTest.ic" NAME="ProxyContextTest Coverage Results" MODIFIED="1743166369825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$TestChannelWatchdog.ic" NAME="TestChannelWatchdog Coverage Results" MODIFIED="1732818533507" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.channel.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleValueTest_testStringToDouble.ic" NAME="DoubleValueTest.testStringToDouble Coverage Results" MODIFIED="1741174654578" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$StringAppenderWriterTest.ic" NAME="StringAppenderWriterTest Coverage Results" MODIFIED="1732979928334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$BlobValueTest.ic" NAME="BlobValueTest Coverage Results" MODIFIED="1733695622542" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$PlatformUtilsTest.ic" NAME="PlatformUtilsTest Coverage Results" MODIFIED="1744231208800" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.clearconnect.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$LongValueCharArrayUtilsTest_test_to_from_charArray.ic" NAME="LongValueCharArrayUtilsTest.test_to_from_charArray Coverage Results" MODIFIED="1733671416021" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$field_in_clearconnect.ic" NAME="field in clearconnect Coverage Results" MODIFIED="1741123010036" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true" />
+    <SUITE FILE_PATH="coverage/clearconnect$LongValueCharArrayUtilsTest.ic" NAME="LongValueCharArrayUtilsTest Coverage Results" MODIFIED="1733671483424" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest_test_workbench.ic" NAME="DoubleToCharArrayCodecTest.test_workbench Coverage Results" MODIFIED="1734274987504" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$PlatformTest.ic" NAME="PlatformTest Coverage Results" MODIFIED="1784994157255" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.clearconnect.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleToCharArrayCodecTest.ic" NAME="DoubleToCharArrayCodecTest Coverage Results" MODIFIED="1734293428897" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$StringProtocolCodecTest.ic" NAME="StringProtocolCodecTest Coverage Results" MODIFIED="1741260700019" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$CharSubArrayTest_testMapGet.ic" NAME="CharSubArrayTest.testMapGet Coverage Results" MODIFIED="1741445989589" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$StringAppenderTest_test_compoundAppend.ic" NAME="StringAppenderTest.test_compoundAppend Coverage Results" MODIFIED="1741260691803" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.util.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleValueCodecTest_test_workbench.ic" NAME="DoubleValueCodecTest.test_workbench Coverage Results" MODIFIED="1734300377433" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$PlatformRegistry.ic" NAME="PlatformRegistry Coverage Results" MODIFIED="1731866767056" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.clearconnect.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$ProxyContextTest_testIncorrectSequenceTriggeringResync.ic" NAME="ProxyContextTest.testIncorrectSequenceTriggeringResync Coverage Results" MODIFIED="1742764453734" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.core.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$DoubleValueTest_test_performance_doubleToAppender.ic" NAME="DoubleValueTest.test_performance_doubleToAppender Coverage Results" MODIFIED="1741194842498" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$_FloatingDecimalTest.ic" NAME="_FloatingDecimalTest Coverage Results" MODIFIED="1733440936776" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>com.fimtra.datafission.field.*</FILTER>
+    </SUITE>
+    <SUITE FILE_PATH="coverage/clearconnect$clearconnect_core.ic" NAME="clearconnect core Coverage Results" MODIFIED="1743112143158" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true" />
+  </component>
+</project>

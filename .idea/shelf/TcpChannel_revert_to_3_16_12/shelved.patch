@@ -1,0 +1,233 @@
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.tcpchannel;\r\n\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;\r\n\r\nimport java.io.IOException;\r\nimport java.net.ConnectException;\r\nimport java.net.InetAddress;\r\nimport java.net.InetSocketAddress;\r\nimport java.net.ServerSocket;\r\nimport java.net.Socket;\r\nimport java.net.SocketTimeoutException;\r\nimport java.net.UnknownHostException;\r\nimport java.nio.BufferUnderflowException;\r\nimport java.nio.ByteBuffer;\r\nimport java.nio.channels.SelectionKey;\r\nimport java.nio.channels.Selector;\r\nimport java.nio.channels.SocketChannel;\r\nimport java.util.ArrayList;\r\nimport java.util.Arrays;\r\nimport java.util.HashMap;\r\nimport java.util.Iterator;\r\nimport java.util.List;\r\nimport java.util.Map;\r\nimport java.util.concurrent.atomic.AtomicInteger;\r\nimport java.util.function.Supplier;\r\n\r\nimport com.fimtra.channel.ChannelUtils;\r\nimport com.fimtra.channel.IReceiver;\r\nimport com.fimtra.channel.TransportTechnologyEnum;\r\nimport com.fimtra.util.Log;\r\nimport com.fimtra.util.ObjectUtils;\r\n\r\n/**\r\n * Utility methods for a {@link TcpChannel}\r\n * <p>\r\n * Socket options for the runtime can be set using system properties in the form\r\n * <code>tcpchannel.{SocketOptions_constant}</code> e.g.\r\n *\r\n * <pre>\r\n * -Dtcpchannel.TCP_NODELAY=true -Dtcpchannel.SO_RCVBUF=65535\r\n * </pre>\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic abstract class TcpChannelUtils\r\n{\r\n    static final Map<String, String> SOCKET_OPTIONS = new HashMap<>();\r\n\r\n    static\r\n    {\r\n        Map.Entry<Object, Object> entry;\r\n        Object key = null;\r\n        Object value;\r\n        for (Iterator<Map.Entry<Object, Object>> it =\r\n             System.getProperties().entrySet().iterator(); it.hasNext(); )\r\n        {\r\n            try\r\n            {\r\n                entry = it.next();\r\n                key = entry.getKey();\r\n                value = entry.getValue();\r\n                if (key.toString().startsWith(\"tcpchannel.\", 0))\r\n                {\r\n                    SOCKET_OPTIONS.put(key.toString().substring(\"tcpchannel.\".length()), value.toString());\r\n                }\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.log(TcpChannelUtils.class, \"Could not read socket option \" + ObjectUtils.safeToString(key)\r\n                        + \" from system properties\", e);\r\n            }\r\n        }\r\n        Log.log(TcpChannelUtils.class, \"Socket options: \", ObjectUtils.safeToString(SOCKET_OPTIONS));\r\n    }\r\n\r\n    /**\r\n     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the {@link\r\n     * TcpChannel} can be constructed with a bigger receive buffer.\r\n     *\r\n     * @author Ramon Servadei\r\n     * @see TcpChannel#TcpChannel(String, int, IReceiver, int)\r\n     */\r\n    public static class BufferOverflowException extends RuntimeException\r\n    {\r\n        private static final long serialVersionUID = 1L;\r\n\r\n        public BufferOverflowException(String message)\r\n        {\r\n            super(message);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * <b>None of the parameters are used.</b>\r\n     *\r\n     * @see TransportTechnologyEnum#getNextAvailableServicePort()\r\n     * @deprecated use {@link ChannelUtils#getNextAvailableServicePort()}\r\n     */\r\n    @SuppressWarnings(\"unused\")\r\n    @Deprecated\r\n    public static int getNextFreeTcpServerPort(String hostName, int startPortRangeInclusive,\r\n            int endPortRangeExclusive)\r\n    {\r\n        return ChannelUtils.getNextAvailableServicePort();\r\n    }\r\n\r\n    static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();\r\n\r\n    /**\r\n     * Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin.\r\n     */\r\n    static final List<SelectorProcessor> READERS = new ArrayList<>();\r\n    private static SelectorProcessor currentReader;\r\n\r\n    static synchronized SelectorProcessor nextReader()\r\n    {\r\n        currentReader = nextSelector(READERS, currentReader,\r\n                () -> new SelectorProcessor(\"tcp-channel-reader-\" + READERS.size(), SelectionKey.OP_READ),\r\n                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.READER_CHANNELS_PER_SELECTOR,\r\n                TcpChannelProperties.Values.READER_THREAD_COUNT);\r\n        return currentReader;\r\n    }\r\n\r\n    /**\r\n     * Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin.\r\n     */\r\n    static final List<SelectorProcessor> WRITERS = new ArrayList<>();\r\n    private static SelectorProcessor currentWriter;\r\n\r\n    static synchronized SelectorProcessor nextWriter()\r\n    {\r\n        currentWriter = nextSelector(WRITERS, currentWriter,\r\n                () -> new SelectorProcessor(\"tcp-channel-writer-\" + WRITERS.size(), SelectionKey.OP_WRITE),\r\n                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.WRITER_CHANNELS_PER_SELECTOR,\r\n                TcpChannelProperties.Values.WRITER_THREAD_COUNT);\r\n        return currentWriter;\r\n    }\r\n\r\n    static synchronized void freeSelector(SelectorProcessor selectorProcessor)\r\n    {\r\n        freeSelector(selectorProcessor, COUNTS_PER_SELECTOR);\r\n    }\r\n\r\n    static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)\r\n    {\r\n        final AtomicInteger count = countsPerSelector.get(currentSelector);\r\n        if (count != null)\r\n        {\r\n            count.decrementAndGet();\r\n        }\r\n    }\r\n\r\n    static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,\r\n            Map<T, AtomicInteger> countsPerSelector, int maxChannelsPerSelector, int maxThreadCount)\r\n    {\r\n        T selectorToUse = currentSelector;\r\n        if (selectorToUse == null)\r\n        {\r\n            selectorToUse = ctor.get();\r\n            selectors.add(selectorToUse);\r\n        }\r\n        else\r\n        {\r\n            final AtomicInteger counts =\r\n                    countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger());\r\n            if (counts.get() >= maxChannelsPerSelector)\r\n            {\r\n                // find free one or create new one if under limit\r\n                if (selectors.size() < maxThreadCount)\r\n                {\r\n                    selectorToUse = ctor.get();\r\n                    selectors.add(selectorToUse);\r\n                }\r\n                else\r\n                {\r\n                    // find the one with the lowest counts\r\n                    int lowestCount = Integer.MAX_VALUE;\r\n                    for (T selector : selectors)\r\n                    {\r\n                        // NOTE: countsPerSelector has reader and writer selector counts!\r\n                        // We use our selectors list to find the correct reader/writer selectors to check\r\n                        final int current = countsPerSelector.get(selector).intValue();\r\n                        if (current < lowestCount)\r\n                        {\r\n                            lowestCount = current;\r\n                            selectorToUse = selector;\r\n                        }\r\n                    }\r\n                }\r\n            }\r\n        }\r\n\r\n        countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger()).incrementAndGet();\r\n        return selectorToUse;\r\n    }\r\n\r\n    /** Handles all socket accept operations for all {@link TcpServer} instances */\r\n    final static SelectorProcessor ACCEPT_PROCESSOR =\r\n            new SelectorProcessor(\"tcp-channel-accept\", SelectionKey.OP_ACCEPT);\r\n\r\n    /**\r\n     * The public facing IP for the local host\r\n     */\r\n    public final static String LOCALHOST_IP;\r\n\r\n    static\r\n    {\r\n        final String hostAddress;\r\n        try\r\n        {\r\n            hostAddress = InetAddress.getLocalHost().getHostAddress();\r\n        }\r\n        catch (UnknownHostException e)\r\n        {\r\n            throw new RuntimeException(\"Could not get host address\", e);\r\n        }\r\n        LOCALHOST_IP = hostAddress;\r\n    }\r\n\r\n    private TcpChannelUtils()\r\n    {\r\n        super();\r\n    }\r\n\r\n    /**\r\n     * Given a ByteBuffer of data, this method decodes it into an array of {@link ByteBuffer} objects. Data\r\n     * between {@link TcpChannel} objects is encoded in the following format (ABNF notation):\r\n     *\r\n     * <pre>\r\n     *  stream = 1*frame\r\n     *  frame = length data\r\n     *\r\n     *  length = 4OCTET ; big-endian integer indicating the length of the data\r\n     *  data = 1*OCTET ; the data\r\n     * </pre>\r\n     *\r\n     * @param frames      the reference for the array to place the decoded frames resolved from the buffer.\r\n     *                    Any incomplete frames are left in the buffer.\r\n     * @param framesSize  used as a reference to pass back the size of the array\r\n     * @param buffer      a bytebuffer holding any number of frames or <b>partial frames</b>\r\n     * @param bufferArray the array of bytes extracted from the buffer\r\n     * @return the array with the decoded frames, different to the frames argument if the array was resized\r\n     * @throws BufferOverflowException if the buffer size cannot hold a complete frame\r\n     */\r\n    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] bufferArray)\r\n            throws BufferOverflowException\r\n    {\r\n        ByteBuffer[] decoded = frames;\r\n        framesSize[0] = 0;\r\n        buffer.flip();\r\n        // the TCP message could be a concatenation of multiple ones\r\n        // the format is: <4 bytes len><data><4 bytes len><data>\r\n        int len;\r\n        int position;\r\n        while (buffer.position() < buffer.limit())\r\n        {\r\n            try\r\n            {\r\n                len = buffer.getInt();\r\n            }\r\n            catch (BufferUnderflowException e)\r\n            {\r\n                break;\r\n            }\r\n\r\n            position = buffer.position();\r\n            if (position + len > buffer.limit())\r\n            {\r\n                if (position == 4)\r\n                {\r\n                    if (position + len > buffer.capacity())\r\n                    {\r\n                        // the buffer is full and the length indicates that there is more data than\r\n                        // the buffer can hold. We cannot extract the data from the buffer so we\r\n                        // need indicate the buffer is full.\r\n                        final String overflowMessage = \"Need to read \" + len\r\n                                + \" but buffer has no more space from current position: \" + buffer;\r\n                        buffer.clear();\r\n                        throw new BufferOverflowException(overflowMessage);\r\n                    }\r\n                }\r\n                // we're waiting for more data to read\r\n                // set the position back\r\n                buffer.position(buffer.position() - 4);\r\n                break;\r\n            }\r\n            else\r\n            {\r\n                if (framesSize[0] == decoded.length)\r\n                {\r\n                    decoded = Arrays.copyOf(decoded, decoded.length + 2);\r\n                }\r\n                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, position, len);\r\n                buffer.position(position + len);\r\n            }\r\n        }\r\n        return decoded;\r\n    }\r\n\r\n    /**\r\n     * Given a ByteBuffer of data containing frames delimited by a termination byte, this method decodes it\r\n     * into an array of {@link ByteBuffer} objects, one for each frame. This method assumes data is encoded in\r\n     * the following format (ABNF notation):\r\n     *\r\n     * <pre>\r\n     * stream = 1*frame\r\n     *\r\n     * frame = data terminator\r\n     * data = 1*OCTET ; the data\r\n     *\r\n     * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)\r\n     * </pre>\r\n     *\r\n     * @param frames      the reference for the array to place the decoded frames resolved from the buffer.\r\n     *                    Any incomplete frames are left in the buffer.\r\n     * @param framesSize  used as a reference to pass back the size of the array\r\n     * @param buffer      a bytebuffer holding any number of frames or <b>partial frames</b>\r\n     * @param bufferArray the array of bytes extracted from the buffer\r\n     * @param terminator  the byte sequence for the end of a frame\r\n     * @return the array with the decoded frames, different to the frames argument if the array was resized\r\n     * @throws BufferOverflowException if the buffer size cannot hold a complete frame\r\n     */\r\n    static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer,\r\n            byte[] bufferArray, byte[] terminator) throws BufferOverflowException\r\n    {\r\n        ByteBuffer[] decoded = frames;\r\n        framesSize[0] = 0;\r\n        buffer.flip();\r\n        int[] terminatorIndex = new int[2];\r\n        int terminatorIndexPtr = 0;\r\n        final int limit = buffer.limit();\r\n        int i;\r\n        for (i = 0; i < limit; i++)\r\n        {\r\n            if (bufferArray[i] == terminator[0] && (i + 1 < limit) && bufferArray[i + 1] == terminator[1])\r\n            {\r\n                // mark the terminator index, expand the terminatorIndex array if we're at its limit\r\n                terminatorIndex[terminatorIndexPtr++] = i;\r\n                if (terminatorIndexPtr == terminatorIndex.length)\r\n                {\r\n                    // (always +2 as a heuristic for reducing constant resizing)\r\n                    terminatorIndex = Arrays.copyOf(terminatorIndex, terminatorIndex.length + 2);\r\n                }\r\n            }\r\n        }\r\n\r\n        if (terminatorIndexPtr > 0)\r\n        {\r\n            int len;\r\n            int lastTerminatorIndex = 0;\r\n            for (i = 0; i < terminatorIndexPtr; i++)\r\n            {\r\n                len = terminatorIndex[i] - lastTerminatorIndex;\r\n                if (framesSize[0] == decoded.length)\r\n                {\r\n                    decoded = Arrays.copyOf(decoded, decoded.length + 2);\r\n                }\r\n                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, lastTerminatorIndex, len);\r\n                lastTerminatorIndex = terminatorIndex[i] + terminator.length;\r\n            }\r\n            buffer.position(lastTerminatorIndex);\r\n        }\r\n        else\r\n        {\r\n            // no terminator found, is the buffer totally full?\r\n            if (buffer.limit() == buffer.capacity())\r\n            {\r\n                final String overflowMessage =\r\n                        \"No frame terminator found and buffer is at its limit: \" + buffer;\r\n                buffer.clear();\r\n                throw new BufferOverflowException(overflowMessage);\r\n            }\r\n        }\r\n        return decoded;\r\n    }\r\n\r\n    /**\r\n     * Create a {@link SocketChannel}, connect in blocking mode to the given TCP server host and port and then\r\n     * set the socket channel to non-blocking mode.\r\n     *\r\n     * @param host the host name of the target TCP server socket to connect to\r\n     * @param port the port of the target TCP server socket to connect to\r\n     * @return a connected socket channel in <b>non-blocking</b> mode\r\n     * @throws ConnectException if the socket could not be created or connected\r\n     */\r\n    static SocketChannel createAndConnectNonBlockingSocketChannel(String host, int port)\r\n            throws ConnectException\r\n    {\r\n        final SocketChannel socketChannel;\r\n        try\r\n        {\r\n            socketChannel = SocketChannel.open();\r\n        }\r\n        catch (IOException e)\r\n        {\r\n            final String message = \"Could not create socket channel for \" + host + \":\" + port;\r\n            Log.log(TcpChannelUtils.class, message, e);\r\n            throw new ConnectException(message);\r\n        }\r\n        try\r\n        {\r\n            socketChannel.configureBlocking(false);\r\n            socketChannel.connect(new InetSocketAddress(host, port));\r\n            try (final Selector connectionSelector = Selector.open())\r\n            {\r\n                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);\r\n                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)\r\n                {\r\n                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);\r\n                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())\r\n                    {\r\n                        selectionKey.cancel();\r\n                        return socketChannel;\r\n                    }\r\n                    throw new ConnectException(\"Selection key not connectable or socket not connected\");\r\n                }\r\n                else\r\n                {\r\n                    // timeout\r\n                    throw new SocketTimeoutException(\r\n                            \"Did not connect to \" + host + \":\" + port + \" after waiting \"\r\n                                    + CONNECTION_TIMEOUT_MILLIS + \"ms\");\r\n                }\r\n            }\r\n        }\r\n        catch (ConnectException e)\r\n        {\r\n            closeChannel(socketChannel);\r\n            final String message =\r\n                    \"Could not connect socket channel to \" + host + \":\" + port + \" (\" + e + \")\";\r\n            throw new ConnectException(message);\r\n\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            final String message =\r\n                    \"Could not connect socket channel to \" + host + \":\" + port + \" (\" + e + \")\";\r\n            Log.log(TcpChannelUtils.class, message, e);\r\n            closeChannel(socketChannel);\r\n            throw new ConnectException(message);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Close the channel\r\n     */\r\n    static void closeChannel(final SocketChannel channel)\r\n    {\r\n        Log.log(TcpChannelUtils.class, \"Closing \", ObjectUtils.safeToString(channel));\r\n        try\r\n        {\r\n            channel.socket().close();\r\n            channel.close();\r\n        }\r\n        catch (IOException e)\r\n        {\r\n            Log.log(TcpChannelUtils.class, \"Could not close \" + ObjectUtils.safeToString(channel), e);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Sets TCP socket options on the channel that are found in system properties.\r\n     * <p>\r\n     * e.g. -Dtcpchannel.TCP_NODELAY=true -Dtcpchannel.SO_RCVBUF=65535\r\n     *\r\n     * @param socketChannel the socket to configure options for\r\n     */\r\n    static void setOptions(SocketChannel socketChannel)\r\n    {\r\n        String key;\r\n        String value;\r\n        final Socket socket = socketChannel.socket();\r\n        for (Map.Entry<String, String> entry : SOCKET_OPTIONS.entrySet())\r\n        {\r\n            key = entry.getKey();\r\n            value = entry.getValue();\r\n            try\r\n            {\r\n                switch(key)\r\n                {\r\n                    case \"TCP_NODELAY\":\r\n                        socket.setTcpNoDelay(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"SO_REUSEADDR\":\r\n                        socket.setReuseAddress(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"IP_TOS\":\r\n                        socket.setTrafficClass(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_LINGER\":\r\n                        socket.setSoLinger(true, Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_TIMEOUT\":\r\n                        socket.setSoTimeout(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_SNDBUF\":\r\n                        socket.setSendBufferSize(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_RCVBUF\":\r\n                        socket.setReceiveBufferSize(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_KEEPALIVE\":\r\n                        socket.setKeepAlive(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"SO_OOBINLINE\":\r\n                        socket.setOOBInline(Boolean.parseBoolean(value));\r\n                        continue;\r\n                }\r\n                Log.log(TcpChannelUtils.class, \"Unhandled socket option: \", key);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.log(TcpChannelUtils.class,\r\n                        \"Could not set socket option \" + ObjectUtils.safeToString(key) + \" on \"\r\n                                + ObjectUtils.safeToString(socketChannel), e);\r\n            }\r\n        }\r\n    }\r\n\r\n    private static int lastEphemeralPort = -1;\r\n\r\n    /**\r\n     * Bind the server socket to the IP address and port. If the address is <code>null</code>, uses the\r\n     * localhost IP. If the port is 0 AND the system properties for the ephemeral port range start-end are set\r\n     * then an ephemeral port within the range is used. If the port is 0 and no system properties are set, an\r\n     * ephemeral port is allocated.\r\n     */\r\n    static void bind(ServerSocket socket, String address, int port) throws IOException\r\n    {\r\n        if (port == 0 && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START > -1\r\n                && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END > -1)\r\n        {\r\n            bindWithinRange(socket, address, TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START,\r\n                    TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END);\r\n        }\r\n        else\r\n        {\r\n            socket.bind(\r\n                    new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address, port));\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Bind the server socket to an ephemeral port within the range start and end, inclusive. If the address\r\n     * is <code>null</code>, uses the localhost IP.\r\n     */\r\n    static synchronized void bindWithinRange(ServerSocket socket, String address,\r\n            final int ephemeralRangeStart, final int ephemeralRangeEnd) throws IOException\r\n    {\r\n        int loop = 0;\r\n\r\n        while (true)\r\n        {\r\n            if (lastEphemeralPort == -1 || lastEphemeralPort < ephemeralRangeStart)\r\n            {\r\n                lastEphemeralPort = ephemeralRangeStart;\r\n            }\r\n            else\r\n            {\r\n                lastEphemeralPort++;\r\n            }\r\n            if (lastEphemeralPort > ephemeralRangeEnd)\r\n            {\r\n                lastEphemeralPort = ephemeralRangeStart;\r\n                if (++loop > 1)\r\n                {\r\n                    throw new IOException(\r\n                            \"No free port found between \" + ephemeralRangeStart + \"-\" + ephemeralRangeEnd);\r\n                }\r\n            }\r\n            try\r\n            {\r\n                final InetSocketAddress endpoint =\r\n                        new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address,\r\n                                lastEphemeralPort);\r\n                socket.bind(endpoint);\r\n                break;\r\n            }\r\n            catch (IOException e)\r\n            {\r\n                Log.log(TcpChannelUtils.class, \"Could not bind to socket: \" + lastEphemeralPort);\r\n            }\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(revision b32c7eaf25e9dd57015fbf02cc9d4e39ab7b59b8)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(date 1785688499434)
+@@ -15,29 +15,21 @@
+  */
+ package com.fimtra.tcpchannel;
+ 
+-import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
+-
+ import java.io.IOException;
+ import java.net.ConnectException;
+ import java.net.InetAddress;
+ import java.net.InetSocketAddress;
+ import java.net.ServerSocket;
+ import java.net.Socket;
+-import java.net.SocketTimeoutException;
+ import java.net.UnknownHostException;
+ import java.nio.BufferUnderflowException;
+ import java.nio.ByteBuffer;
+ import java.nio.channels.SelectionKey;
+-import java.nio.channels.Selector;
+ import java.nio.channels.SocketChannel;
+-import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.Iterator;
+-import java.util.List;
+ import java.util.Map;
+-import java.util.concurrent.atomic.AtomicInteger;
+-import java.util.function.Supplier;
+ 
+ import com.fimtra.channel.ChannelUtils;
+ import com.fimtra.channel.IReceiver;
+@@ -66,8 +58,9 @@
+         Map.Entry<Object, Object> entry;
+         Object key = null;
+         Object value;
+-        for (Iterator<Map.Entry<Object, Object>> it =
+-             System.getProperties().entrySet().iterator(); it.hasNext(); )
++        for (Iterator<Map.Entry<Object, Object>> it = System.getProperties()
++                .entrySet()
++                .iterator(); it.hasNext(); )
+         {
+             try
+             {
+@@ -89,8 +82,8 @@
+     }
+ 
+     /**
+-     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the {@link
+-     * TcpChannel} can be constructed with a bigger receive buffer.
++     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the
++     * {@link TcpChannel} can be constructed with a bigger receive buffer.
+      *
+      * @author Ramon Servadei
+      * @see TcpChannel#TcpChannel(String, int, IReceiver, int)
+@@ -119,94 +112,48 @@
+         return ChannelUtils.getNextAvailableServicePort();
+     }
+ 
+-    static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();
++    /** Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin. */
++    private final static SelectorProcessor[] READER;
++    private static int currentReader = 0;
+ 
+-    /**
+-     * Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin.
+-     */
+-    static final List<SelectorProcessor> READERS = new ArrayList<>();
+-    private static SelectorProcessor currentReader;
++    static
++    {
++        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
++        for (int i = 0; i < READER.length; i++)
++        {
++            READER[i] = new SelectorProcessor("tcp-channel-reader-" + i, SelectionKey.OP_READ);
++        }
++    }
+ 
+     static synchronized SelectorProcessor nextReader()
+     {
+-        currentReader = nextSelector(READERS, currentReader,
+-                () -> new SelectorProcessor("tcp-channel-reader-" + READERS.size(), SelectionKey.OP_READ),
+-                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.READER_CHANNELS_PER_SELECTOR,
+-                TcpChannelProperties.Values.READER_THREAD_COUNT);
+-        return currentReader;
++        if (currentReader == READER.length)
++        {
++            currentReader = 0;
++        }
++        return READER[currentReader++];
+     }
+ 
+-    /**
+-     * Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin.
+-     */
+-    static final List<SelectorProcessor> WRITERS = new ArrayList<>();
+-    private static SelectorProcessor currentWriter;
++    /** Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin. */
++    private final static SelectorProcessor[] WRITER;
++    private static int currentWriter = 0;
++
++    static
++    {
++        WRITER = new SelectorProcessor[TcpChannelProperties.Values.WRITER_THREAD_COUNT];
++        for (int i = 0; i < WRITER.length; i++)
++        {
++            WRITER[i] = new SelectorProcessor("tcp-channel-writer-" + i, SelectionKey.OP_WRITE);
++        }
++    }
+ 
+     static synchronized SelectorProcessor nextWriter()
+     {
+-        currentWriter = nextSelector(WRITERS, currentWriter,
+-                () -> new SelectorProcessor("tcp-channel-writer-" + WRITERS.size(), SelectionKey.OP_WRITE),
+-                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.WRITER_CHANNELS_PER_SELECTOR,
+-                TcpChannelProperties.Values.WRITER_THREAD_COUNT);
+-        return currentWriter;
+-    }
+-
+-    static synchronized void freeSelector(SelectorProcessor selectorProcessor)
+-    {
+-        freeSelector(selectorProcessor, COUNTS_PER_SELECTOR);
+-    }
+-
+-    static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)
+-    {
+-        final AtomicInteger count = countsPerSelector.get(currentSelector);
+-        if (count != null)
+-        {
+-            count.decrementAndGet();
+-        }
+-    }
+-
+-    static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,
+-            Map<T, AtomicInteger> countsPerSelector, int maxChannelsPerSelector, int maxThreadCount)
+-    {
+-        T selectorToUse = currentSelector;
+-        if (selectorToUse == null)
+-        {
+-            selectorToUse = ctor.get();
+-            selectors.add(selectorToUse);
+-        }
+-        else
+-        {
+-            final AtomicInteger counts =
+-                    countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger());
+-            if (counts.get() >= maxChannelsPerSelector)
+-            {
+-                // find free one or create new one if under limit
+-                if (selectors.size() < maxThreadCount)
+-                {
+-                    selectorToUse = ctor.get();
+-                    selectors.add(selectorToUse);
+-                }
+-                else
+-                {
+-                    // find the one with the lowest counts
+-                    int lowestCount = Integer.MAX_VALUE;
+-                    for (T selector : selectors)
+-                    {
+-                        // NOTE: countsPerSelector has reader and writer selector counts!
+-                        // We use our selectors list to find the correct reader/writer selectors to check
+-                        final int current = countsPerSelector.get(selector).intValue();
+-                        if (current < lowestCount)
+-                        {
+-                            lowestCount = current;
+-                            selectorToUse = selector;
+-                        }
+-                    }
+-                }
+-            }
++        if (currentWriter == WRITER.length)
++        {
++            currentWriter = 0;
+         }
+-
+-        countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger()).incrementAndGet();
+-        return selectorToUse;
++        return WRITER[currentWriter++];
+     }
+ 
+     /** Handles all socket accept operations for all {@link TcpServer} instances */
+@@ -414,29 +361,10 @@
+         }
+         try
+         {
+-            socketChannel.configureBlocking(false);
++            socketChannel.configureBlocking(true);
+             socketChannel.connect(new InetSocketAddress(host, port));
+-            try (final Selector connectionSelector = Selector.open())
+-            {
+-                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
+-                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
+-                {
+-                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
+-                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
+-                    {
+-                        selectionKey.cancel();
+-                        return socketChannel;
+-                    }
+-                    throw new ConnectException("Selection key not connectable or socket not connected");
+-                }
+-                else
+-                {
+-                    // timeout
+-                    throw new SocketTimeoutException(
+-                            "Did not connect to " + host + ":" + port + " after waiting "
+-                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
+-                }
+-            }
++            socketChannel.configureBlocking(false);
++            return socketChannel;
+         }
+         catch (ConnectException e)
+         {
+@@ -464,7 +392,8 @@
+         Log.log(TcpChannelUtils.class, "Closing ", ObjectUtils.safeToString(channel));
+         try
+         {
+-            channel.socket().close();
++            channel.socket()
++                    .close();
+             channel.close();
+         }
+         catch (IOException e)

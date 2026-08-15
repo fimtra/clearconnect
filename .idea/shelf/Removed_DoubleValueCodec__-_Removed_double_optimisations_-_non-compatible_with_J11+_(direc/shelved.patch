@@ -1,0 +1,2784 @@
+Index: src/main/java/com/fimtra/datafission/field/DoubleValue.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei \r\n *  \r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *    \r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.datafission.field;\r\n\r\nimport com.fimtra.datafission.IValue;\r\nimport com.fimtra.util.StringAppender;\r\n\r\n/**\r\n * The IValue for a double.\r\n * \r\n * @author Ramon Servadei\r\n */\r\npublic class DoubleValue extends AbstractValue\r\n{\r\n    private final double value;\r\n\r\n    /**\r\n     * Static short-hand constructor for a {@link DoubleValue}\r\n     */\r\n    public static DoubleValue valueOf(double value)\r\n    {\r\n        return new DoubleValue(value);\r\n    }\r\n\r\n    /**\r\n     * Get a double from the passed in IValue, returning the defaultValue if the IValue is\r\n     * <code>null</code> or not a DoubleValue\r\n     * \r\n     * @param target\r\n     *            the IValue to extract a double from\r\n     * @param defaultValue\r\n     *            the default value\r\n     * @return the double value of the IValue or the defaultValue if the IValue is <code>null</code>\r\n     *         or not a DoubleValue\r\n     */\r\n    public static double get(IValue target, double defaultValue)\r\n    {\r\n        return (target instanceof DoubleValue) ? target.doubleValue() : defaultValue;\r\n    }\r\n\r\n    /** Initialises to represent NaN. */\r\n    DoubleValue()\r\n    {\r\n        this(Double.NaN);\r\n    }\r\n\r\n    public DoubleValue(double value)\r\n    {\r\n        super();\r\n        this.value = value;\r\n    }\r\n\r\n    DoubleValue(char[] chars, int start, int len)\r\n    {\r\n        this.value = DoubleValueCodeAdapter.fromCharArray(chars, start, len);\r\n    }\r\n\r\n    @Override\r\n    public final TypeEnum getType()\r\n    {\r\n        return TypeEnum.DOUBLE;\r\n    }\r\n\r\n    @Override\r\n    public final long longValue()\r\n    {\r\n        return (long) this.value;\r\n    }\r\n\r\n    @Override\r\n    public final double doubleValue()\r\n    {\r\n        return this.value;\r\n    }\r\n\r\n    @Override\r\n    public String textValue()\r\n    {\r\n        return DoubleValueCodeAdapter.textValue(value);\r\n    }\r\n    \r\n    @Override\r\n    public final StringAppender toStringAppender()\r\n    {\r\n        return appendTo(new StringAppender(28));\r\n    }\r\n\r\n    @Override\r\n    public final int hashCode()\r\n    {\r\n        final long bits = Double.doubleToLongBits(this.value);\r\n        return (int) (bits ^ (bits >>> 32));\r\n    }\r\n\r\n    @Override\r\n    public final boolean equals(Object obj)\r\n    {\r\n        if (this == obj)\r\n        {\r\n            return true;\r\n        }\r\n        if (!(obj instanceof DoubleValue))\r\n        {\r\n            return false;\r\n        }\r\n        return Double.doubleToLongBits(this.value) == Double.doubleToLongBits(((DoubleValue) obj).value);\r\n    }\r\n\r\n    @Override\r\n    public StringAppender appendTo(StringAppender stringAppender)\r\n    {\r\n        return DoubleValueCodeAdapter.appendTo(stringAppender, this.value);\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/datafission/field/DoubleValue.java b/src/main/java/com/fimtra/datafission/field/DoubleValue.java
+--- a/src/main/java/com/fimtra/datafission/field/DoubleValue.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/main/java/com/fimtra/datafission/field/DoubleValue.java	(date 1777999636480)
+@@ -65,7 +65,7 @@
+ 
+     DoubleValue(char[] chars, int start, int len)
+     {
+-        this.value = DoubleValueCodeAdapter.fromCharArray(chars, start, len);
++        this.value = Double.parseDouble(new String(chars, start, len));
+     }
+ 
+     @Override
+@@ -89,7 +89,7 @@
+     @Override
+     public String textValue()
+     {
+-        return DoubleValueCodeAdapter.textValue(value);
++        return Double.toString(value);
+     }
+     
+     @Override
+@@ -122,6 +122,7 @@
+     @Override
+     public StringAppender appendTo(StringAppender stringAppender)
+     {
+-        return DoubleValueCodeAdapter.appendTo(stringAppender, this.value);
++        return stringAppender.append(DOUBLE_CODE)
++                .append(this.value);
+     }
+ }
+Index: src/main/java/com/fimtra/datafission/field/DoubleValueCodec.java
+===================================================================
+diff --git a/src/main/java/com/fimtra/datafission/field/DoubleValueCodec.java b/src/main/java/com/fimtra/datafission/field/DoubleValueCodec.java
+deleted file mode 100644
+--- a/src/main/java/com/fimtra/datafission/field/DoubleValueCodec.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ /dev/null	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
+@@ -1,1454 +0,0 @@
+-package com.fimtra.datafission.field;
+-
+-
+-import java.util.Arrays;
+-import java.util.function.Consumer;
+-import java.util.function.Supplier;
+-
+-import com.fimtra.util.StringAppender;
+-import sun.misc.DoubleConsts;
+-import sun.misc.FDBigInteger;
+-
+-/**
+- * Based on the {@link sun.misc.FloatingDecimal} java source code to allow use of {@link StringAppender}. A
+- * lot of tidy up was done on the original code and non-relevant methods/classes have been removed (we only
+- * want to focus on double-to-string and vice-versa).
+- * <br>
+- * This does not support HEX format.
+- */
+-class DoubleValueCodec
+-{
+-    /*
+-    R.S. NOTE:
+-    I wont pretend that I fully understand all the IEEE arithmetic happening here, my focus has been
+-    to optimise for reducing char[] create/copy and other minor performance optimisations. The bulk of the
+-    actual conversion logic is unchanged w.r.t. FloatingDecimal algorithm.
+-     */
+-
+-    private static final long[] LONG_5_POW =
+-              { 1L,
+-                5L,
+-                5L * 5,
+-                5L * 5 * 5,
+-                5L * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
+-                5L * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5, };
+-
+-    //
+-    // Constants of the implementation;
+-    // most are IEEE-754 related.
+-    // (There are more really boring constants at the end.)
+-    //
+-    private static final int EXP_SHIFT = DoubleConsts.SIGNIFICAND_WIDTH - 1;
+-    private static final long FRACT_HOB = (1L << EXP_SHIFT); // assumed High-Order bit
+-    private static final long EXP_ONE = ((long) DoubleConsts.EXP_BIAS) << EXP_SHIFT; // exponent of 1.0
+-    private static final int MAX_SMALL_BIN_EXP = 62;
+-    private static final int MIN_SMALL_BIN_EXP = -(63 / 3);
+-    private static final int MAX_DECIMAL_DIGITS = 15;
+-    private static final int MAX_DECIMAL_EXPONENT = 308;
+-    private static final int MIN_DECIMAL_EXPONENT = -324;
+-    private static final int BIG_DECIMAL_EXPONENT = 324; // i.e. abs(MIN_DECIMAL_EXPONENT)
+-    static final int MAX_NDIGITS = 1100;
+-    private static final int INT_DECIMAL_DIGITS = 9;
+-    private static final int REALLY_BIG = Integer.MAX_VALUE / 10;
+-    /**
+-     * All the positive powers of 10 that can be represented exactly in double/float.
+-     */
+-    private static final double[] SMALL_10_POW =
+-            { 1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9, 1.0e10, 1.0e11, 1.0e12,
+-                    1.0e13, 1.0e14, 1.0e15, 1.0e16, 1.0e17, 1.0e18, 1.0e19, 1.0e20, 1.0e21, 1.0e22 };
+-    static final int MAX_SMALL_TEN = SMALL_10_POW.length - 1;
+-
+-    private static final double[] BIG_10_POW = { 1e16, 1e32, 1e64, 1e128, 1e256 };
+-    private static final double[] TINY_10_POW = { 1e-16, 1e-32, 1e-64, 1e-128, 1e-256 };
+-
+-    private static final char[] INFINITY = "Infinity".toCharArray();
+-    private static final char[] NEG_INFINITY = ("-" + new String(INFINITY)).toCharArray();
+-    private static final int INFINITY_LENGTH = INFINITY.length;
+-    private static final int NEG_INFINITY_LENGTH = NEG_INFINITY.length;
+-    private static final char[] NAN = "NaN".toCharArray();
+-    private static final int NAN_LENGTH = NAN.length;
+-
+-    private static final Consumer<StringAppender> D2S_POSITIVE_INFINITY = sa -> sa.append(INFINITY);
+-    private static final Consumer<StringAppender> D2S_NEGATIVE_INFINITY = sa -> sa.append(NEG_INFINITY);
+-    private static final Consumer<StringAppender> D2S_NOT_A_NUMBER = sa -> sa.append(NAN);
+-    private static final Consumer<StringAppender> D2S_POSITIVE_ZERO = new DoubleToString(false, new char[] { '0' });
+-    private static final Consumer<StringAppender> D2S_NEGATIVE_ZERO = new DoubleToString(true, new char[] { '0' });
+-
+-    private static final Supplier<Double> S2D_POSITIVE_INFINITY = () -> (Double.POSITIVE_INFINITY);
+-    private static final Supplier<Double> S2D_NEGATIVE_INFINITY = () -> (Double.NEGATIVE_INFINITY);
+-    private static final Supplier<Double> S2D_NOT_A_NUMBER = () -> (Double.NaN);
+-
+-    /**
+-     * The core logic for converting double-to-string. Thread-local instances keep GC churn and
+-     * synchronization concerns to a minimum.
+-     */
+-    static class DoubleToString implements Consumer<StringAppender>
+-    {
+-        boolean isNegative;
+-        int decExponent;
+-        int firstDigitIndex;
+-        int nDigits;
+-        final char[] digits;
+-
+-        /**
+-         * Default constructor; used for non-zero values,
+-         * <code>DoubleToString</code> may be thread-local and reused
+-         */
+-        DoubleToString()
+-        {
+-            this.digits = new char[20];
+-        }
+-
+-        /**
+-         * Creates a specialized value (positive and negative zeros).
+-         */
+-        DoubleToString(boolean isNegative, char[] digits)
+-        {
+-            this.isNegative = isNegative;
+-            this.decExponent = 0;
+-            this.digits = digits;
+-            this.firstDigitIndex = 0;
+-            this.nDigits = digits.length;
+-        }
+-
+-        @Override
+-        public void accept(StringAppender stringAppender)
+-        {
+-            populateAppender(stringAppender);
+-        }
+-
+-        /**
+-         * This is the easy subcase -- all the significant bits, after scaling, are held in lvalue. negSign
+-         * and decExponent tell us what processing and scaling has already been done. Exceptional cases have
+-         * already been stripped out. In particular: lvalue is a finite number (not Inf, nor NaN) lvalue > 0L
+-         * (not zero, nor negative).
+-         * <p>
+-         * The only reason that we develop the digits here, rather than calling on Long.toString() is that we
+-         * can do it a little faster, and besides want to treat trailing 0s specially. If Long.toString
+-         * changes, we should re-evaluate this strategy!
+-         */
+-        private void developLongDigits(long lValue, int insignificantDigits)
+-        {
+-            int decExponent = 0;
+-            if (insignificantDigits != 0)
+-            {
+-                // Discard non-significant low-order bits, while rounding,
+-                // up to insignificant value.
+-                final long pow10 =
+-                        LONG_5_POW[insignificantDigits] << insignificantDigits; // 10^i == 5^i * 2^i;
+-                final long residue = lValue % pow10;
+-                lValue /= pow10;
+-                decExponent += insignificantDigits;
+-                if (residue >= (pow10 >> 1))
+-                {
+-                    // round up based on the low-order bits we're discarding
+-                    lValue++;
+-                }
+-            }
+-
+-            int lsDigitPos = digits.length - 1;
+-            long q;
+-            int r;
+-
+-            //
+-            // R.S. NOTE:
+-            // I'm using the same algorithm for long-to-string (see LongValueCodec.writeToCharArray)
+-            // This long-to-string logic comes from the java.lang.Long class and seems to
+-            // be much faster than the equivalent logic in Double/FloatingDecimal...
+-            // different authors on the original java code maybe?
+-
+-            // NOTE: this logic works on the least significant digit to most significant
+-            //       hence we start at the END of the array and work "backwards" (--lsDigitPos)
+-
+-            // Get 2 digits/iteration using longs until quotient fits into a short
+-            while (lValue > 65535)
+-            {
+-                q = lValue / 100;
+-                r = (int) (lValue - (q * 100));
+-                lValue = q;
+-                digits[--lsDigitPos] = (char) (48 + (r % 10));
+-                digits[--lsDigitPos] = (char) (48 + (r / 10));
+-                decExponent+=2;
+-            }
+-
+-            int q2;
+-            int i2 = (int)lValue;
+-            // Fall thru to fast mode for smaller numbers
+-            do
+-            {
+-                q2 = (i2 * 52429) >>> 19;
+-                r = i2 - (q2 * 10);
+-                digits[--lsDigitPos] = (char) (48 + r);
+-                decExponent++;
+-                i2 = q2;
+-            }
+-            while (i2 != 0);
+-
+-            this.decExponent = decExponent;
+-            this.firstDigitIndex = lsDigitPos;
+-            this.nDigits = this.digits.length - lsDigitPos - 1;
+-        }
+-
+-        private void hardCase(StringAppender stringAppender, long fractBits, int binExp, int nSignificantBits,
+-                int nTinyBits, int tailZeros, int nFractBits)
+-        {
+-            //
+-            // R.S. NOTE:
+-            // This is taken from the FloatingDecimal.BinaryToASCIIBuffer.dtoa() method, circa line 497
+-            //
+-
+-            //
+-            // This is the hard case. We are going to compute large positive
+-            // integers B and S and integer decExp, s.t.
+-            //      d = ( B / S )// 10^decExp
+-            //      1 <= B / S < 10
+-            // Obvious choices are:
+-            //      decExp = floor( log10(d) )
+-            //      B      = d// 2^nTinyBits// 10^max( 0, -decExp )
+-            //      S      = 10^max( 0, decExp)// 2^nTinyBits
+-            // (noting that nTinyBits has already been forced to non-negative)
+-            // I am also going to compute a large positive integer
+-            //      M      = (1/2^nSignificantBits)// 2^nTinyBits// 10^max( 0, -decExp )
+-            // i.e. M is (1/2) of the ULP of d, scaled like B.
+-            // When we iterate through dividing B/S and picking off the
+-            // quotient bits, we will know when to stop when the remainder
+-            // is <= M.
+-            //
+-            // We keep track of powers of 2 and powers of 5.
+-            //
+-            int decExp = estimateDecExp(fractBits, binExp);
+-            int B2, B5; // powers of 2 and powers of 5, respectively, in B
+-            int S2, S5; // powers of 2 and powers of 5, respectively, in S
+-            int M2, M5; // powers of 2 and powers of 5, respectively, in M
+-
+-            B5 = Math.max(0, -decExp);
+-            B2 = B5 + nTinyBits + binExp;
+-
+-            S5 = Math.max(0, decExp);
+-            S2 = S5 + nTinyBits;
+-
+-            M5 = B5;
+-            M2 = B2 - nSignificantBits;
+-
+-            //
+-            // the long integer fractBits contains the (nFractBits) interesting
+-            // bits from the mantissa of d ( hidden 1 added if necessary) followed
+-            // by (EXP_SHIFT+1-nFractBits) zeros. In the interest of compactness,
+-            // I will shift out those zeros before turning fractBits into a
+-            // FDBigInteger. The resulting whole number will be
+-            //      d * 2^(nFractBits-1-binExp).
+-            //
+-            fractBits >>>= tailZeros;
+-            B2 -= nFractBits - 1;
+-            final int common2factor = Math.min(B2, S2);
+-            B2 -= common2factor;
+-            S2 -= common2factor;
+-            M2 -= common2factor;
+-
+-            //
+-            // HACK!! For exact powers of two, the next smallest number
+-            // is only half as far away as we think (because the meaning of
+-            // ULP changes at power-of-two bounds) for this reason, we
+-            // hack M2. Hope this works.
+-            //
+-            if (nFractBits == 1)
+-            {
+-                M2 -= 1;
+-            }
+-
+-            if (M2 < 0)
+-            {
+-                // oops.
+-                // since we cannot scale M down far enough,
+-                // we must scale the other values up.
+-                B2 -= M2;
+-                S2 -= M2;
+-                M2 = 0;
+-            }
+-            //
+-            // Construct, Scale, iterate.
+-            // Some day, we'll write a stopping test that takes
+-            // account of the asymmetry of the spacing of floating-point
+-            // numbers below perfect powers of 2
+-            // 26 Sept 96 is not that day.
+-            // So we use a symmetric test.
+-            //
+-            int ndigit = 0;
+-            boolean low, high;
+-            long lowDigitDifference;
+-            int q;
+-
+-            //
+-            // Detect the special cases where all the numbers we are about
+-            // to compute will fit in int or long integers.
+-            // In these cases, we will avoid doing FDBigInteger arithmetic.
+-            // We use the same algorithms, except that we "normalize"
+-            // our FDBigIntegers before iterating. This is to make division easier,
+-            // as it makes our fist guess (quotient of high-order words)
+-            // more accurate!
+-            //
+-            // Some day, we'll write a stopping test that takes
+-            // account of the asymmetry of the spacing of floating-point
+-            // numbers below perfect powers of 2
+-            // 26 Sept 96 is not that day.
+-            // So we use a symmetric test.
+-            //
+-            // binary digits needed to represent B, approx.
+-            final int Bbits = nFractBits + B2 + ((B5 < N_5_BITS.length) ? N_5_BITS[B5] : (B5 * 3));
+-
+-            // binary digits needed to represent 10*S, approx.
+-            final int tenSbits =
+-                    S2 + 1 + (((S5 + 1) < N_5_BITS.length) ? N_5_BITS[(S5 + 1)] : ((S5 + 1) * 3));
+-            if (Bbits < 64 && tenSbits < 64)
+-            {
+-                // R.S. its 64 bits (aka a double) - original also handled 32bits (float) but this is removed
+-
+-                // still good! they're all longs!
+-                long b = (fractBits * LONG_5_POW[B5]) << B2;
+-                final long s = LONG_5_POW[S5] << S2;
+-                long m = LONG_5_POW[M5] << M2;
+-                final long tens = s * 10L;
+-                //
+-                // Unroll the first iteration. If our decExp estimate
+-                // was too high, our first quotient will be zero. In this
+-                // case, we discard it and decrement decExp.
+-                //
+-                q = (int) (b / s);
+-                b = 10L * (b % s);
+-                m *= 10L;
+-                low = (b < m);
+-                high = (b + m > tens);
+-                // todo ignore asserts?
+-                //assert q < 10 : q; // excessively large digit
+-                if ((q == 0) && !high)
+-                {
+-                    // oops. Usually ignore leading zero.
+-                    decExp--;
+-                }
+-                else
+-                {
+-                    digits[ndigit++] = (char) (48 + q);
+-                }
+-                //
+-                // HACK! Java spec sez that we always have at least
+-                // one digit after the . in either F- or E-form output.
+-                // Thus we will need more than one digit if we're using
+-                // E-form
+-                //
+-                if (decExp < -3 || decExp >= 8)
+-                {
+-                    high = low = false;
+-                }
+-                boolean mZeroOrLess;
+-                while (!low && !high)
+-                {
+-                    q = (int) (b / s);
+-                    b = 10 * (b % s);
+-                    m *= 10;
+-                    // todo ignore asserts?
+-                    //assert q < 10 : q;  // excessively large digit
+-                    mZeroOrLess = m <= 0L;
+-                    low = mZeroOrLess | (b < m);
+-                    high = mZeroOrLess | (b + m > tens);
+-
+-                    digits[ndigit++] = (char) (48 + q);
+-                }
+-                lowDigitDifference = (b << 1) - tens;
+-            }
+-            else
+-            {
+-                //
+-                // We really must do FDBigInteger arithmetic.
+-                // First, construct our FDBigInteger initial values.
+-                //
+-                FDBigInteger Sval = FDBigInteger.valueOfPow52(S5, S2);
+-                final int shiftBias = Sval.getNormalizationBias();
+-                Sval = Sval.leftShift(shiftBias); // normalize so that division works better
+-
+-                FDBigInteger Bval = FDBigInteger.valueOfMulPow52(fractBits, B5, B2 + shiftBias);
+-                FDBigInteger Mval = FDBigInteger.valueOfPow52(M5 + 1, M2 + shiftBias + 1);
+-
+-                FDBigInteger tenSval =
+-                        FDBigInteger.valueOfPow52(S5 + 1, S2 + shiftBias + 1); //Sval.mult( 10 );
+-                //
+-                // Unroll the first iteration. If our decExp estimate
+-                // was too high, our first quotient will be zero. In this
+-                // case, we discard it and decrement decExp.
+-                //
+-                q = Bval.quoRemIteration(Sval);
+-                low = (Bval.cmp(Mval) < 0);
+-                high = tenSval.addAndCmp(Bval, Mval) <= 0;
+-
+-                // todo ignore asserts?
+-                //assert q < 10 : q; // excessively large digit
+-                if ((q == 0) && !high)
+-                {
+-                    // oops. Usually ignore leading zero.
+-                    decExp--;
+-                }
+-                else
+-                {
+-                    digits[ndigit++] = (char) (48 + q);
+-                }
+-                //
+-                // HACK! Java spec sez that we always have at least
+-                // one digit after the . in either F- or E-form output.
+-                // Thus we will need more than one digit if we're using
+-                // E-form
+-                //
+-                if (decExp < -3 || decExp >= 8)
+-                {
+-                    high = low = false;
+-                }
+-                while (!low && !high)
+-                {
+-                    q = Bval.quoRemIteration(Sval);
+-                    // todo ignore asserts?
+-                    //assert q < 10 : q;  // excessively large digit
+-                    Mval = Mval.multBy10(); //Mval = Mval.mult( 10 );
+-                    low = (Bval.cmp(Mval) < 0);
+-                    high = tenSval.addAndCmp(Bval, Mval) <= 0;
+-                    digits[ndigit++] = (char) (48 + q);
+-                }
+-                if (high && low)
+-                {
+-                    Bval = Bval.leftShift(1);
+-                    lowDigitDifference = Bval.cmp(tenSval);
+-                }
+-                else
+-                {
+-                    lowDigitDifference = 0L; // this here only for flow analysis!
+-                }
+-            }
+-            this.decExponent = decExp + 1;
+-            this.firstDigitIndex = 0;
+-            this.nDigits = ndigit;
+-            //
+-            // Last digit gets rounded based on stopping condition.
+-            //
+-            if (high)
+-            {
+-                if (low)
+-                {
+-                    if (lowDigitDifference == 0L)
+-                    {
+-                        // it's a tie!
+-                        // choose based on which digits we like.
+-                        if ((digits[firstDigitIndex + nDigits - 1] & 1) != 0)
+-                        {
+-                            roundup();
+-                        }
+-                    }
+-                    else if (lowDigitDifference > 0)
+-                    {
+-                        roundup();
+-                    }
+-                }
+-                else
+-                {
+-                    roundup();
+-                }
+-            }
+-            populateAppender(stringAppender);
+-        }
+-
+-        // add one to the least significant digit.
+-        // in the unlikely event there is a carry out, deal with it.
+-        // assert that this will only happen where there
+-        // is only one digit, e.g. (float)1e-44 seems to do it.
+-        //
+-        void roundup()
+-        {
+-            int i = (firstDigitIndex + nDigits - 1);
+-            int q = digits[i];
+-            if (q == '9')
+-            {
+-                while (q == '9' && i > firstDigitIndex)
+-                {
+-                    digits[i] = '0';
+-                    q = digits[--i];
+-                }
+-                if (q == '9')
+-                {
+-                    // carryout! High-order 1, rest 0s, larger exp.
+-                    decExponent += 1;
+-                    digits[firstDigitIndex] = '1';
+-                    return;
+-                }
+-                // else fall through.
+-            }
+-            digits[i] = (char) (q + 1);
+-        }
+-
+-        /**
+-         * Estimate decimal exponent. (If it is small-ish, we could double-check.)
+-         * <p>
+-         * First, scale the mantissa bits such that 1 <= d2 < 2. We are then going to estimate log10(d2) ~=~
+-         * (d2-1.5)/1.5 + log(1.5) and so we can estimate log10(d) ~=~ log10(d2) + binExp * log10(2) take the
+-         * floor and call it decExp.
+-         */
+-        private static int estimateDecExp(long fractBits, int binExp)
+-        {
+-            final double d2 = Double.longBitsToDouble(EXP_ONE | (fractBits & DoubleConsts.SIGNIF_BIT_MASK));
+-            final double d = (d2 - 1.5D) * 0.289529654D + 0.176091259 + (double) binExp * 0.301029995663981;
+-            final long dBits = Double.doubleToRawLongBits(d);  //can't be NaN here so use raw
+-            final int exponent =
+-                    (int) ((dBits & DoubleConsts.EXP_BIT_MASK) >> EXP_SHIFT) - DoubleConsts.EXP_BIAS;
+-            final boolean isNegative = (dBits & DoubleConsts.SIGN_BIT_MASK) != 0; // discover sign
+-            if (exponent >= 0 && exponent < 52)
+-            {
+-                // hot path
+-                final long mask = DoubleConsts.SIGNIF_BIT_MASK >> exponent;
+-                final int r = (int) (((dBits & DoubleConsts.SIGNIF_BIT_MASK) | FRACT_HOB) >> (EXP_SHIFT
+-                        - exponent));
+-                return isNegative ? (((mask & dBits) == 0L) ? -r : -r - 1) : r;
+-            }
+-            else if (exponent < 0)
+-            {
+-                return (((dBits & ~DoubleConsts.SIGN_BIT_MASK) == 0) ? 0 : ((isNegative) ? -1 : 0));
+-            }
+-            else
+-            {
+-                //if (exponent >= 52)
+-                return (int) d;
+-            }
+-        }
+-
+-        /**
+-         * If insignificant==(1L << ixd) i = insignificantDigitsNumber[idx] is the same as: int i; for ( i =
+-         * 0; insignificant >= 10L; i++ ) insignificant /= 10L;
+-         */
+-        private static final int[] insignificantDigitsNumber =
+-                { 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9,
+-                        9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15,
+-                        15, 16, 16, 16, 17, 17, 17, 18, 18, 18, 19 };
+-
+-        // approximately ceil( log2( long5pow[i] ) )
+-        private static final int[] N_5_BITS =
+-                { 0, 3, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 31, 33, 35, 38, 40, 42, 45, 47, 49, 52, 54,
+-                        56, 59, 61, };
+-
+-        private void populateAppender(StringAppender stringAppender)
+-        {
+-            final int start = stringAppender.getLength();
+-            final char[] buffer = stringAppender.reserveAndGet(26);
+-            int i = start;
+-            if (isNegative)
+-            {
+-                buffer[i++] = '-';
+-            }
+-            if (decExponent > 0 && decExponent < 8)
+-            {
+-                // print digits.digits.
+-                int charLength = Math.min(nDigits, decExponent);
+-                System.arraycopy(digits, firstDigitIndex, buffer, i, charLength);
+-                i += charLength;
+-                if (charLength < decExponent)
+-                {
+-                    charLength = decExponent - charLength;
+-                    Arrays.fill(buffer, i, i + charLength, '0');
+-                    i += charLength;
+-                    buffer[i++] = '.';
+-                    buffer[i++] = '0';
+-                }
+-                else
+-                {
+-                    buffer[i++] = '.';
+-                    if (charLength < nDigits)
+-                    {
+-                        int t = nDigits - charLength;
+-                        System.arraycopy(digits, firstDigitIndex + charLength, buffer, i, t);
+-                        i += t;
+-                    }
+-                    else
+-                    {
+-                        buffer[i++] = '0';
+-                    }
+-                }
+-            }
+-            else if (decExponent <= 0 && decExponent > -3)
+-            {
+-                buffer[i++] = '0';
+-                buffer[i++] = '.';
+-                if (decExponent != 0)
+-                {
+-                    Arrays.fill(buffer, i, i - decExponent, '0');
+-                    i -= decExponent;
+-                }
+-                System.arraycopy(digits, firstDigitIndex, buffer, i, nDigits);
+-                i += nDigits;
+-            }
+-            else
+-            {
+-                buffer[i++] = digits[firstDigitIndex];
+-                buffer[i++] = '.';
+-                if (nDigits > 1)
+-                {
+-                    System.arraycopy(digits, firstDigitIndex + 1, buffer, i, nDigits - 1);
+-                    i += nDigits - 1;
+-                }
+-                else
+-                {
+-                    buffer[i++] = '0';
+-                }
+-                buffer[i++] = 'E';
+-                int e;
+-                if (decExponent <= 0)
+-                {
+-                    buffer[i++] = '-';
+-                    e = -decExponent + 1;
+-                }
+-                else
+-                {
+-                    e = decExponent - 1;
+-                }
+-                // decExponent has 1, 2, or 3, digits
+-                if (e <= 9)
+-                {
+-                    buffer[i++] = (char) (48 + e);
+-                }
+-                else if (e <= 99)
+-                {
+-                    buffer[i++] = (char) (48 + (e / 10));
+-                    buffer[i++] = (char) (48 + (e % 10));
+-                }
+-                else
+-                {
+-                    buffer[i++] = (char) (48 + (e / 100));
+-                    e %= 100;
+-                    buffer[i++] = (char) (48 + (e / 10));
+-                    buffer[i++] = (char) (48 + (e % 10));
+-                }
+-            }
+-            stringAppender.setLength(i);
+-        }
+-
+-    }
+-
+-    private static final ThreadLocal<DoubleToString> DOUBLE_TO_STRING_THREAD_LOCAL =
+-            ThreadLocal.withInitial(DoubleToString::new);
+-
+-    /**
+-     * Appends a double precision floating point value to an <code>StringAppender</code>.
+-     *
+-     * @param d   The double precision value.
+-     * @param stringAppender The <code>StringAppender</code> with the value appended.
+-     */
+-    static void writeToCharArray(double d, StringAppender stringAppender)
+-    {
+-        final long dBits = Double.doubleToRawLongBits(d);
+-        final boolean isNegative = (dBits & DoubleConsts.SIGN_BIT_MASK) != 0; // discover sign
+-        long fractBits = dBits & DoubleConsts.SIGNIF_BIT_MASK;
+-        int binExp = (int) ((dBits & DoubleConsts.EXP_BIT_MASK) >> EXP_SHIFT);
+-        // Discover obvious special cases of NaN and Infinity.
+-        if (binExp == (int) (DoubleConsts.EXP_BIT_MASK >> EXP_SHIFT))
+-        {
+-            if (fractBits == 0L)
+-            {
+-                (isNegative ? D2S_NEGATIVE_INFINITY : D2S_POSITIVE_INFINITY).accept(stringAppender);
+-            }
+-            else
+-            {
+-                D2S_NOT_A_NUMBER.accept(stringAppender);
+-            }
+-            return;
+-        }
+-        // Finish unpacking
+-        // Normalize denormalized numbers.
+-        // Insert assumed high-order bit for normalized numbers.
+-        // Subtract exponent bias.
+-        int nSignificantBits;
+-        if (binExp == 0)
+-        {
+-            if (fractBits == 0L)
+-            {
+-                // not a denorm, just a 0!
+-                (isNegative ? D2S_NEGATIVE_ZERO : D2S_POSITIVE_ZERO).accept(stringAppender);
+-                return;
+-            }
+-            final int leadingZeros = Long.numberOfLeadingZeros(fractBits);
+-            final int shift = leadingZeros - (63 - EXP_SHIFT);
+-            fractBits <<= shift;
+-            binExp = 1 - shift;
+-            nSignificantBits = 64 - leadingZeros; // recall binExp is  - shift count.
+-        }
+-        else
+-        {
+-            fractBits |= FRACT_HOB;
+-            nSignificantBits = EXP_SHIFT + 1;
+-        }
+-        binExp -= DoubleConsts.EXP_BIAS;
+-
+-        // call the routine that actually does all the hard work.
+-        final DoubleToString doubleToString = DOUBLE_TO_STRING_THREAD_LOCAL.get();
+-        doubleToString.isNegative = isNegative;
+-
+-        // todo ignore asserts?
+-        //assert fractBits > 0; // fractBits here can't be zero or negative
+-        //assert (fractBits & FRACT_HOB) != 0; // Hi-order bit should be set
+-
+-        // Examine number. Determine if it is an easy case,
+-        // which we can do pretty trivially using float/long conversion,
+-        // or whether we must do real work.
+-        final int tailZeros = Long.numberOfTrailingZeros(fractBits);
+-
+-        // number of significant bits of fractBits;
+-        final int nFractBits = EXP_SHIFT + 1 - tailZeros;
+-
+-        // reset flags to default values as dtoa() does not always set these
+-        // flags and a prior call to dtoa() might have set them to incorrect
+-        // values with respect to the current state.
+-
+-        // number of significant bits to the right of the point.
+-        final int nTinyBits = Math.max(0, nFractBits - binExp - 1);
+-        if (binExp <= MAX_SMALL_BIN_EXP && binExp >= MIN_SMALL_BIN_EXP
+-                // Look more closely at the number to decide if,
+-                // with scaling by 10^nTinyBits, the result will fit in
+-                // a long.
+-                && (nTinyBits < LONG_5_POW.length) && ((nFractBits + DoubleToString.N_5_BITS[nTinyBits]) < 64)
+-                //
+-                // We can do this:
+-                // take the fraction bits, which are normalized.
+-                // (a) nTinyBits == 0: Shift left or right appropriately
+-                //     to align the binary point at the extreme right, i.e.
+-                //     where a long int point is expected to be. The integer
+-                //     result is easily converted to a string.
+-                // (b) nTinyBits > 0: Shift right by EXP_SHIFT-nFractBits,
+-                //     which effectively converts to long and scales by
+-                //     2^nTinyBits. Then multiply by 5^nTinyBits to
+-                //     complete the scaling. We know this won't overflow
+-                //     because we just counted the number of bits necessary
+-                //     in the result. The integer you get from this can
+-                //     then be converted to a string pretty easily.
+-                //
+-                && nTinyBits == 0)
+-        {
+-            final int index = binExp - nSignificantBits - 1;
+-            doubleToString.developLongDigits(binExp >= EXP_SHIFT ? (fractBits << (binExp - EXP_SHIFT)) :
+-                            (fractBits >>> (EXP_SHIFT - binExp)),
+-                    binExp > nSignificantBits && index > 1 ? DoubleToString.insignificantDigitsNumber[index] :
+-                            0);
+-            doubleToString.populateAppender(stringAppender);
+-            return;
+-        }
+-        doubleToString.hardCase(stringAppender, fractBits, binExp, nSignificantBits, nTinyBits, tailZeros,
+-                nFractBits);
+-    }
+-
+-    /**
+-     * Converts a <code>char[]</code> to a double precision floating point value.
+-     *
+-     * @param in    The <code>char[]</code> to convert, starts at index 0.
+-     * @param start the start of the double number in the char[]
+-     * @param len   the length of the chars in the array
+-     * @return The double precision value.
+-     * @throws NumberFormatException If the <code>char[]</code> does not represent a properly formatted double
+-     *                          x     precision value.
+-     */
+-    static double fromCharArray(char[] in, int start, int len) throws NumberFormatException
+-    {
+-        boolean isNegative = false;
+-        boolean signSeen = false;
+-        int decExp;
+-        char c;
+-
+-        parseNumber:
+-        try
+-        {
+-            if (len == 0)
+-            {
+-                throw new NumberFormatException("empty String");
+-            }
+-            int i = start;
+-            c = in[i];
+-            if (c == '-')
+-            {
+-                isNegative = true;
+-                signSeen = true;
+-                c = in[++i];
+-            }
+-            else if (c == '+')
+-            {
+-                signSeen = true;
+-                c = in[++i];
+-            }
+-            if (c == 'N')
+-            {
+-                // Check for NaN
+-                if ((len) == NAN_LENGTH && in[i + 1] == 'a' && in[i + 2] == 'N')
+-                {
+-                    return S2D_NOT_A_NUMBER.get();
+-                }
+-                // something went wrong, throw exception
+-                break parseNumber;
+-            }
+-            else if (c == 'I')
+-            {
+-                if ((isNegative ? len == NEG_INFINITY_LENGTH : len == INFINITY_LENGTH) && in[i + 1] == 'n'
+-                        && in[i + 2] == 'f' && in[i + 3] == 'i' && in[i + 4] == 'n' && in[i + 5] == 'i'
+-                        && in[i + 6] == 't' && in[i + 7] == 'y')
+-                {
+-                    return isNegative ? S2D_NEGATIVE_INFINITY.get() : S2D_POSITIVE_INFINITY.get();
+-                }
+-                // something went wrong, throw exception
+-                break parseNumber;
+-            }
+-            // look for and process decimal floating-point string
+-
+-            int nDigits = 0;
+-            boolean decSeen = false;
+-            int decPt = 0;
+-            int nLeadZero = 0;
+-
+-            final int end = start + len;
+-            // loop to find leading zeros and decimal
+-            do
+-            {
+-                c = in[i];
+-
+-                if (c == '0')
+-                {
+-                    nLeadZero++;
+-                }
+-                else if (c == '.')
+-                {
+-                    if (decSeen)
+-                    {
+-                        // already saw one ., this is the 2nd.
+-                        throw new NumberFormatException("multiple points");
+-                    }
+-                    decPt = i;
+-                    if (signSeen)
+-                    {
+-                        decPt -= 1;
+-                    }
+-                    decSeen = true;
+-                }
+-                else
+-                {
+-                    break;
+-                }
+-            }
+-            while(++i < end);
+-
+-            final int _start = i;
+-            long lValue = 0;
+-            if (i < end)
+-            {
+-                do
+-                {
+-                    c = in[i];
+-
+-                    // old:  if (c >= '0' && c <= '9')
+-                    // Uses one subtraction, one bitwise AND, and one comparison
+-                    // Avoids two comparisons and two branches
+-                    if (((c - 48) & 0xFFFF) <= 9)
+-                    {
+-                        lValue = lValue * 10L + (c - 48);
+-                        nDigits++;
+-                    }
+-                    else if (c == '.')
+-                    {
+-                        if (decSeen)
+-                        {
+-                            // already saw one ., this is the 2nd.
+-                            throw new NumberFormatException("multiple points");
+-                        }
+-                        decPt = i;
+-                        if (signSeen)
+-                        {
+-                            decPt -= 1;
+-                        }
+-                        decSeen = true;
+-                    }
+-                    else
+-                    {
+-                        break;
+-                    }
+-                }
+-                while ((++i < end) && nDigits < MAX_DECIMAL_DIGITS + 1);
+-
+-                // process overspill
+-                while (i < end)
+-                {
+-                    c = in[i];
+-                    if (((c - 48) & 0xFFFF) <= 9)
+-                    {
+-                        nDigits++;
+-                    }
+-                    else if (c == '.')
+-                    {
+-                        if (decSeen)
+-                        {
+-                            // already saw one ., this is the 2nd.
+-                            throw new NumberFormatException("multiple points");
+-                        }
+-                        decPt = i;
+-                        if (signSeen)
+-                        {
+-                            decPt -= 1;
+-                        }
+-                        decSeen = true;
+-                    }
+-                    else
+-                    {
+-                        break;
+-                    }
+-                    i++;
+-                }
+-            }
+-
+-            // adjust the decPt relative to the start and len
+-            decPt -= start;
+-
+-            //
+-            // At this point, we've scanned all the digits and decimal
+-            // point we're going to see. Trim off leading and trailing
+-            // zeros, which will just confuse us later, and adjust
+-            // our initial decimal exponent accordingly.
+-            // To review:
+-            // we have seen i total characters.
+-            // nLeadZero of them were zeros before any other digits.
+-            // nTrailZero of them were zeros after any other digits.
+-            // if ( decSeen ), then a . was seen after decPt characters
+-            // ( including leading zeros which have been discarded )
+-            // nDigits characters were neither lead nor trailing
+-            // zeros, nor point
+-            //
+-            //
+-            // special hack: if we saw no non-zero digits, then the
+-            // answer is zero!
+-            // Unfortunately, we feel honor-bound to keep parsing!
+-            //
+-            if (nDigits == 0 && nLeadZero == 0)
+-            {
+-                // we saw NO DIGITS AT ALL,
+-                // not even a crummy 0!
+-                // this is not allowed.
+-                break parseNumber; // go throw exception
+-            }
+-            //
+-            // Our initial exponent is decPt, adjusted by the number of
+-            // discarded zeros. Or, if there was no decPt,
+-            // then its just nDigits adjusted by discarded trailing zeros.
+-            //
+-            if (decSeen)
+-            {
+-                decExp = decPt - nLeadZero;
+-            }
+-            else
+-            {
+-                decExp = nDigits;
+-            }
+-
+-            //
+-            // Look for 'e' or 'E' and an optionally signed integer.
+-            //
+-            if ((i < end - 1) && (((c = in[i]) == 'e') || (c == 'E')))
+-            {
+-                int expSign = 1;
+-                int expVal = 0;
+-                boolean expOverflow = false;
+-                switch(in[++i])
+-                {
+-                    case '-':
+-                        expSign = -1;
+-                        //FALLTHROUGH
+-                    case '+':
+-                        i++;
+-                }
+-                int expAt = i;
+-                while (i < end)
+-                {
+-                    if (expVal >= REALLY_BIG)
+-                    {
+-                        // the next character will cause integer
+-                        // overflow.
+-                        expOverflow = true;
+-                    }
+-                    c = in[i++];
+-                    if (((c - 48) & 0xFFFF) <= 9)
+-                    {
+-                        expVal = expVal * 10 + (c - 48);
+-                    }
+-                    else
+-                    {
+-                        i--;           // back up.
+-                        break; // stop parsing exponent.
+-                    }
+-                }
+-                final int expLimit = BIG_DECIMAL_EXPONENT + nDigits;
+-                if (expOverflow || (expVal > expLimit))
+-                {
+-                    //
+-                    // The intent here is to end up with
+-                    // infinity or zero, as appropriate.
+-                    // The reason for yielding such a small decExponent,
+-                    // rather than something intuitive such as
+-                    // expSign*Integer.MAX_VALUE, is that this value
+-                    // is subject to further manipulation in
+-                    // doubleValue(), and I don't want
+-                    // it to be able to cause overflow there!
+-                    // (The only way we can get into trouble here is for
+-                    // really outrageous nDigits+nTrailZero, such as 2 billion. )
+-                    //
+-                    decExp = expSign * expLimit;
+-                }
+-                else
+-                {
+-                    // this should not overflow, since we tested
+-                    // for expVal > (MAX+N), where N >= abs(decExp)
+-                    decExp = decExp + expSign * expVal;
+-                }
+-
+-                // if we saw something not a digit ( or end of string )
+-                // after the [Ee][+-], without seeing any digits at all
+-                // this is certainly an error. If we saw some digits,
+-                // but then some trailing garbage, that might be ok.
+-                // so we just fall through in that case.
+-                // HUMBUG
+-                if (i == expAt)
+-                {
+-                    break parseNumber; // certainly bad
+-                }
+-            }
+-            //
+-            // We parsed everything we could.
+-            // If there are leftovers, then this is not good input!
+-            //
+-            if (i < end && ((i != end - 1) || (in[i] != 'f' && in[i] != 'F' && in[i] != 'd' && in[i] != 'D')))
+-            {
+-                break parseNumber; // go throw exception
+-            }
+-
+-            // R.S.
+-            // ======================================
+-            // now do the work to convert to double....everything above was preparation :)
+-            // ======================================
+-            return computeDouble(in, _start, nDigits, decExp, lValue, isNegative, decSeen && nLeadZero == 0);
+-        }
+-        catch (Exception ignored)
+-        {
+-        }
+-        throw new NumberFormatException("For input string: \"" + new String(in, start, len) + "\"");
+-    }
+-
+-    private static double computeDouble(char[] in, int _start,
+-            int nDigits, int decExp, long lValue, boolean isNegative, boolean hasDecimalPoint)
+-    {
+-        final int kDigits = Math.min(nDigits, MAX_DECIMAL_DIGITS + 1);
+-        double dValue = (double) lValue;
+-        int exp = decExp - kDigits;
+-
+-        //
+-        // R.S. NOTE:
+-        // The remainder of this method is copied from FloatingDecimal.doubleValue method circa line 1074.
+-        // This logic is very IEEE indepth so not logic changes have been made.
+-        // Only some code cleanup has been done.
+-        //
+-
+-        //
+-        // lValue now contains a long integer with the value of
+-        // the first kDigits digits of the number.
+-        // dValue contains the (double) of the same.
+-        //
+-
+-        if (nDigits <= MAX_DECIMAL_DIGITS)
+-        {
+-            //
+-            // possibly an easy case.
+-            // We know that the digits can be represented
+-            // exactly. And if the exponent isn't too outrageous,
+-            // the whole thing can be done with one operation,
+-            // thus one rounding error.
+-            // Note that all our constructors trim all leading and
+-            // trailing zeros, so simple values (including zero)
+-            // will always end up here
+-            //
+-            if (exp == 0 || dValue == 0.0)
+-            {
+-                return isNegative ? -dValue : dValue; // small floating integer
+-            }
+-            else if (exp >= 0)
+-            {
+-                if (exp <= MAX_SMALL_TEN)
+-                {
+-                    //
+-                    // Can get the answer with one operation,
+-                    // thus one roundoff.
+-                    //
+-                    final double rValue = dValue * SMALL_10_POW[exp];
+-                    return isNegative ? -rValue : rValue;
+-                }
+-                else
+-                {
+-                    final int slop = MAX_DECIMAL_DIGITS - kDigits;
+-                    if (exp <= MAX_SMALL_TEN + slop)
+-                    {
+-                        //
+-                        // We can multiply dValue by 10^(slop)
+-                        // and it is still "small" and exact.
+-                        // Then we can multiply by 10^(exp-slop)
+-                        // with one rounding.
+-                        //
+-                        dValue *= SMALL_10_POW[slop];
+-                        final double rValue = dValue * SMALL_10_POW[exp - slop];
+-                        return isNegative ? -rValue : rValue;
+-                    }
+-                    //
+-                    // Else we have a hard case with a positive exp.
+-                    //
+-                }
+-            }
+-            else if (exp >= -MAX_SMALL_TEN)
+-            {
+-                //
+-                // Can get the answer in one division.
+-                //
+-                final double rValue = dValue / SMALL_10_POW[-exp];
+-                return isNegative ? -rValue : rValue;
+-            }
+-            //
+-            // Else we have a hard case with a negative exp.
+-            //
+-        }
+-
+-        //
+-        // Harder cases:
+-        // The sum of digits plus exponent is greater than
+-        // what we think we can do with one error.
+-        //
+-        // Start by approximating the right answer by,
+-        // naively, scaling by powers of 10.
+-        //
+-        if (exp > 0)
+-        {
+-            if (decExp > MAX_DECIMAL_EXPONENT + 1)
+-            {
+-                //
+-                // Lets face it. This is going to be
+-                // Infinity. Cut to the chase.
+-                //
+-                return isNegative ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+-            }
+-            if ((exp & 15) != 0)
+-            {
+-                dValue *= SMALL_10_POW[exp & 15];
+-            }
+-            if ((exp >>= 4) != 0)
+-            {
+-                int j;
+-                for (j = 0; exp > 1; j++, exp >>= 1)
+-                {
+-                    if ((exp & 1) != 0)
+-                    {
+-                        dValue *= BIG_10_POW[j];
+-                    }
+-                }
+-                //
+-                // The reason for the weird exp > 1 condition
+-                // in the above loop was so that the last multiply
+-                // would get unrolled. We handle it here.
+-                // It could overflow.
+-                //
+-                double t = dValue * BIG_10_POW[j];
+-                if (Double.isInfinite(t))
+-                {
+-                    // todo not executed in unit tests
+-
+-                    //
+-                    // It did overflow.
+-                    // Look more closely at the result.
+-                    // If the exponent is just one too large,
+-                    // then use the maximum finite as our estimate
+-                    // value. Else call the result infinity
+-                    // and punt it.
+-                    // ( I presume this could happen because
+-                    // rounding forces the result here to be
+-                    // an ULP or two larger than
+-                    // Double.MAX_VALUE ).
+-                    //
+-                    t = dValue / 2.0;
+-                    t *= BIG_10_POW[j];
+-                    if (Double.isInfinite(t))
+-                    {
+-                        return isNegative ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+-                    }
+-                    t = Double.MAX_VALUE;
+-                }
+-                dValue = t;
+-            }
+-        }
+-        else if (exp < 0)
+-        {
+-            exp = -exp;
+-            if (decExp < MIN_DECIMAL_EXPONENT - 1)
+-            {
+-                //
+-                // Lets face it. This is going to be
+-                // zero. Cut to the chase.
+-                //
+-                return isNegative ? -0.0 : 0.0;
+-            }
+-            if ((exp & 15) != 0)
+-            {
+-                dValue /= SMALL_10_POW[exp & 15];
+-            }
+-            if ((exp >>= 4) != 0)
+-            {
+-                int j;
+-                for (j = 0; exp > 1; j++, exp >>= 1)
+-                {
+-                    if ((exp & 1) != 0)
+-                    {
+-                        dValue *= TINY_10_POW[j];
+-                    }
+-                }
+-                //
+-                // The reason for the weird exp > 1 condition
+-                // in the above loop was so that the last multiply
+-                // would get unrolled. We handle it here.
+-                // It could underflow.
+-                //
+-                double t = dValue * TINY_10_POW[j];
+-                if (t == 0.0)
+-                {
+-                    //
+-                    // It did underflow.
+-                    // Look more closely at the result.
+-                    // If the exponent is just one too small,
+-                    // then use the minimum finite as our estimate
+-                    // value. Else call the result 0.0
+-                    // and punt it.
+-                    // ( I presume this could happen because
+-                    // rounding forces the result here to be
+-                    // an ULP or two less than
+-                    // Double.MIN_VALUE ).
+-                    //
+-                    t = dValue * 2.0;
+-                    t *= TINY_10_POW[j];
+-                    if (t == 0.0)
+-                    {
+-                        return isNegative ? -0.0 : 0.0;
+-                    }
+-                    // todo not executed in unit tests
+-                    t = Double.MIN_VALUE;
+-                }
+-                dValue = t;
+-            }
+-        }
+-        //
+-        // dValue is now approximately the result.
+-        // The hard part is adjusting it, by comparison
+-        // with FDBigInteger arithmetic.
+-        // Formulate the EXACT big-number result as
+-        // bigD0 * 10^exp
+-        //
+-        if (nDigits > MAX_NDIGITS)
+-        {
+-            nDigits = MAX_NDIGITS + 1;
+-            in[MAX_NDIGITS + _start] = '1';
+-        }
+-        // R.S. need to compensate for any "." in the char[]  with an offset to kDigits and nDigits
+-        final int offset = _start + (hasDecimalPoint ? 1 : 0);
+-        FDBigInteger bigD0 = new FDBigInteger(lValue, in, kDigits + offset, nDigits + offset);
+-        exp = decExp - nDigits;
+-
+-        long ieeeBits = Double.doubleToRawLongBits(dValue); // IEEE-754 bits of double candidate
+-        final int B5 = Math.max(0, -exp); // powers of 5 in bigB, value is not modified inside correctionLoop
+-        final int D5 = Math.max(0, exp); // powers of 5 in bigD, value is not modified inside correctionLoop
+-        bigD0 = bigD0.multByPow52(D5, 0);
+-        bigD0.makeImmutable();   // prevent bigD0 modification inside correctionLoop
+-        FDBigInteger bigD = null;
+-        int prevD2 = 0;
+-
+-        correctionLoop:
+-        while (true)
+-        {
+-            // here ieeeBits can't be NaN, Infinity or zero
+-            int binexp = (int) (ieeeBits >>> EXP_SHIFT);
+-            long bigBbits = ieeeBits & DoubleConsts.SIGNIF_BIT_MASK;
+-            if (binexp > 0)
+-            {
+-                bigBbits |= FRACT_HOB;
+-            }
+-            else
+-            {
+-                // Normalize denormalized numbers.
+-                // todo ignore asserts?
+-                //assert bigBbits != 0L : bigBbits; // doubleToBigInt(0.0)
+-                int leadingZeros = Long.numberOfLeadingZeros(bigBbits);
+-                int shift = leadingZeros - (63 - EXP_SHIFT);
+-                bigBbits <<= shift;
+-                binexp = 1 - shift;
+-            }
+-            binexp -= DoubleConsts.EXP_BIAS;
+-            int lowOrderZeros = Long.numberOfTrailingZeros(bigBbits);
+-            bigBbits >>>= lowOrderZeros;
+-            final int bigIntExp = binexp - EXP_SHIFT + lowOrderZeros;
+-            final int bigIntNBits = EXP_SHIFT + 1 - lowOrderZeros;
+-
+-            //
+-            // Scale bigD, bigB appropriately for
+-            // big-integer operations.
+-            // Naively, we multiply by powers of ten
+-            // and powers of two. What we actually do
+-            // is keep track of the powers of 5 and
+-            // powers of 2 we would use, then factor out
+-            // common divisors before doing the work.
+-            //
+-            int B2 = B5; // powers of 2 in bigB
+-            int D2 = D5; // powers of 2 in bigD
+-            int Ulp2;   // powers of 2 in halfUlp.
+-            if (bigIntExp >= 0)
+-            {
+-                B2 += bigIntExp;
+-            }
+-            else
+-            {
+-                D2 -= bigIntExp;
+-            }
+-            Ulp2 = B2;
+-            // shift bigB and bigD left by a number s. t.
+-            // halfUlp is still an integer.
+-            final int hulpbias;
+-            if (binexp <= -DoubleConsts.EXP_BIAS)
+-            {
+-                // This is going to be a denormalized number
+-                // (if not actually zero).
+-                // half an ULP is at 2^-(DoubleConsts.EXP_BIAS+EXP_SHIFT+1)
+-                hulpbias = binexp + lowOrderZeros + DoubleConsts.EXP_BIAS;
+-            }
+-            else
+-            {
+-                hulpbias = 1 + lowOrderZeros;
+-            }
+-            B2 += hulpbias;
+-            D2 += hulpbias;
+-            // if there are common factors of 2, we might just as well
+-            // factor them out, as they add nothing useful.
+-            final int common2 = Math.min(B2, Math.min(D2, Ulp2));
+-            B2 -= common2;
+-            D2 -= common2;
+-            Ulp2 -= common2;
+-            // do multiplications by powers of 5 and 2
+-            final FDBigInteger bigB = FDBigInteger.valueOfMulPow52(bigBbits, B5, B2);
+-            if (bigD == null || prevD2 != D2)
+-            {
+-                bigD = bigD0.leftShift(D2);
+-                prevD2 = D2;
+-            }
+-            //
+-            // to recap:
+-            // bigB is the scaled-big-int version of our floating-point
+-            // candidate.
+-            // bigD is the scaled-big-int version of the exact value
+-            // as we understand it.
+-            // halfUlp is 1/2 an ulp of bigB, except for special cases
+-            // of exact powers of 2
+-            //
+-            // the plan is to compare bigB with bigD, and if the difference
+-            // is less than halfUlp, then we're satisfied. Otherwise,
+-            // use the ratio of difference to halfUlp to calculate a fudge
+-            // factor to add to the floating value, then go 'round again.
+-            //
+-            FDBigInteger diff;
+-            int cmpResult;
+-            boolean overvalue;
+-            if ((cmpResult = bigB.cmp(bigD)) > 0)
+-            {
+-                overvalue = true; // our candidate is too big.
+-                diff = bigB.leftInplaceSub(bigD); // bigB is not user further - reuse
+-                if ((bigIntNBits == 1) && (bigIntExp > -DoubleConsts.EXP_BIAS + 1))
+-                {
+-                    // todo not executed in unit tests
+-
+-                    // candidate is a normalized exact power of 2 and
+-                    // is too big (larger than Double.MIN_NORMAL). We will be subtracting.
+-                    // For our purposes, ulp is the ulp of the
+-                    // next smaller range.
+-                    Ulp2 -= 1;
+-                    if (Ulp2 < 0)
+-                    {
+-                        // rats. Cannot de-scale ulp this far.
+-                        // must scale diff in other direction.
+-                        Ulp2 = 0;
+-                        diff = diff.leftShift(1);
+-                    }
+-                }
+-            }
+-            else if (cmpResult < 0)
+-            {
+-                overvalue = false; // our candidate is too small.
+-                diff = bigD.rightInplaceSub(bigB); // bigB is not user further - reuse
+-            }
+-            else
+-            {
+-                // the candidate is exactly right!
+-                // this happens with surprising frequency
+-                break correctionLoop;
+-            }
+-            cmpResult = diff.cmpPow52(B5, Ulp2);
+-            if ((cmpResult) < 0)
+-            {
+-                // difference is small.
+-                // this is close enough
+-                break correctionLoop;
+-            }
+-            else if (cmpResult == 0)
+-            {
+-                // todo not executed in unit tests
+-
+-                // difference is exactly half an ULP
+-                // round to some other value maybe, then finish
+-                if ((ieeeBits & 1) != 0)
+-                {
+-                    // half ties to even
+-                    ieeeBits += overvalue ? -1 : 1; // nextDown or nextUp
+-                }
+-                break correctionLoop;
+-            }
+-            else
+-            {
+-                // difference is non-trivial.
+-                // could scale addend by ratio of difference to
+-                // halfUlp here, if we bothered to compute that difference.
+-                // Most of the time ( I hope ) it is about 1 anyway.
+-                ieeeBits += overvalue ? -1 : 1; // nextDown or nextUp
+-                if (ieeeBits == 0 || ieeeBits == DoubleConsts.EXP_BIT_MASK)
+-                {
+-                    // 0.0 or Double.POSITIVE_INFINITY
+-                    break correctionLoop; // oops. Fell off end of range.
+-                }
+-                // try again.
+-            }
+-        } // while(true)
+-
+-        if (isNegative)
+-        {
+-            ieeeBits |= DoubleConsts.SIGN_BIT_MASK;
+-        }
+-        return Double.longBitsToDouble(ieeeBits);
+-    }
+-}
+Index: src/main/java/com/fimtra/datafission/field/DoubleValueCodecAdapter.java
+===================================================================
+diff --git a/src/main/java/com/fimtra/datafission/field/DoubleValueCodecAdapter.java b/src/main/java/com/fimtra/datafission/field/DoubleValueCodecAdapter.java
+deleted file mode 100644
+--- a/src/main/java/com/fimtra/datafission/field/DoubleValueCodecAdapter.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ /dev/null	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
+@@ -1,96 +0,0 @@
+-package com.fimtra.datafission.field;
+-
+-import static com.fimtra.datafission.DataFissionProperties.Values.USE_CLASSIC_DOUBLE_VALUE_CODEC;
+-
+-import com.fimtra.datafission.IValue;
+-import com.fimtra.util.Log;
+-import com.fimtra.util.StringAppender;
+-
+-/**
+- * Adapter to switch between classic double codec and optimised codec logic.
+- *
+- * @author Ramon Servadei
+- */
+-final class DoubleValueCodeAdapter
+-{
+-    private static final IDoubleValueCodec delegate =
+-            USE_CLASSIC_DOUBLE_VALUE_CODEC ? new ClassicDoubleValueCodec() :
+-                    new OptimisedDoubleValueCodecAdapter();
+-
+-    static
+-    {
+-        Log.log(DoubleValueCodeAdapter.class, "IDoubleValueCodec=", delegate.getClass()
+-                .getSimpleName());
+-    }
+-
+-    static double fromCharArray(char[] chars, int start, int len) throws NumberFormatException
+-    {
+-        return delegate.fromCharArray(chars, start, len);
+-    }
+-
+-    static String textValue(double value)
+-    {
+-        return delegate.textValue(value);
+-    }
+-
+-    static StringAppender appendTo(StringAppender stringAppender, double value)
+-    {
+-        return delegate.appendTo(stringAppender, value);
+-    }
+-}
+-
+-interface IDoubleValueCodec
+-{
+-    double fromCharArray(char[] chars, int start, int len) throws NumberFormatException;
+-
+-    String textValue(double value);
+-
+-    StringAppender appendTo(StringAppender stringAppender, double value);
+-}
+-
+-final class ClassicDoubleValueCodec implements IDoubleValueCodec
+-{
+-    @Override
+-    public double fromCharArray(char[] chars, int start, int len) throws NumberFormatException
+-    {
+-        return Double.parseDouble(new String(chars, start, len));
+-    }
+-
+-    @Override
+-    public String textValue(double value)
+-    {
+-        return Double.toString(value);
+-    }
+-
+-    @Override
+-    public StringAppender appendTo(StringAppender stringAppender, double value)
+-    {
+-        return stringAppender.append(IValue.DOUBLE_CODE)
+-                .append(value);
+-    }
+-}
+-
+-final class OptimisedDoubleValueCodecAdapter implements IDoubleValueCodec
+-{
+-    @Override
+-    public double fromCharArray(char[] chars, int start, int len) throws NumberFormatException
+-    {
+-        return DoubleValueCodec.fromCharArray(chars, start, len);
+-    }
+-
+-    @Override
+-    public String textValue(double value)
+-    {
+-        final StringAppender stringAppender = new StringAppender(28);
+-        DoubleValueCodec.writeToCharArray(value, stringAppender);
+-        return stringAppender.toString();
+-    }
+-
+-    @Override
+-    public StringAppender appendTo(StringAppender stringAppender, double value)
+-    {
+-        final StringAppender appender = stringAppender.append(IValue.DOUBLE_CODE);
+-        DoubleValueCodec.writeToCharArray(value, appender);
+-        return stringAppender;
+-    }
+-}
+Index: src/main/java/com/fimtra/datafission/DataFissionProperties.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.datafission;\r\n\r\nimport java.util.concurrent.ConcurrentHashMap;\r\n\r\nimport com.fimtra.datafission.IObserverContext.ISystemRecordNames;\r\nimport com.fimtra.datafission.core.Context;\r\nimport com.fimtra.datafission.core.ProxyContext;\r\nimport com.fimtra.datafission.core.Publisher;\r\nimport com.fimtra.datafission.field.LongValue;\r\nimport com.fimtra.datafission.field.TextValue;\r\nimport com.fimtra.thimble.ThimbleExecutor;\r\nimport com.fimtra.util.SystemUtils;\r\n\r\n/**\r\n * Defines the properties and property keys used by DataFission\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic abstract class DataFissionProperties\r\n{\r\n    /**\r\n     * The names of the properties\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    public interface Names\r\n    {\r\n        String BASE = \"dataFission.\";\r\n\r\n        /**\r\n         * The system property name to define the number of threads used in the system record\r\n         * {@link ThimbleExecutor} used by all {@link Context} instances in the runtime.\r\n         * <br>\r\n         * E.g. <code>-DdataFission.systemThreadCount=2</code>\r\n         */\r\n        String SYSTEM_THREAD_COUNT = BASE + \"systemThreadCount\";\r\n\r\n        /**\r\n         * The system property name to define the number of threads used in the core {@link ThimbleExecutor}\r\n         * used by all DataFission {@link Context} instances in the runtime.\r\n         * <br>\r\n         * E.g. <code>-DdataFission.coreThreadCount=8</code>\r\n         */\r\n        String CORE_THREAD_COUNT = BASE + \"coreThreadCount\";\r\n\r\n        /**\r\n         * The system property name to define the number of threads used in the {@link ThimbleExecutor} for\r\n         * RPCs used by all DataFission {@link Context} instances in the runtime.<br> E.g.\r\n         * <code>-DdataFission.rpcThreadCount=4</code>\r\n         */\r\n        String RPC_THREAD_COUNT = BASE + \"rpcThreadCount\";\r\n\r\n        /**\r\n         * The system property name to define the timeout in milliseconds to wait for the execution start of\r\n         * an RPC.<br> E.g. <code>-DdataFission.rpcExecutionStartTimeoutMillis=5000</code>\r\n         */\r\n        String RPC_EXECUTION_START_TIMEOUT_MILLIS = BASE + \"rpcExecutionStartTimeoutMillis\";\r\n\r\n        /**\r\n         * The system property name to define the timeout in milliseconds to wait for the execution duration\r\n         * of an RPC. The duration timeout begins <b>after</b> the RPC execution starts.\r\n         * <br>\r\n         * E.g. <code>-DdataFission.rpcExecutionDurationTimeoutMillis=5000</code>\r\n         */\r\n        String RPC_EXECUTION_DURATION_TIMEOUT_MILLIS = BASE + \"rpcExecutionDurationTimeoutMillis\";\r\n\r\n        /**\r\n         * The system property name to define the period in milliseconds to wait before a {@link ProxyContext}\r\n         * will attempt re-connecting to a {@link Context} after losing the connection.<br> E.g.\r\n         * <code>-DdataFission.proxyReconnectPeriodMillis=1000</code>\r\n         */\r\n        String PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS = BASE + \"proxyReconnectPeriodMillis\";\r\n\r\n        /**\r\n         * The system property name to define the maximum number of atomic changes per message sent from a\r\n         * {@link Publisher}.<br> E.g. <code>-DdataFission.maxChangesPerMessage=20</code>\r\n         */\r\n        String PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE = BASE + \"maxChangesPerMessage\";\r\n\r\n        /**\r\n         * The system property name to define the period, in seconds, for logging the context core executors\r\n         * statistics.\r\n         * <p>\r\n         * <b>This setting also defines how often the QStats file is updated with the queue\r\n         * statistics.</b>\r\n         * <p>\r\n         * E.g. <code>-DdataFission.statsLoggingPeriodSecs=30</code>\r\n         */\r\n        String STATS_LOGGING_PERIOD_SECS = BASE + \"statsLoggingPeriodSecs\";\r\n\r\n        /**\r\n         * The system property name to define the maximum number of fields in a map to print.<br> E.g.\r\n         * <code>-DdataFission.maxMapFieldsToPrint=30</code>\r\n         */\r\n        String MAX_MAP_FIELDS_TO_PRINT = BASE + \"maxMapFieldsToPrint\";\r\n\r\n        /**\r\n         * The system property name to define the threshold, in nanos, for defining a slow task (and thus\r\n         * logging a message indicating the task was slow).<br> E.g.\r\n         * <code>-DdataFission.slowTaskThresholdNanos=50000000</code>\r\n         */\r\n        String SLOW_TASK_THRESHOLD_NANOS = BASE + \"slowTaskThresholdNanos\";\r\n\r\n        /**\r\n         * The system property name to define the number of threads assigned to the runtime-wide reconnect\r\n         * task scheduler used by all {@link ProxyContext} instances.<br> E.g.\r\n         * <code>-DdataFission.reconnectThreadCount=2</code>\r\n         */\r\n        String RECONNECT_THREAD_COUNT = BASE + \"reconnectThreadCount\";\r\n\r\n        /**\r\n         * The system property name to define the size of the {@link LongValue} pool. E.g.\r\n         * <code>-DdataFission.longValuePoolSize=2048</code>\r\n         */\r\n        String LONG_VALUE_POOL_SIZE = BASE + \"longValuePoolSize\";\r\n\r\n        /**\r\n         * The system property name to define the size of the {@link TextValue} pool.<br> E.g.\r\n         * <code>-DdataFission.textValuePoolSize=2048</code>\r\n         */\r\n        String TEXT_VALUE_POOL_SIZE = BASE + \"textValuePoolSize\";\r\n\r\n        /**\r\n         * The system property name to define the length limit to be eligible for the value to be held in the\r\n         * {@link TextValue} pool.<br> E.g. <code>-DdataFission.textLengthLimitForTextValuePool=5</code>\r\n         */\r\n        String STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL = BASE + \"textLengthLimitForTextValuePool\";\r\n\r\n        /**\r\n         * The system property name to define the estimated maximum number of concurrent threads that will\r\n         * access {@link IRecord} objects in the runtime. This is used to specify the concurrency of the\r\n         * {@link ConcurrentHashMap} components backing the records.<br> E.g.\r\n         * <code>-DdataFission.maxRecordConcurrency=2</code>\r\n         */\r\n        String MAX_RECORD_CONCURRENCY = BASE + \"maxRecordConcurrency\";\r\n\r\n        /**\r\n         * The coalescing window (in milliseconds) for system record publishing. This helps to control the\r\n         * number of messages that a publisher will transmit that are changes to system records, which are\r\n         * generally not processed at the same rate as application records.<br> E.g.\r\n         * <code>-DdataFission.systemRecordCoalesceWindowMillis=250</code>\r\n         */\r\n        String SYSTEM_RECORD_COALESCE_WINDOW_MILLIS = BASE + \"systemRecordCoalesceWindowMillis\";\r\n\r\n        /**\r\n         * The number of deltas pending processing for a record before starting to log them. This helps to\r\n         * reduce chatty logs when network problems interrupt delta sequences. <br> E.g.\r\n         * <code>-DdataFission.deltaCountLogThreshold=6</code>\r\n         */\r\n        String DELTA_COUNT_LOG_THRESHOLD = BASE + \"deltaCountLogThreshold\";\r\n\r\n        /**\r\n         * The number of microseconds to delay the processing of each subscribe message. This reduces image\r\n         * flooding when a {@link ProxyContext} reconnects to a bounced {@link Context}. <br> E.g.\r\n         * <code>-DdataFission.subscribeDelayMicros=100</code>\r\n         */\r\n        String SUBSCRIBE_DELAY_MICROS = BASE + \"subscribeDelayMicros\";\r\n\r\n        /**\r\n         * The batch size to break a mass subscribe into smaller parts for processing. This helps to reduce\r\n         * image flooding when a {@link ProxyContext} reconnects to a bounced {@link Context}. <br> E.g.\r\n         * <code>-DdataFission.subscribeBatchSize=50</code>\r\n         */\r\n        String SUBSCRIBE_BATCH_SIZE = BASE + \"subscribeBatchSize\";\r\n\r\n        /**\r\n         * The maximum pending event queue size before a thread will wait in\r\n         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.\r\n         * Only affects application threads. <br> E.g.\r\n         * <code>-DdataFission.pendingEventThrottleThreshold=200</code>\r\n         */\r\n        String PENDING_EVENT_THROTTLE_THRESHOLD = BASE + \"pendingEventThrottleThreshold\";\r\n\r\n        /**\r\n         * The name of the system property to define the period, in milliseconds, for a {@link Publisher} to\r\n         * publish updates to the {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br> E.g.\r\n         * <code>-DdataFission.connectionsRecordPublishPeriodMillis=30000</code>\r\n         */\r\n        String CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS = BASE + \"connectionsRecordPublishPeriodMillis\";\r\n\r\n        /**\r\n         * The maximum size for the rx frame handling tasks pool in a {@link ProxyContext}.<br> E.g.\r\n         * <code>-DdataFission.proxyRxFrameHandlerPoolMaxSize=1000</code>\r\n         */\r\n        String PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE = BASE + \"proxyRxFrameHandlerPoolMaxSize\";\r\n\r\n        /**\r\n         * Whether thread deadlock checking and thread dumps are enabled. <b>ENABLING THIS IS AN EXPENSIVE\r\n         * OPERATION.</b> <br> E.g. <code>-DdataFission.enableThreadDeadlockCheck=false</code>\r\n         */\r\n        String ENABLE_THREAD_DEADLOCK_CHECK = BASE + \"enableThreadDeadlockCheck\";\r\n\r\n        /**\r\n         * The name of the system property to define the period, in milliseconds, for thread deadlock checks\r\n         * and thread dumps. Only relevant if {@link #ENABLE_THREAD_DEADLOCK_CHECK} is true.<br> E.g.\r\n         * <code>-DdataFission.threadDeadlockCheckPeriodMillis=300000</code>\r\n         *\r\n         * @see Values#ENABLE_THREAD_DEADLOCK_CHECK\r\n         */\r\n        String THREAD_DEADLOCK_CHECK_PERIOD_MILLIS = BASE + \"threadDeadlockCheckPeriodMillis\";\r\n\r\n        /**\r\n         * The name of the system property to define if queue statistics logging is enabled. <br> E.g.\r\n         * <code>-DdataFission.enableQStatsLogging=false</code>\r\n         */\r\n        String ENABLE_Q_STATS_LOGGING = BASE + \"enableQStatsLogging\";\r\n\r\n        /**\r\n         * The name of the system property to define the symmetric transformation. <br> E.g.\r\n         * <code>-DdataFission.encryptedSessionTransformation=AES/ECB/PKCS5Padding</code>\r\n         */\r\n        String ENCRYPTED_SESSION_TRANSFORMATION = BASE + \"encryptedSessionTransformation\";\r\n\r\n        /**\r\n         * The name of the system property to define the rpc names (comma separated) to exclude from logging.\r\n         * <br> E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>\r\n         */\r\n        String EXCLUDE_RPC_LOGGING = BASE + \"excludeRpcLogging\";\r\n\r\n        /**\r\n         * The name of the system property to define using the classic double value codec.\r\n         * <br> E.g. <code>-DdataFission.useClassicDoubleValueCodec=true</code>\r\n         */\r\n        String USE_CLASSIC_DOUBLE_VALUE_CODEC = BASE + \"useClassicDoubleValueCodec\";\r\n    }\r\n\r\n    /**\r\n     * The values of the properties described in {@link Names}\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    public interface Values\r\n    {\r\n        /**\r\n         * The number of threads used in the system record {@link ThimbleExecutor} used by all DataFission\r\n         * {@link Context} instances in the runtime.\r\n         *\r\n         * @see Names#SYSTEM_THREAD_COUNT\r\n         */\r\n        int SYSTEM_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.SYSTEM_THREAD_COUNT, 2);\r\n\r\n        /**\r\n         * The number of threads used in the core {@link ThimbleExecutor} used by all DataFission\r\n         * {@link Context} instances in the runtime.\r\n         * <p>\r\n         * These are the defaults for the following processor counts:\r\n         * <ul>\r\n         * <li>small (less than 8 processors) = 4\r\n         * <li>medium (8 to 32 processors) = processors / 2\r\n         * <li>large (over 32 processors) = 16\r\n         * </ul>\r\n         *\r\n         * @see Names#CORE_THREAD_COUNT\r\n         */\r\n        int CORE_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.CORE_THREAD_COUNT,\r\n                SystemUtils.getRuntimeSupportedThreadCount());\r\n\r\n        /**\r\n         * The number of threads used in the {@link ThimbleExecutor} for RPCs used by all DataFission\r\n         * {@link Context} instances in the runtime.\r\n         * <p>\r\n         * These are the defaults for the following processor counts:\r\n         * <ul>\r\n         * <li>small (less than 8 processors) = 4\r\n         * <li>medium (8 to 32 processors) = processors / 2\r\n         * <li>large (over 32 processors) = 16\r\n         * </ul>\r\n         *\r\n         * @see Names#RPC_THREAD_COUNT\r\n         */\r\n        int RPC_THREAD_COUNT = SystemUtils.getPropertyAsInt(Names.RPC_THREAD_COUNT,\r\n                SystemUtils.getRuntimeSupportedThreadCount());\r\n\r\n        /**\r\n         * The timeout to wait for an RPC to start.\r\n         * <p>\r\n         * Default is: 5000\r\n         *\r\n         * @see Names#RPC_EXECUTION_START_TIMEOUT_MILLIS\r\n         */\r\n        Long RPC_EXECUTION_START_TIMEOUT_MILLIS =\r\n                SystemUtils.getPropertyAsLong(Names.RPC_EXECUTION_START_TIMEOUT_MILLIS, 5000);\r\n\r\n        /**\r\n         * The duration to wait for an RPC to complete after it has started.\r\n         * <p>\r\n         * Default is: 5000\r\n         *\r\n         * @see Names#RPC_EXECUTION_DURATION_TIMEOUT_MILLIS\r\n         */\r\n        Long RPC_EXECUTION_DURATION_TIMEOUT_MILLIS =\r\n                SystemUtils.getPropertyAsLong(Names.RPC_EXECUTION_DURATION_TIMEOUT_MILLIS, 5000);\r\n\r\n        /**\r\n         * The default period in milliseconds that a {@link ProxyContext} waits before reconnecting to a\r\n         * {@link Context} after losing the connection.\r\n         * <p>\r\n         * Default is: 1000\r\n         *\r\n         * @see Names#PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS\r\n         */\r\n        int PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS =\r\n                SystemUtils.getPropertyAsInt(Names.PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS, 1000);\r\n\r\n        /**\r\n         * The default maximum number of changes per message a {@link Publisher} can send.\r\n         * <p>\r\n         * Default is: 20\r\n         *\r\n         * @see Names#PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE\r\n         */\r\n        int PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE =\r\n                SystemUtils.getPropertyAsInt(Names.PUBLISHER_MAXIMUM_CHANGES_PER_MESSAGE, 20);\r\n\r\n        /**\r\n         * The period, in seconds, for context core executors statistics logging.\r\n         * <p>\r\n         * Default is: 30\r\n         *\r\n         * @see Names#STATS_LOGGING_PERIOD_SECS\r\n         */\r\n        int STATS_LOGGING_PERIOD_SECS = SystemUtils.getPropertyAsInt(Names.STATS_LOGGING_PERIOD_SECS, 30);\r\n        /**\r\n         * The maximum number of map fields to print.\r\n         * <p>\r\n         * Default is: 30\r\n         *\r\n         * @see Names#MAX_MAP_FIELDS_TO_PRINT\r\n         */\r\n        int MAX_MAP_FIELDS_TO_PRINT = SystemUtils.getPropertyAsInt(Names.MAX_MAP_FIELDS_TO_PRINT, 30);\r\n        /**\r\n         * The threshold value for logging when a task is slow, in nanos\r\n         * <p>\r\n         * Default is: 50000000 (50ms)\r\n         *\r\n         * @see Names#SLOW_TASK_THRESHOLD_NANOS\r\n         */\r\n        long SLOW_TASK_THRESHOLD_NANOS =\r\n                SystemUtils.getPropertyAsLong(Names.SLOW_TASK_THRESHOLD_NANOS, 50_000_000);\r\n\r\n        /**\r\n         * The number of threads used in the shared reconnect task scheduler used by all DataFission\r\n         * {@link ProxyContext} instances in the runtime.\r\n         * <p>\r\n         * Default is 2.\r\n         *\r\n         * @see Names#RECONNECT_THREAD_COUNT\r\n         */\r\n        int RECONNECT_THREAD_COUNT = Integer.parseInt(System.getProperty(Names.RECONNECT_THREAD_COUNT, \"1\"));\r\n\r\n        /**\r\n         * The size for the {@link LongValue} pool.\r\n         * <p>\r\n         * Default is 2048.\r\n         *\r\n         * @see Names#LONG_VALUE_POOL_SIZE\r\n         */\r\n        int LONG_VALUE_POOL_SIZE = SystemUtils.getPropertyAsInt(Names.LONG_VALUE_POOL_SIZE, 2048);\r\n\r\n        /**\r\n         * The size for the {@link TextValue} pool.\r\n         * <p>\r\n         * Default is 0 (unlimited).\r\n         *\r\n         * @see Names#TEXT_VALUE_POOL_SIZE\r\n         */\r\n        int TEXT_VALUE_POOL_SIZE = SystemUtils.getPropertyAsInt(Names.TEXT_VALUE_POOL_SIZE, 0);\r\n\r\n        /**\r\n         * The text length limit to be eligible for the value to be held in the {@link TextValue} pool.\r\n         * <p>\r\n         * Default is 5.\r\n         *\r\n         * @see Names#STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL\r\n         */\r\n        int STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL =\r\n                SystemUtils.getPropertyAsInt(Names.STRING_LENGTH_LIMIT_FOR_TEXT_VALUE_POOL, 5);\r\n\r\n        /**\r\n         * The estimated maximum number of concurrent threads that would access an {@link IRecord}. This is\r\n         * used in constructing the {@link ConcurrentHashMap} components backing the records.\r\n         * <p>\r\n         * Default is 2.\r\n         *\r\n         * @see Names#MAX_RECORD_CONCURRENCY\r\n         */\r\n        int MAX_RECORD_CONCURRENCY = Integer.parseInt(System.getProperty(Names.MAX_RECORD_CONCURRENCY, \"2\"));\r\n\r\n        /**\r\n         * The coalescing window (in milliseconds) for system record publishing.\r\n         * <p>\r\n         * Default is 250.\r\n         *\r\n         * @see Names#SYSTEM_RECORD_COALESCE_WINDOW_MILLIS\r\n         */\r\n        int SYSTEM_RECORD_COALESCE_WINDOW_MILLIS =\r\n                SystemUtils.getPropertyAsInt(Names.SYSTEM_RECORD_COALESCE_WINDOW_MILLIS, 250);\r\n\r\n        /**\r\n         * The number of deltas pending processing for a record before starting to log them.\r\n         * <p>\r\n         * Default is 6.\r\n         *\r\n         * @see Names#DELTA_COUNT_LOG_THRESHOLD\r\n         */\r\n        int DELTA_COUNT_LOG_THRESHOLD = SystemUtils.getPropertyAsInt(Names.DELTA_COUNT_LOG_THRESHOLD, 6);\r\n\r\n        /**\r\n         * The delay, in micro seconds, between handling subsequent subscribe messages during resyncing (there\r\n         * can be 1000s of subscriptions in a resync).\r\n         * <p>\r\n         * Default is 0 (no delay).\r\n         *\r\n         * @see Names#SUBSCRIBE_DELAY_MICROS\r\n         */\r\n        int SUBSCRIBE_DELAY_MICROS = SystemUtils.getPropertyAsInt(Names.SUBSCRIBE_DELAY_MICROS, 0);\r\n\r\n        /**\r\n         * The batch size for handling mass subscribes.\r\n         * <p>\r\n         * Default is 50.\r\n         *\r\n         * @see Names#SUBSCRIBE_BATCH_SIZE\r\n         */\r\n        int SUBSCRIBE_BATCH_SIZE = SystemUtils.getPropertyAsInt(Names.SUBSCRIBE_BATCH_SIZE, 50);\r\n\r\n        /**\r\n         * The maximum pending event queue size before a thread will wait in\r\n         * {@link IPublisherContext#publishAtomicChange(IRecord)} until the queue size goes below this value.\r\n         * Only affects application threads.\r\n         * <p>\r\n         * Default is 200.\r\n         *\r\n         * @see Names#PENDING_EVENT_THROTTLE_THRESHOLD\r\n         */\r\n        int PENDING_EVENT_THROTTLE_THRESHOLD =\r\n                SystemUtils.getPropertyAsInt(Names.PENDING_EVENT_THROTTLE_THRESHOLD, 200);\r\n\r\n        /**\r\n         * The period, in milliseconds, for a {@link Publisher} to publish updates to the\r\n         * {@link ISystemRecordNames#CONTEXT_CONNECTIONS} record. <br>\r\n         * <p>\r\n         * Default is 30000.\r\n         *\r\n         * @see Names#CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS\r\n         */\r\n        long CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS =\r\n                SystemUtils.getPropertyAsLong(Names.CONNECTIONS_RECORD_PUBLISH_PERIOD_MILLIS, 30_000);\r\n\r\n        /**\r\n         * The maximum size for the rx frame handling tasks pool in a {@link ProxyContext}.<br>\r\n         * <p>\r\n         * Default is 1000.\r\n         *\r\n         * @see Names#PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE\r\n         */\r\n        int PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE =\r\n                SystemUtils.getPropertyAsInt(Names.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE, 1000);\r\n\r\n        /**\r\n         * Whether thread deadlock checking and thread dumps are enabled. <b>ENABLING THIS IS AN EXPENSIVE\r\n         * OPERATION.</b>\r\n         * <p>\r\n         * Default is false.\r\n         *\r\n         * @see Names#ENABLE_THREAD_DEADLOCK_CHECK\r\n         */\r\n        boolean ENABLE_THREAD_DEADLOCK_CHECK = SystemUtils.getProperty(Names.ENABLE_THREAD_DEADLOCK_CHECK, false);\r\n\r\n        /**\r\n         * The period, in milliseconds, for thread deadlock checks and thread dumps. Only relevant if\r\n         * {@link #ENABLE_THREAD_DEADLOCK_CHECK} is true.\r\n         * <p>\r\n         * Default is 300000 (5 mins).\r\n         *\r\n         * @see Values#ENABLE_THREAD_DEADLOCK_CHECK\r\n         * @see Names#THREAD_DEADLOCK_CHECK_PERIOD_MILLIS\r\n         */\r\n        int THREAD_DEADLOCK_CHECK_PERIOD_MILLIS =\r\n                SystemUtils.getPropertyAsInt(Names.THREAD_DEADLOCK_CHECK_PERIOD_MILLIS, 300_000);\r\n\r\n        /**\r\n         * Whether the queue statistics are logged.\r\n         * <p>\r\n         * Default is false\r\n         */\r\n        boolean ENABLE_Q_STATS_LOGGING = SystemUtils.getProperty(Names.ENABLE_Q_STATS_LOGGING, false);\r\n\r\n        /**\r\n         * Defines the transformation string for encrypted sessions.\r\n         *\r\n         * @see Names#ENCRYPTED_SESSION_TRANSFORMATION\r\n         */\r\n        String ENCRYPTED_SESSION_TRANSFORMATION =\r\n                System.getProperty(Names.ENCRYPTED_SESSION_TRANSFORMATION, \"AES/ECB/PKCS5Padding\");\r\n\r\n        /**\r\n         * Defines the RPC names that are excluded from logging.\r\n         *\r\n         * @see Names#EXCLUDE_RPC_LOGGING\r\n         */\r\n        String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,\r\n                \"runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister\");\r\n\r\n        /**\r\n         * Defines if the classic double value codec is used.\r\n         * <p>\r\n         * Default is false.\r\n         */\r\n        boolean USE_CLASSIC_DOUBLE_VALUE_CODEC =\r\n                SystemUtils.getProperty(Names.USE_CLASSIC_DOUBLE_VALUE_CODEC, false);\r\n    }\r\n\r\n    private DataFissionProperties()\r\n    {\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/datafission/DataFissionProperties.java b/src/main/java/com/fimtra/datafission/DataFissionProperties.java
+--- a/src/main/java/com/fimtra/datafission/DataFissionProperties.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/main/java/com/fimtra/datafission/DataFissionProperties.java	(date 1777999464653)
+@@ -231,12 +231,6 @@
+          * <br> E.g. <code>-DdataFission.excludeRpcLogging=runtimeDynamic,runtimeStatic</code>
+          */
+         String EXCLUDE_RPC_LOGGING = BASE + "excludeRpcLogging";
+-
+-        /**
+-         * The name of the system property to define using the classic double value codec.
+-         * <br> E.g. <code>-DdataFission.useClassicDoubleValueCodec=true</code>
+-         */
+-        String USE_CLASSIC_DOUBLE_VALUE_CODEC = BASE + "useClassicDoubleValueCodec";
+     }
+ 
+     /**
+@@ -516,14 +510,6 @@
+          */
+         String EXCLUDE_RPC_LOGGING = System.getProperty(Names.EXCLUDE_RPC_LOGGING,
+                 "runtimeDynamic,runtimeStatic,getServiceInfoForService,getHeartbeatConfig,getPlatformName,register,deregister");
+-
+-        /**
+-         * Defines if the classic double value codec is used.
+-         * <p>
+-         * Default is false.
+-         */
+-        boolean USE_CLASSIC_DOUBLE_VALUE_CODEC =
+-                SystemUtils.getProperty(Names.USE_CLASSIC_DOUBLE_VALUE_CODEC, false);
+     }
+ 
+     private DataFissionProperties()
+Index: src/main/java/com/fimtra/thimble/TaskQueue.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.thimble;\r\n\r\nimport java.util.Collections;\r\nimport java.util.Deque;\r\nimport java.util.HashMap;\r\nimport java.util.Map;\r\nimport java.util.NoSuchElementException;\r\nimport java.util.Queue;\r\nimport java.util.concurrent.atomic.AtomicReference;\r\n\r\nimport com.fimtra.util.CollectionUtils;\r\nimport com.fimtra.util.IReusableObject;\r\nimport com.fimtra.util.LowGcLinkedList;\r\nimport com.fimtra.util.SingleThreadReusableObjectPool;\r\nimport com.fimtra.util.SystemUtils;\r\n\r\n/**\r\n * An unbounded queue that internally manages the order of {@link Runnable} tasks that are submitted via the\r\n * {@link #offer_callWhilstHoldingLock(Runnable)} method. The {@link #poll_callWhilstHoldingLock()} method\r\n * will return the most appropriate task.\r\n * <p>\r\n * Generally, runnables are returned from the queue in a FIFO manner. Runnables extending {@link\r\n * ISequentialRunnable} or {@link ICoalescingRunnable} will be returned from the queue in a manner that fits\r\n * the interface description, e.g. for {@link ISequentialRunnable}, the runnable is only returned if no other\r\n * runnable (for the same context) is executing, thus maintaining the contract of sequentially executing\r\n * tasks.\r\n * <p>\r\n * <b>This is thread safe.</b>\r\n *\r\n * @author Ramon Servadei\r\n */\r\nfinal class TaskQueue\r\n{\r\n    private final static int SEQUENTIAL_TASKS_MAX_POOL_SIZE =\r\n            SystemUtils.getPropertyAsInt(\"thimble.sequentialTasksMaxPoolSize\", 1000);\r\n    private final static int COALESCING_TASKS_MAX_POOL_SIZE =\r\n            SystemUtils.getPropertyAsInt(\"thimble.coalescingTasksMaxPoolSize\", 1000);\r\n\r\n    interface InternalTaskQueue<T> extends Runnable\r\n    {\r\n        void offer(T t);\r\n\r\n        void onTaskFinished();\r\n    }\r\n\r\n    abstract static class AbstractInternalTasks<T> implements InternalTaskQueue<T>, IReusableObject\r\n    {\r\n        Object context;\r\n        TaskStatistics stats;\r\n        boolean active;\r\n\r\n        AbstractInternalTasks()\r\n        {\r\n            super();\r\n        }\r\n\r\n        /**\r\n         * @return <code>true</code> if it was activated, <code>false</code> if it is already active\r\n         */\r\n        final boolean activate()\r\n        {\r\n            if (!this.active)\r\n            {\r\n                this.active = true;\r\n                return true;\r\n            }\r\n            return false;\r\n        }\r\n\r\n        @Override\r\n        public final void reset()\r\n        {\r\n            this.context = null;\r\n            this.stats = null;\r\n            this.active = false;\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Holds all {@link ISequentialRunnable} objects for the same execution context. Each call to {@link\r\n     * #run()} will dequeue the next runnable from an internal list and execute it.\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    final class SequentialTasks extends AbstractInternalTasks<ISequentialRunnable>\r\n    {\r\n        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);\r\n        int size;\r\n\r\n        SequentialTasks()\r\n        {\r\n            super();\r\n        }\r\n\r\n        @Override\r\n        public void run()\r\n        {\r\n            ISequentialRunnable item = null;\r\n            try\r\n            {\r\n                synchronized (this.sequentialTasks)\r\n                {\r\n                    item = this.sequentialTasks.removeFirst();\r\n                    if (item != null)\r\n                    {\r\n                        this.size--;\r\n                    }\r\n                }\r\n            }\r\n            catch (NoSuchElementException e)\r\n            {\r\n                // empty tasks\r\n            }\r\n            if (item != null)\r\n            {\r\n                item.run();\r\n            }\r\n        }\r\n\r\n        @Override\r\n        public void onTaskFinished()\r\n        {\r\n            this.stats.itemExecuted();\r\n            if (this.size > 0)\r\n            {\r\n                TaskQueue.this.queue.offer(this);\r\n            }\r\n            else\r\n            {\r\n                TaskQueue.this.sequentialTasksPerContext.remove(this.context);\r\n                TaskQueue.this.sequentialTasksPool.offer(this);\r\n            }\r\n        }\r\n\r\n        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock\r\n        @Override\r\n        public void offer(ISequentialRunnable latest)\r\n        {\r\n            this.stats.itemSubmitted();\r\n            synchronized (this.sequentialTasks)\r\n            {\r\n                this.sequentialTasks.offer(latest);\r\n                this.size++;\r\n            }\r\n        }\r\n\r\n        @Override\r\n        public String toString()\r\n        {\r\n            return \"SequentialTasks [\" + this.context + \", size=\" + this.size + \"]\";\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Holds all {@link ICoalescingRunnable} objects for the same execution context. Each call to {@link\r\n     * #run()} will execute the latest {@link ICoalescingRunnable} for the context.\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    final class CoalescingTasks extends AbstractInternalTasks<ICoalescingRunnable>\r\n    {\r\n        final AtomicReference<ICoalescingRunnable> latestTask = new AtomicReference<>();\r\n\r\n        CoalescingTasks()\r\n        {\r\n            super();\r\n        }\r\n\r\n        @Override\r\n        public void run()\r\n        {\r\n            this.latestTask.getAndSet(null).run();\r\n        }\r\n\r\n        @Override\r\n        public void onTaskFinished()\r\n        {\r\n            this.stats.itemExecuted();\r\n            if (this.latestTask.get() != null)\r\n            {\r\n                TaskQueue.this.queue.offer(this);\r\n            }\r\n            else\r\n            {\r\n                TaskQueue.this.coalescingTasksPerContext.remove(this.context);\r\n                TaskQueue.this.coalescingTasksPool.offer(this);\r\n            }\r\n        }\r\n\r\n        // NOTE: offer is called by a thread that synchronizes on TaskQueue.this.lock\r\n        @Override\r\n        public void offer(ICoalescingRunnable latest)\r\n        {\r\n            if (this.latestTask.getAndSet(latest) == null)\r\n            {\r\n                // only track submitted if there was no coalescing (else the qOverflow becomes skewed)\r\n                this.stats.itemSubmitted();\r\n            }\r\n        }\r\n\r\n        @Override\r\n        public String toString()\r\n        {\r\n            return \"CoalescingTasks [\" + this.context + \"]\";\r\n        }\r\n    }\r\n\r\n    final Queue<Runnable> queue = CollectionUtils.newDeque();\r\n    final Map<Object, SequentialTasks> sequentialTasksPerContext = new HashMap<>();\r\n    final Map<Object, CoalescingTasks> coalescingTasksPerContext = new HashMap<>();\r\n    final TaskStatistics allCoalescingStats;\r\n    final TaskStatistics allSequentialStats;\r\n    final Object lock = new Object();\r\n\r\n    final SingleThreadReusableObjectPool<SequentialTasks> sequentialTasksPool;\r\n    final SingleThreadReusableObjectPool<CoalescingTasks> coalescingTasksPool;\r\n    final String name;\r\n\r\n    TaskQueue(String name)\r\n    {\r\n        this.name = name;\r\n        this.sequentialTasksPool =\r\n                new SingleThreadReusableObjectPool<>(\"sequential-\" + name, SequentialTasks::new,\r\n                        SequentialTasks::reset, SEQUENTIAL_TASKS_MAX_POOL_SIZE);\r\n        this.coalescingTasksPool =\r\n                new SingleThreadReusableObjectPool<>(\"coalescing-\" + name, CoalescingTasks::new,\r\n                        CoalescingTasks::reset, COALESCING_TASKS_MAX_POOL_SIZE);\r\n        this.allCoalescingStats = new TaskStatistics(\"Coalescing\" + IContextExecutor.QUEUE_LEVEL_STATS);\r\n        this.allSequentialStats = new TaskStatistics(\"Sequential\" + IContextExecutor.QUEUE_LEVEL_STATS);\r\n    }\r\n\r\n    /**\r\n     * Add the runnable to the queue, ordering it as appropriate for any annotation present on the runnable.\r\n     *\r\n     * @return <code>true</code> if the queue changed, <code>false</code> if the task was merged with a\r\n     * coalescing or sequential task already in the queue\r\n     */\r\n    boolean offer_callWhilstHoldingLock(Runnable runnable)\r\n    {\r\n        if (runnable instanceof ISequentialRunnable)\r\n        {\r\n            final ISequentialRunnable sequentialRunnable = (ISequentialRunnable) runnable;\r\n            final Object context = sequentialRunnable.context();\r\n            SequentialTasks sequentialTasks = this.sequentialTasksPerContext.get(context);\r\n            if (sequentialTasks == null)\r\n            {\r\n                sequentialTasks = this.sequentialTasksPool.get();\r\n                sequentialTasks.context = context;\r\n                sequentialTasks.stats = this.allSequentialStats;\r\n                this.sequentialTasksPerContext.put(context, sequentialTasks);\r\n            }\r\n\r\n            sequentialTasks.offer((ISequentialRunnable) runnable);\r\n            if (sequentialTasks.activate())\r\n            {\r\n                this.queue.offer(sequentialTasks);\r\n                return true;\r\n            }\r\n        }\r\n        else if (runnable instanceof ICoalescingRunnable)\r\n        {\r\n            final ICoalescingRunnable coalescingRunnable = (ICoalescingRunnable) runnable;\r\n            final Object context = coalescingRunnable.context();\r\n            CoalescingTasks coalescingTasks = this.coalescingTasksPerContext.get(context);\r\n            if (coalescingTasks == null)\r\n            {\r\n                coalescingTasks = this.coalescingTasksPool.get();\r\n                coalescingTasks.context = context;\r\n                coalescingTasks.stats = this.allCoalescingStats;\r\n                this.coalescingTasksPerContext.put(context, coalescingTasks);\r\n            }\r\n\r\n            coalescingTasks.offer((ICoalescingRunnable) runnable);\r\n            if (coalescingTasks.activate())\r\n            {\r\n                this.queue.offer(coalescingTasks);\r\n                return true;\r\n            }\r\n        }\r\n        else\r\n        {\r\n            this.queue.offer(runnable);\r\n            return true;\r\n        }\r\n        return false;\r\n    }\r\n\r\n    /**\r\n     * @see Queue#poll()\r\n     */\r\n    Runnable poll_callWhilstHoldingLock()\r\n    {\r\n        return this.queue.poll();\r\n    }\r\n\r\n    /**\r\n     * @return a copy of the internal statistics per sequential task context\r\n     */\r\n    Map<Object, TaskStatistics> getSequentialTaskStatistics()\r\n    {\r\n        return Collections.singletonMap(IContextExecutor.QUEUE_LEVEL_STATS,\r\n                this.allSequentialStats.intervalFinished());\r\n    }\r\n\r\n    /**\r\n     * @return a copy of the internal statistics per coalescing task context\r\n     */\r\n    Map<Object, TaskStatistics> getCoalescingTaskStatistics()\r\n    {\r\n        return Collections.singletonMap(IContextExecutor.QUEUE_LEVEL_STATS,\r\n                this.allCoalescingStats.intervalFinished());\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/thimble/TaskQueue.java b/src/main/java/com/fimtra/thimble/TaskQueue.java
+--- a/src/main/java/com/fimtra/thimble/TaskQueue.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/main/java/com/fimtra/thimble/TaskQueue.java	(date 1778014598463)
+@@ -25,7 +25,7 @@
+ 
+ import com.fimtra.util.CollectionUtils;
+ import com.fimtra.util.IReusableObject;
+-import com.fimtra.util.LowGcLinkedList;
++import com.fimtra.util.LowGcDeque;
+ import com.fimtra.util.SingleThreadReusableObjectPool;
+ import com.fimtra.util.SystemUtils;
+ 
+@@ -99,7 +99,7 @@
+      */
+     final class SequentialTasks extends AbstractInternalTasks<ISequentialRunnable>
+     {
+-        final Deque<ISequentialRunnable> sequentialTasks = new LowGcLinkedList<>(2);
++        final Deque<ISequentialRunnable> sequentialTasks = new LowGcDeque<>(2);
+         int size;
+ 
+         SequentialTasks()
+Index: src/main/java/com/fimtra/util/CollectionUtils.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2015 Ramon Servadei, Fimtra\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.util;\r\n\r\nimport java.util.AbstractSet;\r\nimport java.util.Collection;\r\nimport java.util.Collections;\r\nimport java.util.Deque;\r\nimport java.util.HashMap;\r\nimport java.util.HashSet;\r\nimport java.util.Iterator;\r\nimport java.util.LinkedList;\r\nimport java.util.Map;\r\nimport java.util.Map.Entry;\r\nimport java.util.Set;\r\n\r\nimport com.fimtra.util.UtilProperties.Values;\r\n\r\n/**\r\n * Utility methods for working with collections\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic abstract class CollectionUtils\r\n{\r\n    /**\r\n     * An unmodifiable set of Map.Entry objects that are themselves unmodifiable ( {@link\r\n     * Entry#setValue(Object)} will throw {@link UnsupportedOperationException})\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    static final class UnmodifiableEntrySet<K, V> extends AbstractSet<Map.Entry<K, V>>\r\n    {\r\n        private final static class UnmodifiableEntry<K, V> implements Entry<K, V>\r\n        {\r\n            final Entry<K, V> backingEntry;\r\n\r\n            UnmodifiableEntry(java.util.Map.Entry<K, V> backingEntry)\r\n            {\r\n                super();\r\n                this.backingEntry = backingEntry;\r\n            }\r\n\r\n            @Override\r\n            public K getKey()\r\n            {\r\n                return this.backingEntry.getKey();\r\n            }\r\n\r\n            @Override\r\n            public V getValue()\r\n            {\r\n                return this.backingEntry.getValue();\r\n            }\r\n\r\n            @Override\r\n            public V setValue(V value)\r\n            {\r\n                throw new UnsupportedOperationException();\r\n            }\r\n        }\r\n\r\n        final Set<Entry<K, V>> entrySet;\r\n\r\n        UnmodifiableEntrySet(Set<Entry<K, V>> entrySet)\r\n        {\r\n            this.entrySet = Collections.unmodifiableSet(entrySet);\r\n        }\r\n\r\n        @Override\r\n        public Iterator<Map.Entry<K, V>> iterator()\r\n        {\r\n            return new Iterator<Map.Entry<K, V>>()\r\n            {\r\n                final Iterator<Map.Entry<K, V>> backingIterator =\r\n                        UnmodifiableEntrySet.this.entrySet.iterator();\r\n\r\n                @Override\r\n                public boolean hasNext()\r\n                {\r\n                    return this.backingIterator.hasNext();\r\n                }\r\n\r\n                @Override\r\n                public java.util.Map.Entry<K, V> next()\r\n                {\r\n                    return new UnmodifiableEntry<>(this.backingIterator.next());\r\n                }\r\n\r\n                @Override\r\n                public void remove()\r\n                {\r\n                    throw new UnsupportedOperationException();\r\n                }\r\n            };\r\n        }\r\n\r\n        @Override\r\n        public int size()\r\n        {\r\n            return this.entrySet.size();\r\n        }\r\n    }\r\n\r\n    private CollectionUtils()\r\n    {\r\n    }\r\n\r\n    /**\r\n     * @return a Deque implementation\r\n     * @see Values#USE_LOW_GC_LINKEDLIST\r\n     */\r\n    public static <T> Deque<T> newDeque()\r\n    {\r\n        return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcLinkedList<>() : new LinkedList<>();\r\n    }\r\n\r\n    /**\r\n     * @return an unmodifiable Set view of the comma separated items (each item is trimmed before adding)\r\n     * @deprecated Use {@link #newSetFromString(String, String)} instead\r\n     */\r\n    public static Set<String> newSetFromString(String commaSeparatedList)\r\n    {\r\n        return newSetFromString(commaSeparatedList, \",\");\r\n    }\r\n\r\n    /**\r\n     * @param tokenSeparator the token that separates the items\r\n     * @return an unmodifiable Set view of the token separated items (each item is trimmed before adding)\r\n     */\r\n    public static Set<String> newSetFromString(String tokenSeparatedList, String tokenSeparator)\r\n    {\r\n        if (tokenSeparatedList == null)\r\n        {\r\n            return Collections.emptySet();\r\n        }\r\n        final String[] split = tokenSeparatedList.split(tokenSeparator);\r\n        final Set<String> set = new HashSet<>(split.length);\r\n        for (int i = 0; i < split.length; i++)\r\n        {\r\n            set.add(split[i].trim());\r\n        }\r\n        return Collections.unmodifiableSet(set);\r\n    }\r\n\r\n    /**\r\n     * @return an unmodifiable {@link Set} with unmodifiable {@link Entry} objects for the passed in entrySet\r\n     */\r\n    @SuppressWarnings({ \"unchecked\", \"rawtypes\" })\r\n    public static <K, V> Set<java.util.Map.Entry<K, V>> unmodifiableEntrySet(\r\n            final Set<java.util.Map.Entry<K, V>> entrySet)\r\n    {\r\n        return new UnmodifiableEntrySet(entrySet);\r\n    }\r\n\r\n    /**\r\n     * Creates a new {@link HashSet} wrapping the collection\r\n     *\r\n     * @param c the collection to wrap\r\n     * @return a {@link HashSet}\r\n     */\r\n    public static <T> Set<T> newHashSet(Collection<T> c)\r\n    {\r\n        return new HashSet<>(c);\r\n    }\r\n\r\n    /**\r\n     * Creates a map initialised with the default size 16\r\n     *\r\n     * @return a {@link HashMap}\r\n     */\r\n    public static <K, V> Map<K, V> newMap()\r\n    {\r\n        return newMap(16);\r\n    }\r\n\r\n    /**\r\n     * Creates a map initialised with the given size\r\n     *\r\n     * @param size the size\r\n     * @return a {@link HashMap}\r\n     */\r\n    public static <K, V> Map<K, V> newMap(int size)\r\n    {\r\n        return new HashMap<>(size);\r\n    }\r\n\r\n    /**\r\n     * Creates a map initialised with the given map\r\n     *\r\n     * @param data the map data to use for initialisation\r\n     * @return a {@link HashMap}\r\n     */\r\n    public static <K, V> Map<K, V> newMap(Map<K, V> data)\r\n    {\r\n        return new HashMap<>(data);\r\n    }\r\n\r\n    /**\r\n     * @return the map or an unmodifiable empty-map if null.\r\n     */\r\n    public static <K, V> Map<K, V> emptyIfNull(Map<K, V> map)\r\n    {\r\n        if (map == null)\r\n        {\r\n            return Collections.emptyMap();\r\n        }\r\n        return map;\r\n    }\r\n\r\n    /**\r\n     * A {@link Map} implementation that does not throw exceptions for mutation operations. Returns true for\r\n     * {@link Map#isEmpty()}\r\n     *\r\n     * @return A \"noop\" map implementation\r\n     */\r\n    public static <K, V> Map<K, V> noopMap()\r\n    {\r\n        return new Map<K, V>()\r\n        {\r\n            @Override\r\n            public int size()\r\n            {\r\n                return 0;\r\n            }\r\n\r\n            @Override\r\n            public boolean isEmpty()\r\n            {\r\n                return true;\r\n            }\r\n\r\n            @Override\r\n            public boolean containsKey(Object key)\r\n            {\r\n                return false;\r\n            }\r\n\r\n            @Override\r\n            public boolean containsValue(Object value)\r\n            {\r\n                return false;\r\n            }\r\n\r\n            @Override\r\n            public V get(Object key)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            @Override\r\n            public V put(K key, V value)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            @Override\r\n            public V remove(Object key)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            @Override\r\n            public void putAll(Map<? extends K, ? extends V> m)\r\n            {\r\n                // noop\r\n            }\r\n\r\n            @Override\r\n            public void clear()\r\n            {\r\n                // noop\r\n            }\r\n\r\n            @Override\r\n            public Set<K> keySet()\r\n            {\r\n                return Collections.emptySet();\r\n            }\r\n\r\n            @Override\r\n            public Collection<V> values()\r\n            {\r\n                return Collections.emptyList();\r\n            }\r\n\r\n            @Override\r\n            public Set<Entry<K, V>> entrySet()\r\n            {\r\n                return Collections.emptySet();\r\n            }\r\n        };\r\n    }\r\n\r\n    public static <T> Set<T> newSet()\r\n    {\r\n        return new HashSet<>();\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/util/CollectionUtils.java b/src/main/java/com/fimtra/util/CollectionUtils.java
+--- a/src/main/java/com/fimtra/util/CollectionUtils.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/main/java/com/fimtra/util/CollectionUtils.java	(date 1778001602938)
+@@ -125,7 +125,7 @@
+      */
+     public static <T> Deque<T> newDeque()
+     {
+-        return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcLinkedList<>() : new LinkedList<>();
++        return UtilProperties.Values.USE_LOW_GC_LINKEDLIST ? new LowGcDeque<>() : new LinkedList<>();
+     }
+ 
+     /**
+Index: src/main/java/com/fimtra/util/LowGcDeque.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/util/LowGcDeque.java b/src/main/java/com/fimtra/util/LowGcDeque.java
+new file mode 100644
+--- /dev/null	(date 1778014551303)
++++ b/src/main/java/com/fimtra/util/LowGcDeque.java	(date 1778014551303)
+@@ -0,0 +1,238 @@
++package com.fimtra.util;
++
++import java.util.ArrayDeque;
++import java.util.Collection;
++import java.util.Deque;
++import java.util.Iterator;
++import java.util.Spliterator;
++import java.util.function.Consumer;
++import java.util.function.Predicate;
++import java.util.stream.Stream;
++
++/**
++ * {@link Deque} backed by an internal {@link LowGcLinkedList}. J21 reversed() method clashes between List and
++ * Deque force this design.
++ * <b>This is not thread-safe.</b>
++ *
++ * @author Ramon Servadei
++ * @see LowGcLinkedList
++ */
++public final class LowGcDeque<E> implements Deque<E>
++{
++    private final LowGcLinkedList<E> delegate;
++
++    public LowGcDeque()
++    {
++        this(UtilProperties.Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);
++    }
++
++    public LowGcDeque(int maxInternalSparePoolSize)
++    {
++        delegate = new LowGcLinkedList<>(maxInternalSparePoolSize);
++    }
++
++    public void addFirst(E e)
++    {
++        delegate.addFirst(e);
++    }
++
++    public E pollLast()
++    {
++        return delegate.pollLast();
++    }
++
++    public E element()
++    {
++        return delegate.element();
++    }
++
++    public E peek()
++    {
++        return delegate.peek();
++    }
++
++    public E removeLast()
++    {
++        return delegate.removeLast();
++    }
++
++    public E remove()
++    {
++        return delegate.remove();
++    }
++
++    public void clear()
++    {
++        delegate.clear();
++    }
++
++    public E poll()
++    {
++        return delegate.poll();
++    }
++
++    public E pollFirst()
++    {
++        return delegate.pollFirst();
++    }
++
++    public Deque<E> reversed()
++    {
++        return new ArrayDeque<E>(delegate.reversed());
++    }
++
++    public <T> T[] toArray(T[] a)
++    {
++        return delegate.toArray(a);
++    }
++
++    public Object[] toArray()
++    {
++        return delegate.toArray();
++    }
++
++    public boolean retainAll(Collection<?> c)
++    {
++        return delegate.retainAll(c);
++    }
++
++    public E peekFirst()
++    {
++        return delegate.peekFirst();
++    }
++
++    public void push(E e)
++    {
++        delegate.push(e);
++    }
++
++    public E peekLast()
++    {
++        return delegate.peekLast();
++    }
++
++    public E getFirst()
++    {
++        return delegate.getFirst();
++    }
++
++    public boolean removeIf(Predicate<? super E> filter)
++    {
++        return delegate.removeIf(filter);
++    }
++
++    public E getLast()
++    {
++        return delegate.getLast();
++    }
++
++    public boolean addAll(Collection<? extends E> c)
++    {
++        return delegate.addAll(c);
++    }
++
++    public boolean removeAll(Collection<?> c)
++    {
++        return delegate.removeAll(c);
++    }
++
++    public void addLast(E e)
++    {
++        delegate.addLast(e);
++    }
++
++    public boolean isEmpty()
++    {
++        return delegate.isEmpty();
++    }
++
++    public void forEach(Consumer<? super E> action)
++    {
++        delegate.forEach(action);
++    }
++
++    public boolean removeLastOccurrence(Object o)
++    {
++        return delegate.removeLastOccurrence(o);
++    }
++
++    public boolean contains(Object o)
++    {
++        return delegate.contains(o);
++    }
++
++    public boolean offerFirst(E e)
++    {
++        return delegate.offerFirst(e);
++    }
++
++    public E pop()
++    {
++        return delegate.pop();
++    }
++
++    public boolean removeFirstOccurrence(Object o)
++    {
++        return delegate.removeFirstOccurrence(o);
++    }
++
++    public boolean containsAll(Collection<?> c)
++    {
++        return delegate.containsAll(c);
++    }
++
++    public boolean remove(Object o)
++    {
++        return delegate.remove(o);
++    }
++
++    public Stream<E> parallelStream()
++    {
++        return delegate.parallelStream();
++    }
++
++    public boolean offer(E e)
++    {
++        return delegate.offer(e);
++    }
++
++    public Iterator<E> iterator()
++    {
++        return delegate.iterator();
++    }
++
++    public E removeFirst()
++    {
++        return delegate.removeFirst();
++    }
++
++    public Iterator<E> descendingIterator()
++    {
++        return delegate.descendingIterator();
++    }
++
++    public Stream<E> stream()
++    {
++        return delegate.stream();
++    }
++
++    public Spliterator<E> spliterator()
++    {
++        return delegate.spliterator();
++    }
++
++    public boolean add(E e)
++    {
++        return delegate.add(e);
++    }
++
++    public int size()
++    {
++        return delegate.size();
++    }
++
++    public boolean offerLast(E e)
++    {
++        return delegate.offerLast(e);
++    }
++}
+Index: src/main/java/com/fimtra/util/LowGcLinkedList.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2015 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.util;\r\n\r\nimport java.io.IOException;\r\nimport java.io.ObjectInputStream;\r\nimport java.io.ObjectOutputStream;\r\nimport java.io.Serializable;\r\nimport java.util.AbstractSequentialList;\r\nimport java.util.Collection;\r\nimport java.util.ConcurrentModificationException;\r\nimport java.util.Deque;\r\nimport java.util.Iterator;\r\nimport java.util.LinkedList;\r\nimport java.util.ListIterator;\r\nimport java.util.NoSuchElementException;\r\n\r\nimport com.fimtra.util.UtilProperties.Values;\r\n\r\n/**\r\n * A version of the standard {@link LinkedList} that uses an internal pool of objects to wrap and hold entries\r\n * added to the list. This technique reduces garbage churn at the expense of a higher memory footprint and\r\n * some extra (minor) processing.\r\n * <p>\r\n * The internal pool will adapt to resize to 1/4 of the list size but has a starting limit set by {@link\r\n * Values#LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE}.\r\n * <p>\r\n * <b>This is not thread-safe.</b>\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic final class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deque<E>, Serializable\r\n{\r\n    private static final long serialVersionUID = 1L;\r\n\r\n    final static class Node<E>\r\n    {\r\n        E item;\r\n        Node<E> next;\r\n        Node<E> prev;\r\n\r\n        Node()\r\n        {\r\n        }\r\n    }\r\n\r\n    transient int size = 0;\r\n    transient Node<E> first;\r\n    transient Node<E> last;\r\n\r\n    Node<E> spare;\r\n    int spareCount;\r\n\r\n    private int maxInternalSparePoolSize;\r\n\r\n    public LowGcLinkedList(int maxInternalSparePoolSize)\r\n    {\r\n        this.maxInternalSparePoolSize = maxInternalSparePoolSize;\r\n    }\r\n\r\n    public LowGcLinkedList()\r\n    {\r\n        this(Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);\r\n    }\r\n\r\n    public LowGcLinkedList(Collection<? extends E> c)\r\n    {\r\n        this(Values.LOW_GC_LINKEDLIST_INTERNAL_SPARE_POOL_SIZE);\r\n        addAll(c);\r\n    }\r\n\r\n    private void linkFirst(E e)\r\n    {\r\n        final Node<E> f = this.first;\r\n        final Node<E> newNode = wrap(null, e, f);\r\n        this.first = newNode;\r\n        if (f == null)\r\n        {\r\n            this.last = newNode;\r\n        }\r\n        else\r\n        {\r\n            f.prev = newNode;\r\n        }\r\n        this.size++;\r\n        this.modCount++;\r\n    }\r\n\r\n    void linkLast(E e)\r\n    {\r\n        final Node<E> l = this.last;\r\n        final Node<E> newNode = wrap(l, e, null);\r\n        this.last = newNode;\r\n        if (l == null)\r\n        {\r\n            this.first = newNode;\r\n        }\r\n        else\r\n        {\r\n            l.next = newNode;\r\n        }\r\n        this.size++;\r\n        this.modCount++;\r\n    }\r\n\r\n    void linkBefore(E e, Node<E> succ)\r\n    {\r\n        final Node<E> pred = succ.prev;\r\n        final Node<E> newNode = wrap(pred, e, succ);\r\n        succ.prev = newNode;\r\n        if (pred == null)\r\n        {\r\n            this.first = newNode;\r\n        }\r\n        else\r\n        {\r\n            pred.next = newNode;\r\n        }\r\n        this.size++;\r\n        this.modCount++;\r\n    }\r\n\r\n    private E unlinkFirst(Node<E> f)\r\n    {\r\n        final E element = f.item;\r\n        final Node<E> next = f.next;\r\n        f.item = null;\r\n        f.next = null;\r\n        this.first = next;\r\n        if (next == null)\r\n        {\r\n            this.last = null;\r\n        }\r\n        else\r\n        {\r\n            next.prev = null;\r\n        }\r\n        release(f);\r\n        this.size--;\r\n        this.modCount++;\r\n        return element;\r\n    }\r\n\r\n    private E unlinkLast(Node<E> l)\r\n    {\r\n        final E element = l.item;\r\n        final Node<E> prev = l.prev;\r\n        l.item = null;\r\n        l.prev = null;\r\n        this.last = prev;\r\n        if (prev == null)\r\n        {\r\n            this.first = null;\r\n        }\r\n        else\r\n        {\r\n            prev.next = null;\r\n        }\r\n        release(l);\r\n        this.size--;\r\n        this.modCount++;\r\n        return element;\r\n    }\r\n\r\n    E unlink(Node<E> x)\r\n    {\r\n        final E element = x.item;\r\n        final Node<E> next = x.next;\r\n        final Node<E> prev = x.prev;\r\n\r\n        if (prev == null)\r\n        {\r\n            this.first = next;\r\n        }\r\n        else\r\n        {\r\n            prev.next = next;\r\n            x.prev = null;\r\n        }\r\n\r\n        if (next == null)\r\n        {\r\n            this.last = prev;\r\n        }\r\n        else\r\n        {\r\n            next.prev = prev;\r\n            x.next = null;\r\n        }\r\n\r\n        x.item = null;\r\n        release(x);\r\n        this.size--;\r\n        this.modCount++;\r\n        return element;\r\n    }\r\n\r\n    @Override\r\n    public E getFirst()\r\n    {\r\n        final Node<E> f = this.first;\r\n        if (f == null)\r\n        {\r\n            throw new NoSuchElementException();\r\n        }\r\n        return f.item;\r\n    }\r\n\r\n    @Override\r\n    public E getLast()\r\n    {\r\n        final Node<E> l = this.last;\r\n        if (l == null)\r\n        {\r\n            throw new NoSuchElementException();\r\n        }\r\n        return l.item;\r\n    }\r\n\r\n    @Override\r\n    public E removeFirst()\r\n    {\r\n        final Node<E> f = this.first;\r\n        if (f == null)\r\n        {\r\n            throw new NoSuchElementException();\r\n        }\r\n        return unlinkFirst(f);\r\n    }\r\n\r\n    @Override\r\n    public E removeLast()\r\n    {\r\n        final Node<E> l = this.last;\r\n        if (l == null)\r\n        {\r\n            throw new NoSuchElementException();\r\n        }\r\n        return unlinkLast(l);\r\n    }\r\n\r\n    @Override\r\n    public void addFirst(E e)\r\n    {\r\n        linkFirst(e);\r\n    }\r\n\r\n    @Override\r\n    public void addLast(E e)\r\n    {\r\n        linkLast(e);\r\n    }\r\n\r\n    @Override\r\n    public boolean contains(Object o)\r\n    {\r\n        return indexOf(o) != -1;\r\n    }\r\n\r\n    @Override\r\n    public int size()\r\n    {\r\n        return this.size;\r\n    }\r\n\r\n    @Override\r\n    public boolean add(E e)\r\n    {\r\n        linkLast(e);\r\n        return true;\r\n    }\r\n\r\n    @Override\r\n    public boolean remove(Object o)\r\n    {\r\n        if (o == null)\r\n        {\r\n            for (Node<E> x = this.first; x != null; x = x.next)\r\n            {\r\n                if (x.item == null)\r\n                {\r\n                    unlink(x);\r\n                    return true;\r\n                }\r\n            }\r\n        }\r\n        else\r\n        {\r\n            for (Node<E> x = this.first; x != null; x = x.next)\r\n            {\r\n                if (o.equals(x.item))\r\n                {\r\n                    unlink(x);\r\n                    return true;\r\n                }\r\n            }\r\n        }\r\n        return false;\r\n    }\r\n\r\n    @Override\r\n    public boolean addAll(Collection<? extends E> c)\r\n    {\r\n        return addAll(this.size, c);\r\n    }\r\n\r\n    @Override\r\n    public boolean addAll(int index, Collection<? extends E> c)\r\n    {\r\n        checkPositionIndex(index);\r\n\r\n        Object[] a = c.toArray();\r\n        int numNew = a.length;\r\n        if (numNew == 0)\r\n        {\r\n            return false;\r\n        }\r\n\r\n        Node<E> pred, succ;\r\n        if (index == this.size)\r\n        {\r\n            succ = null;\r\n            pred = this.last;\r\n        }\r\n        else\r\n        {\r\n            succ = node(index);\r\n            pred = succ.prev;\r\n        }\r\n\r\n        for (Object o : a)\r\n        {\r\n            @SuppressWarnings(\"unchecked\") E e = (E) o;\r\n            Node<E> newNode = wrap(pred, e, null);\r\n            if (pred == null)\r\n            {\r\n                this.first = newNode;\r\n            }\r\n            else\r\n            {\r\n                pred.next = newNode;\r\n            }\r\n            pred = newNode;\r\n        }\r\n\r\n        if (succ == null)\r\n        {\r\n            this.last = pred;\r\n        }\r\n        else\r\n        {\r\n            pred.next = succ;\r\n            succ.prev = pred;\r\n        }\r\n\r\n        this.size += numNew;\r\n        this.modCount++;\r\n        return true;\r\n    }\r\n\r\n    @Override\r\n    public void clear()\r\n    {\r\n        for (Node<E> x = this.first; x != null; )\r\n        {\r\n            Node<E> next = x.next;\r\n            x.item = null;\r\n            x.next = null;\r\n            x.prev = null;\r\n            x = next;\r\n        }\r\n        this.first = this.last = null;\r\n        this.size = 0;\r\n        this.modCount++;\r\n    }\r\n\r\n    @Override\r\n    public E get(int index)\r\n    {\r\n        checkElementIndex(index);\r\n        return node(index).item;\r\n    }\r\n\r\n    @Override\r\n    public E set(int index, E element)\r\n    {\r\n        checkElementIndex(index);\r\n        Node<E> x = node(index);\r\n        E oldVal = x.item;\r\n        x.item = element;\r\n        return oldVal;\r\n    }\r\n\r\n    @Override\r\n    public void add(int index, E element)\r\n    {\r\n        checkPositionIndex(index);\r\n\r\n        if (index == this.size)\r\n        {\r\n            linkLast(element);\r\n        }\r\n        else\r\n        {\r\n            linkBefore(element, node(index));\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public E remove(int index)\r\n    {\r\n        checkElementIndex(index);\r\n        return unlink(node(index));\r\n    }\r\n\r\n    private boolean isElementIndex(int index)\r\n    {\r\n        return index >= 0 && index < this.size;\r\n    }\r\n\r\n    private boolean isPositionIndex(int index)\r\n    {\r\n        return index >= 0 && index <= this.size;\r\n    }\r\n\r\n    private String outOfBoundsMsg(int index)\r\n    {\r\n        return \"Index: \" + index + \", Size: \" + this.size;\r\n    }\r\n\r\n    private void checkElementIndex(int index)\r\n    {\r\n        if (!isElementIndex(index))\r\n        {\r\n            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));\r\n        }\r\n    }\r\n\r\n    private void checkPositionIndex(int index)\r\n    {\r\n        if (!isPositionIndex(index))\r\n        {\r\n            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));\r\n        }\r\n    }\r\n\r\n    Node<E> node(int index)\r\n    {\r\n        Node<E> x;\r\n        if (index < (this.size >> 1))\r\n        {\r\n            x = this.first;\r\n            for (int i = 0; i < index; i++)\r\n            {\r\n                x = x.next;\r\n            }\r\n        }\r\n        else\r\n        {\r\n            x = this.last;\r\n            for (int i = this.size - 1; i > index; i--)\r\n            {\r\n                x = x.prev;\r\n            }\r\n        }\r\n        return x;\r\n    }\r\n\r\n    @Override\r\n    public int indexOf(Object o)\r\n    {\r\n        int index = 0;\r\n        if (o == null)\r\n        {\r\n            for (Node<E> x = this.first; x != null; x = x.next)\r\n            {\r\n                if (x.item == null)\r\n                {\r\n                    return index;\r\n                }\r\n                index++;\r\n            }\r\n        }\r\n        else\r\n        {\r\n            for (Node<E> x = this.first; x != null; x = x.next)\r\n            {\r\n                if (o.equals(x.item))\r\n                {\r\n                    return index;\r\n                }\r\n                index++;\r\n            }\r\n        }\r\n        return -1;\r\n    }\r\n\r\n    @Override\r\n    public int lastIndexOf(Object o)\r\n    {\r\n        int index = this.size;\r\n        if (o == null)\r\n        {\r\n            for (Node<E> x = this.last; x != null; x = x.prev)\r\n            {\r\n                index--;\r\n                if (x.item == null)\r\n                {\r\n                    return index;\r\n                }\r\n            }\r\n        }\r\n        else\r\n        {\r\n            for (Node<E> x = this.last; x != null; x = x.prev)\r\n            {\r\n                index--;\r\n                if (o.equals(x.item))\r\n                {\r\n                    return index;\r\n                }\r\n            }\r\n        }\r\n        return -1;\r\n    }\r\n\r\n    @Override\r\n    public E peek()\r\n    {\r\n        final Node<E> f = this.first;\r\n        return (f == null) ? null : f.item;\r\n    }\r\n\r\n    @Override\r\n    public E element()\r\n    {\r\n        return getFirst();\r\n    }\r\n\r\n    @Override\r\n    public E poll()\r\n    {\r\n        final Node<E> f = this.first;\r\n        return (f == null) ? null : unlinkFirst(f);\r\n    }\r\n\r\n    @Override\r\n    public E remove()\r\n    {\r\n        return removeFirst();\r\n    }\r\n\r\n    @Override\r\n    public boolean offer(E e)\r\n    {\r\n        return add(e);\r\n    }\r\n\r\n    @Override\r\n    public boolean offerFirst(E e)\r\n    {\r\n        linkFirst(e);\r\n        return true;\r\n    }\r\n\r\n    @Override\r\n    public boolean offerLast(E e)\r\n    {\r\n        linkLast(e);\r\n        return true;\r\n    }\r\n\r\n    @Override\r\n    public E peekFirst()\r\n    {\r\n        final Node<E> f = this.first;\r\n        return (f == null) ? null : f.item;\r\n    }\r\n\r\n    @Override\r\n    public E peekLast()\r\n    {\r\n        final Node<E> l = this.last;\r\n        return (l == null) ? null : l.item;\r\n    }\r\n\r\n    @Override\r\n    public E pollFirst()\r\n    {\r\n        final Node<E> f = this.first;\r\n        return (f == null) ? null : unlinkFirst(f);\r\n    }\r\n\r\n    @Override\r\n    public E pollLast()\r\n    {\r\n        final Node<E> l = this.last;\r\n        return (l == null) ? null : unlinkLast(l);\r\n    }\r\n\r\n    @Override\r\n    public void push(E e)\r\n    {\r\n        linkFirst(e);\r\n    }\r\n\r\n    @Override\r\n    public E pop()\r\n    {\r\n        return removeFirst();\r\n    }\r\n\r\n    @Override\r\n    public boolean removeFirstOccurrence(Object o)\r\n    {\r\n        return remove(o);\r\n    }\r\n\r\n    @Override\r\n    public boolean removeLastOccurrence(Object o)\r\n    {\r\n        if (o == null)\r\n        {\r\n            for (Node<E> x = this.last; x != null; x = x.prev)\r\n            {\r\n                if (x.item == null)\r\n                {\r\n                    unlink(x);\r\n                    return true;\r\n                }\r\n            }\r\n        }\r\n        else\r\n        {\r\n            for (Node<E> x = this.last; x != null; x = x.prev)\r\n            {\r\n                if (o.equals(x.item))\r\n                {\r\n                    unlink(x);\r\n                    return true;\r\n                }\r\n            }\r\n        }\r\n        return false;\r\n    }\r\n\r\n    @Override\r\n    public ListIterator<E> listIterator(int index)\r\n    {\r\n        checkPositionIndex(index);\r\n        return new ListItr(index);\r\n    }\r\n\r\n    @SuppressWarnings(\"synthetic-access\")\r\n    private class ListItr implements ListIterator<E>\r\n    {\r\n        private Node<E> lastReturned = null;\r\n        private Node<E> next;\r\n        private int nextIndex;\r\n        private int expectedModCount = LowGcLinkedList.this.modCount;\r\n\r\n        ListItr(int index)\r\n        {\r\n            this.next = (index == LowGcLinkedList.this.size) ? null : node(index);\r\n            this.nextIndex = index;\r\n        }\r\n\r\n        @Override\r\n        public boolean hasNext()\r\n        {\r\n            return this.nextIndex < LowGcLinkedList.this.size;\r\n        }\r\n\r\n        @Override\r\n        public E next()\r\n        {\r\n            checkForComodification();\r\n            if (!hasNext())\r\n            {\r\n                throw new NoSuchElementException();\r\n            }\r\n\r\n            this.lastReturned = this.next;\r\n            this.next = this.next.next;\r\n            this.nextIndex++;\r\n            return this.lastReturned.item;\r\n        }\r\n\r\n        @Override\r\n        public boolean hasPrevious()\r\n        {\r\n            return this.nextIndex > 0;\r\n        }\r\n\r\n        @Override\r\n        public E previous()\r\n        {\r\n            checkForComodification();\r\n            if (!hasPrevious())\r\n            {\r\n                throw new NoSuchElementException();\r\n            }\r\n\r\n            this.lastReturned = this.next = (this.next == null) ? LowGcLinkedList.this.last : this.next.prev;\r\n            this.nextIndex--;\r\n            return this.lastReturned.item;\r\n        }\r\n\r\n        @Override\r\n        public int nextIndex()\r\n        {\r\n            return this.nextIndex;\r\n        }\r\n\r\n        @Override\r\n        public int previousIndex()\r\n        {\r\n            return this.nextIndex - 1;\r\n        }\r\n\r\n        @Override\r\n        public void remove()\r\n        {\r\n            checkForComodification();\r\n            if (this.lastReturned == null)\r\n            {\r\n                throw new IllegalStateException();\r\n            }\r\n\r\n            Node<E> lastNext = this.lastReturned.next;\r\n            unlink(this.lastReturned);\r\n            if (this.next == this.lastReturned)\r\n            {\r\n                this.next = lastNext;\r\n            }\r\n            else\r\n            {\r\n                this.nextIndex--;\r\n            }\r\n            this.lastReturned = null;\r\n            this.expectedModCount++;\r\n        }\r\n\r\n        @Override\r\n        public void set(E e)\r\n        {\r\n            if (this.lastReturned == null)\r\n            {\r\n                throw new IllegalStateException();\r\n            }\r\n            checkForComodification();\r\n            this.lastReturned.item = e;\r\n        }\r\n\r\n        @Override\r\n        public void add(E e)\r\n        {\r\n            checkForComodification();\r\n            this.lastReturned = null;\r\n            if (this.next == null)\r\n            {\r\n                linkLast(e);\r\n            }\r\n            else\r\n            {\r\n                linkBefore(e, this.next);\r\n            }\r\n            this.nextIndex++;\r\n            this.expectedModCount++;\r\n        }\r\n\r\n        final void checkForComodification()\r\n        {\r\n            if (LowGcLinkedList.this.modCount != this.expectedModCount)\r\n            {\r\n                throw new ConcurrentModificationException();\r\n            }\r\n        }\r\n    }\r\n\r\n    public int getSpareCount()\r\n    {\r\n        return this.spareCount;\r\n    }\r\n\r\n    private void release(Node<E> node)\r\n    {\r\n        node.prev = null;\r\n        node.next = null;\r\n        node.item = null;\r\n        if (this.spare == null)\r\n        {\r\n            this.spare = node;\r\n            this.spareCount++;\r\n        }\r\n        else\r\n        {\r\n            // >> 2 for quarter\r\n            final int adaptedSize = this.size >> 2;\r\n            if (adaptedSize > this.maxInternalSparePoolSize)\r\n            {\r\n                this.maxInternalSparePoolSize = adaptedSize;\r\n            }\r\n            if (this.spareCount < this.maxInternalSparePoolSize)\r\n            {\r\n                node.prev = this.spare;\r\n                this.spare = node;\r\n                this.spareCount++;\r\n            }\r\n        }\r\n    }\r\n\r\n    private Node<E> wrap(Node<E> prev, E element, Node<E> next)\r\n    {\r\n        Node<E> node;\r\n        if (this.spare != null)\r\n        {\r\n            this.spareCount--;\r\n            node = this.spare;\r\n            this.spare = this.spare.prev;\r\n        }\r\n        else\r\n        {\r\n            node = new Node<>();\r\n        }\r\n        node.prev = prev;\r\n        node.next = next;\r\n        node.item = element;\r\n        return node;\r\n    }\r\n\r\n    @Override\r\n    public Iterator<E> descendingIterator()\r\n    {\r\n        return new DescendingIterator();\r\n    }\r\n\r\n    private class DescendingIterator implements Iterator<E>\r\n    {\r\n        private final ListItr itr = new ListItr(size());\r\n\r\n        DescendingIterator()\r\n        {\r\n        }\r\n\r\n        @Override\r\n        public boolean hasNext()\r\n        {\r\n            return this.itr.hasPrevious();\r\n        }\r\n\r\n        @Override\r\n        public E next()\r\n        {\r\n            return this.itr.previous();\r\n        }\r\n\r\n        @Override\r\n        public void remove()\r\n        {\r\n            this.itr.remove();\r\n        }\r\n    }\r\n\r\n    @SuppressWarnings(\"unchecked\")\r\n    private LowGcLinkedList<E> superClone()\r\n    {\r\n        try\r\n        {\r\n            return (LowGcLinkedList<E>) super.clone();\r\n        }\r\n        catch (CloneNotSupportedException e)\r\n        {\r\n            throw new InternalError();\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public Object clone()\r\n    {\r\n        LowGcLinkedList<E> clone = superClone();\r\n\r\n        clone.first = clone.last = null;\r\n        clone.size = 0;\r\n        clone.modCount = 0;\r\n\r\n        for (Node<E> x = this.first; x != null; x = x.next)\r\n        {\r\n            clone.add(x.item);\r\n        }\r\n\r\n        return clone;\r\n    }\r\n\r\n    @Override\r\n    public Object[] toArray()\r\n    {\r\n        Object[] result = new Object[this.size];\r\n        int i = 0;\r\n        for (Node<E> x = this.first; x != null; x = x.next)\r\n        {\r\n            result[i++] = x.item;\r\n        }\r\n        return result;\r\n    }\r\n\r\n    @Override\r\n    @SuppressWarnings(\"unchecked\")\r\n    public <T> T[] toArray(T[] a)\r\n    {\r\n        if (a.length < this.size)\r\n        {\r\n            a = (T[]) java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), this.size);\r\n        }\r\n        int i = 0;\r\n        Object[] result = a;\r\n        for (Node<E> x = this.first; x != null; x = x.next)\r\n        {\r\n            result[i++] = x.item;\r\n        }\r\n\r\n        if (a.length > this.size)\r\n        {\r\n            a[this.size] = null;\r\n        }\r\n\r\n        return a;\r\n    }\r\n\r\n    private void writeObject(ObjectOutputStream s) throws IOException\r\n    {\r\n        s.defaultWriteObject();\r\n        s.writeInt(this.size);\r\n        for (Node<E> x = this.first; x != null; x = x.next)\r\n        {\r\n            s.writeObject(x.item);\r\n        }\r\n    }\r\n\r\n    @SuppressWarnings(\"unchecked\")\r\n    private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException\r\n    {\r\n        s.defaultReadObject();\r\n        int size = s.readInt();\r\n        for (int i = 0; i < size; i++)\r\n        {\r\n            linkLast((E) s.readObject());\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/util/LowGcLinkedList.java b/src/main/java/com/fimtra/util/LowGcLinkedList.java
+--- a/src/main/java/com/fimtra/util/LowGcLinkedList.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/main/java/com/fimtra/util/LowGcLinkedList.java	(date 1778014423991)
+@@ -22,9 +22,9 @@
+ import java.util.AbstractSequentialList;
+ import java.util.Collection;
+ import java.util.ConcurrentModificationException;
+-import java.util.Deque;
+ import java.util.Iterator;
+ import java.util.LinkedList;
++import java.util.List;
+ import java.util.ListIterator;
+ import java.util.NoSuchElementException;
+ 
+@@ -42,7 +42,8 @@
+  *
+  * @author Ramon Servadei
+  */
+-public final class LowGcLinkedList<E> extends AbstractSequentialList<E> implements Deque<E>, Serializable
++public final class LowGcLinkedList<E> extends AbstractSequentialList<E>
++        implements List<E>, Serializable, Cloneable
+ {
+     private static final long serialVersionUID = 1L;
+ 
+@@ -208,7 +209,6 @@
+         return element;
+     }
+ 
+-    @Override
+     public E getFirst()
+     {
+         final Node<E> f = this.first;
+@@ -219,7 +219,6 @@
+         return f.item;
+     }
+ 
+-    @Override
+     public E getLast()
+     {
+         final Node<E> l = this.last;
+@@ -230,7 +229,6 @@
+         return l.item;
+     }
+ 
+-    @Override
+     public E removeFirst()
+     {
+         final Node<E> f = this.first;
+@@ -241,7 +239,6 @@
+         return unlinkFirst(f);
+     }
+ 
+-    @Override
+     public E removeLast()
+     {
+         final Node<E> l = this.last;
+@@ -252,13 +249,11 @@
+         return unlinkLast(l);
+     }
+ 
+-    @Override
+     public void addFirst(E e)
+     {
+         linkFirst(e);
+     }
+ 
+-    @Override
+     public void addLast(E e)
+     {
+         linkLast(e);
+@@ -537,99 +532,84 @@
+         return -1;
+     }
+ 
+-    @Override
+     public E peek()
+     {
+         final Node<E> f = this.first;
+         return (f == null) ? null : f.item;
+     }
+ 
+-    @Override
+     public E element()
+     {
+         return getFirst();
+     }
+ 
+-    @Override
+     public E poll()
+     {
+         final Node<E> f = this.first;
+         return (f == null) ? null : unlinkFirst(f);
+     }
+ 
+-    @Override
+     public E remove()
+     {
+         return removeFirst();
+     }
+ 
+-    @Override
+     public boolean offer(E e)
+     {
+         return add(e);
+     }
+ 
+-    @Override
+     public boolean offerFirst(E e)
+     {
+         linkFirst(e);
+         return true;
+     }
+ 
+-    @Override
+     public boolean offerLast(E e)
+     {
+         linkLast(e);
+         return true;
+     }
+ 
+-    @Override
+     public E peekFirst()
+     {
+         final Node<E> f = this.first;
+         return (f == null) ? null : f.item;
+     }
+ 
+-    @Override
+     public E peekLast()
+     {
+         final Node<E> l = this.last;
+         return (l == null) ? null : l.item;
+     }
+ 
+-    @Override
+     public E pollFirst()
+     {
+         final Node<E> f = this.first;
+         return (f == null) ? null : unlinkFirst(f);
+     }
+ 
+-    @Override
+     public E pollLast()
+     {
+         final Node<E> l = this.last;
+         return (l == null) ? null : unlinkLast(l);
+     }
+ 
+-    @Override
+     public void push(E e)
+     {
+         linkFirst(e);
+     }
+ 
+-    @Override
+     public E pop()
+     {
+         return removeFirst();
+     }
+ 
+-    @Override
+     public boolean removeFirstOccurrence(Object o)
+     {
+         return remove(o);
+     }
+ 
+-    @Override
+     public boolean removeLastOccurrence(Object o)
+     {
+         if (o == null)
+@@ -657,6 +637,22 @@
+         return false;
+     }
+ 
++    public List<E> reversed()
++    {
++        LowGcLinkedList<E> clone = superClone();
++
++        clone.first = clone.last = null;
++        clone.size = 0;
++        clone.modCount = 0;
++
++        for (Node<E> x = this.first; x != null; x = x.next)
++        {
++            clone.linkFirst(x.item);
++        }
++
++        return clone;
++    }
++
+     @Override
+     public ListIterator<E> listIterator(int index)
+     {
+@@ -842,7 +838,6 @@
+         return node;
+     }
+ 
+-    @Override
+     public Iterator<E> descendingIterator()
+     {
+         return new DescendingIterator();
+Index: src/test/java/com/fimtra/datafission/field/DoubleValueCodecTest.java
+===================================================================
+diff --git a/src/test/java/com/fimtra/datafission/field/DoubleValueCodecTest.java b/src/test/java/com/fimtra/datafission/field/DoubleValueCodecTest.java
+deleted file mode 100644
+--- a/src/test/java/com/fimtra/datafission/field/DoubleValueCodecTest.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ /dev/null	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
+@@ -1,373 +0,0 @@
+-package com.fimtra.datafission.field;
+-
+-import static com.fimtra.datafission.field.DoubleValueCodec.MAX_SMALL_TEN;
+-import static com.fimtra.datafission.field.DoubleValueCodec.writeToCharArray;
+-import static org.junit.Assert.assertEquals;
+-import static org.junit.Assert.fail;
+-
+-import java.math.BigDecimal;
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Random;
+-
+-import com.fimtra.util.StringAppender;
+-import org.junit.Before;
+-import org.junit.Ignore;
+-import org.junit.Test;
+-
+-/**
+- * Tests for the {@link DoubleValueCodec}
+- *
+- * @author Ramon Servadei
+- */
+-public class DoubleValueCodecTest
+-{
+-    static final double delta = 0.000000000000000000000000001d;
+-
+-    static void _testPositiveAndNegative(String d)
+-    {
+-        _test_double_to_string_to_double(d);
+-        if (Character.isDigit(d.charAt(0)))
+-        {
+-            _test_double_to_string_to_double("-" + d);
+-            _test_double_to_string_to_double("+" + d);
+-        }
+-    }
+-
+-    private static final ThreadLocal<StringAppender> STRING_APPENDER_THREAD_LOCAL =
+-            ThreadLocal.withInitial(StringAppender::new);
+-
+-    private static String toString(double d)
+-    {
+-        final StringAppender stringAppender = STRING_APPENDER_THREAD_LOCAL.get();
+-        stringAppender.setLength(0);
+-        writeToCharArray(d, stringAppender);
+-        return stringAppender.toString();
+-    }
+-
+-    private static void _test_double_to_string_to_double(String stringValue)
+-    {
+-        char[] charArray = stringValue.toCharArray();
+-
+-        final double codec_dVal = DoubleValueCodec.fromCharArray(charArray, 0, charArray.length);
+-        // check we can rebuild from our own codec value
+-        final char[] codec_charArray = toString(codec_dVal).toCharArray();
+-        assertEquals(codec_dVal, DoubleValueCodec.fromCharArray(codec_charArray, 0, codec_charArray.length),
+-                delta);
+-
+-        // check java double matches codec double
+-        assertEquals(Double.parseDouble(stringValue), codec_dVal, delta);
+-
+-        // check reverse Double compatibility
+-        charArray = Double.toString(codec_dVal)
+-                .toCharArray();
+-        assertEquals(codec_dVal, DoubleValueCodec.fromCharArray(charArray, 0, charArray.length), delta);
+-    }
+-
+-    @Before
+-    public void setUp() throws Exception
+-    {
+-    }
+-
+-    @Test
+-    public void test_invalidInputs()
+-    {
+-        final List<String> invalid = new ArrayList<>();
+-
+-        invalid.add("Na");
+-        invalid.add("NAN");
+-        invalid.add("Nan");
+-        invalid.add("Infinit");
+-        invalid.add("INfinity");
+-        invalid.add("InFinity");
+-        invalid.add("InfInity");
+-        invalid.add("InfiNity");
+-        invalid.add("InfinIty");
+-        invalid.add("InfiniTy");
+-        invalid.add("InfinitY");
+-        invalid.add("12.345.6789");
+-        invalid.add("00.12.6789");
+-        invalid.add("00.123456789123456789.89");
+-        invalid.add("0f0.123456789123456789.89");
+-        invalid.add("");
+-        invalid.add(" ");
+-        invalid.add("+");
+-        invalid.add("-");
+-        invalid.add("0..123");
+-        invalid.add("1234567890..1");
+-        invalid.add("1249396249097535200000000..123");
+-        invalid.add("3.1415926535898E2147d483640");
+-        invalid.add("3.1415926535898E ");
+-        invalid.add("3.141g");
+-
+-        char[] charArray = null;
+-        for (String s : invalid)
+-        {
+-            charArray = s.toCharArray();
+-            try
+-            {
+-                DoubleValueCodec.fromCharArray(charArray, 0, charArray.length);
+-                fail("Expected NumberFormatException for [" + s + "]");
+-            }
+-            catch (NumberFormatException e)
+-            {
+-                // ok
+-            }
+-        }
+-    }
+-
+-    @Test
+-    public void test_workbench()
+-    {
+-        String dVal = "12345678901234.567890123e-200";
+-
+-        final char[] charArray = dVal.toCharArray();
+-        final double actual = DoubleValueCodec.fromCharArray(charArray, 0, charArray.length);
+-        final double expected = Double.parseDouble(new String(charArray));
+-        System.err.println("test_workbench expected=" + expected);
+-        assertEquals(expected, actual, delta);
+-        final StringAppender stringAppender = new StringAppender();
+-        writeToCharArray(expected, stringAppender);
+-        System.err.println("test_workbench stringAppender.toString()=" + stringAppender);
+-    }
+-
+-    @Test
+-    public void test_specialCase_roundup_1()
+-    {
+-        final DoubleValueCodec.DoubleToString candidate = new DoubleValueCodec.DoubleToString();
+-        int i = 0;
+-        candidate.nDigits = 6;
+-        candidate.digits[i++] = '1';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-
+-        final int prevDecExp = candidate.decExponent;
+-        candidate.roundup();
+-
+-        assertEquals('2', (candidate.digits[candidate.firstDigitIndex]));
+-        assertEquals(prevDecExp, candidate.decExponent);
+-    }
+-
+-    @Test
+-    public void test_specialCase_roundup_2()
+-    {
+-        final DoubleValueCodec.DoubleToString candidate = new DoubleValueCodec.DoubleToString();
+-        int i = 0;
+-        candidate.nDigits = 6;
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-        candidate.digits[i++] = '9';
+-
+-        final int prevDecExp = candidate.decExponent;
+-        candidate.roundup();
+-
+-        assertEquals('1', (candidate.digits[candidate.firstDigitIndex]));
+-        assertEquals(prevDecExp + 1, candidate.decExponent);
+-    }
+-
+-    @Test
+-    public void test_specialCase_populateAppender()
+-    {
+-        final DoubleValueCodec.DoubleToString candidate = new DoubleValueCodec.DoubleToString();
+-        int i = 0;
+-        candidate.digits[i++] = '1';
+-        candidate.digits[i++] = '1';
+-        for (; i < candidate.digits.length; i++)
+-        {
+-            candidate.digits[i] = '0';
+-        }
+-
+-        _test_populateAppender(candidate, 6, 0, "000000.0");
+-        _test_populateAppender(candidate, 6, 1, "100000.0");
+-        _test_populateAppender(candidate, 6, 2, "110000.0");
+-        _test_populateAppender(candidate, 6, 8, "110000.00");
+-
+-        _test_populateAppender(candidate, 0, 0, "0.");
+-        _test_populateAppender(candidate, 0, 1, "0.1");
+-        _test_populateAppender(candidate, 0, 2, "0.11");
+-        _test_populateAppender(candidate, 0, 3, "0.110");
+-
+-        _test_populateAppender(candidate, -1, 0, "0.0");
+-        _test_populateAppender(candidate, -1, 1, "0.01");
+-        _test_populateAppender(candidate, -1, 2, "0.011");
+-        _test_populateAppender(candidate, -1, 3, "0.0110");
+-
+-        _test_populateAppender(candidate, -3, 0, "1.0E-4");
+-        _test_populateAppender(candidate, -3, 1, "1.0E-4");
+-        _test_populateAppender(candidate, -3, 2, "1.1E-4");
+-        _test_populateAppender(candidate, -3, 3, "1.10E-4");
+-    }
+-
+-    private void _test_populateAppender(DoubleValueCodec.DoubleToString candidate, int decExp, int nDigits,
+-            String expected)
+-    {
+-        candidate.decExponent = decExp;
+-        candidate.nDigits = nDigits;
+-        final StringAppender stringAppender = new StringAppender();
+-        candidate.accept(stringAppender);
+-        assertEquals(expected, stringAppender.toString());
+-    }
+-
+-    @Ignore
+-    @Test
+-    public void test_100_million_takes_5mins()
+-    {
+-        double current = 0;
+-        Random random = new Random();
+-        while (current < 100_000_000d)
+-        {
+-            // check to-from for this "integral" and a random number
+-            _testPositiveAndNegative(Double.toString(current + random.nextDouble()));
+-
+-            if (++current % 1_000_000 == 0)
+-            {
+-                System.err.println("Completed " + current);
+-            }
+-        }
+-    }
+-
+-    @Test
+-    public void test_MAIN()
+-    {
+-        _testPositiveAndNegative(Double.toString(Double.NaN));
+-        _testPositiveAndNegative(Double.toString(Double.POSITIVE_INFINITY));
+-        _testPositiveAndNegative(Double.toString(Double.NEGATIVE_INFINITY));
+-        _testPositiveAndNegative(Double.toString(Double.MAX_VALUE));
+-        _testPositiveAndNegative(Double.toString(Double.MIN_VALUE));
+-
+-        _testPositiveAndNegative("0");
+-        _testPositiveAndNegative("0.0");
+-        _testPositiveAndNegative("00000000.0");
+-        _testPositiveAndNegative("00000000000000000.0");
+-        _testPositiveAndNegative("00000000.01");
+-        _testPositiveAndNegative("00000000000000000000000000000000.01");
+-
+-        _testPositiveAndNegative("2.30569183400573030E18");
+-        _testPositiveAndNegative("2.3056918340057303E18");
+-        _testPositiveAndNegative("1.0");
+-        _testPositiveAndNegative("2047.0");
+-        _testPositiveAndNegative("100.123456789d");
+-        _testPositiveAndNegative("100.123d");
+-
+-        // test endings
+-        _testPositiveAndNegative("12345678d");
+-        _testPositiveAndNegative("12345678D");
+-        _testPositiveAndNegative("12345678f");
+-        _testPositiveAndNegative("12345678F");
+-        _testPositiveAndNegative("1234567890d");
+-        _testPositiveAndNegative("12345678901d");
+-        _testPositiveAndNegative("012493962490975352d");
+-        _testPositiveAndNegative("12345678.1d");
+-        _testPositiveAndNegative("123456789.1D");
+-        _testPositiveAndNegative("1234567890.1d");
+-        _testPositiveAndNegative("12345678901.1D");
+-        _testPositiveAndNegative("1234567890123456789.1d");
+-
+-        // some exponents
+-        _testPositiveAndNegative("1.23456789e8");
+-        _testPositiveAndNegative("1.23456789e136");
+-        _testPositiveAndNegative("3.1415926535898E18");
+-        _testPositiveAndNegative("3.1415926535898E+18");
+-        _testPositiveAndNegative("3.1415926535898E-18");
+-        _testPositiveAndNegative("3.1415926535898E20000");
+-        // check exponent limits
+-        _testPositiveAndNegative("3.1415926535898e214748364");
+-        _testPositiveAndNegative("3.1415926535898e2147483640");
+-        _testPositiveAndNegative("31415926535898E" + (MAX_SMALL_TEN + 1));
+-        _testPositiveAndNegative("3.14159e-200");
+-        _testPositiveAndNegative("3.14159e-400");
+-        _testPositiveAndNegative("0.0000001e-400");
+-
+-        _testPositiveAndNegative("0.08212310038385495d");
+-        _testPositiveAndNegative("0.12345678d");
+-        _testPositiveAndNegative("0.12493962490975352d");
+-        _testPositiveAndNegative("01.12493962490975352d");
+-        _testPositiveAndNegative("1.12493962490975352d");
+-        _testPositiveAndNegative("0.12345678d");
+-        _testPositiveAndNegative("0.12493962490975352d");
+-
+-        _testPositiveAndNegative("100000000100000000100000000100000000.01");
+-
+-        String number = "1";
+-        for (int i = 1; i < 20; i++)
+-        {
+-            _testPositiveAndNegative(number);
+-            number += "0";
+-        }
+-
+-        final Random random = new Random();
+-        for (int i = 0; i < 1000; i++)
+-        {
+-            final double d = random.nextDouble();
+-            _testPositiveAndNegative(Double.toString(d));
+-            final double bigValue = random.nextLong() + d;
+-            _testPositiveAndNegative(Double.toString(bigValue));
+-        }
+-
+-        // test some BIG and super-small numbers
+-
+-        // NOTE: this tests a BIG number with a decExp that is < MAX exp (308)
+-        _testPositiveAndNegative(
+-                "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        // decimal here
+-                        + ".1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        + "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+-                        // some extra to take us over the 1100 digit limit
+-                        + "1234567890");
+-
+-        _testPositiveAndNegative("3.14E300");
+-        _testPositiveAndNegative("3.14E+300");
+-        _testPositiveAndNegative("3.14E-300");
+-        _testPositiveAndNegative("3.14E307");
+-        _testPositiveAndNegative("3.14E-324");
+-    }
+-
+-    // Lifted from the OpenJDK FloatingDecimal tests at:
+-    // https://github.com/openjdk/jdk/blob/master/test/jdk/jdk/internal/math/FloatingDecimal/TestFloatingDecimal.java
+-    @Test
+-    public void test_vsBigDecimal()
+-    {
+-        final int NUM_RANDOM_TESTS = 100_000;
+-        final Random rnd = new Random();
+-        StringAppender stringAppender = new StringAppender();
+-        String dec;
+-        char[] chars;
+-        BigDecimal bd;
+-        String full;
+-
+-        for (int i = 0; i < NUM_RANDOM_TESTS; i++)
+-        {
+-            double[] d = { rnd.nextLong(), rnd.nextInt() * rnd.nextGaussian(), rnd.nextGaussian(),
+-                    rnd.nextDouble() * Double.MAX_VALUE, };
+-            for (double v : d)
+-            {
+-                stringAppender.setLength(0);
+-                DoubleValueCodec.writeToCharArray(v, stringAppender);
+-                dec = stringAppender.toString();
+-                chars = dec.toCharArray();
+-                assertEquals(new BigDecimal(dec).doubleValue(),
+-                        DoubleValueCodec.fromCharArray(chars, 0, chars.length), delta);
+-
+-                bd = new BigDecimal(v);
+-                full = bd.toString();
+-                chars = full.toCharArray();
+-                stringAppender.setLength(0);
+-                assertEquals(bd.doubleValue(), DoubleValueCodec.fromCharArray(chars, 0, chars.length), delta);
+-            }
+-        }
+-    }
+-}
+\ No newline at end of file
+Index: src/test/java/com/fimtra/datafission/field/DoubleValueTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.datafission.field;\r\n\r\nimport static com.fimtra.datafission.DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;\r\nimport static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;\r\nimport static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;\r\nimport static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;\r\nimport static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;\r\nimport static java.lang.Double.NEGATIVE_INFINITY;\r\nimport static java.lang.Double.NaN;\r\nimport static java.lang.Double.POSITIVE_INFINITY;\r\nimport static org.junit.Assert.assertEquals;\r\nimport static org.junit.Assert.assertNotEquals;\r\nimport static org.junit.Assert.assertNotSame;\r\nimport static org.junit.Assert.assertSame;\r\nimport static org.junit.Assert.assertTrue;\r\n\r\nimport java.util.ArrayList;\r\nimport java.util.List;\r\nimport java.util.Random;\r\nimport java.util.Set;\r\n\r\nimport com.fimtra.datafission.IValue;\r\nimport com.fimtra.datafission.IValue.TypeEnum;\r\nimport com.fimtra.util.StringAppender;\r\nimport org.junit.Before;\r\nimport org.junit.Test;\r\n\r\n/**\r\n * Tests {@link DoubleValue}\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic class DoubleValueTest\r\n{\r\n    static final int LOOPS = LongValueTest.LOOPS;\r\n\r\n    @Before\r\n    public void setUp() throws Exception\r\n    {\r\n    }\r\n\r\n    @Test\r\n    public void testCache()\r\n    {\r\n        for (int i = -LONG_VALUE_POOL_SIZE; i <= LONG_VALUE_POOL_SIZE; i++)\r\n        {\r\n            assertEquals(i, LongValue.valueOf(i)\r\n                    .longValue());\r\n            assertSame(LongValue.valueOf(i), LongValue.valueOf(i));\r\n            assertSame(LongValue.valueOf(i)\r\n                    .textValue(), LongValue.valueOf(i)\r\n                    .textValue());\r\n            assertSame(LongValue.valueOf(i)\r\n                    .toString(), LongValue.valueOf(i)\r\n                    .toString());\r\n        }\r\n    }\r\n\r\n    @Test\r\n    public void testBeyondCache()\r\n    {\r\n        int lVal = -LONG_VALUE_POOL_SIZE - 1;\r\n        assertEquals(lVal, LongValue.valueOf(lVal)\r\n                .longValue());\r\n        assertNotSame(LongValue.valueOf(lVal), LongValue.valueOf(lVal));\r\n        assertNotSame(LongValue.valueOf(lVal)\r\n                .textValue(), LongValue.valueOf(lVal)\r\n                .textValue());\r\n\r\n        lVal = LONG_VALUE_POOL_SIZE + 1;\r\n        assertEquals(lVal, LongValue.valueOf(lVal)\r\n                .longValue());\r\n        assertNotSame(LongValue.valueOf(lVal), LongValue.valueOf(lVal));\r\n        assertNotSame(LongValue.valueOf(lVal)\r\n                .textValue(), LongValue.valueOf(lVal)\r\n                .textValue());\r\n    }\r\n\r\n    @Test\r\n    public void testEquals()\r\n    {\r\n        assertEquals(new DoubleValue(1.2), new DoubleValue(1.2));\r\n        assertNotEquals(new DoubleValue(1.2), new DoubleValue(1.21));\r\n    }\r\n\r\n    @Test\r\n    public void testGetType()\r\n    {\r\n        assertEquals(TypeEnum.DOUBLE, new DoubleValue(1.2).getType());\r\n    }\r\n\r\n    @Test\r\n    public void testInitialisedWithNaN()\r\n    {\r\n        assertEquals(NaN, new DoubleValue().doubleValue(), DoubleValueCodecTest.delta);\r\n    }\r\n\r\n    @Test\r\n    public void testGet()\r\n    {\r\n        assertEquals(1.0, DoubleValue.get(DoubleValue.valueOf(1), -1), DoubleValueCodecTest.delta);\r\n        assertTrue(Double.isNaN(DoubleValue.get(null, NaN)));\r\n        assertTrue(Double.isNaN(DoubleValue.get(LongValue.valueOf(1), NaN)));\r\n        assertTrue(Double.isNaN(DoubleValue.get(TextValue.valueOf(\"1\"), NaN)));\r\n    }\r\n\r\n    @Test\r\n    public void testToString()\r\n    {\r\n        for (int i = -LONG_VALUE_POOL_SIZE; i <= LONG_VALUE_POOL_SIZE; i++)\r\n        {\r\n            assertEquals(Double.toString(i), new DoubleValue(i).textValue());\r\n        }\r\n\r\n        assertEquals(\"Infinity\", DoubleValue.valueOf(POSITIVE_INFINITY)\r\n                .textValue());\r\n        assertEquals(\"-Infinity\", DoubleValue.valueOf(NEGATIVE_INFINITY)\r\n                .textValue());\r\n        assertEquals(\"NaN\", DoubleValue.valueOf(NaN)\r\n                .textValue());\r\n        assertEquals(\"99.0\", DoubleValue.valueOf(99.0)\r\n                .textValue());\r\n        assertEquals(\"99.0\", DoubleValue.valueOf(99.00000000)\r\n                .textValue());\r\n        assertEquals(\"99.0001\", DoubleValue.valueOf(99.0001)\r\n                .textValue());\r\n    }\r\n\r\n    @Test\r\n    public void testStringToDouble_largeDecimal()\r\n    {\r\n        assertEquals(Double.parseDouble(\"0.12345678901234567890\"),\r\n                DoubleValueCodec.fromCharArray(\"0.12345678901234567890\".toCharArray(), 0, 22),\r\n                DoubleValueCodecTest.delta);\r\n    }\r\n\r\n    @Test\r\n    public void test_copilot_bitwiseChar09()\r\n    {\r\n        for (int i = 0; i < 128; i++)\r\n        {\r\n            char c = (char) i;\r\n            if (c >= '0' && c <= '9')\r\n            {\r\n                assertEquals(\"Char '\" + c + \"'\", 0, getIsDigitIb(c));\r\n            }\r\n            else\r\n            {\r\n                assertEquals(\"Char '\" + c + \"' code=\" + i, 1, getIsDigitIb(c));\r\n            }\r\n        }\r\n\r\n    }\r\n\r\n    private static int getIsDigitIb(char c)\r\n    {\r\n        final int x = (c - '0');\r\n        return ((x | (~(x - 10))) >>> 31);\r\n    }\r\n\r\n    @Test\r\n    public synchronized void test_performance_charsToDouble()\r\n    {\r\n        List<long[]> times;\r\n        int tries = 0;\r\n        do\r\n        {\r\n            tries++;\r\n            times = new ArrayList<>();\r\n            final Random random = new Random();\r\n            for (int i = 0; i < 19; i++)\r\n            {\r\n                final double random3dp = (double) random.nextInt(1000) / 1000;\r\n                final String sVal = \"\" + ((double) random.nextInt(100_000_000) + random3dp);\r\n                doPerfTestCharsToDouble(sVal, times);\r\n            }\r\n        }\r\n        while (!checkNormalVsOptimisedResults(times, \"test_performance_charsToDouble\", tries));\r\n    }\r\n\r\n    @Test\r\n    public void test_performance_doubleToAppender()\r\n    {\r\n        List<long[]> times;\r\n        int tries = 0;\r\n        do\r\n        {\r\n            tries++;\r\n            times = new ArrayList<>();\r\n            doPerfTestWriteToAppender(-2.3056918340057303E18, times);\r\n            //        doPerfTestWriteToString(99.00, times);\r\n            //        doPerfTestWriteToString(99.1, times);\r\n            //        doPerfTestWriteToString(99.01, times);\r\n            //        doPerfTestWriteToString(99.001, times);\r\n            //        doPerfTestWriteToString(99.0001, times);\r\n            //        doPerfTestWriteToString(Double.MAX_VALUE, times);\r\n            //        doPerfTestWriteToString(Double.MIN_VALUE, times);\r\n            //        doPerfTestWriteToString(POSITIVE_INFINITY, times);\r\n            //        doPerfTestWriteToString(NEGATIVE_INFINITY, times);\r\n            //        doPerfTestWriteToString(NaN, times);\r\n\r\n            final Random random = new Random();\r\n            for (int i = 0; i < 5; i++)\r\n            {\r\n                final double value = random.nextLong() + random.nextDouble();\r\n                doPerfTestWriteToAppender(value, times);\r\n                doPerfTestWriteToAppender(-value, times);\r\n            }\r\n        }\r\n        while (!checkNormalVsOptimisedResults(times, \"test_performance_doubleToAppender\", tries));\r\n    }\r\n\r\n    private static void doPerfTestWriteToAppender(double value, List<long[]> times)\r\n    {\r\n        //        System.err.println(\"==================== \" + value + \"-to-string loops:\" + LOOPS + \"===============\");\r\n\r\n        final StringAppender appender = new StringAppender();\r\n        final DoubleValue doubleValue = DoubleValue.valueOf(value);\r\n\r\n        for (int i = 0; i < LOOPS; i++)\r\n        {\r\n            appender.setLength(0);\r\n            doubleValue.appendTo(appender);\r\n            appender.setLength(0);\r\n            appender.append(IValue.DOUBLE_CODE)\r\n                    .append(Double.toString(value));\r\n        }\r\n\r\n        for (int j = 0; j < REPEAT_RUNS; j++)\r\n        {\r\n            prepareForPerfTestStep();\r\n\r\n            long tDoubleValue = System.nanoTime();\r\n            for (int i = 0; i < LOOPS; i++)\r\n            {\r\n                appender.setLength(0);\r\n                doubleValue.appendTo(appender);\r\n            }\r\n            tDoubleValue = System.nanoTime() - tDoubleValue;\r\n\r\n            prepareForPerfTestStep();\r\n\r\n            long tDouble = System.nanoTime();\r\n            for (int i = 0; i < LOOPS; i++)\r\n            {\r\n                appender.setLength(0);\r\n                appender.append(IValue.DOUBLE_CODE)\r\n                        .append(Double.toString(value));\r\n            }\r\n            tDouble = System.nanoTime() - tDouble;\r\n\r\n            final String doubleString = Double.toString(value);\r\n            final String doubleValueString = doubleValue.textValue();\r\n            assertEquals(Double.parseDouble(doubleString), Double.parseDouble(doubleValueString),\r\n                    DoubleValueCodecTest.delta);\r\n\r\n            //        System.err.println(\" tDouble=\" + tDouble + \" tDoubleValue=\" + tDoubleValue);\r\n\r\n            saveQuickestTimes(times, tDouble, tDoubleValue);\r\n        }\r\n    }\r\n\r\n    private static void doPerfTestCharsToDouble(String sVal, List<long[]> times)\r\n    {\r\n        final char[] chars = sVal.toCharArray();\r\n\r\n        //        System.err.println(\"==================== \" + sVal + \"-toDouble loops:\" + LOOPS + \"===============\");\r\n\r\n        // warmup\r\n        for (int i = 0; i < LOOPS; i++)\r\n        {\r\n            Double.parseDouble(sVal);\r\n            DoubleValueCodec.fromCharArray(chars, 0, chars.length);\r\n        }\r\n\r\n        for (int j = 0; j < REPEAT_RUNS; j++)\r\n        {\r\n            prepareForPerfTestStep();\r\n\r\n            long tDoubleValue = System.nanoTime();\r\n            for (int i = 0; i < LOOPS; i++)\r\n            {\r\n                DoubleValueCodec.fromCharArray(chars, 0, chars.length);\r\n            }\r\n            tDoubleValue = System.nanoTime() - tDoubleValue;\r\n\r\n            prepareForPerfTestStep();\r\n\r\n            long tDouble = System.nanoTime();\r\n            for (int i = 0; i < LOOPS; i++)\r\n            {\r\n                Double.parseDouble(sVal);\r\n            }\r\n            tDouble = System.nanoTime() - tDouble;\r\n\r\n            assertEquals(Double.parseDouble(sVal), DoubleValueCodec.fromCharArray(chars, 0, chars.length),\r\n                    DoubleValueCodecTest.delta);\r\n\r\n            //        System.err.println(\" tDouble=\" + tDouble + \" tDoubleValue=\" + tDoubleValue);\r\n\r\n            saveQuickestTimes(times, tDouble, tDoubleValue);\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/com/fimtra/datafission/field/DoubleValueTest.java b/src/test/java/com/fimtra/datafission/field/DoubleValueTest.java
+--- a/src/test/java/com/fimtra/datafission/field/DoubleValueTest.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/test/java/com/fimtra/datafission/field/DoubleValueTest.java	(date 1778002041449)
+@@ -16,10 +16,6 @@
+ package com.fimtra.datafission.field;
+ 
+ import static com.fimtra.datafission.DataFissionProperties.Values.LONG_VALUE_POOL_SIZE;
+-import static com.fimtra.datafission.field.LongValueTest.REPEAT_RUNS;
+-import static com.fimtra.datafission.field.LongValueTest.checkNormalVsOptimisedResults;
+-import static com.fimtra.datafission.field.LongValueTest.prepareForPerfTestStep;
+-import static com.fimtra.datafission.field.LongValueTest.saveQuickestTimes;
+ import static java.lang.Double.NEGATIVE_INFINITY;
+ import static java.lang.Double.NaN;
+ import static java.lang.Double.POSITIVE_INFINITY;
+@@ -29,14 +25,7 @@
+ import static org.junit.Assert.assertSame;
+ import static org.junit.Assert.assertTrue;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Random;
+-import java.util.Set;
+-
+-import com.fimtra.datafission.IValue;
+ import com.fimtra.datafission.IValue.TypeEnum;
+-import com.fimtra.util.StringAppender;
+ import org.junit.Before;
+ import org.junit.Test;
+ 
+@@ -47,7 +36,7 @@
+  */
+ public class DoubleValueTest
+ {
+-    static final int LOOPS = LongValueTest.LOOPS;
++    static final double delta = 0.000000000000000000000000001d;
+ 
+     @Before
+     public void setUp() throws Exception
+@@ -107,13 +96,13 @@
+     @Test
+     public void testInitialisedWithNaN()
+     {
+-        assertEquals(NaN, new DoubleValue().doubleValue(), DoubleValueCodecTest.delta);
++        assertEquals(NaN, new DoubleValue().doubleValue(), delta);
+     }
+ 
+     @Test
+     public void testGet()
+     {
+-        assertEquals(1.0, DoubleValue.get(DoubleValue.valueOf(1), -1), DoubleValueCodecTest.delta);
++        assertEquals(1.0, DoubleValue.get(DoubleValue.valueOf(1), -1), delta);
+         assertTrue(Double.isNaN(DoubleValue.get(null, NaN)));
+         assertTrue(Double.isNaN(DoubleValue.get(LongValue.valueOf(1), NaN)));
+         assertTrue(Double.isNaN(DoubleValue.get(TextValue.valueOf("1"), NaN)));
+@@ -141,14 +130,6 @@
+                 .textValue());
+     }
+ 
+-    @Test
+-    public void testStringToDouble_largeDecimal()
+-    {
+-        assertEquals(Double.parseDouble("0.12345678901234567890"),
+-                DoubleValueCodec.fromCharArray("0.12345678901234567890".toCharArray(), 0, 22),
+-                DoubleValueCodecTest.delta);
+-    }
+-
+     @Test
+     public void test_copilot_bitwiseChar09()
+     {
+@@ -172,148 +153,12 @@
+         final int x = (c - '0');
+         return ((x | (~(x - 10))) >>> 31);
+     }
+-
+-    @Test
+-    public synchronized void test_performance_charsToDouble()
+-    {
+-        List<long[]> times;
+-        int tries = 0;
+-        do
+-        {
+-            tries++;
+-            times = new ArrayList<>();
+-            final Random random = new Random();
+-            for (int i = 0; i < 19; i++)
+-            {
+-                final double random3dp = (double) random.nextInt(1000) / 1000;
+-                final String sVal = "" + ((double) random.nextInt(100_000_000) + random3dp);
+-                doPerfTestCharsToDouble(sVal, times);
+-            }
+-        }
+-        while (!checkNormalVsOptimisedResults(times, "test_performance_charsToDouble", tries));
+-    }
+-
+-    @Test
+-    public void test_performance_doubleToAppender()
+-    {
+-        List<long[]> times;
+-        int tries = 0;
+-        do
+-        {
+-            tries++;
+-            times = new ArrayList<>();
+-            doPerfTestWriteToAppender(-2.3056918340057303E18, times);
+-            //        doPerfTestWriteToString(99.00, times);
+-            //        doPerfTestWriteToString(99.1, times);
+-            //        doPerfTestWriteToString(99.01, times);
+-            //        doPerfTestWriteToString(99.001, times);
+-            //        doPerfTestWriteToString(99.0001, times);
+-            //        doPerfTestWriteToString(Double.MAX_VALUE, times);
+-            //        doPerfTestWriteToString(Double.MIN_VALUE, times);
+-            //        doPerfTestWriteToString(POSITIVE_INFINITY, times);
+-            //        doPerfTestWriteToString(NEGATIVE_INFINITY, times);
+-            //        doPerfTestWriteToString(NaN, times);
+-
+-            final Random random = new Random();
+-            for (int i = 0; i < 5; i++)
+-            {
+-                final double value = random.nextLong() + random.nextDouble();
+-                doPerfTestWriteToAppender(value, times);
+-                doPerfTestWriteToAppender(-value, times);
+-            }
+-        }
+-        while (!checkNormalVsOptimisedResults(times, "test_performance_doubleToAppender", tries));
+-    }
+-
+-    private static void doPerfTestWriteToAppender(double value, List<long[]> times)
+-    {
+-        //        System.err.println("==================== " + value + "-to-string loops:" + LOOPS + "===============");
+-
+-        final StringAppender appender = new StringAppender();
+-        final DoubleValue doubleValue = DoubleValue.valueOf(value);
+-
+-        for (int i = 0; i < LOOPS; i++)
+-        {
+-            appender.setLength(0);
+-            doubleValue.appendTo(appender);
+-            appender.setLength(0);
+-            appender.append(IValue.DOUBLE_CODE)
+-                    .append(Double.toString(value));
+-        }
++}
+ 
+-        for (int j = 0; j < REPEAT_RUNS; j++)
+-        {
+-            prepareForPerfTestStep();
+ 
+-            long tDoubleValue = System.nanoTime();
+-            for (int i = 0; i < LOOPS; i++)
+-            {
+-                appender.setLength(0);
+-                doubleValue.appendTo(appender);
+-            }
+-            tDoubleValue = System.nanoTime() - tDoubleValue;
+ 
+-            prepareForPerfTestStep();
+ 
+-            long tDouble = System.nanoTime();
+-            for (int i = 0; i < LOOPS; i++)
+-            {
+-                appender.setLength(0);
+-                appender.append(IValue.DOUBLE_CODE)
+-                        .append(Double.toString(value));
+-            }
+-            tDouble = System.nanoTime() - tDouble;
+ 
+-            final String doubleString = Double.toString(value);
+-            final String doubleValueString = doubleValue.textValue();
+-            assertEquals(Double.parseDouble(doubleString), Double.parseDouble(doubleValueString),
+-                    DoubleValueCodecTest.delta);
+ 
+-            //        System.err.println(" tDouble=" + tDouble + " tDoubleValue=" + tDoubleValue);
+ 
+-            saveQuickestTimes(times, tDouble, tDoubleValue);
+-        }
+-    }
+ 
+-    private static void doPerfTestCharsToDouble(String sVal, List<long[]> times)
+-    {
+-        final char[] chars = sVal.toCharArray();
+-
+-        //        System.err.println("==================== " + sVal + "-toDouble loops:" + LOOPS + "===============");
+-
+-        // warmup
+-        for (int i = 0; i < LOOPS; i++)
+-        {
+-            Double.parseDouble(sVal);
+-            DoubleValueCodec.fromCharArray(chars, 0, chars.length);
+-        }
+-
+-        for (int j = 0; j < REPEAT_RUNS; j++)
+-        {
+-            prepareForPerfTestStep();
+-
+-            long tDoubleValue = System.nanoTime();
+-            for (int i = 0; i < LOOPS; i++)
+-            {
+-                DoubleValueCodec.fromCharArray(chars, 0, chars.length);
+-            }
+-            tDoubleValue = System.nanoTime() - tDoubleValue;
+-
+-            prepareForPerfTestStep();
+-
+-            long tDouble = System.nanoTime();
+-            for (int i = 0; i < LOOPS; i++)
+-            {
+-                Double.parseDouble(sVal);
+-            }
+-            tDouble = System.nanoTime() - tDouble;
+-
+-            assertEquals(Double.parseDouble(sVal), DoubleValueCodec.fromCharArray(chars, 0, chars.length),
+-                    DoubleValueCodecTest.delta);
+-
+-            //        System.err.println(" tDouble=" + tDouble + " tDoubleValue=" + tDoubleValue);
+-
+-            saveQuickestTimes(times, tDouble, tDoubleValue);
+-        }
+-    }
+-}
+Index: src/test/java/com/fimtra/util/LowGcLinkedListTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2018 Ramon Servadei\r\n *  \r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *    \r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.util;\r\n\r\nimport static org.junit.Assert.assertEquals;\r\nimport static org.junit.Assert.assertNotNull;\r\nimport static org.junit.Assert.assertNull;\r\n\r\nimport org.junit.Before;\r\nimport org.junit.Test;\r\n\r\n/**\r\n * Tests for the {@link LowGcLinkedList}\r\n * \r\n * @author Ramon Servadei\r\n */\r\npublic class LowGcLinkedListTest\r\n{\r\n    LowGcLinkedList<String> candidate;\r\n    \r\n    /**\r\n     * @throws java.lang.Exception\r\n     */\r\n    @Before\r\n    public void setUp() throws Exception\r\n    {\r\n        candidate = new LowGcLinkedList<>();\r\n    }\r\n\r\n    @Test\r\n    public void testNodeReuse()    \r\n    {\r\n        assertNull(candidate.spare);\r\n        \r\n        // add 3 items to the list\r\n        candidate.offer(\"1\");\r\n        assertNull(candidate.spare);\r\n        candidate.offer(\"2\");\r\n        candidate.offer(\"3\");\r\n        \r\n        // remove first\r\n        assertEquals(\"1\", candidate.pollFirst());\r\n        assertNotNull(candidate.spare);\r\n        assertNull(candidate.spare.next);\r\n        assertNull(candidate.spare.prev);\r\n        assertNull(candidate.spare.item);\r\n\r\n        // remove last\r\n        assertEquals(\"3\", candidate.pollLast());\r\n        assertNotNull(candidate.spare);\r\n        assertNull(candidate.spare.next);\r\n        assertNotNull(candidate.spare.prev);\r\n        assertNull(candidate.spare.item);\r\n        // check the prev\r\n        assertNull(candidate.spare.prev.next);\r\n        assertNull(candidate.spare.prev.prev);\r\n        assertNull(candidate.spare.prev.item);\r\n\r\n        // remove - list is empty after this\r\n        assertEquals(\"2\", candidate.pollFirst());\r\n        assertNotNull(candidate.spare);\r\n        assertNull(candidate.spare.next);\r\n        assertNotNull(candidate.spare.prev);\r\n        assertNull(candidate.spare.item);\r\n        // check the prev\r\n        assertNull(candidate.spare.prev.next);\r\n        assertNotNull(candidate.spare.prev.prev);\r\n        assertNull(candidate.spare.prev.item);\r\n        // check the prev.prev\r\n        assertNull(candidate.spare.prev.prev.next);\r\n        assertNull(candidate.spare.prev.prev.prev);\r\n        assertNull(candidate.spare.prev.prev.item);\r\n        \r\n        // now add - check we re-use\r\n        candidate.offer(\"4\");\r\n        assertNotNull(candidate.spare);\r\n        assertNull(candidate.spare.next);\r\n        assertNotNull(candidate.spare.prev);\r\n        assertNull(candidate.spare.item);\r\n        // check the prev\r\n        assertNull(candidate.spare.prev.next);\r\n        assertNull(candidate.spare.prev.prev);\r\n        assertNull(candidate.spare.prev.item);\r\n        \r\n        candidate.offer(\"5\");\r\n        assertNotNull(candidate.spare);\r\n        assertNull(candidate.spare.next);\r\n        assertNull(candidate.spare.prev);\r\n        assertNull(candidate.spare.item);\r\n        \r\n        candidate.offer(\"6\");\r\n        assertNull(candidate.spare);\r\n    }\r\n\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/com/fimtra/util/LowGcLinkedListTest.java b/src/test/java/com/fimtra/util/LowGcLinkedListTest.java
+--- a/src/test/java/com/fimtra/util/LowGcLinkedListTest.java	(revision 8ef8691dee4fe45ee5d791f0f461ebc1037b6f0e)
++++ b/src/test/java/com/fimtra/util/LowGcLinkedListTest.java	(date 1778013118302)
+@@ -19,6 +19,8 @@
+ import static org.junit.Assert.assertNotNull;
+ import static org.junit.Assert.assertNull;
+ 
++import java.util.List;
++
+ import org.junit.Before;
+ import org.junit.Test;
+ 
+@@ -105,4 +107,15 @@
+         assertNull(candidate.spare);
+     }
+ 
++    @Test
++    public void testReverse()
++    {
++        for(int i = 0; i < 6; i++)
++        {
++            candidate.offer("" + i);
++        }
++        final List<String> reversed = candidate.reversed();
++        assertEquals("[5, 4, 3, 2, 1, 0]", reversed.toString());
++    }
++
+ }

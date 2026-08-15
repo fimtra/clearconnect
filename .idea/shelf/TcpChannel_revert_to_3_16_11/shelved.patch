@@ -1,0 +1,1381 @@
+Index: src/main/java/com/fimtra/tcpchannel/QueueThresholdMonitor.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2018 Ramon Servadei\r\n *  \r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *    \r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.tcpchannel;\r\n\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD_BREACH_MILLIS;\r\n\r\nimport java.util.Deque;\r\nimport java.util.function.Supplier;\r\n\r\nimport com.fimtra.util.Log;\r\n\r\n/**\r\n * A simple utility class that monitors queue levels and upgrades/downgrades warning levels as the\r\n * queue size alters.\r\n * \r\n * @author Ramon Servadei\r\n */\r\nfinal class QueueThresholdMonitor\r\n{\r\n    private static final double _40_WATERMARK = SEND_QUEUE_THRESHOLD * 0.4;\r\n    private static final double _50_WATERMARK = SEND_QUEUE_THRESHOLD * 0.5;\r\n    private static final double _60_WATERMARK = SEND_QUEUE_THRESHOLD * 0.6;\r\n    private static final double _75_WATERMARK = SEND_QUEUE_THRESHOLD * 0.75;\r\n    private static final double _80_WATERMARK = SEND_QUEUE_THRESHOLD * 0.8;\r\n    private static final double _90_WATERMARK = SEND_QUEUE_THRESHOLD * 0.9;\r\n\r\n    final Object target;\r\n    final long sendQThresholdBreachNanos;\r\n    int thresholdWarningLevel;\r\n    int queueSizeAtLastCheckPoint;\r\n    long thresholdMaxBreachStartTimeNanos;\r\n\r\n    QueueThresholdMonitor(Object target, long sendQueueThresholdBreachMillis)\r\n    {\r\n        this.target = target;\r\n        this.sendQThresholdBreachNanos = sendQueueThresholdBreachMillis * 1000000;\r\n    }\r\n\r\n    /**\r\n     * @return <code>true</code> if the size of the combined queues has breached a maximum level for\r\n     *         too long\r\n     */\r\n    boolean checkQueueSize(final Deque<TxByteArrayFragment> pendingTxFrames,\r\n        final Deque<TxByteArrayFragment> sendingTxFrames, final long writeBufferToSocketCount)\r\n    {\r\n        return checkQSize(pendingTxFrames.size() + sendingTxFrames.size(), writeBufferToSocketCount);\r\n    }\r\n\r\n    boolean checkQSize(final int size, final long writeBufferToSocketCount)\r\n    {\r\n        switch(this.thresholdWarningLevel)\r\n        {\r\n            case 0:\r\n                if (size > _90_WATERMARK)\r\n                {\r\n                    upgrade(3, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size > _75_WATERMARK)\r\n                {\r\n                    upgrade(2, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size > _50_WATERMARK)\r\n                {\r\n                    upgrade(1, size, writeBufferToSocketCount);\r\n                }\r\n                break;\r\n            case 1:\r\n                if (size > _90_WATERMARK)\r\n                {\r\n                    upgrade(3, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size > _75_WATERMARK)\r\n                {\r\n                    upgrade(2, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size < _40_WATERMARK)\r\n                {\r\n                    downgrade(0, size, writeBufferToSocketCount);\r\n                }\r\n                break;\r\n            case 2:\r\n                if (size > _90_WATERMARK)\r\n                {\r\n                    upgrade(3, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size < _40_WATERMARK)\r\n                {\r\n                    downgrade(0, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size < _60_WATERMARK)\r\n                {\r\n                    downgrade(1, size, writeBufferToSocketCount);\r\n                }\r\n                break;\r\n            case 3:\r\n                if (size < _40_WATERMARK)\r\n                {\r\n                    this.thresholdMaxBreachStartTimeNanos = 0;\r\n                    downgrade(0, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size < _60_WATERMARK)\r\n                {\r\n                    this.thresholdMaxBreachStartTimeNanos = 0;\r\n                    downgrade(1, size, writeBufferToSocketCount);\r\n                }\r\n                else if (size < _80_WATERMARK)\r\n                {\r\n                    this.thresholdMaxBreachStartTimeNanos = 0;\r\n                    downgrade(2, size, writeBufferToSocketCount);\r\n                }\r\n                break;\r\n        }\r\n\r\n        if (size > SEND_QUEUE_THRESHOLD)\r\n        {\r\n            if (this.thresholdMaxBreachStartTimeNanos == 0)\r\n            {\r\n                this.thresholdMaxBreachStartTimeNanos = System.nanoTime();\r\n                this.queueSizeAtLastCheckPoint = size;\r\n            }\r\n            else if ((System.nanoTime() - this.thresholdMaxBreachStartTimeNanos) > this.sendQThresholdBreachNanos)\r\n            {\r\n                if (size < this.queueSizeAtLastCheckPoint)\r\n                {\r\n                    Log.log(this.target, \"Queue draining, was \", Integer.toString(this.queueSizeAtLastCheckPoint),\r\n                        \" now \", Integer.toString(size), \" for \", this.target.toString());\r\n                    this.queueSizeAtLastCheckPoint = size;\r\n                }\r\n                else\r\n                {\r\n                    Log.log(this.target,\r\n                        \"Queue too large: \" + size + \" after waiting \" + SEND_QUEUE_THRESHOLD_BREACH_MILLIS + \"ms, was \"\r\n                            + Integer.toString(this.queueSizeAtLastCheckPoint));\r\n                    return true;\r\n                }\r\n            }\r\n        }\r\n\r\n        return false;\r\n    }\r\n\r\n    private void downgrade(final int level, final int size, long writeBufferToSocketCount)\r\n    {\r\n        Log.log(this.target, \"[-] Q level \", Integer.toString(this.thresholdWarningLevel), \"->\",\r\n                Integer.toString(level), \" size=\", Integer.toString(size), \" writeBufferToSocketCount=\",\r\n                Long.toString(writeBufferToSocketCount), \" \", this.target.toString());\r\n        this.thresholdWarningLevel = level;\r\n    }\r\n\r\n    private void upgrade(final int level, final int size, long writeBufferToSocketCount)\r\n    {\r\n        Log.log(this.target, \"[+] Q level \", Integer.toString(this.thresholdWarningLevel), \"->\",\r\n                Integer.toString(level), \" size=\", Integer.toString(size), \" writeBufferToSocketCount=\",\r\n                Long.toString(writeBufferToSocketCount), \" \", this.target.toString());\r\n        this.thresholdWarningLevel = level;\r\n    }\r\n\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/QueueThresholdMonitor.java b/src/main/java/com/fimtra/tcpchannel/QueueThresholdMonitor.java
+--- a/src/main/java/com/fimtra/tcpchannel/QueueThresholdMonitor.java	(revision b32c7eaf25e9dd57015fbf02cc9d4e39ab7b59b8)
++++ b/src/main/java/com/fimtra/tcpchannel/QueueThresholdMonitor.java	(date 1785687740287)
+@@ -19,7 +19,6 @@
+ import static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD_BREACH_MILLIS;
+ 
+ import java.util.Deque;
+-import java.util.function.Supplier;
+ 
+ import com.fimtra.util.Log;
+ 
+@@ -54,73 +53,73 @@
+      * @return <code>true</code> if the size of the combined queues has breached a maximum level for
+      *         too long
+      */
+-    boolean checkQueueSize(final Deque<TxByteArrayFragment> pendingTxFrames,
+-        final Deque<TxByteArrayFragment> sendingTxFrames, final long writeBufferToSocketCount)
++    final boolean checkQueueSize(final Deque<TxByteArrayFragment> pendingTxFrames,
++        final Deque<TxByteArrayFragment> sendingTxFrames)
+     {
+-        return checkQSize(pendingTxFrames.size() + sendingTxFrames.size(), writeBufferToSocketCount);
++        return checkQSize(pendingTxFrames.size() + sendingTxFrames.size());
+     }
+ 
+-    boolean checkQSize(final int size, final long writeBufferToSocketCount)
++    final boolean checkQSize(final int size)
+     {
+         switch(this.thresholdWarningLevel)
+         {
+             case 0:
+                 if (size > _90_WATERMARK)
+                 {
+-                    upgrade(3, size, writeBufferToSocketCount);
++                    upgrade(3, size);
+                 }
+                 else if (size > _75_WATERMARK)
+                 {
+-                    upgrade(2, size, writeBufferToSocketCount);
++                    upgrade(2, size);
+                 }
+                 else if (size > _50_WATERMARK)
+                 {
+-                    upgrade(1, size, writeBufferToSocketCount);
++                    upgrade(1, size);
+                 }
+                 break;
+             case 1:
+                 if (size > _90_WATERMARK)
+                 {
+-                    upgrade(3, size, writeBufferToSocketCount);
++                    upgrade(3, size);
+                 }
+                 else if (size > _75_WATERMARK)
+                 {
+-                    upgrade(2, size, writeBufferToSocketCount);
++                    upgrade(2, size);
+                 }
+                 else if (size < _40_WATERMARK)
+                 {
+-                    downgrade(0, size, writeBufferToSocketCount);
++                    downgrade(0, size);
+                 }
+                 break;
+             case 2:
+                 if (size > _90_WATERMARK)
+                 {
+-                    upgrade(3, size, writeBufferToSocketCount);
++                    upgrade(3, size);
+                 }
+                 else if (size < _40_WATERMARK)
+                 {
+-                    downgrade(0, size, writeBufferToSocketCount);
++                    downgrade(0, size);
+                 }
+                 else if (size < _60_WATERMARK)
+                 {
+-                    downgrade(1, size, writeBufferToSocketCount);
++                    downgrade(1, size);
+                 }
+                 break;
+             case 3:
+                 if (size < _40_WATERMARK)
+                 {
+                     this.thresholdMaxBreachStartTimeNanos = 0;
+-                    downgrade(0, size, writeBufferToSocketCount);
++                    downgrade(0, size);
+                 }
+                 else if (size < _60_WATERMARK)
+                 {
+                     this.thresholdMaxBreachStartTimeNanos = 0;
+-                    downgrade(1, size, writeBufferToSocketCount);
++                    downgrade(1, size);
+                 }
+                 else if (size < _80_WATERMARK)
+                 {
+                     this.thresholdMaxBreachStartTimeNanos = 0;
+-                    downgrade(2, size, writeBufferToSocketCount);
++                    downgrade(2, size);
+                 }
+                 break;
+         }
+@@ -153,19 +152,17 @@
+         return false;
+     }
+ 
+-    private void downgrade(final int level, final int size, long writeBufferToSocketCount)
++    private final void downgrade(final int level, final int size)
+     {
+         Log.log(this.target, "[-] Q level ", Integer.toString(this.thresholdWarningLevel), "->",
+-                Integer.toString(level), " size=", Integer.toString(size), " writeBufferToSocketCount=",
+-                Long.toString(writeBufferToSocketCount), " ", this.target.toString());
++            Integer.toString(level), " size=", Integer.toString(size), " ", this.target.toString());
+         this.thresholdWarningLevel = level;
+     }
+ 
+-    private void upgrade(final int level, final int size, long writeBufferToSocketCount)
++    private final void upgrade(final int level, final int size)
+     {
+         Log.log(this.target, "[+] Q level ", Integer.toString(this.thresholdWarningLevel), "->",
+-                Integer.toString(level), " size=", Integer.toString(size), " writeBufferToSocketCount=",
+-                Long.toString(writeBufferToSocketCount), " ", this.target.toString());
++            Integer.toString(level), " size=", Integer.toString(size), " ", this.target.toString());
+         this.thresholdWarningLevel = level;
+     }
+ 
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannel.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.tcpchannel;\r\n\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.FRAME_ENCODING;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.RX_BUFFER_SIZE;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SEND_QUEUE_THRESHOLD_BREACH_MILLIS;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SLOW_RX_FRAME_THRESHOLD_NANOS;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.SLOW_TX_FRAME_THRESHOLD_NANOS;\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.TX_SEND_SIZE;\r\n\r\nimport java.io.IOException;\r\nimport java.net.ConnectException;\r\nimport java.net.Socket;\r\nimport java.net.SocketException;\r\nimport java.nio.ByteBuffer;\r\nimport java.nio.channels.CancelledKeyException;\r\nimport java.nio.channels.ClosedChannelException;\r\nimport java.nio.channels.SelectionKey;\r\nimport java.nio.channels.SocketChannel;\r\nimport java.util.Arrays;\r\nimport java.util.Collections;\r\nimport java.util.Deque;\r\nimport java.util.IdentityHashMap;\r\nimport java.util.Map;\r\nimport java.util.concurrent.atomic.AtomicBoolean;\r\n\r\nimport com.fimtra.channel.ChannelUtils;\r\nimport com.fimtra.channel.IReceiver;\r\nimport com.fimtra.channel.ITransportChannel;\r\nimport com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;\r\nimport com.fimtra.thimble.ContextExecutorFactory;\r\nimport com.fimtra.thimble.IContextExecutor;\r\nimport com.fimtra.thimble.ISequentialRunnable;\r\nimport com.fimtra.util.CollectionUtils;\r\nimport com.fimtra.util.IReusableObject;\r\nimport com.fimtra.util.Log;\r\nimport com.fimtra.util.MultiThreadReusableObjectPool;\r\nimport com.fimtra.util.ObjectUtils;\r\n\r\n/**\r\n * Provides the ability to send and receive data over TCP to a peer.\r\n * <p>\r\n * TCP socket options are configured by system properties and are applied by the\r\n * {@link TcpChannelUtils#setOptions(SocketChannel)} method.\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic class TcpChannel implements ITransportChannel\r\n{\r\n    private static final boolean TX_SEND_QUEUE_THRESHOLD_ACTIVE = SEND_QUEUE_THRESHOLD > 0;\r\n\r\n    static final double _INVERSE_1000000 = 1 / 1000000d;\r\n\r\n    /** Expresses the encoding format for the data frames */\r\n    public enum FrameEncodingFormatEnum\r\n    {\r\n        /**\r\n         * Length-based frame encoding, in the following format (ABNF notation):\r\n         *\r\n         * <pre>\r\n         *  stream = 1*frame\r\n         *  frame = length data\r\n         *\r\n         *  length = 4OCTET ; big-endian integer indicating the length of the data\r\n         *  data = 1*OCTET ; the data\r\n         * </pre>\r\n         */\r\n        LENGTH_BASED,\r\n\r\n        /**\r\n         * Terminator-based frame encoding, in the following format (ABNF notation):\r\n         *\r\n         * <pre>\r\n         * stream = 1*frame\r\n         *\r\n         * frame = data terminator\r\n         * data = 1*OCTET ; the data\r\n         *\r\n         * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)\r\n         * </pre>\r\n         */\r\n        TERMINATOR_BASED;\r\n\r\n        /**\r\n         * @param tcpChannel\r\n         *            the channel to create a frame reader-writer for\r\n         * @return the reader-writer that supports this frame format\r\n         */\r\n        public IFrameReaderWriter getFrameReaderWriter(TcpChannel tcpChannel)\r\n        {\r\n            switch(this)\r\n            {\r\n                case LENGTH_BASED:\r\n                    return new LengthBasedWriter(tcpChannel);\r\n                case TERMINATOR_BASED:\r\n                    return new TerminatorBasedReaderWriter(tcpChannel);\r\n                default :\r\n                    throw new IllegalStateException(\"No support for \" + this);\r\n            }\r\n        }\r\n    }\r\n\r\n    private enum StateEnum\r\n    {\r\n        DESTROYED, IDLE, SENDING\r\n    }\r\n\r\n    private static final String TCP_CHANNEL_CLOSED = \"TcpChannel [closed \";\r\n    private static final String TCP_CHANNEL_PENDING = \"TcpChannel [pending \";\r\n    private static final String TCP_CHANNEL_CONNECTED = \"TcpChannel [connected \";\r\n\r\n    /** Represents the ASCII code for CRLF */\r\n    static final byte[] TERMINATOR = { 0xd, 0xa };\r\n\r\n    /**\r\n     * Exclusively used to handle frames dispatched from the TCP socket reads. Has the same number\r\n     * of threads as the TCP reader count.\r\n     */\r\n    private static final IContextExecutor RX_FRAME_PROCESSOR =\r\n        ContextExecutorFactory.create(\"rxframe-processor\", TcpChannelProperties.Values.READER_THREAD_COUNT);\r\n\r\n    static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =\r\n        new MultiThreadReusableObjectPool<>(\"RxFrameResolverPool\", RxFrameResolver::new,\r\n                RxFrameResolver::reset, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);\r\n\r\n    /**\r\n     * Holds a linked list (the chain) of channels that want to send. All the channels are bound to\r\n     * the same {@link SelectorProcessor}.\r\n     *\r\n     * @author Ramon Servadei\r\n     */\r\n    private static final class SendChannelChain\r\n    {\r\n        SendChannelChain()\r\n        {\r\n        }\r\n\r\n        /**\r\n         * This is the start of the logical linked-list of TcpChannels with data to send. This is an\r\n         * equal-sending-opportunity mechanism. The list is traversed from start to end, each\r\n         * channel has one frame sent, looping back to the start and continuing sending one frame\r\n         * for each channel. If a channel has no more frames to sent, it is unlinked by\r\n         * {@link #unlinkChannel_callWithChainLock(TcpChannel)}\r\n         */\r\n        volatile TcpChannel first;\r\n        /**\r\n         * The end of the logical linked-list of TcpChannels with data to send.\r\n         *\r\n         * @see #first\r\n         */\r\n        volatile TcpChannel last;\r\n    }\r\n\r\n    /** The chain per writer  */\r\n    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =\r\n            Collections.synchronizedMap(new IdentityHashMap<>());\r\n\r\n    /**\r\n     * Add the channel into the chain. If it already there, does nothing.\r\n     *\r\n     * @param channel\r\n     *            the channel to add\r\n     * @return <code>true</code> if this is the first channel to be added into the chain - and thus\r\n     *         the {@link SelectorProcessor} needs to be triggered for writing\r\n     */\r\n    private static boolean linkChannel_callWithChainLock(TcpChannel channel)\r\n    {\r\n        final SendChannelChain chain = channel.sendChannelChain;\r\n        if (channel.prev == null && channel.next == null && chain.first != channel)\r\n        {\r\n            if (chain.first == null)\r\n            {\r\n                chain.first = channel;\r\n                chain.last = channel;\r\n                return true;\r\n            }\r\n            else\r\n            {\r\n                chain.last.next = channel;\r\n                channel.prev = chain.last;\r\n                chain.last = channel;\r\n                return false;\r\n            }\r\n        }\r\n        return false;\r\n    }\r\n\r\n    private static void unlinkChannel_callWithChainLock(TcpChannel channel)\r\n    {\r\n        switch(channel.state)\r\n        {\r\n            case DESTROYED:\r\n            case IDLE:\r\n\r\n                if (channel.next != null)\r\n                {\r\n                    channel.next.prev = channel.prev;\r\n                }\r\n                if (channel.prev != null)\r\n                {\r\n                    channel.prev.next = channel.next;\r\n                }\r\n                final SendChannelChain chain = channel.sendChannelChain;\r\n                if (channel == chain.first)\r\n                {\r\n                    chain.first = channel.next;\r\n                }\r\n                if (channel == chain.last)\r\n                {\r\n                    chain.last = channel.prev;\r\n                }\r\n                channel.prev = null;\r\n                channel.next = null;\r\n                break;\r\n            default:\r\n                break;\r\n        }\r\n    }\r\n\r\n    volatile TcpChannel next;\r\n    TcpChannel prev;\r\n\r\n    final SelectorProcessor reader;\r\n    final SelectorProcessor writer;\r\n    volatile boolean rxData;\r\n    final IReceiver receiver;\r\n    final ByteBuffer rxByteBuffer;\r\n    final byte[] rxBytes;\r\n    ByteBuffer[] fragments = new ByteBuffer[10];\r\n    ByteBuffer[] resolvedFrames = new ByteBuffer[10];\r\n    final int[] fragmentsSize = new int[1];\r\n    @SuppressWarnings(\"unchecked\")\r\n    final Deque<TxByteArrayFragment>[] txFrames =\r\n        new Deque[] { CollectionUtils.newDeque(), CollectionUtils.newDeque() };\r\n    int pendingQueue = 0;\r\n    int sendingQueue = 1;\r\n    final SocketChannel socketChannel;\r\n    final IFrameReaderWriter readerWriter;\r\n    final ByteArrayFragmentResolver byteArrayFragmentResolver;\r\n    /** The details of the end-point socket connection */\r\n    final String endPointSocketDescription;\r\n    /** The short-hand description of the end-point connections */\r\n    final String shortSocketDescription;\r\n    /**\r\n     * Tracks if the {@link IReceiver#onChannelConnected(ITransportChannel)} has been called. Ensures its\r\n     * only called once.\r\n     */\r\n    private boolean onChannelConnectedCalled;\r\n    /**\r\n     * Tracks if the {@link IReceiver#onChannelClosed(ITransportChannel)} has been called. Ensures its\r\n     * only called once.\r\n     */\r\n    private final AtomicBoolean onChannelClosedCalled;\r\n    private final Object lock = new Object();\r\n\r\n    /** The channel state - always access using the {@link #lock} */\r\n    StateEnum state = StateEnum.IDLE;\r\n\r\n    SelectionKey writerKey;\r\n    final SendChannelChain sendChannelChain;\r\n    final QueueThresholdMonitor sendQueueMonitor;\r\n\r\n    long messagesPublished;\r\n    long bytesPublished;\r\n\r\n    /**\r\n     * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding\r\n     * format.\r\n     *\r\n     * @see TcpChannelProperties.Values#FRAME_ENCODING\r\n     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE\r\n     * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)\r\n     */\r\n    public TcpChannel(String serverHost, int serverPort, IReceiver receiver) throws ConnectException\r\n    {\r\n        this(serverHost, serverPort, receiver, RX_BUFFER_SIZE);\r\n    }\r\n\r\n    /**\r\n     * Construct a {@link TcpChannel} with a specific receive buffer size and default frame encoding\r\n     * format.\r\n     *\r\n     * @see TcpChannelProperties.Values#FRAME_ENCODING\r\n     * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)\r\n     */\r\n    public TcpChannel(String serverHost, int serverPort, IReceiver receiver, int rxBufferSize) throws ConnectException\r\n    {\r\n        this(serverHost, serverPort, receiver, rxBufferSize, FRAME_ENCODING);\r\n    }\r\n\r\n    /**\r\n     * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding\r\n     * format.\r\n     *\r\n     * @see TcpChannelProperties.Values#RX_BUFFER_SIZE\r\n     * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)\r\n     */\r\n    public TcpChannel(String serverHost, int serverPort, IReceiver receiver,\r\n        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException\r\n    {\r\n        this(serverHost, serverPort, receiver, RX_BUFFER_SIZE, frameEncodingFormat);\r\n    }\r\n\r\n    /**\r\n     * Construct a client {@link TcpChannel} that connects to a TCP server. This establishes a TCP\r\n     * connection to the indicated host and port. After the constructor completes, the channel is\r\n     * ready for use however the underlying {@link SocketChannel} may not yet be connected. This\r\n     * does not stop the channel from being used; any data queued up to send via the\r\n     * {@link #send(byte[])} method will be sent when the connection completes.\r\n     *\r\n     * @param serverHost\r\n     *            the target host for the TCP connection\r\n     * @param serverPort\r\n     *            the target port for the TCP connection\r\n     * @param receiver\r\n     *            the object that will receive all the communication data from the target host\r\n     * @param rxBufferSize\r\n     *            the size of the receive buffer in bytes\r\n     * @param frameEncodingFormat\r\n     *            the enum for the frame format for this channel\r\n     * @throws ConnectException\r\n     *             if the TCP connection could not be established\r\n     */\r\n    public TcpChannel(final String serverHost, final int serverPort, final IReceiver receiver, int rxBufferSize,\r\n        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException\r\n    {\r\n        this.onChannelClosedCalled = new AtomicBoolean();\r\n        this.rxByteBuffer = ByteBuffer.wrap(new byte[rxBufferSize]);\r\n        this.rxBytes = this.rxByteBuffer.array();\r\n        this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);\r\n        this.receiver = receiver;\r\n        this.reader = TcpChannelUtils.nextReader();\r\n        this.writer = TcpChannelUtils.nextWriter();\r\n        this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);\r\n        this.endPointSocketDescription = serverHost + \":\" + serverPort;\r\n        this.socketChannel = TcpChannelUtils.createAndConnectNonBlockingSocketChannel(serverHost, serverPort);\r\n        this.shortSocketDescription =\r\n                this.socketChannel.socket().getLocalSocketAddress() + \"->\" + getEndPointDescription();\r\n        this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);\r\n        this.sendChannelChain = getSendChannelChain();\r\n\r\n        finishConstruction();\r\n    }\r\n\r\n    /** Internally used constructor for server-side channels */\r\n    TcpChannel(SocketChannel socketChannel, IReceiver receiver, int rxBufferSize,\r\n        FrameEncodingFormatEnum frameEncodingFormat) throws ConnectException\r\n    {\r\n        this.onChannelClosedCalled = new AtomicBoolean();\r\n        this.socketChannel = socketChannel;\r\n        this.rxByteBuffer = ByteBuffer.wrap(new byte[rxBufferSize]);\r\n        this.rxBytes = this.rxByteBuffer.array();\r\n        this.byteArrayFragmentResolver = ByteArrayFragmentResolver.newInstance(frameEncodingFormat);\r\n        this.receiver = receiver;\r\n        this.reader = TcpChannelUtils.nextReader();\r\n        this.writer = TcpChannelUtils.nextWriter();\r\n        this.readerWriter = frameEncodingFormat.getFrameReaderWriter(this);\r\n        final Socket socket = this.socketChannel.socket();\r\n        this.endPointSocketDescription = socket.getInetAddress().getHostAddress() + \":\" + socket.getPort();\r\n        this.shortSocketDescription = socket.getLocalSocketAddress() + \"<-\" + getEndPointDescription();\r\n        this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);\r\n        this.sendChannelChain = getSendChannelChain();\r\n\r\n        finishConstruction();\r\n    }\r\n\r\n    private SendChannelChain getSendChannelChain()\r\n    {\r\n        return sendChannelChains.computeIfAbsent(this.writer, w -> new SendChannelChain());\r\n    }\r\n\r\n    private void finishConstruction() throws ConnectException\r\n    {\r\n        // this can be overridden by system properties\r\n        final Socket socket = this.socketChannel.socket();\r\n        try\r\n        {\r\n            socket.setTcpNoDelay(true);\r\n        }\r\n        catch (SocketException e1)\r\n        {\r\n            Log.log(TcpChannel.this, \"Could not set TCP_NODELAY option on \" + ObjectUtils.safeToString(this), e1);\r\n        }\r\n\r\n        TcpChannelUtils.setOptions(this.socketChannel);\r\n\r\n        try\r\n        {\r\n            this.writer.register(this.socketChannel, () -> writeFrames(this.sendChannelChain));\r\n\r\n            this.writerKey = this.writer.getKeyFor(this.socketChannel);\r\n            SelectorProcessor.resetInterest(this.writerKey);\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            String message = this + \" could not register for write operations\";\r\n            Log.log(this, message, e);\r\n            throw new ConnectException(message);\r\n        }\r\n\r\n        try\r\n        {\r\n            this.reader.register(this.socketChannel, () -> {\r\n                try\r\n                {\r\n                    readFrames();\r\n                }\r\n                catch (BufferOverflowException e)\r\n                {\r\n                    TcpChannel.this.destroy(\"Buffer overflow during frame decode\", e);\r\n                    throw e;\r\n                }\r\n            });\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            String message = this + \" could not register for read operations\";\r\n            Log.log(this, message, e);\r\n            throw new ConnectException(message);\r\n        }\r\n\r\n        ChannelUtils.WATCHDOG.addChannel(this);\r\n\r\n        final StringBuilder sockedOptions = new StringBuilder();\r\n        try\r\n        {\r\n            sockedOptions.append(\", socket options {\")\r\n                    .append(\"TCP_NODELAY=\")\r\n                    .append(socket.getTcpNoDelay())\r\n                    .append(\" \")\r\n                    .append(\"SO_REUSEADDR=\")\r\n                    .append(socket.getReuseAddress())\r\n                    .append(\" \")\r\n                    .append(\"IP_TOS=\")\r\n                    .append(socket.getTrafficClass())\r\n                    .append(\" \")\r\n                    .append(\"SO_LINGER=\")\r\n                    .append(socket.getSoLinger())\r\n                    .append(\" \")\r\n                    .append(\"SO_TIMEOUT=\")\r\n                    .append(socket.getSoTimeout())\r\n                    .append(\" \")\r\n                    .append(\"SO_SNDBUF=\")\r\n                    .append(socket.getSendBufferSize())\r\n                    .append(\" \")\r\n                    .append(\"SO_RCVBUF=\")\r\n                    .append(socket.getReceiveBufferSize())\r\n                    .append(\" \")\r\n                    .append(\"SO_KEEPALIVE=\")\r\n                    .append(socket.getKeepAlive())\r\n                    .append(\" \")\r\n                    .append(\"SO_OOBINLINE=\")\r\n                    .append(socket.getOOBInline())\r\n                    .append(\"}\");\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            Log.log(this, \"Could not log socket options \" + ObjectUtils.safeToString(socket), e);\r\n        }\r\n\r\n        Log.log(this, \"Constructed \", ObjectUtils.safeToString(this),\r\n                this.socketChannel.isBlocking() ? \" blocking mode\" : \" non-blocking mode\",\r\n                sockedOptions.toString());\r\n    }\r\n\r\n    @Override\r\n    public boolean send(byte[] toSend)\r\n    {\r\n        try\r\n        {\r\n            final TxByteArrayFragment[] byteFragmentsToSend =\r\n                TxByteArrayFragment.getFragmentsForTxData(toSend, TX_SEND_SIZE);\r\n\r\n            for (int i = 0; i < byteFragmentsToSend.length; i++)\r\n            {\r\n                this.byteArrayFragmentResolver.prepareBuffersToSend(byteFragmentsToSend[i]);\r\n            }\r\n\r\n            final Deque<TxByteArrayFragment> pendingTxFrames;\r\n            synchronized (this.lock)\r\n            {\r\n                pendingTxFrames = this.txFrames[this.pendingQueue];\r\n                for (int i = 0; i < byteFragmentsToSend.length; i++)\r\n                {\r\n                    pendingTxFrames.offer(byteFragmentsToSend[i]);\r\n                }\r\n\r\n                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)\r\n                {\r\n                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1],\r\n                            this.readerWriter.getWriteBufferToSocketCount()))\r\n                    {\r\n                        destroy(\"Queue too large\");\r\n                    }\r\n                }\r\n\r\n                switch(this.state)\r\n                {\r\n                    case DESTROYED:\r\n                        throw new ClosedChannelException();\r\n                    case IDLE:\r\n                        this.state = StateEnum.SENDING;\r\n                        synchronized (this.sendChannelChain)\r\n                        {\r\n                            if (linkChannel_callWithChainLock(this))\r\n                            {\r\n                                this.writer.setInterest(this.writerKey);\r\n                            }\r\n                        }\r\n                        break;\r\n                    case SENDING:\r\n                    default :\r\n                        break;\r\n                }\r\n            }\r\n\r\n            return true;\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            destroy(\"Could not send data\", e);\r\n            return false;\r\n        }\r\n    }\r\n\r\n    @Override\r\n    @Deprecated\r\n    public boolean sendAsync(byte[] toSend)\r\n    {\r\n        return send(toSend);\r\n    }\r\n\r\n    @Override\r\n    public String toString()\r\n    {\r\n        final StringBuilder sb = new StringBuilder(80);\r\n        sb.append(this.onChannelConnectedCalled\r\n            ? (this.onChannelClosedCalled.get() ? TCP_CHANNEL_CLOSED : TCP_CHANNEL_CONNECTED)\r\n            : TCP_CHANNEL_PENDING).append(getDescription()).append(\"]\");\r\n        return sb.toString();\r\n    }\r\n\r\n    @Override\r\n    protected void finalize() throws Throwable\r\n    {\r\n        super.finalize();\r\n        destroy(\"finalize\");\r\n    }\r\n\r\n    void readFrames()\r\n    {\r\n        try\r\n        {\r\n            final long start = System.nanoTime();\r\n\r\n            final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();\r\n\r\n            final int readCount = this.socketChannel.read(frameResolver.getBuffer());\r\n            switch(readCount)\r\n            {\r\n                case -1:\r\n                    destroy(\"End-of-stream reached\");\r\n                    return;\r\n                case 0:\r\n                    return;\r\n                default:\r\n                    this.rxData = true;\r\n            }\r\n\r\n            frameResolver.setChannelAndReadTime(this, System.nanoTime() - start);\r\n\r\n            RX_FRAME_PROCESSOR.execute(frameResolver);\r\n        }\r\n        catch (IOException e)\r\n        {\r\n            destroy(\"Could not read from socket (\" + e + \")\");\r\n        }\r\n    }\r\n\r\n    void resolveFrameFromBuffer(long socketRead, ByteBuffer buffer)\r\n    {\r\n        long connected = 0;\r\n        long decodeFrames = 0;\r\n        long resolveFrames = 0;\r\n        long processFrames = 0;\r\n        int size = 0;\r\n\r\n        final long start = System.nanoTime();\r\n\r\n        // prepare the main buffer\r\n        this.rxByteBuffer.compact();\r\n        if (this.rxByteBuffer.position() == this.rxByteBuffer.limit())\r\n        {\r\n            this.rxByteBuffer.clear();\r\n        }\r\n\r\n        // read the input buffer into the main buffer\r\n        buffer.flip();\r\n        this.rxByteBuffer.put(buffer);\r\n\r\n        try\r\n        {\r\n            // mark connected when we receive the first message (all channels send a heartbeat or\r\n            // data as the first action they perform)\r\n            if (!this.onChannelConnectedCalled)\r\n            {\r\n                this.onChannelConnectedCalled = true;\r\n                Log.log(this, \"Connected \", ObjectUtils.safeToString(this.socketChannel));\r\n                try\r\n                {\r\n                    this.receiver.onChannelConnected(TcpChannel.this);\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.log(this, ObjectUtils.safeToString(this) + \" receiver \"\r\n                        + ObjectUtils.safeToString(this.receiver) + \" threw exception during onChannelConnected\", e);\r\n                }\r\n                connected = System.nanoTime();\r\n            }\r\n\r\n            this.fragments =\r\n                this.readerWriter.readFrames(this.rxByteBuffer, this.rxBytes, this.fragments, this.fragmentsSize);\r\n            decodeFrames = System.nanoTime();\r\n\r\n            ByteBuffer data;\r\n            size = this.fragmentsSize[0];\r\n            int i;\r\n            int resolvedFramesSize = 0;\r\n            for (i = 0; i < size; i++)\r\n            {\r\n                if ((data = this.byteArrayFragmentResolver.resolve(this.fragments[i])) != null)\r\n                {\r\n                    if (resolvedFramesSize == this.resolvedFrames.length)\r\n                    {\r\n                        this.resolvedFrames = Arrays.copyOf(this.resolvedFrames, this.resolvedFrames.length + 2);\r\n                    }\r\n                    this.resolvedFrames[resolvedFramesSize++] = data;\r\n                }\r\n                this.fragments[i] = null;\r\n            }\r\n            resolveFrames = System.nanoTime();\r\n\r\n            ByteBuffer resolvedFrame;\r\n            for (i = 0; i < resolvedFramesSize; i++)\r\n            {\r\n                // NOTE: we know that all ByteBuffers coming in here have position=0\r\n                // (because they come from ByteArrayFragment.getData()\r\n                // so limit() is the length\r\n                resolvedFrame = this.resolvedFrames[i];\r\n                if (resolvedFrame.limit() == 1 && ChannelUtils.HEARTBEAT_SIGNAL[0] == resolvedFrame.get(0))\r\n                {\r\n                    ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);\r\n                }\r\n                else\r\n                {\r\n                    try\r\n                    {\r\n                        this.receiver.onDataReceived(resolvedFrame, this);\r\n                    }\r\n                    catch (Exception e)\r\n                    {\r\n                        Log.log(this,\r\n                                ObjectUtils.safeToString(this) + \" receiver \" + ObjectUtils.safeToString(\r\n                                        this.receiver) + \" threw exception during onDataReceived\", e);\r\n                    }\r\n                }\r\n                this.resolvedFrames[i] = null;\r\n            }\r\n            processFrames = System.nanoTime();\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            destroy(\"Could not read from socket (\" + e + \")\");\r\n        }\r\n        finally\r\n        {\r\n            final long elapsedTimeNanos = System.nanoTime() - start + socketRead;\r\n            if (elapsedTimeNanos > SLOW_RX_FRAME_THRESHOLD_NANOS)\r\n            {\r\n                if (connected == 0)\r\n                {\r\n                    Log.log(this, \"SLOW FRAME: \", Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))),\r\n                        \"ms [socketRead=\", Long.toString(((long) ((socketRead) * _INVERSE_1000000))), \"ms, decode(\",\r\n                        Integer.toString(size), \")=\",\r\n                        Long.toString(((long) ((decodeFrames - start) * _INVERSE_1000000))), \"ms, resolve=\",\r\n                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), \"ms, process=\",\r\n                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), \"ms] for \",\r\n                        ObjectUtils.safeToString(this));\r\n                }\r\n                else\r\n                {\r\n                    Log.log(this, \"SLOW FRAME: \", Long.toString(((long) (elapsedTimeNanos * _INVERSE_1000000))),\r\n                        \"ms [socketRead=\", Long.toString(((long) ((socketRead) * _INVERSE_1000000))),\r\n                        \"ms, onChannelConnected=\", Long.toString(((long) ((connected - start) * _INVERSE_1000000))),\r\n                        \"ms, decode(\", Integer.toString(size), \")=\",\r\n                        Long.toString(((long) ((decodeFrames - connected) * _INVERSE_1000000))), \"ms, resolve=\",\r\n                        Long.toString(((long) ((resolveFrames - decodeFrames) * _INVERSE_1000000))), \"ms, process=\",\r\n                        Long.toString(((long) ((processFrames - resolveFrames) * _INVERSE_1000000))), \"ms] for \",\r\n                        ObjectUtils.safeToString(this));\r\n                }\r\n            }\r\n        }\r\n    }\r\n\r\n    static void writeFrames(SendChannelChain chain)\r\n    {\r\n        /*\r\n         * This code logic will give equal opportunity for sending across all channels in the\r\n         * runtime. This prevents one channel starving out other channels by having a queue that is\r\n         * being fed as fast as it can be dequeued, which leads to starvation of other channels.\r\n         */\r\n        TxByteArrayFragment data;\r\n        TcpChannel channel = null;\r\n        boolean writeInProgress;\r\n        while (chain.first != null)\r\n        {\r\n            if (channel == null)\r\n            {\r\n                channel = chain.first;\r\n            }\r\n            else\r\n            {\r\n                channel = channel.next;\r\n            }\r\n            if (channel == null)\r\n            {\r\n                continue;\r\n            }\r\n\r\n            writeInProgress = ((AbstractFrameReaderWriter) channel.readerWriter).isWriteInProgress();\r\n\r\n            if (!writeInProgress)\r\n            {\r\n                // minimise locking by checking what we have grabbed previously, only if its\r\n                // empty do we go into here\r\n                if (channel.txFrames[channel.sendingQueue].isEmpty())\r\n                {\r\n                    synchronized (channel.lock)\r\n                    {\r\n                        if (channel.state != StateEnum.DESTROYED)\r\n                        {\r\n                            // swap txFrames over\r\n                            final int temp = channel.sendingQueue;\r\n                            channel.sendingQueue = channel.pendingQueue;\r\n                            channel.pendingQueue = temp;\r\n\r\n                            if (channel.txFrames[channel.sendingQueue].isEmpty())\r\n                            {\r\n                                channel.state = StateEnum.IDLE;\r\n                            }\r\n                        }\r\n\r\n                        switch(channel.state)\r\n                        {\r\n                            case DESTROYED:\r\n                                synchronized (channel.sendChannelChain)\r\n                                {\r\n                                    unlinkChannel_callWithChainLock(channel);\r\n                                }\r\n                                continue;\r\n                            case IDLE:\r\n                                synchronized (channel.sendChannelChain)\r\n                                {\r\n                                    unlinkChannel_callWithChainLock(channel);\r\n                                    try\r\n                                    {\r\n                                        SelectorProcessor.resetInterest(channel.writerKey);\r\n                                    }\r\n                                    catch (CancelledKeyException e)\r\n                                    {\r\n                                        channel.destroy(\"Socket has been closed\", e);\r\n                                    }\r\n                                }\r\n                                continue;\r\n                            default :\r\n                                break;\r\n                        }\r\n                    }\r\n\r\n                }\r\n\r\n                data = channel.txFrames[channel.sendingQueue].poll();\r\n                if (data != null)\r\n                {\r\n                    try\r\n                    {\r\n                        final ByteBuffer[] txDataWithHeader = data.getTxDataWithHeader();\r\n                        ((AbstractFrameReaderWriter) channel.readerWriter).writeNextFrame(txDataWithHeader[0],\r\n                                txDataWithHeader[1]);\r\n                    }\r\n                    catch (Exception e)\r\n                    {\r\n                        channel.destroy(\"Could not write frames to socket\", e);\r\n                    }\r\n                    finally\r\n                    {\r\n                        data.free();\r\n                    }\r\n                }\r\n            }\r\n            else\r\n            {\r\n                try\r\n                {\r\n                    ((AbstractFrameReaderWriter) channel.readerWriter).writeBufferToSocket();\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    channel.destroy(\"Could not write buffer to socket\", e);\r\n                }\r\n            }\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public boolean isConnected()\r\n    {\r\n        try\r\n        {\r\n            return this.socketChannel.isConnected() && this.socketChannel.isOpen();\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            Log.log(this, \"Could not determine connected state\", e);\r\n            return false;\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public void destroy(String reason, Exception... e)\r\n    {\r\n        if (this.onChannelClosedCalled.getAndSet(true))\r\n        {\r\n            return;\r\n        }\r\n\r\n        if (e == null || e.length == 0)\r\n        {\r\n            Log.log(this, reason, \", destroying \", ObjectUtils.safeToString(this));\r\n        }\r\n        else\r\n        {\r\n            Log.log(this, reason + \", destroying \" + ObjectUtils.safeToString(this), e[0]);\r\n        }\r\n\r\n        try\r\n        {\r\n            synchronized (this.lock)\r\n            {\r\n                this.state = StateEnum.DESTROYED;\r\n                this.txFrames[this.pendingQueue].clear();\r\n                this.txFrames[this.sendingQueue].clear();\r\n                this.rxByteBuffer.clear();\r\n\r\n                // finalizer sometimes sees this as null - its not clear why/how this can happen\r\n                if (this.sendChannelChain != null)\r\n                {\r\n                    synchronized (this.sendChannelChain)\r\n                    {\r\n                        unlinkChannel_callWithChainLock(this);\r\n                    }\r\n                }\r\n            }\r\n\r\n            if (this.socketChannel != null)\r\n            {\r\n                TcpChannelUtils.closeChannel(this.socketChannel);\r\n                this.reader.cancel(this.socketChannel);\r\n                this.writer.cancel(this.socketChannel);\r\n            }\r\n\r\n            TcpChannelUtils.freeSelector(this.reader);\r\n            TcpChannelUtils.freeSelector(this.writer);\r\n\r\n            this.receiver.onChannelClosed(this);\r\n        }\r\n        catch (Exception e1)\r\n        {\r\n            Log.log(this, \"Could not destroy \" + ObjectUtils.safeToString(this), e1);\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public String getEndPointDescription()\r\n    {\r\n        return this.endPointSocketDescription;\r\n    }\r\n\r\n    @Override\r\n    public String getDescription()\r\n    {\r\n        return this.shortSocketDescription;\r\n    }\r\n\r\n    @Override\r\n    public boolean hasRxData()\r\n    {\r\n        final boolean hasRxData = this.rxData;\r\n        this.rxData = false;\r\n        return hasRxData;\r\n    }\r\n\r\n    @Override\r\n    public int getTxQueueSize()\r\n    {\r\n        return this.txFrames[0].size() + this.txFrames[1].size();\r\n    }\r\n\r\n    @Override\r\n    public long getMessagesPublished()\r\n    {\r\n        return this.messagesPublished;\r\n    }\r\n\r\n    @Override\r\n    public long getBytesPublished()\r\n    {\r\n        return this.bytesPublished;\r\n    }\r\n}\r\n\r\n/**\r\n * Interface for the component that reads and writes transmission frames for a {@link TcpChannel}\r\n *\r\n * @author Ramon Servadei\r\n */\r\ninterface IFrameReaderWriter\r\n{\r\n    /**\r\n     * @param rxByteBuffer\r\n     *            the byte buffer read from a TCP socket\r\n     * @param rxBytes\r\n     *            the raw bytes extracted from the buffer\r\n     * @param frames\r\n     *            the reference to the buffer to use for holding the decoded frames read from the\r\n     *            raw bytes\r\n     * @param framesSize\r\n     *            int[] to allow the result array size to be reported\r\n     * @return the frame buffer with all the decoded frames\r\n     */\r\n    ByteBuffer[] readFrames(ByteBuffer rxByteBuffer, byte[] rxBytes, ByteBuffer[] frames, int[] framesSize);\r\n\r\n    long getWriteBufferToSocketCount();\r\n}\r\n\r\n/**\r\n * Base class for {@link IFrameReaderWriter} implementations. This class handles partial writing of\r\n * data buffers to a socket. The {@link #writeBufferToSocket()} method will continually attempt to\r\n * write the buffers to the socket until all data has been sent.\r\n *\r\n * @author Ramon Servadei\r\n */\r\nabstract class AbstractFrameReaderWriter implements IFrameReaderWriter\r\n{\r\n    // note: the header will never by this large, but we just use it to ensure we have enough so the\r\n    // txBuffer never resizes\r\n    static final int HEADER_SPACE = 1024;\r\n    static final int BUFFER_SIZE = TX_SEND_SIZE + HEADER_SPACE;\r\n\r\n    final TcpChannel tcpChannel;\r\n    final ByteBuffer txBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);\r\n    boolean writeInProgress = false;\r\n    long zeroByteWriteTimeNanos;\r\n    long writeBufferToSocketCount;\r\n\r\n    AbstractFrameReaderWriter(TcpChannel tcpChannel)\r\n    {\r\n        super();\r\n        this.tcpChannel = tcpChannel;\r\n    }\r\n\r\n    @Override\r\n    public long getWriteBufferToSocketCount()\r\n    {\r\n        return this.writeBufferToSocketCount;\r\n    }\r\n\r\n    final boolean isWriteInProgress()\r\n    {\r\n        return this.writeInProgress;\r\n    }\r\n\r\n    /**\r\n     * Write the internal {@link #txBuffer} to the socket. This will continually try to write the\r\n     * buffer to the socket until all the data has been written.\r\n     */\r\n    final void writeBufferToSocket() throws IOException\r\n    {\r\n        long time = System.nanoTime();\r\n        this.writeBufferToSocketCount++;\r\n\r\n        if (!this.writeInProgress)\r\n        {\r\n            // only flip if there is not a previous write in progress - we are still reading from\r\n            // the buffer if a write is in progress\r\n            this.txBuffer.flip();\r\n            this.writeInProgress = true;\r\n        }\r\n\r\n        final int byteCount = this.txBuffer.remaining();\r\n        final int bytesWritten;\r\n        if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)\r\n        {\r\n            final long current = System.nanoTime();\r\n            if (current - this.zeroByteWriteTimeNanos > 5_000_000_000L)\r\n            {\r\n                this.zeroByteWriteTimeNanos = current;\r\n                Log.log(this.tcpChannel, \"SLOW SOCKET: wrote \", Integer.toString(bytesWritten), \"/\",\r\n                    Integer.toString(byteCount), \" bytes at least once in the last 5 secs to \",\r\n                    this.tcpChannel.toString());\r\n            }\r\n\r\n            // don't reset the writeInProgress flag and don't compact the buffer\r\n            // as we need to continue reading it on the next run\r\n        }\r\n        else\r\n        {\r\n            this.writeInProgress = false;\r\n            this.txBuffer.compact();\r\n            tcpChannel.messagesPublished++;\r\n        }\r\n\r\n        tcpChannel.bytesPublished += bytesWritten;\r\n\r\n        time = System.nanoTime() - time;\r\n        if (time > SLOW_TX_FRAME_THRESHOLD_NANOS)\r\n        {\r\n            Log.log(this.tcpChannel, \"SLOW FRAME WRITE: \", Long.toString((long) (time * TcpChannel._INVERSE_1000000)),\r\n                \"ms to write \", Integer.toString(bytesWritten), \" bytes to \", this.tcpChannel.toString());\r\n        }\r\n    }\r\n\r\n    abstract void writeNextFrame(ByteBuffer header, ByteBuffer data) throws Exception;\r\n}\r\n\r\n/**\r\n * Handles frame encoding using a terminator field after each frame.\r\n *\r\n * @see TcpChannelUtils#decodeUsingTerminator(ByteBuffer[], int[], ByteBuffer, byte[], byte[])\r\n * @author Ramon Servadei\r\n */\r\nfinal class TerminatorBasedReaderWriter extends AbstractFrameReaderWriter\r\n{\r\n    TerminatorBasedReaderWriter(TcpChannel tcpChannel)\r\n    {\r\n        super(tcpChannel);\r\n    }\r\n\r\n    @Override\r\n    public ByteBuffer[] readFrames(ByteBuffer rxByteBuffer, byte[] rxBytes, ByteBuffer[] frames, int[] framesSize)\r\n    {\r\n        return TcpChannelUtils.decodeUsingTerminator(frames, framesSize, rxByteBuffer, rxBytes, TcpChannel.TERMINATOR);\r\n    }\r\n\r\n    @Override\r\n    void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException\r\n    {\r\n        final int dataLen = data.limit() - data.position();\r\n        final int headerLen = header.limit() - header.position();\r\n\r\n        this.txBuffer.put(header.array(), header.position(), headerLen);\r\n        this.txBuffer.put(data.array(), data.position(), dataLen);\r\n        this.txBuffer.put(TcpChannel.TERMINATOR);\r\n\r\n        writeBufferToSocket();\r\n    }\r\n}\r\n\r\n/**\r\n * Handles frame encoding with a 4-byte length field before each frame.\r\n *\r\n * @see TcpChannelUtils#decode(ByteBuffer[], int[], ByteBuffer, byte[])\r\n * @author Ramon Servadei\r\n */\r\nfinal class LengthBasedWriter extends AbstractFrameReaderWriter\r\n{\r\n    LengthBasedWriter(TcpChannel tcpChannel)\r\n    {\r\n        super(tcpChannel);\r\n    }\r\n\r\n    @Override\r\n    public ByteBuffer[] readFrames(ByteBuffer rxByteBuffer, byte[] rxBytes, ByteBuffer[] frames, int[] framesSize)\r\n    {\r\n        return TcpChannelUtils.decode(frames, framesSize, rxByteBuffer, rxBytes);\r\n    }\r\n\r\n    @Override\r\n    void writeNextFrame(ByteBuffer header, ByteBuffer data) throws IOException\r\n    {\r\n        final int dataLen = data.limit() - data.position();\r\n        final int headerLen = header.limit() - header.position();\r\n\r\n        this.txBuffer.putInt(headerLen + dataLen);\r\n        this.txBuffer.put(header.array(), header.position(), headerLen);\r\n        this.txBuffer.put(data.array(), data.position(), dataLen);\r\n\r\n        writeBufferToSocket();\r\n    }\r\n}\r\n\r\n/**\r\n * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading\r\n * from the socket and logic to resolve a frame from the fragments received from the socket\r\n * buffer.\r\n *\r\n * @author Ramon Servadei\r\n */\r\nfinal class RxFrameResolver implements ISequentialRunnable, IReusableObject\r\n{\r\n    /** direct byte buffer to optimise reading */\r\n    private final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);\r\n\r\n    // variables written by tcp-reader thread but read by a resolver thread\r\n    private TcpChannel channel;\r\n    private long socketRead;\r\n\r\n    RxFrameResolver()\r\n    {\r\n    }\r\n\r\n    @Override\r\n    public void run()\r\n    {\r\n        try\r\n        {\r\n            this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);\r\n        }\r\n        finally\r\n        {\r\n            TcpChannel.RX_FRAME_RESOLVER_POOL.offer(this);\r\n        }\r\n    }\r\n\r\n    @Override\r\n    public Object context()\r\n    {\r\n        return this.channel;\r\n    }\r\n\r\n    void setChannelAndReadTime(TcpChannel channel, long socketRead)\r\n    {\r\n        this.channel = channel;\r\n        this.socketRead = socketRead;\r\n    }\r\n\r\n    ByteBuffer getBuffer()\r\n    {\r\n        return this.buffer;\r\n    }\r\n\r\n    @Override\r\n    public void reset()\r\n    {\r\n        // note: reset is called by the object pool and with its own synchronization\r\n        this.buffer.clear();\r\n        this.channel = null;\r\n        this.socketRead = -1;\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannel.java b/src/main/java/com/fimtra/tcpchannel/TcpChannel.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannel.java	(revision b32c7eaf25e9dd57015fbf02cc9d4e39ab7b59b8)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannel.java	(date 1785687740303)
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (c) 2013 Ramon Servadei
+- *
++ * Copyright (c) 2013 Ramon Servadei 
++ *  
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at
+  *
+  *    http://www.apache.org/licenses/LICENSE-2.0
+- *
++ *    
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+@@ -33,21 +33,22 @@
+ import java.nio.channels.SelectionKey;
+ import java.nio.channels.SocketChannel;
+ import java.util.Arrays;
+-import java.util.Collections;
+ import java.util.Deque;
+-import java.util.IdentityHashMap;
++import java.util.HashMap;
+ import java.util.Map;
+ import java.util.concurrent.atomic.AtomicBoolean;
++import java.util.concurrent.locks.Lock;
++import java.util.concurrent.locks.ReentrantLock;
+ 
+ import com.fimtra.channel.ChannelUtils;
+ import com.fimtra.channel.IReceiver;
+ import com.fimtra.channel.ITransportChannel;
+ import com.fimtra.tcpchannel.TcpChannelUtils.BufferOverflowException;
+-import com.fimtra.thimble.ContextExecutorFactory;
+-import com.fimtra.thimble.IContextExecutor;
+ import com.fimtra.thimble.ISequentialRunnable;
++import com.fimtra.thimble.ThimbleExecutor;
+ import com.fimtra.util.CollectionUtils;
+-import com.fimtra.util.IReusableObject;
++import com.fimtra.util.IReusableObjectBuilder;
++import com.fimtra.util.IReusableObjectFinalizer;
+ import com.fimtra.util.Log;
+ import com.fimtra.util.MultiThreadReusableObjectPool;
+ import com.fimtra.util.ObjectUtils;
+@@ -57,7 +58,7 @@
+  * <p>
+  * TCP socket options are configured by system properties and are applied by the
+  * {@link TcpChannelUtils#setOptions(SocketChannel)} method.
+- *
++ * 
+  * @author Ramon Servadei
+  */
+ public class TcpChannel implements ITransportChannel
+@@ -69,32 +70,32 @@
+     /** Expresses the encoding format for the data frames */
+     public enum FrameEncodingFormatEnum
+     {
+-        /**
+-         * Length-based frame encoding, in the following format (ABNF notation):
+-         *
+-         * <pre>
+-         *  stream = 1*frame
+-         *  frame = length data
+-         *
+-         *  length = 4OCTET ; big-endian integer indicating the length of the data
+-         *  data = 1*OCTET ; the data
+-         * </pre>
+-         */
+-        LENGTH_BASED,
++            /**
++             * Length-based frame encoding, in the following format (ABNF notation):
++             * 
++             * <pre>
++             *  stream = 1*frame
++             *  frame = length data
++             * 
++             *  length = 4OCTET ; big-endian integer indicating the length of the data
++             *  data = 1*OCTET ; the data
++             * </pre>
++             */
++            LENGTH_BASED,
+ 
+-        /**
+-         * Terminator-based frame encoding, in the following format (ABNF notation):
+-         *
+-         * <pre>
+-         * stream = 1*frame
+-         *
+-         * frame = data terminator
+-         * data = 1*OCTET ; the data
+-         *
+-         * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
+-         * </pre>
+-         */
+-        TERMINATOR_BASED;
++            /**
++             * Terminator-based frame encoding, in the following format (ABNF notation):
++             * 
++             * <pre>
++             * stream = 1*frame
++             * 
++             * frame = data terminator
++             * data = 1*OCTET ; the data
++             * 
++             * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)
++             * </pre>
++             */
++            TERMINATOR_BASED;
+ 
+         /**
+          * @param tcpChannel
+@@ -127,21 +128,61 @@
+     /** Represents the ASCII code for CRLF */
+     static final byte[] TERMINATOR = { 0xd, 0xa };
+ 
++    /**
++     * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
++     * from the socket and logic to resolve a frame from the fragments received from the socket
++     * buffer.
++     * 
++     * @author Ramon Servadei
++     */
++    private static final class RxFrameResolver implements ISequentialRunnable
++    {
++        /** direct byte buffer to optimise reading */
++        final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
++        long socketRead;
++        TcpChannel channel;
++
++        RxFrameResolver()
++        {
++        }
++
++        @Override
++        public void run()
++        {
++            try
++            {
++                this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
++            }
++            finally
++            {
++                RX_FRAME_RESOLVER_POOL.offer(this);
++            }
++        }
++
++        @Override
++        public Object context()
++        {
++            return this.channel;
++        }
++    }
++
+     /**
+      * Exclusively used to handle frames dispatched from the TCP socket reads. Has the same number
+      * of threads as the TCP reader count.
+      */
+-    private static final IContextExecutor RX_FRAME_PROCESSOR =
+-        ContextExecutorFactory.create("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
++    private static final ThimbleExecutor RX_FRAME_PROCESSOR =
++        new ThimbleExecutor("rxframe-processor", TcpChannelProperties.Values.READER_THREAD_COUNT);
+ 
+     static final MultiThreadReusableObjectPool<RxFrameResolver> RX_FRAME_RESOLVER_POOL =
+-        new MultiThreadReusableObjectPool<>("RxFrameResolverPool", RxFrameResolver::new,
+-                RxFrameResolver::reset, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
++            new MultiThreadReusableObjectPool<>("RxFrameResolverPool", RxFrameResolver::new, instance -> {
++                instance.buffer.clear();
++                instance.channel = null;
++            }, TcpChannelProperties.Values.RX_FRAME_RESOLVER_POOL_MAX_SIZE);
+ 
+     /**
+      * Holds a linked list (the chain) of channels that want to send. All the channels are bound to
+      * the same {@link SelectorProcessor}.
+-     *
++     * 
+      * @author Ramon Servadei
+      */
+     private static final class SendChannelChain
+@@ -155,30 +196,29 @@
+          * equal-sending-opportunity mechanism. The list is traversed from start to end, each
+          * channel has one frame sent, looping back to the start and continuing sending one frame
+          * for each channel. If a channel has no more frames to sent, it is unlinked by
+-         * {@link #unlinkChannel_callWithChainLock(TcpChannel)}
++         * {@link #unlinkChannel(TcpChannel)}
+          */
+         volatile TcpChannel first;
+         /**
+          * The end of the logical linked-list of TcpChannels with data to send.
+-         *
++         * 
+          * @see #first
+          */
+         volatile TcpChannel last;
+     }
+ 
+-    /** The chain per writer  */
+-    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains =
+-            Collections.synchronizedMap(new IdentityHashMap<>());
++    /** The chain per writer - acces must be synchronized on the TcpChannel class */
++    private final static Map<SelectorProcessor, SendChannelChain> sendChannelChains = new HashMap<>();
+ 
+     /**
+      * Add the channel into the chain. If it already there, does nothing.
+-     *
++     * 
+      * @param channel
+      *            the channel to add
+      * @return <code>true</code> if this is the first channel to be added into the chain - and thus
+      *         the {@link SelectorProcessor} needs to be triggered for writing
+      */
+-    private static boolean linkChannel_callWithChainLock(TcpChannel channel)
++    private synchronized static boolean linkChannel(TcpChannel channel)
+     {
+         final SendChannelChain chain = channel.sendChannelChain;
+         if (channel.prev == null && channel.next == null && chain.first != channel)
+@@ -187,12 +227,15 @@
+             {
+                 chain.first = channel;
+                 chain.last = channel;
++                channel.prev = null;
++                channel.next = null;
+                 return true;
+             }
+             else
+             {
+                 chain.last.next = channel;
+                 channel.prev = chain.last;
++                channel.next = null;
+                 chain.last = channel;
+                 return false;
+             }
+@@ -200,44 +243,39 @@
+         return false;
+     }
+ 
+-    private static void unlinkChannel_callWithChainLock(TcpChannel channel)
++    private synchronized static void unlinkChannel(TcpChannel channel)
+     {
+-        switch(channel.state)
+-        {
+-            case DESTROYED:
+-            case IDLE:
+-
+-                if (channel.next != null)
+-                {
+-                    channel.next.prev = channel.prev;
+-                }
+-                if (channel.prev != null)
+-                {
+-                    channel.prev.next = channel.next;
+-                }
+-                final SendChannelChain chain = channel.sendChannelChain;
+-                if (channel == chain.first)
+-                {
+-                    chain.first = channel.next;
+-                }
+-                if (channel == chain.last)
+-                {
+-                    chain.last = channel.prev;
+-                }
+-                channel.prev = null;
+-                channel.next = null;
+-                break;
+-            default:
+-                break;
+-        }
++        final SendChannelChain chain = channel.sendChannelChain;
++        if (channel.next != null)
++        {
++            channel.next.prev = channel.prev;
++        }
++        if (channel.prev != null)
++        {
++            channel.prev.next = channel.next;
++        }
++        // defensive check if chain is null
++        if (chain != null)
++        {
++            if (channel == chain.first)
++            {
++                chain.first = channel.next;
++            }
++            if (channel == chain.last)
++            {
++                chain.last = channel.prev;
++            }
++        }
++        channel.next = null;
++        channel.prev = null;
+     }
+ 
+-    volatile TcpChannel next;
++    TcpChannel next;
+     TcpChannel prev;
+ 
+     final SelectorProcessor reader;
+     final SelectorProcessor writer;
+-    volatile boolean rxData;
++    volatile int rxData;
+     final IReceiver receiver;
+     final ByteBuffer rxByteBuffer;
+     final byte[] rxBytes;
+@@ -245,7 +283,7 @@
+     ByteBuffer[] resolvedFrames = new ByteBuffer[10];
+     final int[] fragmentsSize = new int[1];
+     @SuppressWarnings("unchecked")
+-    final Deque<TxByteArrayFragment>[] txFrames =
++    final Deque<TxByteArrayFragment> txFrames[] =
+         new Deque[] { CollectionUtils.newDeque(), CollectionUtils.newDeque() };
+     int pendingQueue = 0;
+     int sendingQueue = 1;
+@@ -266,7 +304,7 @@
+      * only called once.
+      */
+     private final AtomicBoolean onChannelClosedCalled;
+-    private final Object lock = new Object();
++    private final Lock lock = new ReentrantLock();
+ 
+     /** The channel state - always access using the {@link #lock} */
+     StateEnum state = StateEnum.IDLE;
+@@ -275,13 +313,10 @@
+     final SendChannelChain sendChannelChain;
+     final QueueThresholdMonitor sendQueueMonitor;
+ 
+-    long messagesPublished;
+-    long bytesPublished;
+-
+     /**
+      * Construct a {@link TcpChannel} with a default receive buffer size and default frame encoding
+      * format.
+-     *
++     * 
+      * @see TcpChannelProperties.Values#FRAME_ENCODING
+      * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
+      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
+@@ -294,7 +329,7 @@
+     /**
+      * Construct a {@link TcpChannel} with a specific receive buffer size and default frame encoding
+      * format.
+-     *
++     * 
+      * @see TcpChannelProperties.Values#FRAME_ENCODING
+      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
+      */
+@@ -306,7 +341,7 @@
+     /**
+      * Construct a {@link TcpChannel} with a default receive buffer size and specific frame encoding
+      * format.
+-     *
++     * 
+      * @see TcpChannelProperties.Values#RX_BUFFER_SIZE
+      * @see #TcpChannel(String, int, IReceiver, int, FrameEncodingFormatEnum)
+      */
+@@ -322,7 +357,7 @@
+      * ready for use however the underlying {@link SocketChannel} may not yet be connected. This
+      * does not stop the channel from being used; any data queued up to send via the
+      * {@link #send(byte[])} method will be sent when the connection completes.
+-     *
++     * 
+      * @param serverHost
+      *            the target host for the TCP connection
+      * @param serverPort
+@@ -350,9 +385,20 @@
+         this.endPointSocketDescription = serverHost + ":" + serverPort;
+         this.socketChannel = TcpChannelUtils.createAndConnectNonBlockingSocketChannel(serverHost, serverPort);
+         this.shortSocketDescription =
+-                this.socketChannel.socket().getLocalSocketAddress() + "->" + getEndPointDescription();
++            this.socketChannel.socket().getLocalSocketAddress() + "->" + getEndPointDescription();
+         this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);
+-        this.sendChannelChain = getSendChannelChain();
++
++        SendChannelChain chain;
++        synchronized (TcpChannel.class)
++        {
++            chain = sendChannelChains.get(this.writer);
++            if (chain == null)
++            {
++                chain = new SendChannelChain();
++                sendChannelChains.put(this.writer, chain);
++            }
++        }
++        this.sendChannelChain = chain;
+ 
+         finishConstruction();
+     }
+@@ -374,23 +420,28 @@
+         this.endPointSocketDescription = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+         this.shortSocketDescription = socket.getLocalSocketAddress() + "<-" + getEndPointDescription();
+         this.sendQueueMonitor = new QueueThresholdMonitor(this, SEND_QUEUE_THRESHOLD_BREACH_MILLIS);
+-        this.sendChannelChain = getSendChannelChain();
++
++        SendChannelChain chain;
++        synchronized (TcpChannel.class)
++        {
++            chain = sendChannelChains.get(this.writer);
++            if (chain == null)
++            {
++                chain = new SendChannelChain();
++                sendChannelChains.put(this.writer, chain);
++            }
++        }
++        this.sendChannelChain = chain;
+ 
+         finishConstruction();
+     }
+ 
+-    private SendChannelChain getSendChannelChain()
+-    {
+-        return sendChannelChains.computeIfAbsent(this.writer, w -> new SendChannelChain());
+-    }
+-
+     private void finishConstruction() throws ConnectException
+     {
+         // this can be overridden by system properties
+-        final Socket socket = this.socketChannel.socket();
+         try
+         {
+-            socket.setTcpNoDelay(true);
++            this.socketChannel.socket().setTcpNoDelay(true);
+         }
+         catch (SocketException e1)
+         {
+@@ -401,7 +452,7 @@
+ 
+         try
+         {
+-            this.writer.register(this.socketChannel, () -> writeFrames(this.sendChannelChain));
++            this.writer.register(this.socketChannel, (Runnable) () -> writeFrames(TcpChannel.this.writer));
+ 
+             this.writerKey = this.writer.getKeyFor(this.socketChannel);
+             SelectorProcessor.resetInterest(this.writerKey);
+@@ -415,7 +466,7 @@
+ 
+         try
+         {
+-            this.reader.register(this.socketChannel, () -> {
++            this.reader.register(this.socketChannel, (Runnable) () -> {
+                 try
+                 {
+                     readFrames();
+@@ -436,46 +487,8 @@
+ 
+         ChannelUtils.WATCHDOG.addChannel(this);
+ 
+-        final StringBuilder sockedOptions = new StringBuilder();
+-        try
+-        {
+-            sockedOptions.append(", socket options {")
+-                    .append("TCP_NODELAY=")
+-                    .append(socket.getTcpNoDelay())
+-                    .append(" ")
+-                    .append("SO_REUSEADDR=")
+-                    .append(socket.getReuseAddress())
+-                    .append(" ")
+-                    .append("IP_TOS=")
+-                    .append(socket.getTrafficClass())
+-                    .append(" ")
+-                    .append("SO_LINGER=")
+-                    .append(socket.getSoLinger())
+-                    .append(" ")
+-                    .append("SO_TIMEOUT=")
+-                    .append(socket.getSoTimeout())
+-                    .append(" ")
+-                    .append("SO_SNDBUF=")
+-                    .append(socket.getSendBufferSize())
+-                    .append(" ")
+-                    .append("SO_RCVBUF=")
+-                    .append(socket.getReceiveBufferSize())
+-                    .append(" ")
+-                    .append("SO_KEEPALIVE=")
+-                    .append(socket.getKeepAlive())
+-                    .append(" ")
+-                    .append("SO_OOBINLINE=")
+-                    .append(socket.getOOBInline())
+-                    .append("}");
+-        }
+-        catch (Exception e)
+-        {
+-            Log.log(this, "Could not log socket options " + ObjectUtils.safeToString(socket), e);
+-        }
+-
+         Log.log(this, "Constructed ", ObjectUtils.safeToString(this),
+-                this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode",
+-                sockedOptions.toString());
++            this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode");
+     }
+ 
+     @Override
+@@ -492,7 +505,8 @@
+             }
+ 
+             final Deque<TxByteArrayFragment> pendingTxFrames;
+-            synchronized (this.lock)
++            this.lock.lock();
++            try
+             {
+                 pendingTxFrames = this.txFrames[this.pendingQueue];
+                 for (int i = 0; i < byteFragmentsToSend.length; i++)
+@@ -500,35 +514,32 @@
+                     pendingTxFrames.offer(byteFragmentsToSend[i]);
+                 }
+ 
+-                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)
+-                {
+-                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1],
+-                            this.readerWriter.getWriteBufferToSocketCount()))
+-                    {
+-                        destroy("Queue too large");
+-                    }
+-                }
+-
+                 switch(this.state)
+                 {
+                     case DESTROYED:
+                         throw new ClosedChannelException();
+                     case IDLE:
+                         this.state = StateEnum.SENDING;
+-                        synchronized (this.sendChannelChain)
+-                        {
+-                            if (linkChannel_callWithChainLock(this))
+-                            {
+-                                this.writer.setInterest(this.writerKey);
+-                            }
+-                        }
++                        linkChannel(this);
++                        this.writer.setInterest(this.writerKey);
+                         break;
+                     case SENDING:
+                     default :
+                         break;
+                 }
++
++                if (TX_SEND_QUEUE_THRESHOLD_ACTIVE)
++                {
++                    if (this.sendQueueMonitor.checkQueueSize(this.txFrames[0], this.txFrames[1]))
++                    {
++                        destroy("Queue too large");
++                    }
++                }
+             }
+-
++            finally
++            {
++                this.lock.unlock();
++            }
+             return true;
+         }
+         catch (Exception e)
+@@ -569,8 +580,9 @@
+             final long start = System.nanoTime();
+ 
+             final RxFrameResolver frameResolver = RX_FRAME_RESOLVER_POOL.get();
++            frameResolver.channel = this;
+ 
+-            final int readCount = this.socketChannel.read(frameResolver.getBuffer());
++            final int readCount = this.socketChannel.read(frameResolver.buffer);
+             switch(readCount)
+             {
+                 case -1:
+@@ -578,17 +590,17 @@
+                     return;
+                 case 0:
+                     return;
+-                default:
+-                    this.rxData = true;
++                default :
++                    this.rxData++; // todo
+             }
+ 
+-            frameResolver.setChannelAndReadTime(this, System.nanoTime() - start);
++            frameResolver.socketRead = System.nanoTime() - start;
+ 
+             RX_FRAME_PROCESSOR.execute(frameResolver);
+         }
+         catch (IOException e)
+         {
+-            destroy("Could not read from socket (" + e + ")");
++            destroy("Could not read from socket (" + e.toString() + ")");
+         }
+     }
+ 
+@@ -639,7 +651,7 @@
+ 
+             ByteBuffer data;
+             size = this.fragmentsSize[0];
+-            int i;
++            int i = 0;
+             int resolvedFramesSize = 0;
+             for (i = 0; i < size; i++)
+             {
+@@ -655,29 +667,31 @@
+             }
+             resolveFrames = System.nanoTime();
+ 
+-            ByteBuffer resolvedFrame;
+             for (i = 0; i < resolvedFramesSize; i++)
+             {
+                 // NOTE: we know that all ByteBuffers coming in here have position=0
+                 // (because they come from ByteArrayFragment.getData()
+                 // so limit() is the length
+-                resolvedFrame = this.resolvedFrames[i];
+-                if (resolvedFrame.limit() == 1 && ChannelUtils.HEARTBEAT_SIGNAL[0] == resolvedFrame.get(0))
++                switch(this.resolvedFrames[i].limit())
+                 {
+-                    ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
+-                }
+-                else
+-                {
+-                    try
+-                    {
+-                        this.receiver.onDataReceived(resolvedFrame, this);
+-                    }
+-                    catch (Exception e)
+-                    {
+-                        Log.log(this,
+-                                ObjectUtils.safeToString(this) + " receiver " + ObjectUtils.safeToString(
+-                                        this.receiver) + " threw exception during onDataReceived", e);
+-                    }
++                    case 1:
++                        if (ChannelUtils.HEARTBEAT_SIGNAL[0] == this.resolvedFrames[i].get(0))
++                        {
++                            ChannelUtils.WATCHDOG.onHeartbeat(TcpChannel.this);
++                            break;
++                        }
++                        //$FALL-THROUGH$
++                    default :
++                        try
++                        {
++                            this.receiver.onDataReceived(this.resolvedFrames[i], this);
++                        }
++                        catch (Exception e)
++                        {
++                            Log.log(this, ObjectUtils.safeToString(this) + " receiver "
++                                + ObjectUtils.safeToString(this.receiver) + " threw exception during onDataReceived",
++                                e);
++                        }
+                 }
+                 this.resolvedFrames[i] = null;
+             }
+@@ -685,7 +699,7 @@
+         }
+         catch (Exception e)
+         {
+-            destroy("Could not read from socket (" + e + ")");
++            destroy("Could not read from socket (" + e.toString() + ")");
+         }
+         finally
+         {
+@@ -717,16 +731,27 @@
+         }
+     }
+ 
+-    static void writeFrames(SendChannelChain chain)
++    static void writeFrames(SelectorProcessor writer)
+     {
+         /*
+          * This code logic will give equal opportunity for sending across all channels in the
+          * runtime. This prevents one channel starving out other channels by having a queue that is
+          * being fed as fast as it can be dequeued, which leads to starvation of other channels.
+          */
+-        TxByteArrayFragment data;
++        TxByteArrayFragment data = null;
+         TcpChannel channel = null;
+-        boolean writeInProgress;
++        final SendChannelChain chain;
++        synchronized (TcpChannel.class)
++        {
++            chain = sendChannelChains.get(writer);
++        }
++        // should never happen but do this to be defensive
++        if (chain == null)
++        {
++            return;
++        }
++
++        boolean writeInProgress = false;
+         while (chain.first != null)
+         {
+             if (channel == null)
+@@ -748,50 +773,32 @@
+             {
+                 // minimise locking by checking what we have grabbed previously, only if its
+                 // empty do we go into here
+-                if (channel.txFrames[channel.sendingQueue].isEmpty())
++                if (channel.txFrames[channel.sendingQueue].size() == 0)
+                 {
+-                    synchronized (channel.lock)
++                    channel.lock.lock();
++                    try
+                     {
+-                        if (channel.state != StateEnum.DESTROYED)
++                        if (channel.state == StateEnum.DESTROYED)
+                         {
+-                            // swap txFrames over
+-                            final int temp = channel.sendingQueue;
+-                            channel.sendingQueue = channel.pendingQueue;
+-                            channel.pendingQueue = temp;
++                            unlinkChannel(channel);
++                            continue;
++                        }
++
++                        // swap txFrames over
++                        final int temp = channel.sendingQueue;
++                        channel.sendingQueue = channel.pendingQueue;
++                        channel.pendingQueue = temp;
+ 
+-                            if (channel.txFrames[channel.sendingQueue].isEmpty())
+-                            {
+-                                channel.state = StateEnum.IDLE;
+-                            }
+-                        }
+-
+-                        switch(channel.state)
++                        if (channel.txFrames[channel.sendingQueue].size() == 0)
+                         {
+-                            case DESTROYED:
+-                                synchronized (channel.sendChannelChain)
+-                                {
+-                                    unlinkChannel_callWithChainLock(channel);
+-                                }
+-                                continue;
+-                            case IDLE:
+-                                synchronized (channel.sendChannelChain)
+-                                {
+-                                    unlinkChannel_callWithChainLock(channel);
+-                                    try
+-                                    {
+-                                        SelectorProcessor.resetInterest(channel.writerKey);
+-                                    }
+-                                    catch (CancelledKeyException e)
+-                                    {
+-                                        channel.destroy("Socket has been closed", e);
+-                                    }
+-                                }
+-                                continue;
+-                            default :
+-                                break;
++                            setChannelIdle(channel);
++                            continue;
+                         }
+                     }
+-
++                    finally
++                    {
++                        channel.lock.unlock();
++                    }
+                 }
+ 
+                 data = channel.txFrames[channel.sendingQueue].poll();
+@@ -827,6 +834,20 @@
+         }
+     }
+ 
++    private static void setChannelIdle(TcpChannel channel)
++    {
++        channel.state = StateEnum.IDLE;
++        unlinkChannel(channel);
++        try
++        {
++            SelectorProcessor.resetInterest(channel.writerKey);
++        }
++        catch (CancelledKeyException e)
++        {
++            channel.destroy("Socket has been closed", e);
++        }
++    }
++
+     @Override
+     public boolean isConnected()
+     {
+@@ -860,21 +881,19 @@
+ 
+         try
+         {
+-            synchronized (this.lock)
++            this.lock.lock();
++            try
+             {
+                 this.state = StateEnum.DESTROYED;
+                 this.txFrames[this.pendingQueue].clear();
+                 this.txFrames[this.sendingQueue].clear();
+                 this.rxByteBuffer.clear();
+ 
+-                // finalizer sometimes sees this as null - its not clear why/how this can happen
+-                if (this.sendChannelChain != null)
+-                {
+-                    synchronized (this.sendChannelChain)
+-                    {
+-                        unlinkChannel_callWithChainLock(this);
+-                    }
+-                }
++                unlinkChannel(this);
++            }
++            finally
++            {
++                this.lock.unlock();
+             }
+ 
+             if (this.socketChannel != null)
+@@ -884,9 +903,6 @@
+                 this.writer.cancel(this.socketChannel);
+             }
+ 
+-            TcpChannelUtils.freeSelector(this.reader);
+-            TcpChannelUtils.freeSelector(this.writer);
+-
+             this.receiver.onChannelClosed(this);
+         }
+         catch (Exception e1)
+@@ -910,8 +926,8 @@
+     @Override
+     public boolean hasRxData()
+     {
+-        final boolean hasRxData = this.rxData;
+-        this.rxData = false;
++        final boolean hasRxData = this.rxData > 0;
++        this.rxData = 0;
+         return hasRxData;
+     }
+ 
+@@ -920,23 +936,11 @@
+     {
+         return this.txFrames[0].size() + this.txFrames[1].size();
+     }
+-
+-    @Override
+-    public long getMessagesPublished()
+-    {
+-        return this.messagesPublished;
+-    }
+-
+-    @Override
+-    public long getBytesPublished()
+-    {
+-        return this.bytesPublished;
+-    }
+ }
+ 
+ /**
+  * Interface for the component that reads and writes transmission frames for a {@link TcpChannel}
+- *
++ * 
+  * @author Ramon Servadei
+  */
+ interface IFrameReaderWriter
+@@ -954,19 +958,20 @@
+      * @return the frame buffer with all the decoded frames
+      */
+     ByteBuffer[] readFrames(ByteBuffer rxByteBuffer, byte[] rxBytes, ByteBuffer[] frames, int[] framesSize);
+-
+-    long getWriteBufferToSocketCount();
+ }
+ 
+ /**
+  * Base class for {@link IFrameReaderWriter} implementations. This class handles partial writing of
+  * data buffers to a socket. The {@link #writeBufferToSocket()} method will continually attempt to
+  * write the buffers to the socket until all data has been sent.
+- *
++ * 
+  * @author Ramon Servadei
+  */
+ abstract class AbstractFrameReaderWriter implements IFrameReaderWriter
+ {
++
++    static final long SLOW_FRAME_WRITE_TIME_NANOS = 10000000;
++
+     // note: the header will never by this large, but we just use it to ensure we have enough so the
+     // txBuffer never resizes
+     static final int HEADER_SPACE = 1024;
+@@ -976,7 +981,6 @@
+     final ByteBuffer txBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+     boolean writeInProgress = false;
+     long zeroByteWriteTimeNanos;
+-    long writeBufferToSocketCount;
+ 
+     AbstractFrameReaderWriter(TcpChannel tcpChannel)
+     {
+@@ -984,12 +988,6 @@
+         this.tcpChannel = tcpChannel;
+     }
+ 
+-    @Override
+-    public long getWriteBufferToSocketCount()
+-    {
+-        return this.writeBufferToSocketCount;
+-    }
+-
+     final boolean isWriteInProgress()
+     {
+         return this.writeInProgress;
+@@ -998,11 +996,12 @@
+     /**
+      * Write the internal {@link #txBuffer} to the socket. This will continually try to write the
+      * buffer to the socket until all the data has been written.
++     * 
++     * @throws IOException
+      */
+     final void writeBufferToSocket() throws IOException
+     {
+         long time = System.nanoTime();
+-        this.writeBufferToSocketCount++;
+ 
+         if (!this.writeInProgress)
+         {
+@@ -1017,7 +1016,7 @@
+         if ((bytesWritten = this.tcpChannel.socketChannel.write(this.txBuffer)) != byteCount)
+         {
+             final long current = System.nanoTime();
+-            if (current - this.zeroByteWriteTimeNanos > 5_000_000_000L)
++            if (current - this.zeroByteWriteTimeNanos > 5000000000L)
+             {
+                 this.zeroByteWriteTimeNanos = current;
+                 Log.log(this.tcpChannel, "SLOW SOCKET: wrote ", Integer.toString(bytesWritten), "/",
+@@ -1032,10 +1031,7 @@
+         {
+             this.writeInProgress = false;
+             this.txBuffer.compact();
+-            tcpChannel.messagesPublished++;
+         }
+-
+-        tcpChannel.bytesPublished += bytesWritten;
+ 
+         time = System.nanoTime() - time;
+         if (time > SLOW_TX_FRAME_THRESHOLD_NANOS)
+@@ -1050,7 +1046,7 @@
+ 
+ /**
+  * Handles frame encoding using a terminator field after each frame.
+- *
++ * 
+  * @see TcpChannelUtils#decodeUsingTerminator(ByteBuffer[], int[], ByteBuffer, byte[], byte[])
+  * @author Ramon Servadei
+  */
+@@ -1083,7 +1079,7 @@
+ 
+ /**
+  * Handles frame encoding with a 4-byte length field before each frame.
+- *
++ * 
+  * @see TcpChannelUtils#decode(ByteBuffer[], int[], ByteBuffer, byte[])
+  * @author Ramon Servadei
+  */
+@@ -1113,63 +1109,3 @@
+         writeBufferToSocket();
+     }
+ }
+-
+-/**
+- * Re-usable class for resolving frames read from the socket. Has an internal buffer for reading
+- * from the socket and logic to resolve a frame from the fragments received from the socket
+- * buffer.
+- *
+- * @author Ramon Servadei
+- */
+-final class RxFrameResolver implements ISequentialRunnable, IReusableObject
+-{
+-    /** direct byte buffer to optimise reading */
+-    private final ByteBuffer buffer = ByteBuffer.allocateDirect(AbstractFrameReaderWriter.BUFFER_SIZE);
+-
+-    // variables written by tcp-reader thread but read by a resolver thread
+-    private TcpChannel channel;
+-    private long socketRead;
+-
+-    RxFrameResolver()
+-    {
+-    }
+-
+-    @Override
+-    public void run()
+-    {
+-        try
+-        {
+-            this.channel.resolveFrameFromBuffer(this.socketRead, this.buffer);
+-        }
+-        finally
+-        {
+-            TcpChannel.RX_FRAME_RESOLVER_POOL.offer(this);
+-        }
+-    }
+-
+-    @Override
+-    public Object context()
+-    {
+-        return this.channel;
+-    }
+-
+-    void setChannelAndReadTime(TcpChannel channel, long socketRead)
+-    {
+-        this.channel = channel;
+-        this.socketRead = socketRead;
+-    }
+-
+-    ByteBuffer getBuffer()
+-    {
+-        return this.buffer;
+-    }
+-
+-    @Override
+-    public void reset()
+-    {
+-        // note: reset is called by the object pool and with its own synchronization
+-        this.buffer.clear();
+-        this.channel = null;
+-        this.socketRead = -1;
+-    }
+-}
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Copyright (c) 2013 Ramon Servadei\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *    http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */\r\npackage com.fimtra.tcpchannel;\r\n\r\nimport static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;\r\n\r\nimport java.io.IOException;\r\nimport java.net.ConnectException;\r\nimport java.net.InetAddress;\r\nimport java.net.InetSocketAddress;\r\nimport java.net.ServerSocket;\r\nimport java.net.Socket;\r\nimport java.net.SocketTimeoutException;\r\nimport java.net.UnknownHostException;\r\nimport java.nio.BufferUnderflowException;\r\nimport java.nio.ByteBuffer;\r\nimport java.nio.channels.SelectionKey;\r\nimport java.nio.channels.Selector;\r\nimport java.nio.channels.SocketChannel;\r\nimport java.util.ArrayList;\r\nimport java.util.Arrays;\r\nimport java.util.HashMap;\r\nimport java.util.Iterator;\r\nimport java.util.List;\r\nimport java.util.Map;\r\nimport java.util.concurrent.atomic.AtomicInteger;\r\nimport java.util.function.Supplier;\r\n\r\nimport com.fimtra.channel.ChannelUtils;\r\nimport com.fimtra.channel.IReceiver;\r\nimport com.fimtra.channel.TransportTechnologyEnum;\r\nimport com.fimtra.util.Log;\r\nimport com.fimtra.util.ObjectUtils;\r\n\r\n/**\r\n * Utility methods for a {@link TcpChannel}\r\n * <p>\r\n * Socket options for the runtime can be set using system properties in the form\r\n * <code>tcpchannel.{SocketOptions_constant}</code> e.g.\r\n *\r\n * <pre>\r\n * -Dtcpchannel.TCP_NODELAY=true -Dtcpchannel.SO_RCVBUF=65535\r\n * </pre>\r\n *\r\n * @author Ramon Servadei\r\n */\r\npublic abstract class TcpChannelUtils\r\n{\r\n    static final Map<String, String> SOCKET_OPTIONS = new HashMap<>();\r\n\r\n    static\r\n    {\r\n        Map.Entry<Object, Object> entry;\r\n        Object key = null;\r\n        Object value;\r\n        for (Iterator<Map.Entry<Object, Object>> it =\r\n             System.getProperties().entrySet().iterator(); it.hasNext(); )\r\n        {\r\n            try\r\n            {\r\n                entry = it.next();\r\n                key = entry.getKey();\r\n                value = entry.getValue();\r\n                if (key.toString().startsWith(\"tcpchannel.\", 0))\r\n                {\r\n                    SOCKET_OPTIONS.put(key.toString().substring(\"tcpchannel.\".length()), value.toString());\r\n                }\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.log(TcpChannelUtils.class, \"Could not read socket option \" + ObjectUtils.safeToString(key)\r\n                        + \" from system properties\", e);\r\n            }\r\n        }\r\n        Log.log(TcpChannelUtils.class, \"Socket options: \", ObjectUtils.safeToString(SOCKET_OPTIONS));\r\n    }\r\n\r\n    /**\r\n     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the {@link\r\n     * TcpChannel} can be constructed with a bigger receive buffer.\r\n     *\r\n     * @author Ramon Servadei\r\n     * @see TcpChannel#TcpChannel(String, int, IReceiver, int)\r\n     */\r\n    public static class BufferOverflowException extends RuntimeException\r\n    {\r\n        private static final long serialVersionUID = 1L;\r\n\r\n        public BufferOverflowException(String message)\r\n        {\r\n            super(message);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * <b>None of the parameters are used.</b>\r\n     *\r\n     * @see TransportTechnologyEnum#getNextAvailableServicePort()\r\n     * @deprecated use {@link ChannelUtils#getNextAvailableServicePort()}\r\n     */\r\n    @SuppressWarnings(\"unused\")\r\n    @Deprecated\r\n    public static int getNextFreeTcpServerPort(String hostName, int startPortRangeInclusive,\r\n            int endPortRangeExclusive)\r\n    {\r\n        return ChannelUtils.getNextAvailableServicePort();\r\n    }\r\n\r\n    static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();\r\n\r\n    /**\r\n     * Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin.\r\n     */\r\n    static final List<SelectorProcessor> READERS = new ArrayList<>();\r\n    private static SelectorProcessor currentReader;\r\n\r\n    static synchronized SelectorProcessor nextReader()\r\n    {\r\n        currentReader = nextSelector(READERS, currentReader,\r\n                () -> new SelectorProcessor(\"tcp-channel-reader-\" + READERS.size(), SelectionKey.OP_READ),\r\n                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.READER_CHANNELS_PER_SELECTOR,\r\n                TcpChannelProperties.Values.READER_THREAD_COUNT);\r\n        return currentReader;\r\n    }\r\n\r\n    /**\r\n     * Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin.\r\n     */\r\n    static final List<SelectorProcessor> WRITERS = new ArrayList<>();\r\n    private static SelectorProcessor currentWriter;\r\n\r\n    static synchronized SelectorProcessor nextWriter()\r\n    {\r\n        currentWriter = nextSelector(WRITERS, currentWriter,\r\n                () -> new SelectorProcessor(\"tcp-channel-writer-\" + WRITERS.size(), SelectionKey.OP_WRITE),\r\n                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.WRITER_CHANNELS_PER_SELECTOR,\r\n                TcpChannelProperties.Values.WRITER_THREAD_COUNT);\r\n        return currentWriter;\r\n    }\r\n\r\n    static synchronized void freeSelector(SelectorProcessor selectorProcessor)\r\n    {\r\n        freeSelector(selectorProcessor, COUNTS_PER_SELECTOR);\r\n    }\r\n\r\n    static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)\r\n    {\r\n        final AtomicInteger count = countsPerSelector.get(currentSelector);\r\n        if (count != null)\r\n        {\r\n            count.decrementAndGet();\r\n        }\r\n    }\r\n\r\n    static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,\r\n            Map<T, AtomicInteger> countsPerSelector, int maxChannelsPerSelector, int maxThreadCount)\r\n    {\r\n        T selectorToUse = currentSelector;\r\n        if (selectorToUse == null)\r\n        {\r\n            selectorToUse = ctor.get();\r\n            selectors.add(selectorToUse);\r\n        }\r\n        else\r\n        {\r\n            final AtomicInteger counts =\r\n                    countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger());\r\n            if (counts.get() >= maxChannelsPerSelector)\r\n            {\r\n                // find free one or create new one if under limit\r\n                if (selectors.size() < maxThreadCount)\r\n                {\r\n                    selectorToUse = ctor.get();\r\n                    selectors.add(selectorToUse);\r\n                }\r\n                else\r\n                {\r\n                    // find the one with the lowest counts\r\n                    int lowestCount = Integer.MAX_VALUE;\r\n                    for (T selector : selectors)\r\n                    {\r\n                        // NOTE: countsPerSelector has reader and writer selector counts!\r\n                        // We use our selectors list to find the correct reader/writer selectors to check\r\n                        final int current = countsPerSelector.get(selector).intValue();\r\n                        if (current < lowestCount)\r\n                        {\r\n                            lowestCount = current;\r\n                            selectorToUse = selector;\r\n                        }\r\n                    }\r\n                }\r\n            }\r\n        }\r\n\r\n        countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger()).incrementAndGet();\r\n        return selectorToUse;\r\n    }\r\n\r\n    /** Handles all socket accept operations for all {@link TcpServer} instances */\r\n    final static SelectorProcessor ACCEPT_PROCESSOR =\r\n            new SelectorProcessor(\"tcp-channel-accept\", SelectionKey.OP_ACCEPT);\r\n\r\n    /**\r\n     * The public facing IP for the local host\r\n     */\r\n    public final static String LOCALHOST_IP;\r\n\r\n    static\r\n    {\r\n        final String hostAddress;\r\n        try\r\n        {\r\n            hostAddress = InetAddress.getLocalHost().getHostAddress();\r\n        }\r\n        catch (UnknownHostException e)\r\n        {\r\n            throw new RuntimeException(\"Could not get host address\", e);\r\n        }\r\n        LOCALHOST_IP = hostAddress;\r\n    }\r\n\r\n    private TcpChannelUtils()\r\n    {\r\n        super();\r\n    }\r\n\r\n    /**\r\n     * Given a ByteBuffer of data, this method decodes it into an array of {@link ByteBuffer} objects. Data\r\n     * between {@link TcpChannel} objects is encoded in the following format (ABNF notation):\r\n     *\r\n     * <pre>\r\n     *  stream = 1*frame\r\n     *  frame = length data\r\n     *\r\n     *  length = 4OCTET ; big-endian integer indicating the length of the data\r\n     *  data = 1*OCTET ; the data\r\n     * </pre>\r\n     *\r\n     * @param frames      the reference for the array to place the decoded frames resolved from the buffer.\r\n     *                    Any incomplete frames are left in the buffer.\r\n     * @param framesSize  used as a reference to pass back the size of the array\r\n     * @param buffer      a bytebuffer holding any number of frames or <b>partial frames</b>\r\n     * @param bufferArray the array of bytes extracted from the buffer\r\n     * @return the array with the decoded frames, different to the frames argument if the array was resized\r\n     * @throws BufferOverflowException if the buffer size cannot hold a complete frame\r\n     */\r\n    static ByteBuffer[] decode(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer, byte[] bufferArray)\r\n            throws BufferOverflowException\r\n    {\r\n        ByteBuffer[] decoded = frames;\r\n        framesSize[0] = 0;\r\n        buffer.flip();\r\n        // the TCP message could be a concatenation of multiple ones\r\n        // the format is: <4 bytes len><data><4 bytes len><data>\r\n        int len;\r\n        int position;\r\n        while (buffer.position() < buffer.limit())\r\n        {\r\n            try\r\n            {\r\n                len = buffer.getInt();\r\n            }\r\n            catch (BufferUnderflowException e)\r\n            {\r\n                break;\r\n            }\r\n\r\n            position = buffer.position();\r\n            if (position + len > buffer.limit())\r\n            {\r\n                if (position == 4)\r\n                {\r\n                    if (position + len > buffer.capacity())\r\n                    {\r\n                        // the buffer is full and the length indicates that there is more data than\r\n                        // the buffer can hold. We cannot extract the data from the buffer so we\r\n                        // need indicate the buffer is full.\r\n                        final String overflowMessage = \"Need to read \" + len\r\n                                + \" but buffer has no more space from current position: \" + buffer;\r\n                        buffer.clear();\r\n                        throw new BufferOverflowException(overflowMessage);\r\n                    }\r\n                }\r\n                // we're waiting for more data to read\r\n                // set the position back\r\n                buffer.position(buffer.position() - 4);\r\n                break;\r\n            }\r\n            else\r\n            {\r\n                if (framesSize[0] == decoded.length)\r\n                {\r\n                    decoded = Arrays.copyOf(decoded, decoded.length + 2);\r\n                }\r\n                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, position, len);\r\n                buffer.position(position + len);\r\n            }\r\n        }\r\n        return decoded;\r\n    }\r\n\r\n    /**\r\n     * Given a ByteBuffer of data containing frames delimited by a termination byte, this method decodes it\r\n     * into an array of {@link ByteBuffer} objects, one for each frame. This method assumes data is encoded in\r\n     * the following format (ABNF notation):\r\n     *\r\n     * <pre>\r\n     * stream = 1*frame\r\n     *\r\n     * frame = data terminator\r\n     * data = 1*OCTET ; the data\r\n     *\r\n     * terminator = OCTET OCTET ; an ASCII control code, possibly 0x3 for ETX (end of text)\r\n     * </pre>\r\n     *\r\n     * @param frames      the reference for the array to place the decoded frames resolved from the buffer.\r\n     *                    Any incomplete frames are left in the buffer.\r\n     * @param framesSize  used as a reference to pass back the size of the array\r\n     * @param buffer      a bytebuffer holding any number of frames or <b>partial frames</b>\r\n     * @param bufferArray the array of bytes extracted from the buffer\r\n     * @param terminator  the byte sequence for the end of a frame\r\n     * @return the array with the decoded frames, different to the frames argument if the array was resized\r\n     * @throws BufferOverflowException if the buffer size cannot hold a complete frame\r\n     */\r\n    static ByteBuffer[] decodeUsingTerminator(ByteBuffer[] frames, int[] framesSize, ByteBuffer buffer,\r\n            byte[] bufferArray, byte[] terminator) throws BufferOverflowException\r\n    {\r\n        ByteBuffer[] decoded = frames;\r\n        framesSize[0] = 0;\r\n        buffer.flip();\r\n        int[] terminatorIndex = new int[2];\r\n        int terminatorIndexPtr = 0;\r\n        final int limit = buffer.limit();\r\n        int i;\r\n        for (i = 0; i < limit; i++)\r\n        {\r\n            if (bufferArray[i] == terminator[0] && (i + 1 < limit) && bufferArray[i + 1] == terminator[1])\r\n            {\r\n                // mark the terminator index, expand the terminatorIndex array if we're at its limit\r\n                terminatorIndex[terminatorIndexPtr++] = i;\r\n                if (terminatorIndexPtr == terminatorIndex.length)\r\n                {\r\n                    // (always +2 as a heuristic for reducing constant resizing)\r\n                    terminatorIndex = Arrays.copyOf(terminatorIndex, terminatorIndex.length + 2);\r\n                }\r\n            }\r\n        }\r\n\r\n        if (terminatorIndexPtr > 0)\r\n        {\r\n            int len;\r\n            int lastTerminatorIndex = 0;\r\n            for (i = 0; i < terminatorIndexPtr; i++)\r\n            {\r\n                len = terminatorIndex[i] - lastTerminatorIndex;\r\n                if (framesSize[0] == decoded.length)\r\n                {\r\n                    decoded = Arrays.copyOf(decoded, decoded.length + 2);\r\n                }\r\n                decoded[framesSize[0]++] = ByteBuffer.wrap(bufferArray, lastTerminatorIndex, len);\r\n                lastTerminatorIndex = terminatorIndex[i] + terminator.length;\r\n            }\r\n            buffer.position(lastTerminatorIndex);\r\n        }\r\n        else\r\n        {\r\n            // no terminator found, is the buffer totally full?\r\n            if (buffer.limit() == buffer.capacity())\r\n            {\r\n                final String overflowMessage =\r\n                        \"No frame terminator found and buffer is at its limit: \" + buffer;\r\n                buffer.clear();\r\n                throw new BufferOverflowException(overflowMessage);\r\n            }\r\n        }\r\n        return decoded;\r\n    }\r\n\r\n    /**\r\n     * Create a {@link SocketChannel}, connect in blocking mode to the given TCP server host and port and then\r\n     * set the socket channel to non-blocking mode.\r\n     *\r\n     * @param host the host name of the target TCP server socket to connect to\r\n     * @param port the port of the target TCP server socket to connect to\r\n     * @return a connected socket channel in <b>non-blocking</b> mode\r\n     * @throws ConnectException if the socket could not be created or connected\r\n     */\r\n    static SocketChannel createAndConnectNonBlockingSocketChannel(String host, int port)\r\n            throws ConnectException\r\n    {\r\n        final SocketChannel socketChannel;\r\n        try\r\n        {\r\n            socketChannel = SocketChannel.open();\r\n        }\r\n        catch (IOException e)\r\n        {\r\n            final String message = \"Could not create socket channel for \" + host + \":\" + port;\r\n            Log.log(TcpChannelUtils.class, message, e);\r\n            throw new ConnectException(message);\r\n        }\r\n        try\r\n        {\r\n            socketChannel.configureBlocking(false);\r\n            socketChannel.connect(new InetSocketAddress(host, port));\r\n            try (final Selector connectionSelector = Selector.open())\r\n            {\r\n                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);\r\n                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)\r\n                {\r\n                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);\r\n                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())\r\n                    {\r\n                        selectionKey.cancel();\r\n                        return socketChannel;\r\n                    }\r\n                    throw new ConnectException(\"Selection key not connectable or socket not connected\");\r\n                }\r\n                else\r\n                {\r\n                    // timeout\r\n                    throw new SocketTimeoutException(\r\n                            \"Did not connect to \" + host + \":\" + port + \" after waiting \"\r\n                                    + CONNECTION_TIMEOUT_MILLIS + \"ms\");\r\n                }\r\n            }\r\n        }\r\n        catch (ConnectException e)\r\n        {\r\n            closeChannel(socketChannel);\r\n            final String message =\r\n                    \"Could not connect socket channel to \" + host + \":\" + port + \" (\" + e + \")\";\r\n            throw new ConnectException(message);\r\n\r\n        }\r\n        catch (Exception e)\r\n        {\r\n            final String message =\r\n                    \"Could not connect socket channel to \" + host + \":\" + port + \" (\" + e + \")\";\r\n            Log.log(TcpChannelUtils.class, message, e);\r\n            closeChannel(socketChannel);\r\n            throw new ConnectException(message);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Close the channel\r\n     */\r\n    static void closeChannel(final SocketChannel channel)\r\n    {\r\n        Log.log(TcpChannelUtils.class, \"Closing \", ObjectUtils.safeToString(channel));\r\n        try\r\n        {\r\n            channel.socket().close();\r\n            channel.close();\r\n        }\r\n        catch (IOException e)\r\n        {\r\n            Log.log(TcpChannelUtils.class, \"Could not close \" + ObjectUtils.safeToString(channel), e);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Sets TCP socket options on the channel that are found in system properties.\r\n     * <p>\r\n     * e.g. -Dtcpchannel.TCP_NODELAY=true -Dtcpchannel.SO_RCVBUF=65535\r\n     *\r\n     * @param socketChannel the socket to configure options for\r\n     */\r\n    static void setOptions(SocketChannel socketChannel)\r\n    {\r\n        String key;\r\n        String value;\r\n        final Socket socket = socketChannel.socket();\r\n        for (Map.Entry<String, String> entry : SOCKET_OPTIONS.entrySet())\r\n        {\r\n            key = entry.getKey();\r\n            value = entry.getValue();\r\n            try\r\n            {\r\n                switch(key)\r\n                {\r\n                    case \"TCP_NODELAY\":\r\n                        socket.setTcpNoDelay(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"SO_REUSEADDR\":\r\n                        socket.setReuseAddress(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"IP_TOS\":\r\n                        socket.setTrafficClass(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_LINGER\":\r\n                        socket.setSoLinger(true, Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_TIMEOUT\":\r\n                        socket.setSoTimeout(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_SNDBUF\":\r\n                        socket.setSendBufferSize(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_RCVBUF\":\r\n                        socket.setReceiveBufferSize(Integer.parseInt(value));\r\n                        continue;\r\n                    case \"SO_KEEPALIVE\":\r\n                        socket.setKeepAlive(Boolean.parseBoolean(value));\r\n                        continue;\r\n                    case \"SO_OOBINLINE\":\r\n                        socket.setOOBInline(Boolean.parseBoolean(value));\r\n                        continue;\r\n                }\r\n                Log.log(TcpChannelUtils.class, \"Unhandled socket option: \", key);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.log(TcpChannelUtils.class,\r\n                        \"Could not set socket option \" + ObjectUtils.safeToString(key) + \" on \"\r\n                                + ObjectUtils.safeToString(socketChannel), e);\r\n            }\r\n        }\r\n    }\r\n\r\n    private static int lastEphemeralPort = -1;\r\n\r\n    /**\r\n     * Bind the server socket to the IP address and port. If the address is <code>null</code>, uses the\r\n     * localhost IP. If the port is 0 AND the system properties for the ephemeral port range start-end are set\r\n     * then an ephemeral port within the range is used. If the port is 0 and no system properties are set, an\r\n     * ephemeral port is allocated.\r\n     */\r\n    static void bind(ServerSocket socket, String address, int port) throws IOException\r\n    {\r\n        if (port == 0 && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START > -1\r\n                && TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END > -1)\r\n        {\r\n            bindWithinRange(socket, address, TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_START,\r\n                    TcpChannelProperties.Values.EPHEMERAL_PORT_RANGE_END);\r\n        }\r\n        else\r\n        {\r\n            socket.bind(\r\n                    new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address, port));\r\n        }\r\n    }\r\n\r\n    /**\r\n     * Bind the server socket to an ephemeral port within the range start and end, inclusive. If the address\r\n     * is <code>null</code>, uses the localhost IP.\r\n     */\r\n    static synchronized void bindWithinRange(ServerSocket socket, String address,\r\n            final int ephemeralRangeStart, final int ephemeralRangeEnd) throws IOException\r\n    {\r\n        int loop = 0;\r\n\r\n        while (true)\r\n        {\r\n            if (lastEphemeralPort == -1 || lastEphemeralPort < ephemeralRangeStart)\r\n            {\r\n                lastEphemeralPort = ephemeralRangeStart;\r\n            }\r\n            else\r\n            {\r\n                lastEphemeralPort++;\r\n            }\r\n            if (lastEphemeralPort > ephemeralRangeEnd)\r\n            {\r\n                lastEphemeralPort = ephemeralRangeStart;\r\n                if (++loop > 1)\r\n                {\r\n                    throw new IOException(\r\n                            \"No free port found between \" + ephemeralRangeStart + \"-\" + ephemeralRangeEnd);\r\n                }\r\n            }\r\n            try\r\n            {\r\n                final InetSocketAddress endpoint =\r\n                        new InetSocketAddress(address == null ? TcpChannelUtils.LOCALHOST_IP : address,\r\n                                lastEphemeralPort);\r\n                socket.bind(endpoint);\r\n                break;\r\n            }\r\n            catch (IOException e)\r\n            {\r\n                Log.log(TcpChannelUtils.class, \"Could not bind to socket: \" + lastEphemeralPort);\r\n            }\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(revision b32c7eaf25e9dd57015fbf02cc9d4e39ab7b59b8)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(date 1785688460625)
+@@ -15,29 +15,21 @@
+  */
+ package com.fimtra.tcpchannel;
+ 
+-import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
+-
+ import java.io.IOException;
+ import java.net.ConnectException;
+ import java.net.InetAddress;
+ import java.net.InetSocketAddress;
+ import java.net.ServerSocket;
+ import java.net.Socket;
+-import java.net.SocketTimeoutException;
+ import java.net.UnknownHostException;
+ import java.nio.BufferUnderflowException;
+ import java.nio.ByteBuffer;
+ import java.nio.channels.SelectionKey;
+-import java.nio.channels.Selector;
+ import java.nio.channels.SocketChannel;
+-import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.Iterator;
+-import java.util.List;
+ import java.util.Map;
+-import java.util.concurrent.atomic.AtomicInteger;
+-import java.util.function.Supplier;
+ 
+ import com.fimtra.channel.ChannelUtils;
+ import com.fimtra.channel.IReceiver;
+@@ -66,8 +58,9 @@
+         Map.Entry<Object, Object> entry;
+         Object key = null;
+         Object value;
+-        for (Iterator<Map.Entry<Object, Object>> it =
+-             System.getProperties().entrySet().iterator(); it.hasNext(); )
++        for (Iterator<Map.Entry<Object, Object>> it = System.getProperties()
++                .entrySet()
++                .iterator(); it.hasNext(); )
+         {
+             try
+             {
+@@ -89,8 +82,8 @@
+     }
+ 
+     /**
+-     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the {@link
+-     * TcpChannel} can be constructed with a bigger receive buffer.
++     * Thrown when a TCP channel buffer cannot hold the incoming message. In these situations, the
++     * {@link TcpChannel} can be constructed with a bigger receive buffer.
+      *
+      * @author Ramon Servadei
+      * @see TcpChannel#TcpChannel(String, int, IReceiver, int)
+@@ -119,94 +112,48 @@
+         return ChannelUtils.getNextAvailableServicePort();
+     }
+ 
+-    static final Map<SelectorProcessor, AtomicInteger> COUNTS_PER_SELECTOR = new HashMap<>();
++    /** Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin. */
++    private final static SelectorProcessor[] READER;
++    private static int currentReader = 0;
+ 
+-    /**
+-     * Handles socket read operations for {@link TcpChannel} instances. Allocation based on round-robin.
+-     */
+-    static final List<SelectorProcessor> READERS = new ArrayList<>();
+-    private static SelectorProcessor currentReader;
++    static
++    {
++        READER = new SelectorProcessor[TcpChannelProperties.Values.READER_THREAD_COUNT];
++        for (int i = 0; i < READER.length; i++)
++        {
++            READER[i] = new SelectorProcessor("tcp-channel-reader-" + i, SelectionKey.OP_READ);
++        }
++    }
+ 
+     static synchronized SelectorProcessor nextReader()
+     {
+-        currentReader = nextSelector(READERS, currentReader,
+-                () -> new SelectorProcessor("tcp-channel-reader-" + READERS.size(), SelectionKey.OP_READ),
+-                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.READER_CHANNELS_PER_SELECTOR,
+-                TcpChannelProperties.Values.READER_THREAD_COUNT);
+-        return currentReader;
++        if (currentReader == READER.length)
++        {
++            currentReader = 0;
++        }
++        return READER[currentReader++];
+     }
+ 
+-    /**
+-     * Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin.
+-     */
+-    static final List<SelectorProcessor> WRITERS = new ArrayList<>();
+-    private static SelectorProcessor currentWriter;
++    /** Handles socket write operations for {@link TcpChannel} instances. Allocation based on round-robin. */
++    private final static SelectorProcessor[] WRITER;
++    private static int currentWriter = 0;
++
++    static
++    {
++        WRITER = new SelectorProcessor[TcpChannelProperties.Values.WRITER_THREAD_COUNT];
++        for (int i = 0; i < WRITER.length; i++)
++        {
++            WRITER[i] = new SelectorProcessor("tcp-channel-writer-" + i, SelectionKey.OP_WRITE);
++        }
++    }
+ 
+     static synchronized SelectorProcessor nextWriter()
+     {
+-        currentWriter = nextSelector(WRITERS, currentWriter,
+-                () -> new SelectorProcessor("tcp-channel-writer-" + WRITERS.size(), SelectionKey.OP_WRITE),
+-                COUNTS_PER_SELECTOR, TcpChannelProperties.Values.WRITER_CHANNELS_PER_SELECTOR,
+-                TcpChannelProperties.Values.WRITER_THREAD_COUNT);
+-        return currentWriter;
+-    }
+-
+-    static synchronized void freeSelector(SelectorProcessor selectorProcessor)
+-    {
+-        freeSelector(selectorProcessor, COUNTS_PER_SELECTOR);
+-    }
+-
+-    static synchronized <T> void freeSelector(T currentSelector, Map<T, AtomicInteger> countsPerSelector)
+-    {
+-        final AtomicInteger count = countsPerSelector.get(currentSelector);
+-        if (count != null)
+-        {
+-            count.decrementAndGet();
+-        }
+-    }
+-
+-    static synchronized <T> T nextSelector(List<T> selectors, T currentSelector, Supplier<T> ctor,
+-            Map<T, AtomicInteger> countsPerSelector, int maxChannelsPerSelector, int maxThreadCount)
+-    {
+-        T selectorToUse = currentSelector;
+-        if (selectorToUse == null)
+-        {
+-            selectorToUse = ctor.get();
+-            selectors.add(selectorToUse);
+-        }
+-        else
+-        {
+-            final AtomicInteger counts =
+-                    countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger());
+-            if (counts.get() >= maxChannelsPerSelector)
+-            {
+-                // find free one or create new one if under limit
+-                if (selectors.size() < maxThreadCount)
+-                {
+-                    selectorToUse = ctor.get();
+-                    selectors.add(selectorToUse);
+-                }
+-                else
+-                {
+-                    // find the one with the lowest counts
+-                    int lowestCount = Integer.MAX_VALUE;
+-                    for (T selector : selectors)
+-                    {
+-                        // NOTE: countsPerSelector has reader and writer selector counts!
+-                        // We use our selectors list to find the correct reader/writer selectors to check
+-                        final int current = countsPerSelector.get(selector).intValue();
+-                        if (current < lowestCount)
+-                        {
+-                            lowestCount = current;
+-                            selectorToUse = selector;
+-                        }
+-                    }
+-                }
+-            }
++        if (currentWriter == WRITER.length)
++        {
++            currentWriter = 0;
+         }
+-
+-        countsPerSelector.computeIfAbsent(selectorToUse, s -> new AtomicInteger()).incrementAndGet();
+-        return selectorToUse;
++        return WRITER[currentWriter++];
+     }
+ 
+     /** Handles all socket accept operations for all {@link TcpServer} instances */
+@@ -414,29 +361,10 @@
+         }
+         try
+         {
+-            socketChannel.configureBlocking(false);
++            socketChannel.configureBlocking(true);
+             socketChannel.connect(new InetSocketAddress(host, port));
+-            try (final Selector connectionSelector = Selector.open())
+-            {
+-                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
+-                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
+-                {
+-                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
+-                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
+-                    {
+-                        selectionKey.cancel();
+-                        return socketChannel;
+-                    }
+-                    throw new ConnectException("Selection key not connectable or socket not connected");
+-                }
+-                else
+-                {
+-                    // timeout
+-                    throw new SocketTimeoutException(
+-                            "Did not connect to " + host + ":" + port + " after waiting "
+-                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
+-                }
+-            }
++            socketChannel.configureBlocking(false);
++            return socketChannel;
+         }
+         catch (ConnectException e)
+         {
+@@ -464,7 +392,8 @@
+         Log.log(TcpChannelUtils.class, "Closing ", ObjectUtils.safeToString(channel));
+         try
+         {
+-            channel.socket().close();
++            channel.socket()
++                    .close();
+             channel.close();
+         }
+         catch (IOException e)

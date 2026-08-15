@@ -1,0 +1,254 @@
+Subject: [PATCH] TcpChannel - refactor to construct with timeout
+---
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannel.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannel.java b/src/main/java/com/fimtra/tcpchannel/TcpChannel.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannel.java	(revision c59dcf804aa9a41c237a4f55249e9b6966463c2a)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannel.java	(revision d574d24a2c3676625c28480ccb03686406d64f0d)
+@@ -387,9 +387,10 @@
+     private void finishConstruction() throws ConnectException
+     {
+         // this can be overridden by system properties
++        final Socket socket = this.socketChannel.socket();
+         try
+         {
+-            this.socketChannel.socket().setTcpNoDelay(true);
++            socket.setTcpNoDelay(true);
+         }
+         catch (SocketException e1)
+         {
+@@ -435,8 +436,46 @@
+ 
+         ChannelUtils.WATCHDOG.addChannel(this);
+ 
++        final StringBuilder sockedOptions = new StringBuilder();
++        try
++        {
++            sockedOptions.append(", socket options {")
++                    .append("TCP_NODELAY=")
++                    .append(socket.getTcpNoDelay())
++                    .append(" ")
++                    .append("SO_REUSEADDR=")
++                    .append(socket.getReuseAddress())
++                    .append(" ")
++                    .append("IP_TOS=")
++                    .append(socket.getTrafficClass())
++                    .append(" ")
++                    .append("SO_LINGER=")
++                    .append(socket.getSoLinger())
++                    .append(" ")
++                    .append("SO_TIMEOUT=")
++                    .append(socket.getSoTimeout())
++                    .append(" ")
++                    .append("SO_SNDBUF=")
++                    .append(socket.getSendBufferSize())
++                    .append(" ")
++                    .append("SO_RCVBUF=")
++                    .append(socket.getReceiveBufferSize())
++                    .append(" ")
++                    .append("SO_KEEPALIVE=")
++                    .append(socket.getKeepAlive())
++                    .append(" ")
++                    .append("SO_OOBINLINE=")
++                    .append(socket.getOOBInline())
++                    .append("}");
++        }
++        catch (Exception e)
++        {
++            Log.log(this, "Could not log socket options " + ObjectUtils.safeToString(socket), e);
++        }
++
+         Log.log(this, "Constructed ", ObjectUtils.safeToString(this),
+-            this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode");
++                this.socketChannel.isBlocking() ? " blocking mode" : " non-blocking mode",
++                sockedOptions.toString());
+     }
+ 
+     @Override
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannelProperties.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannelProperties.java b/src/main/java/com/fimtra/tcpchannel/TcpChannelProperties.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannelProperties.java	(revision c59dcf804aa9a41c237a4f55249e9b6966463c2a)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannelProperties.java	(revision d574d24a2c3676625c28480ccb03686406d64f0d)
+@@ -211,6 +211,13 @@
+          * E.g. <code>-DtcpChannel.ephemeralPortRangeEnd=33333</code>
+          */
+         String EPHEMERAL_PORT_RANGE_END = BASE + "ephemeralPortRangeEnd";
++
++        /**
++         * The system property name to define the timeout in milliseconds for TCP socket connections.
++         * <p>
++         * E.g. <code>-DtcpChannel.connectionTimeoutMillis=5000</code>
++         */
++        String CONNECTION_TIMEOUT_MILLIS = BASE + "connectionTimeoutMillis";
+     }
+ 
+     /**
+@@ -404,6 +411,13 @@
+          * Default is: -1 (no range)
+          */
+         int EPHEMERAL_PORT_RANGE_END = SystemUtils.getPropertyAsInt(Names.EPHEMERAL_PORT_RANGE_END, -1);
++
++        /**
++         * The system property to define the TCP socket connection timeout in milliseconds
++         * <p>
++         * Default is: 5000
++         */
++        int CONNECTION_TIMEOUT_MILLIS = SystemUtils.getPropertyAsInt(Names.CONNECTION_TIMEOUT_MILLIS, 5000);
+     }
+ 
+     private TcpChannelProperties()
+Index: src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java
+--- a/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(revision c59dcf804aa9a41c237a4f55249e9b6966463c2a)
++++ b/src/main/java/com/fimtra/tcpchannel/TcpChannelUtils.java	(revision d574d24a2c3676625c28480ccb03686406d64f0d)
+@@ -15,15 +15,20 @@
+  */
+ package com.fimtra.tcpchannel;
+ 
++import static com.fimtra.tcpchannel.TcpChannelProperties.Values.CONNECTION_TIMEOUT_MILLIS;
++
+ import java.io.IOException;
+ import java.net.ConnectException;
+ import java.net.InetAddress;
+ import java.net.InetSocketAddress;
+ import java.net.ServerSocket;
++import java.net.Socket;
++import java.net.SocketTimeoutException;
+ import java.net.UnknownHostException;
+ import java.nio.BufferUnderflowException;
+ import java.nio.ByteBuffer;
+ import java.nio.channels.SelectionKey;
++import java.nio.channels.Selector;
+ import java.nio.channels.SocketChannel;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+@@ -409,10 +414,29 @@
+         }
+         try
+         {
+-            socketChannel.configureBlocking(true);
+-            socketChannel.connect(new InetSocketAddress(host, port));
+             socketChannel.configureBlocking(false);
+-            return socketChannel;
++            socketChannel.connect(new InetSocketAddress(host, port));
++            try (final Selector connectionSelector = Selector.open())
++            {
++                socketChannel.register(connectionSelector, SelectionKey.OP_CONNECT);
++                if (connectionSelector.select(CONNECTION_TIMEOUT_MILLIS) > 0)
++                {
++                    final SelectionKey selectionKey = socketChannel.keyFor(connectionSelector);
++                    if (selectionKey != null && selectionKey.isConnectable() && socketChannel.finishConnect())
++                    {
++                        selectionKey.cancel();
++                        return socketChannel;
++                    }
++                    throw new ConnectException("Selection key not connectable or socket not connected");
++                }
++                else
++                {
++                    // timeout
++                    throw new SocketTimeoutException(
++                            "Did not connect to " + host + ":" + port + " after waiting "
++                                    + CONNECTION_TIMEOUT_MILLIS + "ms");
++                }
++            }
+         }
+         catch (ConnectException e)
+         {
+@@ -460,56 +484,42 @@
+     {
+         String key;
+         String value;
++        final Socket socket = socketChannel.socket();
+         for (Map.Entry<String, String> entry : SOCKET_OPTIONS.entrySet())
+         {
+             key = entry.getKey();
+             value = entry.getValue();
+             try
+             {
+-                if (key.equals("TCP_NODELAY"))
++                switch(key)
+                 {
+-                    socketChannel.socket().setTcpNoDelay(Boolean.valueOf(value).booleanValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_REUSEADDR"))
+-                {
+-                    socketChannel.socket().setReuseAddress(Boolean.valueOf(value).booleanValue());
+-                    continue;
+-                }
+-                if (key.equals("IP_TOS"))
+-                {
+-                    socketChannel.socket().setTrafficClass(Integer.valueOf(value).intValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_LINGER"))
+-                {
+-                    socketChannel.socket().setSoLinger(true, Integer.valueOf(value).intValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_TIMEOUT"))
+-                {
+-                    socketChannel.socket().setSoTimeout(Integer.valueOf(value).intValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_SNDBUF"))
+-                {
+-                    socketChannel.socket().setSendBufferSize(Integer.valueOf(value).intValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_RCVBUF"))
+-                {
+-                    socketChannel.socket().setReceiveBufferSize(Integer.valueOf(value).intValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_KEEPALIVE"))
+-                {
+-                    socketChannel.socket().setKeepAlive(Boolean.valueOf(value).booleanValue());
+-                    continue;
+-                }
+-                if (key.equals("SO_OOBINLINE"))
+-                {
+-                    socketChannel.socket().setOOBInline(Boolean.valueOf(value).booleanValue());
+-                    continue;
++                    case "TCP_NODELAY":
++                        socket.setTcpNoDelay(Boolean.parseBoolean(value));
++                        continue;
++                    case "SO_REUSEADDR":
++                        socket.setReuseAddress(Boolean.parseBoolean(value));
++                        continue;
++                    case "IP_TOS":
++                        socket.setTrafficClass(Integer.parseInt(value));
++                        continue;
++                    case "SO_LINGER":
++                        socket.setSoLinger(true, Integer.parseInt(value));
++                        continue;
++                    case "SO_TIMEOUT":
++                        socket.setSoTimeout(Integer.parseInt(value));
++                        continue;
++                    case "SO_SNDBUF":
++                        socket.setSendBufferSize(Integer.parseInt(value));
++                        continue;
++                    case "SO_RCVBUF":
++                        socket.setReceiveBufferSize(Integer.parseInt(value));
++                        continue;
++                    case "SO_KEEPALIVE":
++                        socket.setKeepAlive(Boolean.parseBoolean(value));
++                        continue;
++                    case "SO_OOBINLINE":
++                        socket.setOOBInline(Boolean.parseBoolean(value));
++                        continue;
+                 }
+                 Log.log(TcpChannelUtils.class, "Unhandled socket option: ", key);
+             }
