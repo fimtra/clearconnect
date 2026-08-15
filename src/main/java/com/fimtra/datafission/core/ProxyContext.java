@@ -36,6 +36,7 @@ import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -57,6 +58,7 @@ import com.fimtra.datafission.IRecord;
 import com.fimtra.datafission.IRecordChange;
 import com.fimtra.datafission.IRecordListener;
 import com.fimtra.datafission.IRpcInstance;
+import com.fimtra.datafission.ISessionProtocol;
 import com.fimtra.datafission.ISessionProtocol.SyncResponse;
 import com.fimtra.datafission.IValue;
 import com.fimtra.datafission.core.AtomicChangeTeleporter.IncorrectSequenceException;
@@ -111,7 +113,7 @@ import com.fimtra.util.ThreadUtils;
  * connection status on a per record basis. Subscribing for this record (
  * {@link #RECORD_CONNECTION_STATUS_NAME}) provides application code with the ability to detect
  * connection status changes for a record.
- * 
+ *
  * @see ISystemRecordNames#CONTEXT_RECORDS
  * @author Ramon Servadei
  */
@@ -176,7 +178,7 @@ public final class ProxyContext implements IObserverContext
     /**
      * Encapsulates all the remote system records. These are effectively the system records in a
      * remote context.
-     * 
+     *
      * @author Ramon Servadei
      */
     public interface IRemoteSystemRecordNames
@@ -188,7 +190,7 @@ public final class ProxyContext implements IObserverContext
          * records exist in the remote context.
          * <p>
          * Use {@link #getRecord(String)} to obtain the remote context record using this string.
-         * 
+         *
          * @see ISystemRecordNames#CONTEXT_RECORDS
          */
         String REMOTE_CONTEXT_RECORDS = REMOTE + ISystemRecordNames.CONTEXT_RECORDS;
@@ -199,7 +201,7 @@ public final class ProxyContext implements IObserverContext
          * <p>
          * Use {@link #getRecord(String)} to obtain the remote context subscriptions using this
          * string.
-         * 
+         *
          * @see ISystemRecordNames#CONTEXT_SUBSCRIPTIONS
          */
         String REMOTE_CONTEXT_SUBSCRIPTIONS = REMOTE + ISystemRecordNames.CONTEXT_SUBSCRIPTIONS;
@@ -209,7 +211,7 @@ public final class ProxyContext implements IObserverContext
          * <p>
          * Use {@link #getRecord(String)} to obtain the available RPCs in the remote context using
          * this string.
-         * 
+         *
          * @see ISystemRecordNames#CONTEXT_RPCS
          */
         String REMOTE_CONTEXT_RPCS = REMOTE + ISystemRecordNames.CONTEXT_RPCS;
@@ -219,7 +221,7 @@ public final class ProxyContext implements IObserverContext
          * <p>
          * Use {@link #getRecord(String)} to obtain the remote context connections using this
          * string.
-         * 
+         *
          * @see ISystemRecordNames#CONTEXT_CONNECTIONS
          */
         String REMOTE_CONTEXT_CONNECTIONS = REMOTE + ISystemRecordNames.CONTEXT_CONNECTIONS;
@@ -230,14 +232,14 @@ public final class ProxyContext implements IObserverContext
      * KEY=record name
      * VALUE="CONNECTED" or "DISCONNECTED"
      * </pre>
-     * 
+     *
      * A special record that holds the connection status per record subscribed from the remote
      * context. The keys are the record names, the value is a string indicating the connection
      * status for the record, one of: {@link #RECORD_CONNECTED} or {@link #RECORD_DISCONNECTED}.
      * <p>
      * There are occasions where a record will have a different connection status to other records
      * from the same remote context - typically during a record re-sync operation.
-     * 
+     *
      * @see ProxyContext#isRecordConnected(String)
      */
     public static final String RECORD_CONNECTION_STATUS_NAME = "RecordConnectionStatus";
@@ -329,9 +331,14 @@ public final class ProxyContext implements IObserverContext
         return permissionAndRecords;
     }
 
+    static void finalEncodeAndSendToPublisher(byte[] data, ITransportChannel channel, ICodec<?> codec)
+    {
+        channel.send(codec.finalEncode(data));
+    }
+
     /**
      * Handles RPC results
-     * 
+     *
      * @author Ramon Servadei
      */
     private final class RpcResultHandler implements ISequentialRunnable
@@ -389,7 +396,7 @@ public final class ProxyContext implements IObserverContext
 
     /**
      * The receiver for handling socket events and data for the {@link ProxyContext}
-     * 
+     *
      * @author Ramon Servadei
      */
     private static final class ProxyContextReceiver implements IReceiver
@@ -397,7 +404,7 @@ public final class ProxyContext implements IObserverContext
         final Object receiverToken;
         final ProxyContext proxyContext;
 
-        ITransportChannel localChannelRef;
+        volatile ITransportChannel v_localChannelRef;
         boolean codecSyncExpected = true;
 
         ProxyContextReceiver(Object newToken, ProxyContext proxyContext)
@@ -421,27 +428,27 @@ public final class ProxyContext implements IObserverContext
                     {
                         try
                         {
-                            ProxyContextReceiver.this.localChannelRef = channel;
-
                             // clear records before dispatching further messages (this assumes
                             // single-threaded dispatching)
-                            ContextUtils.clearNonSystemRecords(ProxyContextReceiver.this.proxyContext.context);
+                            ContextUtils.clearNonSystemRecords(proxyContext.context);
 
                             // when connecting, initialise a new codec instance to reset any state
                             // held by the previous codec
-                            ProxyContextReceiver.this.proxyContext.codec =
-                                ProxyContextReceiver.this.proxyContext.codec.newInstance();
-                            ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().setSessionListener(
-                                ProxyContextReceiver.this.proxyContext.sessionListener);
+                            final ICodec<?> _codec = proxyContext.v_codec.newInstance();
+
+                            final ISessionProtocol sessionProtocol = _codec.getSessionProtocol();
+                            sessionProtocol.setSessionListener(proxyContext.sessionListener);
 
                             // proxy initiates the codec-sync operation
                             // THIS MUST BE THE FIRST MESSAGE SENT
 
-                            ProxyContextReceiver.this.localChannelRef.send(
-                                ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().getSessionSyncStartMessage(
-                                    ProxyContextReceiver.this.proxyContext.sessionContextName));
-                            Log.log(ProxyContextReceiver.this.proxyContext, "(->) START SESSION SYNC ",
-                                ObjectUtils.safeToString(ProxyContextReceiver.this.localChannelRef));
+                            channel.send(sessionProtocol.getSessionSyncStartMessage(
+                                    proxyContext.sessionContextName));
+                            Log.log(proxyContext, "(->) START SESSION SYNC ",
+                                    ObjectUtils.safeToString(channel));
+
+                            proxyContext.v_codec = _codec;
+                            v_localChannelRef = channel;
                         }
                         catch (Exception e)
                         {
@@ -452,7 +459,7 @@ public final class ProxyContext implements IObserverContext
                     @Override
                     public Object context()
                     {
-                        return ProxyContextReceiver.this.proxyContext;
+                        return proxyContext;
                     }
                 });
             }
@@ -481,14 +488,14 @@ public final class ProxyContext implements IObserverContext
                     @Override
                     public void run()
                     {
-                        ProxyContextReceiver.this.proxyContext.codec.getSessionProtocol().destroy();
-                        ProxyContextReceiver.this.proxyContext.onChannelClosed();
+                        proxyContext.v_codec.getSessionProtocol().destroy();
+                        proxyContext.onChannelClosed();
                     }
 
                     @Override
                     public Object context()
                     {
-                        return ProxyContextReceiver.this.proxyContext;
+                        return proxyContext;
                     }
                 });
             }
@@ -548,13 +555,13 @@ public final class ProxyContext implements IObserverContext
                 if (this.receiver.codecSyncExpected)
                 {
                     final SyncResponse response =
-                        this.proxyContext.codec.getSessionProtocol().handleSessionSyncData(this.data);
+                        this.proxyContext.v_codec.getSessionProtocol().handleSessionSyncData(this.data);
                     if (!response.syncFailed)
                     {
                         Log.log(this.proxyContext, "(<-) SYNC RESP ", ObjectUtils.safeToString(this.source));
                         if (response.syncDataResponse != null)
                         {
-                            this.receiver.localChannelRef.send(response.syncDataResponse);
+                            this.receiver.v_localChannelRef.send(response.syncDataResponse);
                             Log.log(this.proxyContext, "(->) SYNC RESP ", ObjectUtils.safeToString(this.source));
                         }
                         if (response.syncComplete)
@@ -749,18 +756,18 @@ public final class ProxyContext implements IObserverContext
                 RxFrameHandler::reset, DataFissionProperties.Values.PROXY_RX_FRAME_HANDLER_POOL_MAX_SIZE);
 
     final Object lock;
-    volatile boolean active;
-    volatile boolean connected;
+    final AtomicBoolean active = new AtomicBoolean();
+    volatile boolean v_connected;
     final Context context;
-    ICodec<?> codec;
+    volatile ICodec<?> v_codec;
     final ImageDeltaChangeProcessor imageDeltaProcessor;
-    ITransportChannel channel;
-    ITransportChannelBuilderFactory channelBuilderFactory;
+    volatile ITransportChannel v_channel;
+    volatile ITransportChannelBuilderFactory v_channelBuilderFactory;
 
     /** @see #RECORD_CONNECTION_STATUS_NAME */
     final IRecord remoteConnectionStatusRecord;
     /** Signals if a reconnection is in progress */
-    volatile ScheduledFuture reconnectTask;
+    final AtomicReference<ScheduledFuture> reconnectTask = new AtomicReference<>();
     /**
      * The period in milliseconds to wait before trying a reconnect, default is
      * {@link Values#PROXY_CONTEXT_RECONNECT_PERIOD_MILLIS}
@@ -794,7 +801,7 @@ public final class ProxyContext implements IObserverContext
     final AtomicChangeTeleporter teleportReceiver;
     /** The permission token used for subscribing each record */
     final Map<String, String> tokenPerRecord;
-    EndPointAddress currentEndPoint;
+    volatile EndPointAddress v_currentEndPoint;
 
     /** Tracks records that have a re-sync operation pending */
     final Set<String> resyncs;
@@ -865,7 +872,7 @@ public final class ProxyContext implements IObserverContext
         String sessionContextName)
     {
         super();
-        this.codec = codec;
+        this.v_codec = codec;
         this.sessionContextName = sessionContextName;
         this.rpcTemplates = new ConcurrentHashMap<>();
 
@@ -929,8 +936,8 @@ public final class ProxyContext implements IObserverContext
         this.remoteConnectionStatusRecord = this.context.createRecord(RECORD_CONNECTION_STATUS_NAME);
         this.context.updateContextStatusAndPublishChange(Connection.DISCONNECTED);
 
-        this.channelBuilderFactory = channelBuilderFactory;
-        this.active = true;
+        this.v_channelBuilderFactory = channelBuilderFactory;
+        this.active.set(true);
 
         // this allows the ProxyContext to be constructed and reconnects asynchronously
         reconnect();
@@ -972,7 +979,7 @@ public final class ProxyContext implements IObserverContext
      */
     public EndPointAddress getEndPointAddress()
     {
-        return this.currentEndPoint;
+        return this.v_currentEndPoint;
     }
 
     /**
@@ -1021,11 +1028,11 @@ public final class ProxyContext implements IObserverContext
      */
     public void reconnect(final String node, final int port)
     {
-        setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(this.codec.getFrameEncodingFormat(),
+        setTransportChannelBuilderFactory(TransportChannelBuilderFactoryLoader.load(this.v_codec.getFrameEncodingFormat(),
             new EndPointAddress(node, port)));
 
         // force a reconnect
-        this.channel.destroy("Forced reconnect");
+        this.v_channel.destroy("Forced reconnect");
     }
 
     /**
@@ -1033,7 +1040,7 @@ public final class ProxyContext implements IObserverContext
      */
     public void setTransportChannelBuilderFactory(ITransportChannelBuilderFactory channelBuilderFactory)
     {
-        this.channelBuilderFactory = channelBuilderFactory;
+        this.v_channelBuilderFactory = channelBuilderFactory;
     }
 
 
@@ -1089,8 +1096,8 @@ public final class ProxyContext implements IObserverContext
     public String toString()
     {
         return "ProxyContext [" + this.context.getName() + " subscriptions="
-            + this.context.getSubscribedRecords().size() + (this.active ? " active " : " inactive ")
-            + (this.connected ? " connected " : " disconnected ") + getChannelString() + "]";
+            + this.context.getSubscribedRecords().size() + (this.active.get() ? " active " : " inactive ")
+            + (this.v_connected ? " connected " : " disconnected ") + getChannelString() + "]";
     }
 
     @Override
@@ -1156,7 +1163,7 @@ public final class ProxyContext implements IObserverContext
             {
                 final Runnable task;
                 // only issue the subscribe if connected
-                if (this.connected)
+                if (this.v_connected)
                 {
                     task = () -> subscribe(permissionToken, recordsToSubscribeFor);
                 }
@@ -1189,7 +1196,7 @@ public final class ProxyContext implements IObserverContext
             if (recordsToUnsubscribe.length > 0)
             {
                 // only send an unsubscribe if connected
-                if (this.connected)
+                if (this.v_connected)
                 {
                     final Runnable task = () -> unsubscribe(recordsToUnsubscribe);
                     latch = executeTask(recordsToUnsubscribe, UNSUBSCRIBE, task, null, null);
@@ -1232,33 +1239,30 @@ public final class ProxyContext implements IObserverContext
     @Override
     public void destroy()
     {
-        synchronized (this.lock)
+        if (this.active.compareAndSet(true, false))
         {
-            if (this.active)
+            Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
+            cancelReconnectTask();
+            // the channel can be null if destroying during a reconnection
+            final ITransportChannel _channel = this.v_channel;
+            if (_channel != null)
             {
-                Log.log(this, "Destroying ", ObjectUtils.safeToString(this));
-                this.active = false;
-                cancelReconnectTask();
-                // the channel can be null if destroying during a reconnection
-                if (this.channel != null)
-                {
-                    this.channel.destroy(getShortName() + " destroyed");
-                }
-                else
-                {
-                    updateConnectionStatus(Connection.DISCONNECTED);
-                }
-
-                // destroy at the end so that connection notifications are received
-                this.context.destroy();
+                _channel.destroy(getShortName() + " destroyed");
             }
+            else
+            {
+                updateConnectionStatus(Connection.DISCONNECTED);
+            }
+
+            // destroy at the end so that connection notifications are received
+            this.context.destroy();
         }
     }
 
     @Override
     public boolean isActive()
     {
-        return this.active;
+        return this.active.get();
     }
 
     @Override
@@ -1275,8 +1279,8 @@ public final class ProxyContext implements IObserverContext
 
         final IReceiver receiver = new ProxyContextReceiver(newToken, this);
 
-        final ITransportChannelBuilder channelBuilder = this.channelBuilderFactory.nextBuilder();
-        this.currentEndPoint = channelBuilder.getEndPointAddress();
+        final ITransportChannelBuilder channelBuilder = this.v_channelBuilderFactory.nextBuilder();
+        this.v_currentEndPoint = channelBuilder.getEndPointAddress();
         Log.log(this, "Constructing channel for ", getShortName(), " using ", ObjectUtils.safeToString(channelBuilder));
         return channelBuilder.buildChannel(receiver);
 
@@ -1284,55 +1288,53 @@ public final class ProxyContext implements IObserverContext
 
     void onChannelConnected()
     {
-        synchronized (ProxyContext.this.lock)
+        cancelReconnectTask();
+
+        if (!this.active.get())
         {
-            cancelReconnectTask();
-
-            if (!ProxyContext.this.active)
-            {
-                ProxyContext.this.channel.destroy("ProxyContext not active");
-                return;
-            }
-
-            // now identity the proxy with the publisher end
-            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForIdentify(getName()));
-
-            ProxyContext.this.imageDeltaProcessor.reset();
-            ProxyContext.this.teleportReceiver.reset();
-
-            // update the connection status
-            ProxyContext.this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
-
-            final List<String> recordNames = ProxyContext.this.context.getSubscribedRecords();
-
-            // remove any local system record subscriptions (the 'local' system records of
-            // the remote context are subscribed for as RemoteContextXYZ, not ContextXYZ)
-            recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
-            for (String systemRecordName : ContextUtils.SYSTEM_RECORDS)
-            {
-                recordNames.remove(systemRecordName);
-            }
-
-            // re-subscribe
-            if (!recordNames.isEmpty())
-            {
-                final String[] recordNamesToSubscribeFor = new String[recordNames.size()];
-                int i = 0;
-                for (String recordName : recordNames)
-                {
-                    recordNamesToSubscribeFor[i++] = (substituteRemoteNameWithLocalName(recordName));
-                }
-                doResubscribe(recordNamesToSubscribeFor);
-            }
-
-            ProxyContext.this.connected = true;
+            this.v_channel.destroy("ProxyContext not active");
+            return;
         }
+
+        // now identify the proxy with the publisher end
+        final ICodec<?> codec = this.v_codec;
+        finalEncodeAndSendToPublisher(codec.getTxMessageForIdentify(getName()), this.v_channel, codec);
+
+        this.imageDeltaProcessor.reset();
+        this.teleportReceiver.reset();
+
+        // update the connection status
+        this.context.updateContextStatusAndPublishChange(Connection.CONNECTED);
+
+        final List<String> recordNames = this.context.getSubscribedRecords();
+
+        // remove any local system record subscriptions (the 'local' system records of
+        // the remote context are subscribed for as RemoteContextXYZ, not ContextXYZ)
+        recordNames.remove(RECORD_CONNECTION_STATUS_NAME);
+        for (String systemRecordName : ContextUtils.SYSTEM_RECORDS)
+        {
+            recordNames.remove(systemRecordName);
+        }
+
+        // re-subscribe
+        if (!recordNames.isEmpty())
+        {
+            final String[] recordNamesToSubscribeFor = new String[recordNames.size()];
+            int i = 0;
+            for (String recordName : recordNames)
+            {
+                recordNamesToSubscribeFor[i++] = (substituteRemoteNameWithLocalName(recordName));
+            }
+            doResubscribe(recordNamesToSubscribeFor);
+        }
+
+        this.v_connected = true;
     }
 
     boolean onDataReceived(RxFrameHandler frameHandler) throws IncorrectSequenceException
     {
         final IRecordChange changeToApply =
-            this.teleportReceiver.combine((AtomicChange) this.codec.getAtomicChangeFromRxMessage(frameHandler.data));
+            this.teleportReceiver.combine((AtomicChange) this.v_codec.getAtomicChangeFromRxMessage(frameHandler.data));
 
         if (logRx)
         {
@@ -1355,7 +1357,7 @@ public final class ProxyContext implements IObserverContext
                     if (this.firstUpdateExpected.remove(changeToApply.getName()))
                     {
                         Log.log(ProxyContext.this, () -> new String[] { "(<-) first update from [",
-                                this.channel.getEndPointDescription(), "] for [",
+                                this.v_channel.getEndPointDescription(), "] for [",
                                 ObjectUtils.safeToString(changeToApply) + "]" });
                     }
                 }
@@ -1474,8 +1476,9 @@ public final class ProxyContext implements IObserverContext
                     this.firstUpdateExpected.add(name);
                 }
             }
-            finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForResync(
-                    substituteRemoteNameWithLocalName(name)));
+            final ICodec<?> codec = this.v_codec;
+            finalEncodeAndSendToPublisher(codec.getTxMessageForResync(
+                    substituteRemoteNameWithLocalName(name)), this.v_channel, codec);
 
             return true;
         }
@@ -1493,13 +1496,10 @@ public final class ProxyContext implements IObserverContext
     void onChannelClosed()
     {
         this.channelToken = null;
-        this.connected = false;
+        this.v_connected = false;
         updateConnectionStatus(Connection.DISCONNECTED);
 
-        if (this.active)
-        {
-            setupReconnectTask();
-        }
+        setupReconnectTask();
     }
 
     @Override
@@ -1555,13 +1555,13 @@ public final class ProxyContext implements IObserverContext
         }
 
         instance = instance.clone();
-        setRpcHander(name, instance);
+        setRpcHandler(name, instance);
         return instance;
     }
 
-    private void setRpcHander(String name, RpcInstance instance)
+    private void setRpcHandler(String name, RpcInstance instance)
     {
-        instance.setHandler(new RpcInstance.Remote.Caller(name, this.codec, this.channel, this.context,
+        instance.setHandler(new RpcInstance.Remote.Caller(name, this.v_codec, this.v_channel, this.context,
                 instance.remoteExecutionStartTimeoutMillis, instance.remoteExecutionDurationTimeoutMillis));
     }
 
@@ -1570,7 +1570,7 @@ public final class ProxyContext implements IObserverContext
      */
     public void setRpcHander(RpcInstance rpcTemplate)
     {
-        setRpcHander(rpcTemplate.getName(), rpcTemplate);
+        setRpcHandler(rpcTemplate.getName(), rpcTemplate);
     }
 
     /**
@@ -1578,12 +1578,13 @@ public final class ProxyContext implements IObserverContext
      */
     public boolean isConnected()
     {
-        return this.channel != null && this.channel.isConnected();
+        final ITransportChannel _channel = this.v_channel;
+        return _channel != null && _channel.isConnected();
     }
 
     public String getChannelString()
     {
-        return ObjectUtils.safeToString(this.channel);
+        return ObjectUtils.safeToString(this.v_channel);
     }
 
     @Override
@@ -1627,63 +1628,68 @@ public final class ProxyContext implements IObserverContext
 
     void cancelReconnectTask()
     {
-        synchronized (this.lock)
+        final ScheduledFuture current = this.reconnectTask.getAndSet(null);
+        if (current != null)
         {
-            if (this.reconnectTask != null)
-            {
-                this.reconnectTask.cancel(false);
-                ProxyContext.this.reconnectTask = null;
-            }
+            current.cancel(false);
         }
     }
 
     void setupReconnectTask()
     {
-        synchronized (this.lock)
+        if (!this.active.get())
         {
-            if (!this.active)
-            {
-                Log.log(this, "Not setting up reconnect task for ", ObjectUtils.safeToString(this));
-                return;
-            }
-            if (this.reconnectTask != null)
-            {
-                Log.log(this, "Reconnect still pending for ", getEndPoint());
-                return;
-            }
+            Log.log(this, "Not setting up reconnect task for ", ObjectUtils.safeToString(this));
+            return;
+        }
 
-            // Remove RPCs
-            final IRecord rpcRecord = this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
-            if (rpcRecord != null && !rpcRecord.isEmpty())
+        final boolean reconnectDisabled = this.reconnectPeriodMillis == Integer.MAX_VALUE;
+
+        if (reconnectDisabled)
+        {
+            Log.log(this, "Reconnect DISABLED for ", getShortName(), " to ", getEndPoint());
+        }
+        else
+        {
+            // we need to sync here as there are non-atomic ops that need to occur if we setup the task
+            synchronized (reconnectTask)
             {
-                Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord.keySet()), " from ", getShortName());
-                synchronized (this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS).getWriteLock())
+                if (reconnectTask.get() == null)
                 {
-                    rpcRecord.clear();
-                    this.rpcTemplates.clear();
-                    this.context.publishAtomicChange(rpcRecord);
+                    // Remove RPCs
+                    final IRecord rpcRecord =
+                            this.context.getRecord(IRemoteSystemRecordNames.REMOTE_CONTEXT_RPCS);
+                    if (rpcRecord != null && !rpcRecord.isEmpty())
+                    {
+                        Log.log(this, "Removing RPCs ", ObjectUtils.safeToString(rpcRecord.keySet()),
+                                " from ", getShortName());
+                        synchronized (rpcRecord.getWriteLock())
+                        {
+                            rpcRecord.clear();
+                            this.rpcTemplates.clear();
+                            this.context.publishAtomicChange(rpcRecord);
+                        }
+                    }
+
+                    Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
+                            Long.toString(this.reconnectPeriodMillis), "ms ");
+                    final ScheduledFuture<?> reconnectTask =
+                            RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis,
+                                    TimeUnit.MILLISECONDS);
+                    this.reconnectTask.set(reconnectTask);
                 }
-            }
-
-            if (this.reconnectPeriodMillis == Integer.MAX_VALUE)
-            {
-                Log.log(this, "Reconnect DISABLED for ", getShortName(), " to ", getEndPoint());
-            }
-            else
-            {
-                Log.log(this, "Scheduling reconnect for ", getShortName(), " to ", getEndPoint(), " in ",
-                        Long.toString(this.reconnectPeriodMillis), "ms ");
-
-                this.reconnectTask =
-                        RECONNECT_TASKS.schedule((Runnable) this::reconnect, this.reconnectPeriodMillis,
-                                TimeUnit.MILLISECONDS);
+                else
+                {
+                    Log.log(this, "Reconnect still pending for ", getEndPoint());
+                }
             }
         }
     }
 
     String getEndPoint()
     {
-        return "[" + (this.channel == null ? "not connected yet" : this.channel.getEndPointDescription()) + "]";
+        final ITransportChannel _channel = this.v_channel;
+        return "[" + (_channel == null ? "not connected yet" : _channel.getEndPointDescription()) + "]";
     }
 
     String getShortName()
@@ -1736,37 +1742,34 @@ public final class ProxyContext implements IObserverContext
 
     void reconnect()
     {
-        synchronized (this.lock)
+        this.v_connected = false;
+        this.reconnectTask.set(null);
+
+        if (!this.active.get())
         {
-            this.connected = false;
-            this.reconnectTask = null;
+            Log.log(this, "Not reconnecting proxy as it is not active: ", getShortName());
+            return;
+        }
 
-            if (!this.active)
-            {
-                Log.log(this, "Not reconnecting proxy as it is not active: ", getShortName());
-                return;
-            }
+        updateConnectionStatus(Connection.RECONNECTING);
 
-            updateConnectionStatus(Connection.RECONNECTING);
-
-            String endPoint = ObjectUtils.safeToString(this.channel);
-            try
-            {
-                // reconstruct the channel
-                this.channel = constructChannel();
-            }
-            catch (Exception e)
-            {
-                Log.log(ProxyContext.class, "Could not reconnect ", endPoint, " (", e.getMessage(), ")");
-                onChannelClosed();
-            }
+        String endPoint = ObjectUtils.safeToString(this.v_channel);
+        try
+        {
+            // reconstruct the channel
+            this.v_channel = constructChannel();
+        }
+        catch (Exception e)
+        {
+            Log.log(ProxyContext.class, "Could not reconnect ", endPoint, " (", e.getMessage(), ")");
+            onChannelClosed();
         }
     }
 
     CountDownLatch executeTask(final String[] recordNames, final String action, final Runnable task,
         RunnableFuture<Map<String, Boolean>> subscribeFutureResult, Map<String, Boolean> subscribeResults)
     {
-        CountDownLatch latch = new CountDownLatch(recordNames.length);
+        final CountDownLatch latch = new CountDownLatch(recordNames.length);
         Queue<CountDownLatch> latches;
         Queue<CountDownLatch> pending;
         for (String recordName : recordNames)
@@ -1796,7 +1799,7 @@ public final class ProxyContext implements IObserverContext
      */
     public String getShortSocketDescription()
     {
-        return this.channel.getDescription();
+        return this.v_channel.getDescription();
     }
 
     @Override
@@ -1821,33 +1824,35 @@ public final class ProxyContext implements IObserverContext
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
         List<String> batchSubscribeRecordNames = new ArrayList<>(batchSize);
         final int size = recordsToSubscribeFor.length;
+        final ITransportChannel channel = this.v_channel;
+        final ICodec<?> codec = this.v_codec;
         int i;
         for (i = 0; i < size; i++)
         {
             if (batchSubscribeRecordNames.size() == batchSize)
             {
-                subscribeBatch(permissionToken,
-                    batchSubscribeRecordNames.toArray(new String[0]), i, size);
+                subscribeBatch(permissionToken, batchSubscribeRecordNames.toArray(new String[0]), i, size,
+                        channel, codec);
                 batchSubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchSubscribeRecordNames.add(recordsToSubscribeFor[i]);
         }
         if (!batchSubscribeRecordNames.isEmpty())
         {
-            subscribeBatch(permissionToken,
-                batchSubscribeRecordNames.toArray(new String[0]), i, size);
+            subscribeBatch(permissionToken, batchSubscribeRecordNames.toArray(new String[0]), i, size,
+                    channel, codec);
         }
     }
 
     private void subscribeBatch(final String permissionToken, final String[] recordsToSubscribeFor, int current,
-        int total)
+        int total, ITransportChannel channel, ICodec<?> codec)
     {
         int i;
-        if (ProxyContext.this.channel instanceof ISubscribingChannel)
+        if (channel instanceof ISubscribingChannel)
         {
             for (i = 0; i < recordsToSubscribeFor.length; i++)
             {
-                ((ISubscribingChannel) ProxyContext.this.channel).contextSubscribed(recordsToSubscribeFor[i]);
+                ((ISubscribingChannel) channel).contextSubscribed(recordsToSubscribeFor[i]);
             }
         }
 
@@ -1863,11 +1868,12 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) subscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")",
-            (logVerboseSubscribes || total <= 10 ? Arrays.toString(recordsToSubscribeFor) : ""));
+                Integer.toString(total), ")",
+                (logVerboseSubscribes || total <= 10 ? Arrays.toString(recordsToSubscribeFor) : ""));
 
-        finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForSubscribe(
-            insertPermissionToken(permissionToken, recordsToSubscribeFor)));
+        finalEncodeAndSendToPublisher(
+                codec.getTxMessageForSubscribe(insertPermissionToken(permissionToken, recordsToSubscribeFor)),
+                channel, codec);
     }
 
     void unsubscribe(final String[] recordsToUnsubscribe)
@@ -1875,32 +1881,33 @@ public final class ProxyContext implements IObserverContext
         final int batchSize = DataFissionProperties.Values.SUBSCRIBE_BATCH_SIZE;
         List<String> batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
         final int size = recordsToUnsubscribe.length;
+        final ITransportChannel channel = this.v_channel;
+        final ICodec<?> codec = this.v_codec;
         int i;
         for (i = 0; i < size; i++)
         {
             if (batchUnsubscribeRecordNames.size() == batchSize)
             {
-                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
-                    size);
+                unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i, size, channel, codec);
                 batchUnsubscribeRecordNames = new ArrayList<>(batchSize);
             }
             batchUnsubscribeRecordNames.add(recordsToUnsubscribe[i]);
         }
         if (!batchUnsubscribeRecordNames.isEmpty())
         {
-            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i,
-                size);
+            unsubscribeBatch(batchUnsubscribeRecordNames.toArray(new String[0]), i, size, channel, codec);
         }
     }
 
-    private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total)
+    private void unsubscribeBatch(final String[] recordsToUnsubscribe, int current, int total,
+            ITransportChannel channel, ICodec<?> codec)
     {
         int i;
-        if (ProxyContext.this.channel instanceof ISubscribingChannel)
+        if (channel instanceof ISubscribingChannel)
         {
             for (i = 0; i < recordsToUnsubscribe.length; i++)
             {
-                ((ISubscribingChannel) ProxyContext.this.channel).contextUnsubscribed(recordsToUnsubscribe[i]);
+                ((ISubscribingChannel) channel).contextUnsubscribed(recordsToUnsubscribe[i]);
             }
         }
 
@@ -1916,14 +1923,14 @@ public final class ProxyContext implements IObserverContext
         }
 
         Log.log(this, "(->) unsubscribe to ", getEndPoint(), " (", Integer.toString(current), "/",
-            Integer.toString(total), ")",
-            (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToUnsubscribe) : ""));
+                Integer.toString(total), ")",
+                (logVerboseSubscribes || total == 1 ? Arrays.toString(recordsToUnsubscribe) : ""));
 
-        finalEncodeAndSendToPublisher(ProxyContext.this.codec.getTxMessageForUnsubscribe(recordsToUnsubscribe));
+        finalEncodeAndSendToPublisher(codec.getTxMessageForUnsubscribe(recordsToUnsubscribe), channel, codec);
 
         for (i = 0; i < recordsToUnsubscribe.length; i++)
         {
-            ProxyContext.this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
+            this.imageDeltaProcessor.unsubscribed(recordsToUnsubscribe[i]);
         }
     }
 
@@ -1946,10 +1953,5 @@ public final class ProxyContext implements IObserverContext
             records = entry.getValue();
             subscribe(token, records.toArray(new String[0]));
         }
-    }
-
-    void finalEncodeAndSendToPublisher(byte[] data)
-    {
-        this.channel.send(this.codec.finalEncode(data));
     }
 }

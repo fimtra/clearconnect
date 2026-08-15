@@ -1156,7 +1156,7 @@ public class ProxyContextTest
         connected.set(new CountDownLatch(1));
 
         // INTERRUPT!
-        this.candidate.channel.destroy("unit test");
+        this.candidate.v_channel.destroy("unit test");
         // we expect connected->disconnected->reconnecting->connected
         assertTrue(recordsDisconnected.await(timeout, TimeUnit.SECONDS));
         assertTrue(connected.get().await(timeout, TimeUnit.SECONDS));
@@ -1271,7 +1271,7 @@ public class ProxyContextTest
         connected.set(new CountDownLatch(1));
 
         // INTERRUPT!
-        this.candidate.channel.destroy("unit test interrupting!");
+        this.candidate.v_channel.destroy("unit test interrupting!");
         // we expect connected->disconnected->reconnecting->connected
         assertTrue(recordsDisconnected.await(timeout, TimeUnit.SECONDS));
         assertTrue(connected.get().await(timeout, TimeUnit.SECONDS));
